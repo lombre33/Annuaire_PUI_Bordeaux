@@ -61,7 +61,7 @@ function normalizeRecord(r) {
     tel: r.numero_de_telephone || '',
     genre: r.Genre || '',
     structure: r.Etablissement2 || '',
-    avatar: buildAvatarUrl(r.Lien_avatar),
+    : buildUrl(r.Lien_),
     competences,
     // Les colonnes Reference / ReferenceList renvoient soit un id numérique,
     // soit un tableau ['L', id...]. On garde les ids bruts ici et on les
@@ -77,18 +77,15 @@ function normalizeRecord(r) {
   };
 }
 
-function buildAvatarUrl(lien) {
-  if (!lien) return defaultAvatar();
+function buildUrl(lien) {
+  if (!lien) return default();
   if (String(lien).startsWith('http')) return lien;
   return `https://resana.numerique.gouv.fr${lien}`;
 }
 
 function defaultAvatar() {
-  return 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="52" height="52">
-      <rect width="52" height="52" rx="26" fill="#eef2ff"/>
-      <text x="50%" y="55%" text-anchor="middle" font-size="20" fill="#4f46e5" font-family="sans-serif">?</text>
-    </svg>`);
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52"><rect width="52" height="52" rx="26" fill="#eef2ff"/><text x="50%" y="55%" text-anchor="middle" font-size="20" fill="#4f46e5" font-family="sans-serif">?</text></svg>';
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
 }
 
 /* ============ RESOLUTION DES REFERENCES ============
