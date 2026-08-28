@@ -1,0 +1,5 @@
+widgets:
+  - widgetId: annuaire-cartes
+    name: "Annuaire — Contacts (cartes filtrables)"
+    url: https://VOTRE-USER.github.io/grist-annuaire-widget/index.html
+    accessLevel: read table
