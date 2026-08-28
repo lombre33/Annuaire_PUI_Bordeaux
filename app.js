@@ -1,7 +1,6 @@
 /* ============ CONFIG ============ */
 
 const CATEGORY_META = {
-  perimetre:     { label: 'Périmètres',      color: 'perimetre',     weight: 3 },
   competence:    { label: 'Compétences',     color: 'competence',    weight: 2 },
   instance:      { label: 'Instances',       color: 'instance',      weight: 3 },
   gt:            { label: 'Groupes de travail', color: 'gt',         weight: 2 },
@@ -29,7 +28,10 @@ grist.ready({
 
 grist.onRecords((records) => {
   rawRecords = records;
-  contacts = rawRecords.map(normalizeRecord);
+  var filteredRecords = rawRecords.filter(function(r) {
+    return safeArray(r.perimetre_all).length > 0;
+  });
+  contacts = filteredRecords.map(normalizeRecord);
   render();
 });
 
@@ -57,9 +59,7 @@ function normalizeRecord(r) {
   var competences = [];
   for (var i = 1; i <= 15; i++) {
     var v = r['competences_' + i];
-    if (v && String(v).trim()) {
-      competences.push(String(v).trim());
-    }
+    if (v && String(v).trim()) competences.push(String(v).trim());
   }
 
   return {
@@ -73,7 +73,6 @@ function normalizeRecord(r) {
     structure: r.Etablissement2 || '',
     avatar: buildAvatarPlaceholder(r.Prenom, r.Nom),
     competences: competences,
-    perimetreIds: safeArray(r.perimetre_all),
     instanceIds: safeArray(r.Instances),
     gtIds: safeArray(r.GT),
     actionIds: safeArray(r.Actions),
@@ -86,14 +85,13 @@ function normalizeRecord(r) {
 
 /* ============ RESOLUTION DES REFERENCES ============ */
 
-var refTables = {
-  Perimetres: {}, Instances: {}, GT: {}, Actions: {},
+let refTables = {
+  Instances: {}, GT: {}, Actions: {},
   Taches: {}, Communautees: {}, Etablissements: {}, Role_Dans_le_PUI: {}
 };
 
 async function loadRefTables() {
   var specs = [
-    ['Perimetres', 'Perimetre'],
     ['Instances', 'nom_instance'],
     ['GT', 'nom'],
     ['Actions', 'Action'],
@@ -102,33 +100,32 @@ async function loadRefTables() {
     ['Etablissements', 'nom_complet'],
     ['Role_Dans_le_PUI', 'Role'],
   ];
-  
   await Promise.all(specs.map(async function(spec) {
     var table = spec[0];
     var field = spec[1];
     try {
       var data = await grist.docApi.fetchTable(table);
       var map = {};
-      for (var idx = 0; idx < data.id.length; idx++) {
-        var id = data.id[idx];
-        var val = data[field] ? data[field][idx] : '#' + id;
-        map[id] = val;
-      }
+      data.id.forEach(function(id, idx) {
+        map[id] = data[field] ? data[field][idx] : '#' + id;
+      });
       refTables[table] = map;
     } catch (e) {
-      console.warn('Impossible de charger ' + table, e);
+      console.warn('Impossible de charger', table, e);
     }
   }));
-  
-  contacts = rawRecords.map(normalizeRecord);
+  contacts = rawRecords.filter(function(r) {
+    return safeArray(r.perimetre_all).length > 0;
+  }).map(normalizeRecord);
   render();
 }
 
 function label(table, id) {
-  if (!id) return null;
-  return refTables[table][id] || '#' + id;
+  if (!id || !refTables[table]) return null;
+  return refTables[table][id] || null;
 }
 
+/* Enrichit un contact avec les libellés résolus */
 function enrich(c) {
   return {
     id: c.id,
@@ -141,15 +138,6 @@ function enrich(c) {
     structure: c.structure,
     avatar: c.avatar,
     competences: c.competences,
-    perimetreIds: c.perimetreIds,
-    instanceIds: c.instanceIds,
-    gtIds: c.gtIds,
-    actionIds: c.actionIds,
-    tacheIds: c.tacheIds,
-    communauteIds: c.communauteIds,
-    etablissementId: c.etablissementId,
-    roleId: c.roleId,
-    perimetres: c.perimetreIds.map(function(id) { return label('Perimetres', id); }).filter(Boolean),
     instances: c.instanceIds.map(function(id) { return label('Instances', id); }).filter(Boolean),
     gts: c.gtIds.map(function(id) { return label('GT', id); }).filter(Boolean),
     actions: c.actionIds.map(function(id) { return label('Actions', id); }).filter(Boolean),
@@ -164,29 +152,32 @@ function enrich(c) {
 
 function collectFacetValues(enrichedContacts) {
   var facets = {};
-  CATEGORY_ORDER.forEach(function(cat) {
-    facets[cat] = new Map();
-  });
+  CATEGORY_ORDER.forEach(function(cat) { facets[cat] = new Map(); });
 
   enrichedContacts.forEach(function(c) {
     CATEGORY_ORDER.forEach(function(cat) {
-      var arr = [];
-      if (cat === 'etablissement') arr = c.etablissement ? [c.etablissement] : [];
-      else if (cat === 'role') arr = c.role ? [c.role] : [];
-      else if (cat === 'perimetre') arr = c.perimetres;
-      else if (cat === 'competence') arr = c.competences;
-      else if (cat === 'instance') arr = c.instances;
-      else if (cat === 'gt') arr = c.gts;
-      else if (cat === 'action') arr = c.actions;
-      else if (cat === 'tache') arr = c.taches;
-      else if (cat === 'communaute') arr = c.communautes;
-
-      arr.forEach(function(v) {
-        if (v) facets[cat].set(v, (facets[cat].get(v) || 0) + 1);
-      });
+      var values;
+      if (cat === 'etablissement') {
+        if (c.etablissement) bump(facets.etablissement, c.etablissement);
+        return;
+      }
+      if (cat === 'role') {
+        if (c.role) bump(facets.role, c.role);
+        return;
+      }
+      var fieldMap = {
+        competence: 'competences', instance: 'instances',
+        gt: 'gts', action: 'actions', tache: 'taches', communaute: 'communautes',
+      };
+      values = c[fieldMap[cat]] || [];
+      values.forEach(function(v) { bump(facets[cat], v); });
     });
   });
   return facets;
+}
+
+function bump(map, key) {
+  map.set(key, (map.get(key) || 0) + 1);
 }
 
 /* ============ FILTERING LOGIC ============ */
@@ -194,10 +185,9 @@ function collectFacetValues(enrichedContacts) {
 function matchesSearch(c) {
   if (!searchTerm) return true;
   var t = searchTerm.toLowerCase();
-  var fields = [c.nom, c.prenom, c.fonction, c.structure, c.etablissement];
-  return fields.filter(Boolean).some(function(v) {
-    return String(v).toLowerCase().indexOf(t) !== -1;
-  });
+  return [c.nom, c.prenom, c.fonction, c.structure, c.etablissement]
+    .filter(Boolean)
+    .some(function(v) { return String(v).toLowerCase().includes(t); });
 }
 
 function matchesFilters(c) {
@@ -206,17 +196,16 @@ function matchesFilters(c) {
     var selected = activeFilters[cat];
     if (selected.size === 0) continue;
 
-    var values = [];
+    var values;
     if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
     else if (cat === 'role') values = c.role ? [c.role] : [];
-    else if (cat === 'perimetre') values = c.perimetres;
-    else if (cat === 'competence') values = c.competences;
-    else if (cat === 'instance') values = c.instances;
-    else if (cat === 'gt') values = c.gts;
-    else if (cat === 'action') values = c.actions;
-    else if (cat === 'tache') values = c.taches;
-    else if (cat === 'communaute') values = c.communautes;
-
+    else {
+      var fieldMap = {
+        competence: 'competences', instance: 'instances',
+        gt: 'gts', action: 'actions', tache: 'taches', communaute: 'communautes',
+      };
+      values = c[fieldMap[cat]] || [];
+    }
     var hasMatch = false;
     for (var j = 0; j < values.length; j++) {
       if (selected.has(values[j])) {
@@ -232,36 +221,35 @@ function matchesFilters(c) {
 function relevanceScore(c) {
   var score = 0;
   var totalSelected = 0;
-  CATEGORY_ORDER.forEach(function(cat) {
-    totalSelected += activeFilters[cat].size;
-  });
+  for (var i = 0; i < CATEGORY_ORDER.length; i++) {
+    totalSelected += activeFilters[CATEGORY_ORDER[i]].size;
+  }
 
   if (totalSelected > 0) {
-    CATEGORY_ORDER.forEach(function(cat) {
+    for (var i = 0; i < CATEGORY_ORDER.length; i++) {
+      var cat = CATEGORY_ORDER[i];
       var selected = activeFilters[cat];
-      if (selected.size === 0) return;
-      var values = [];
+      if (selected.size === 0) continue;
+      var values;
       if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
       else if (cat === 'role') values = c.role ? [c.role] : [];
-      else if (cat === 'perimetre') values = c.perimetres;
-      else if (cat === 'competence') values = c.competences;
-      else if (cat === 'instance') values = c.instances;
-      else if (cat === 'gt') values = c.gts;
-      else if (cat === 'action') values = c.actions;
-      else if (cat === 'tache') values = c.taches;
-      else if (cat === 'communaute') values = c.communautes;
-
+      else {
+        var fieldMap = {
+          competence: 'competences', instance: 'instances',
+          gt: 'gts', action: 'actions', tache: 'taches', communaute: 'communautes',
+        };
+        values = c[fieldMap[cat]] || [];
+      }
       var matchCount = 0;
-      for (var k = 0; k < values.length; k++) {
-        if (selected.has(values[k])) matchCount++;
+      for (var j = 0; j < values.length; j++) {
+        if (selected.has(values[j])) matchCount++;
       }
       score += matchCount * (CATEGORY_META[cat].weight || 1);
-    });
+    }
   } else {
-    var totalLinks = c.perimetres.length + c.instances.length + c.gts.length +
-                     c.actions.length + c.taches.length + c.communautes.length +
-                     c.competences.length;
-    score += totalLinks * 0.1;
+    score += (c.instances.length + c.gts.length +
+              c.actions.length + c.taches.length + c.communautes.length +
+              c.competences.length) * 0.1;
   }
   return score;
 }
@@ -274,15 +262,14 @@ function render() {
 
   renderFilterPanel(facets);
 
-  var filtered = enriched.filter(matchesSearch).filter(matchesFilters);
+  var filtered = enriched
+    .filter(matchesSearch)
+    .filter(matchesFilters);
 
   var sorted = filtered.sort(function(a, b) {
-    var sA = relevanceScore(a);
-    var sB = relevanceScore(b);
-    if (sB !== sA) return sB - sA;
-    var nameA = (a.nom || '').toLowerCase();
-    var nameB = (b.nom || '').toLowerCase();
-    return nameA.localeCompare(nameB, 'fr');
+    var s = relevanceScore(b) - relevanceScore(a);
+    if (s !== 0) return s;
+    return (a.nom || '').localeCompare(b.nom || '', 'fr');
   });
 
   renderCards(sorted);
@@ -303,81 +290,77 @@ function renderFilterPanel(facets) {
 
   CATEGORY_ORDER.forEach(function(cat) {
     var meta = CATEGORY_META[cat];
-    var values = Array.from(facets[cat].entries()).sort(function(a, b) { return b[1] - a[1]; });
-    if (values.length === 0) return;
+    var entries = [];
+    facets[cat].forEach(function(count, val) {
+      entries.push([val, count]);
+    });
+    entries.sort(function(a, b) { return b[1] - a[1]; });
 
-    var group = document.createElement('div');
-    group.className = 'filter-group';
+    if (entries.length === 0) return;
 
-    var title = document.createElement('div');
-    title.className = 'filter-group-title';
-    var colorVar = 'var(--accent-' + meta.color + ')';
-    title.innerHTML = '<span class="dot" style="background:' + colorVar + '"></span>' + meta.label + '<span class="arrow">▾</span>';
-    title.onclick = function() {
-      group.classList.toggle('collapsed');
-    };
-    group.appendChild(title);
+    var section = document.createElement('div');
+    section.className = 'filter-section';
 
-    var optionsWrap = document.createElement('div');
-    optionsWrap.className = 'filter-options';
+    var header = document.createElement('div');
+    header.className = 'filter-header';
+    header.textContent = meta.label;
+    section.appendChild(header);
 
-    values.forEach(function(entry) {
+    var list = document.createElement('div');
+    list.className = 'filter-values';
+
+    entries.forEach(function(entry) {
       var val = entry[0];
       var count = entry[1];
-      var opt = document.createElement('div');
-      var activeClass = activeFilters[cat].has(val) ? ' active' : '';
-      opt.className = 'filter-option' + activeClass;
-      opt.innerHTML = '<span>' + escapeHtml(val) + '</span><span class="opt-count">' + count + '</span>';
-      opt.onclick = function() {
+      var btn = document.createElement('button');
+      btn.className = 'filter-btn' + (activeFilters[cat].has(val) ? ' active' : '');
+      btn.textContent = val + ' (' + count + ')';
+      btn.onclick = function() {
         toggleFilter(cat, val);
       };
-      optionsWrap.appendChild(opt);
+      list.appendChild(btn);
     });
 
-    group.appendChild(optionsWrap);
-    container.appendChild(group);
+    section.appendChild(list);
+    container.appendChild(section);
   });
 }
 
 function toggleFilter(cat, val) {
-  var set = activeFilters[cat];
-  if (set.has(val)) {
-    set.delete(val);
+  if (activeFilters[cat].has(val)) {
+    activeFilters[cat].delete(val);
   } else {
-    set.add(val);
+    activeFilters[cat].add(val);
   }
   render();
 }
 
-function renderCards(list) {
-  var grid = document.getElementById('cardsGrid');
-  var tmpl = document.getElementById('cardTemplate');
-  if (!grid || !tmpl) return;
+function renderCards(contacts) {
+  var grid = document.getElementById('contactsGrid');
+  if (!grid) return;
   grid.innerHTML = '';
 
-  list.forEach(function(c) {
-    var node = tmpl.content.cloneNode(true);
+  contacts.forEach(function(c) {
+    var template = document.getElementById('cardTemplate');
+    if (!template) return;
+    var node = template.cloneNode(true);
+    node.id = '';
+    node.style.display = 'block';
 
     var avatarEl = node.querySelector('.avatar');
     if (avatarEl) {
       avatarEl.src = c.avatar;
-      avatarEl.alt = c.prenom + ' ' + c.nom;
+      avatarEl.alt = (c.prenom + ' ' + c.nom).trim();
     }
 
     var nameEl = node.querySelector('.name');
-    if (nameEl) {
-      nameEl.textContent = (c.prenom + ' ' + c.nom).trim();
-    }
+    if (nameEl) nameEl.textContent = (c.prenom + ' ' + c.nom).trim();
 
     var fonctionEl = node.querySelector('.fonction');
-    if (fonctionEl) {
-      fonctionEl.textContent = c.fonction || '';
-    }
+    if (fonctionEl) fonctionEl.textContent = c.fonction || '';
 
     var structureEl = node.querySelector('.structure');
-    if (structureEl) {
-      structureEl.textContent = c.structure || '';
-    }
+    if (structureEl) structureEl.textContent = c.structure || '';
 
     var emailEl = node.querySelector('.email');
     if (emailEl && c.email) {
@@ -392,7 +375,6 @@ function renderCards(list) {
 
     var tagsWrap = node.querySelector('.card-tags');
     if (tagsWrap) {
-      appendTags(tagsWrap, c.perimetres, 'perimetre');
       appendTags(tagsWrap, c.competences, 'competence');
       appendTags(tagsWrap, c.instances, 'instance');
       appendTags(tagsWrap, c.gts, 'gt');
