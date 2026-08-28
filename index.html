@@ -3,31 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Annuaire - Grist Widget</title>
+  <title>Annuaire des Contacts</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Header avec recherche -->
-  <div class="header">
-    <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="Rechercher par nom, prénom, fonction...">
-      <span id="contactCount" class="contact-count"></span>
+  <div id="container">
+    <!-- HEADER avec recherche et bouton filtres -->
+    <div id="header">
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="Rechercher par nom, prénom, fonction..."
+        class="search-input"
+      />
+      <button id="toggleFilters" class="btn-filters">🔽 Filtres</button>
+      <button id="resetFilters" class="btn-reset">↻ Réinitialiser</button>
     </div>
-    <div class="filter-controls">
-      <button id="toggleFilters" class="btn-toggle-filters">🔽 Filtres</button>
-      <button id="resetFilters" class="btn-reset">⟲ Réinitialiser</button>
+
+    <!-- PANEL FILTRES (caché par défaut) -->
+    <div id="filtersPanel" class="filters-panel">
+      <div id="filtersContainer" class="filters-container"></div>
+    </div>
+
+    <!-- COMPTEUR RÉSULTATS -->
+    <div id="resultCount" class="result-count">0 contacts</div>
+
+    <!-- GRILLE DE CARTES -->
+    <div id="cardsGrid" class="cards-grid"></div>
+
+    <!-- ÉTAT VIDE -->
+    <div id="emptyState" class="empty-state" hidden>
+      <p>Aucun contact ne correspond à vos critères.</p>
     </div>
   </div>
 
-  <!-- Panneau de filtres (horizontal) -->
-  <div id="filtersPanel" class="filters-panel">
-    <div id="filtersList" class="filters-list"></div>
-  </div>
+  <!-- TEMPLATE POUR LES CARTES -->
+  <template id="cardTemplate">
+    <div class="card">
+      <div class="card-header">
+        <img class="avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect fill='%23ddd' width='60' height='60'/%3E%3Ctext x='50%' y='50%' font-size='24' fill='%23999' text-anchor='middle' dy='.3em'%3E?%3C/text%3E%3C/svg%3E" alt="avatar">
+        <div class="card-names">
+          <div class="name"></div>
+          <div class="fonction"></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="structure"></div>
+        <a class="email" href="#"></a>
+        <div class="tel"></div>
+      </div>
+      <div class="card-tags"></div>
+    </div>
+  </template>
 
-  <!-- Grille de contacts -->
-  <div id="contactsGrid" class="contacts-grid"></div>
-
-  <!-- Scripts -->
+  <!-- SCRIPTS -->
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="app.js"></script>
 </body>
