@@ -25,19 +25,27 @@ CATEGORY_ORDER.forEach(k => activeFilters[k] = new Set());
 /* ============ GRIST INIT ============ */
 console.log('[INIT] Initialisation du widget Annuaire');
 
-grist.ready({
-  requiredAccess: 'read table',
-});
+if (typeof grist === 'undefined') {
+  console.error('[GRIST] ❌ grist object NOT available');
+} else {
+  console.log('[GRIST] ✅ grist object available');
+  
+  grist.ready({
+    requiredAccess: 'read table',
+  });
+  console.log('[GRIST] grist.ready() called');
 
-grist.onRecords((records) => {
-  console.log('[GRIST] Reçu', records.length, 'enregistrements bruts');
-  rawRecords = records;
-  contacts = rawRecords
-    .map(normalizeRecord)
-    .filter(c => c.perimetreIds && c.perimetreIds.length > 0); // Filter vides
-  console.log('[GRIST] Après normalisation et filtrage:', contacts.length, 'contacts');
-  loadRefTables();
-});
+  grist.onRecords((records) => {
+    console.log('[GRIST] Reçu', records.length, 'enregistrements bruts');
+    rawRecords = records;
+    contacts = rawRecords
+      .map(normalizeRecord)
+      .filter(c => c.perimetreIds && c.perimetreIds.length > 0);
+    console.log('[GRIST] Après normalisation et filtrage:', contacts.length, 'contacts');
+    loadRefTables();
+  });
+  console.log('[GRIST] grist.onRecords() registered');
+}
 
 /* ============ NORMALIZATION ============ */
 function safeArray(val) {
@@ -55,14 +63,12 @@ function normalizeRecord(r) {
 
   return {
     id: r.id,
-    nom: r.Nom || '',
     prenom: r.Prenom || '',
-    fonction: r.fonction || '',
+    nom: r.Nom || '',
     email: r.Email || '',
+    fonction: r.fonction || '',
     tel: r.numero_de_telephone || '',
-    genre: r.Genre || '',
     structure: r.Etablissement2 || '',
-    avatar: defaultAvatar(),
     competences,
     perimetreIds: safeArray(r.perimetre_all || [r.perimetre_1, r.perimetre_2].filter(Boolean)),
     instanceIds: safeArray(r.Instances),
@@ -85,10 +91,10 @@ async function loadRefTables() {
   const specs = [
     ['Perimetres', 'Perimetre'],
     ['Instances', 'nom_instance'],
-    ['GT', 'nom'],
+    ['GT', 'nom_gt'],
     ['Actions', 'Action'],
     ['Taches', 'taches'],
-    ['Communautees', 'communaute'],
+    ['Communautees', 'Communaute'],
     ['Etablissements', 'nom_complet'],
     ['Role_Dans_le_PUI', 'Role'],
   ];
@@ -101,7 +107,7 @@ async function loadRefTables() {
         map[id] = data[field] ? data[field][idx] : `#${id}`;
       });
       refTables[table] = map;
-      console.log(`[REFS] Chargé ${table}:`, Object.keys(map).length, 'entrées');
+      console.log('[REFS] Chargé', table, ':', Object.keys(map).length, 'entrées');
     } catch (e) {
       console.warn('[REFS] Impossible de charger', table, e);
     }
@@ -118,7 +124,8 @@ function label(table, id) {
 function enrich(c) {
   return {
     ...c,
-    perimetres: c.perimetreIds.map(id => label('Perimetres', id)).filter(Boolean),
+    avatar: defaultAvatar(),
+    competences: c.competences.map(v => String(v).trim()).filter(Boolean),
     instances: c.instanceIds.map(id => label('Instances', id)).filter(Boolean),
     gts: c.gtIds.map(id => label('GT', id)).filter(Boolean),
     actions: c.actionIds.map(id => label('Actions', id)).filter(Boolean),
@@ -159,7 +166,7 @@ function collectFacetValues(enrichedContacts) {
 function matchesSearch(c) {
   if (!searchTerm) return true;
   const t = searchTerm.toLowerCase();
-  return [c.nom, c.prenom, c.fonction, c.structure, c.etablissement]
+  return [c.nom, c.prenom, c.fonction, c.structure]
     .filter(Boolean)
     .some(v => String(v).toLowerCase().includes(t));
 }
@@ -193,8 +200,7 @@ function relevanceScore(c) {
     CATEGORY_ORDER.forEach(cat => {
       const selected = activeFilters[cat];
       if (selected.size === 0) return;
-
-      let values = [];
+      let values;
       if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
       else if (cat === 'role') values = c.role ? [c.role] : [];
       else {
@@ -313,7 +319,7 @@ function toggleFilter(cat, val) {
 }
 
 function renderActiveFilters() {
-  const container = document.getElementById('activeFiltersChips');
+  const container = document.getElementById('activeFilters');
   if (!container) return;
   container.innerHTML = '';
 
@@ -351,7 +357,6 @@ function renderCards(list) {
 
   list.forEach(c => {
     const node = tmpl.content.cloneNode(true);
-    const card = node.querySelector('.card');
 
     node.querySelector('.card-avatar').src = c.avatar;
     node.querySelector('.card-avatar').alt = `${c.prenom} ${c.nom}`;
@@ -369,7 +374,7 @@ function renderCards(list) {
 
     const telEl = node.querySelector('.card-tel');
     if (c.tel) {
-      telEl.textContent = `☎ ${c.tel}`;
+      telEl.textContent = '☎ ' + c.tel;
     } else {
       telEl.style.display = 'none';
     }
@@ -392,7 +397,7 @@ function appendTags(container, values, category) {
   if (!Array.isArray(values)) values = [values];
   values.filter(Boolean).forEach(val => {
     const tag = document.createElement('div');
-    tag.className = `tag ${category}`;
+    tag.className = 'tag ' + category;
     tag.textContent = val;
     tag.addEventListener('click', () => {
       activeFilters[category].add(val);
@@ -405,7 +410,7 @@ function appendTags(container, values, category) {
 function updateResultCount(count) {
   const el = document.getElementById('resultCount');
   if (!el) return;
-  el.textContent = `${count} contact${count > 1 ? 's' : ''}`;
+  el.textContent = `${count} contact${count !== 1 ? 's' : ''}`;
   const emptyState = document.getElementById('emptyState');
   if (emptyState) {
     if (count === 0) {
@@ -439,7 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Close dropdowns on outside click
   document.addEventListener('click', () => {
     document.querySelectorAll('.filter-dropdown.open').forEach(dd => {
       dd.classList.remove('open');
