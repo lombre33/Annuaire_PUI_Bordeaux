@@ -3,60 +3,83 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Annuaire des Contacts</title>
+  <title>Annuaire - Contacts</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="container">
-    <!-- HEADER avec recherche et bouton filtres -->
-    <div id="header">
-      <input 
-        type="text" 
-        id="searchInput" 
-        placeholder="Rechercher par nom, prénom, fonction..."
-        class="search-input"
-      />
-      <button id="toggleFilters" class="btn-filters">🔽 Filtres</button>
-      <button id="resetFilters" class="btn-reset">↻ Réinitialiser</button>
-    </div>
-
-    <!-- PANEL FILTRES (caché par défaut) -->
-    <div id="filtersPanel" class="filters-panel">
-      <div id="filtersContainer" class="filters-container"></div>
-    </div>
-
-    <!-- COMPTEUR RÉSULTATS -->
-    <div id="resultCount" class="result-count">0 contacts</div>
-
-    <!-- GRILLE DE CARTES -->
-    <div id="cardsGrid" class="cards-grid"></div>
-
-    <!-- ÉTAT VIDE -->
-    <div id="emptyState" class="empty-state" hidden>
-      <p>Aucun contact ne correspond à vos critères.</p>
-    </div>
-  </div>
-
-  <!-- TEMPLATE POUR LES CARTES -->
-  <template id="cardTemplate">
-    <div class="card">
-      <div class="card-header">
-        <img class="avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect fill='%23ddd' width='60' height='60'/%3E%3Ctext x='50%' y='50%' font-size='24' fill='%23999' text-anchor='middle' dy='.3em'%3E?%3C/text%3E%3C/svg%3E" alt="avatar">
-        <div class="card-names">
-          <div class="name"></div>
-          <div class="fonction"></div>
+  <div class="app-container">
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo-section">
+          <h1 class="logo">📇 Annuaire</h1>
+          <p class="subtitle">Répertoire de contacts</p>
+        </div>
+        <div class="search-section">
+          <input type="text" id="searchInput" class="search-input" placeholder="Rechercher par nom, fonction, structure...">
+          <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+            <circle cx="8" cy="8" r="7"/>
+            <path d="M13 13l4 4"/>
+          </svg>
         </div>
       </div>
-      <div class="card-body">
-        <div class="structure"></div>
-        <a class="email" href="#"></a>
-        <div class="tel"></div>
+    </header>
+
+    <!-- FILTER BANNER -->
+    <div class="filter-banner">
+      <div class="filter-banner-content">
+        <div class="filter-categories" id="filterCategories">
+          <!-- Categories will be rendered here -->
+        </div>
+        <div class="filter-actions">
+          <button id="resetFilters" class="btn-reset" title="Réinitialiser les filtres">
+            ✕ Réinitialiser
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <!-- ACTIVE FILTERS DISPLAY -->
+      <div class="active-filters-display" id="activeFiltersDisplay"></div>
+
+      <!-- RESULTS INFO -->
+      <div class="results-header">
+        <span id="resultCount" class="result-count">0 contacts</span>
+      </div>
+
+      <!-- CARDS GRID -->
+      <div class="cards-grid" id="cardsGrid"></div>
+
+      <!-- EMPTY STATE -->
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="empty-state-icon">📭</div>
+        <h3>Aucun contact trouvé</h3>
+        <p>Modifiez vos filtres ou votre recherche</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- CARD TEMPLATE -->
+  <template id="cardTemplate">
+    <div class="card">
+      <div class="card-avatar">
+        <div class="avatar-placeholder">👤</div>
+      </div>
+      <div class="card-content">
+        <h3 class="card-name"></h3>
+        <p class="card-fonction"></p>
+        <p class="card-structure"></p>
+        <div class="card-contact">
+          <a class="card-email" href="#"></a>
+          <span class="card-tel"></span>
+        </div>
       </div>
       <div class="card-tags"></div>
     </div>
   </template>
 
-  <!-- SCRIPTS -->
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="app.js"></script>
 </body>
