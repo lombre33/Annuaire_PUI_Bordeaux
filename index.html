@@ -7,80 +7,69 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-container">
-    <!-- HEADER -->
-    <header class="header">
-      <div class="header-content">
-        <div class="logo-section">
-          <h1 class="logo">📇 Annuaire</h1>
-          <p class="subtitle">Répertoire de contacts</p>
-        </div>
-        <div class="search-section">
-          <input type="text" id="searchInput" class="search-input" placeholder="Rechercher par nom, fonction, structure...">
-          <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-            <circle cx="8" cy="8" r="7"/>
-            <path d="M13 13l4 4"/>
-          </svg>
-        </div>
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="header-left">
+        <h1 class="app-title">📄 Annuaire</h1>
+        <p class="app-subtitle">Répertoire de contacts</p>
       </div>
-    </header>
-
-    <!-- FILTER BANNER -->
-    <div class="filter-banner">
-      <div class="filter-banner-content">
-        <div class="filter-categories" id="filterCategories">
-          <!-- Categories will be rendered here -->
-        </div>
-        <div class="filter-actions">
-          <button id="resetFilters" class="btn-reset" title="Réinitialiser les filtres">
-            ✕ Réinitialiser
-          </button>
+      <div class="header-right">
+        <div class="search-wrapper">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="Rechercher par nom, fonction, structure..."
+          />
         </div>
       </div>
     </div>
+  </header>
 
-    <!-- MAIN CONTENT -->
-    <main class="main-content">
-      <!-- ACTIVE FILTERS DISPLAY -->
-      <div class="active-filters-display" id="activeFiltersDisplay"></div>
-
-      <!-- RESULTS INFO -->
-      <div class="results-header">
-        <span id="resultCount" class="result-count">0 contacts</span>
-      </div>
-
-      <!-- CARDS GRID -->
-      <div class="cards-grid" id="cardsGrid"></div>
-
-      <!-- EMPTY STATE -->
-      <div class="empty-state" id="emptyState" hidden>
-        <div class="empty-state-icon">📭</div>
-        <h3>Aucun contact trouvé</h3>
-        <p>Modifiez vos filtres ou votre recherche</p>
-      </div>
-    </main>
+  <!-- FILTER BUBBLES -->
+  <div class="filters-section">
+    <div id="filterBubbles" class="filter-bubbles"></div>
+    <button id="resetFilters" class="reset-btn">✕ Réinitialiser</button>
   </div>
+
+  <!-- ACTIVE FILTERS CHIPS -->
+  <div id="activeFilters" class="active-filters"></div>
+
+  <!-- MAIN CONTENT -->
+  <main class="app-main">
+    <!-- RESULT COUNT -->
+    <div class="results-header">
+      <span id="resultCount" class="result-count">0 contacts</span>
+    </div>
+
+    <!-- EMPTY STATE -->
+    <div id="emptyState" class="empty-state" hidden>
+      <p>🔍 Aucun contact ne correspond à votre recherche</p>
+    </div>
+
+    <!-- CARDS GRID -->
+    <div id="cardsGrid" class="cards-grid"></div>
+  </main>
 
   <!-- CARD TEMPLATE -->
   <template id="cardTemplate">
-    <div class="card">
-      <div class="card-avatar">
-        <div class="avatar-placeholder">👤</div>
+    <div class="contact-card">
+      <div class="card-header">
+        <div class="card-avatar"></div>
       </div>
-      <div class="card-content">
+      <div class="card-body">
         <h3 class="card-name"></h3>
         <p class="card-fonction"></p>
         <p class="card-structure"></p>
-        <div class="card-contact">
-          <a class="card-email" href="#"></a>
-          <span class="card-tel"></span>
-        </div>
+        <a class="card-email" href="#"></a>
+        <p class="card-tel"></p>
       </div>
       <div class="card-tags"></div>
     </div>
   </template>
 
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
