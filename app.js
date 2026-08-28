@@ -61,7 +61,7 @@ function normalizeRecord(r) {
     tel: r.numero_de_telephone || '',
     genre: r.Genre || '',
     structure: r.Etablissement2 || '',
-    : buildUrl(r.Lien_),
+    avatar: buildUrl(r.Lien_avatar),
     competences,
     // Les colonnes Reference / ReferenceList renvoient soit un id numérique,
     // soit un tableau ['L', id...]. On garde les ids bruts ici et on les
@@ -78,7 +78,7 @@ function normalizeRecord(r) {
 }
 
 function buildUrl(lien) {
-  if (!lien) return default();
+  if (!lien) return defaultAvatar();
   if (String(lien).startsWith('http')) return lien;
   return `https://resana.numerique.gouv.fr${lien}`;
 }
