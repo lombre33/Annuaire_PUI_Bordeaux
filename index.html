@@ -4,34 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Annuaire - Grist Widget</title>
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Bandeau de filtres horizontal -->
-  <div id="filtersPanel" class="filters-panel">
-    <div class="filters-header">
-      <button id="toggleFilters" class="toggle-filters">🔽 Filtres</button>
-      <button id="resetFilters" class="reset-filters">↻ Réinitialiser</button>
+  <!-- Header avec recherche -->
+  <div class="header">
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Rechercher par nom, prénom, fonction...">
+      <span id="contactCount" class="contact-count"></span>
     </div>
-    <div id="filtersContainer" class="filters-container"></div>
+    <div class="filter-controls">
+      <button id="toggleFilters" class="btn-toggle-filters">🔽 Filtres</button>
+      <button id="resetFilters" class="btn-reset">⟲ Réinitialiser</button>
+    </div>
   </div>
 
-  <!-- Barre de recherche -->
-  <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="Rechercher par nom, prénom, fonction, structure...">
-    <span id="resultCount" class="result-count">0 contacts</span>
+  <!-- Panneau de filtres (horizontal) -->
+  <div id="filtersPanel" class="filters-panel">
+    <div id="filtersList" class="filters-list"></div>
   </div>
 
-  <!-- Grille de cartes -->
-  <div id="cardsGrid" class="cards-grid"></div>
-
-  <!-- État vide -->
-  <div id="emptyState" class="empty-state" hidden>
-    <p>Aucun contact ne correspond à vos critères.</p>
-  </div>
+  <!-- Grille de contacts -->
+  <div id="contactsGrid" class="contacts-grid"></div>
 
   <!-- Scripts -->
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
