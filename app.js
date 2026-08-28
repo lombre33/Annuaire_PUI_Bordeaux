@@ -1,6 +1,5 @@
 /* ============ CONFIG ============ */
 
-// Ordre et méta des catégories de filtres/tags
 const CATEGORY_META = {
   perimetre:     { label: 'Périmètres',      color: 'perimetre',     weight: 3 },
   competence:    { label: 'Compétences',     color: 'competence',    weight: 2 },
@@ -18,7 +17,7 @@ const CATEGORY_ORDER = Object.keys(CATEGORY_META);
 
 let rawRecords = [];
 let contacts = [];
-let activeFilters = {}; // { perimetre: Set(), competence: Set(), ... }
+let activeFilters = {};
 CATEGORY_ORDER.forEach(k => activeFilters[k] = new Set());
 let searchTerm = '';
 
@@ -37,12 +36,24 @@ grist.onRecords((records) => {
 /* ============ NORMALIZATION ============ */
 
 function safeArray(v) {
-  // Grist ReferenceList arrive souvent sous forme ['L', id1, id2, ...] ou [id1, id2]
   if (!v) return [];
   if (Array.isArray(v)) {
     return v.filter(x => x !== 'L' && x !== null && x !== undefined && x !== 0);
   }
   return [];
+}
+
+// Avatar simplifié : on n'essaie plus de construire une URL distante,
+// on utilise directement un placeholder généré localement (SVG initiales).
+function buildAvatarPlaceholder(prenom, nom) {
+  const initials = `${(prenom || '').charAt(0)}${(nom || '').charAt(0)}`.toUpperCase() || '?';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52">' +
+    '<rect width="52" height="52" rx="26" fill="#eef2ff"/>' +
+    '<text x="50%" y="55%" text-anchor="middle" font-size="18" fill="#4f46e5" font-family="sans-serif">' +
+    initials +
+    '</text></svg>';
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
 }
 
 function normalizeRecord(r) {
@@ -61,11 +72,8 @@ function normalizeRecord(r) {
     tel: r.numero_de_telephone || '',
     genre: r.Genre || '',
     structure: r.Etablissement2 || '',
-    avatar: buildUrl(r.Lien_avatar),
+    avatar: buildAvatarPlaceholder(r.Prenom, r.Nom),
     competences,
-    // Les colonnes Reference / ReferenceList renvoient soit un id numérique,
-    // soit un tableau ['L', id...]. On garde les ids bruts ici et on les
-    // résoudra en libellés via les tables de référence.
     perimetreIds: safeArray(r.perimetre_all),
     instanceIds: safeArray(r.Instances),
     gtIds: safeArray(r.GT),
@@ -77,29 +85,7 @@ function normalizeRecord(r) {
   };
 }
 
-function buildUrl(lien) {
-  if (!lien) return defaultAvatar();
-  if (String(lien).startsWith('http')) return lien;
-  return `https://resana.numerique.gouv.fr${lien}`;
-}
-
-function defaultAvatar() {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52"><rect width="52" height="52" rx="26" fill="#eef2ff"/><text x="50%" y="55%" text-anchor="middle" font-size="20" fill="#4f46e5" font-family="sans-serif">?</text></svg>';
-  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-}
-
-/* ============ RESOLUTION DES REFERENCES ============
-   IMPORTANT : sans table de référence chargée séparément, on ne peut afficher
-   que les IDs. Pour afficher les vrais libellés (nom du périmètre, nom de
-   l'instance, etc.), il faut soit :
-   - une seconde souscription grist (widget lié à plusieurs tables via
-     grist.getTable + fetchTable), soit
-   - ajouter des colonnes "texte" calculées côté Grist qui exposent
-     directement le libellé plutôt que la référence.
-   Ci-dessous : on résout via l'API grist.docApi.fetchTable, appelée une
-   fois au chargement, pour les tables Perimetres, Instances, GT, Actions,
-   Taches, Communautees, Etablissements, Role_Dans_le_PUI.
-============================================================ */
+/* ============ RESOLUTION DES REFERENCES ============ */
 
 let refTables = {
   Perimetres: {}, Instances: {}, GT: {}, Actions: {},
@@ -127,7 +113,7 @@ async function loadRefTables() {
       console.warn('Impossible de charger', table, e);
     }
   }));
-  contacts = rawRecords.map(normalizeRecord); // relabel not needed, resolution happens at render
+  contacts = rawRecords.map(normalizeRecord);
   render();
 }
 
@@ -136,7 +122,6 @@ function label(table, id) {
   return refTables[table][id] || `#${id}`;
 }
 
-/* Enrichit un contact avec les libellés résolus */
 function enrich(c) {
   return {
     ...c,
@@ -151,7 +136,7 @@ function enrich(c) {
   };
 }
 
-/* ============ FILTER COUNTING (pour construire le panneau) ============ */
+/* ============ FILTER COUNTING ============ */
 
 function collectFacetValues(enrichedContacts) {
   const facets = {};
@@ -195,7 +180,6 @@ function matchesSearch(c) {
 }
 
 function matchesFilters(c) {
-  // ET entre catégories, OU au sein d'une catégorie
   for (const cat of CATEGORY_ORDER) {
     const selected = activeFilters[cat];
     if (selected.size === 0) continue;
@@ -217,8 +201,6 @@ function matchesFilters(c) {
 }
 
 function relevanceScore(c) {
-  // Plus un contact matche de tags actifs (au-delà du strict nécessaire), plus il est mis en avant.
-  // Egalement : contacts avec plus d'éléments renseignés remontent (montre la richesse du profil).
   let score = 0;
   const totalSelected = CATEGORY_ORDER.reduce((s, cat) => s + activeFilters[cat].size, 0);
 
@@ -240,7 +222,6 @@ function relevanceScore(c) {
       score += matchCount * (CATEGORY_META[cat].weight || 1);
     });
   } else {
-    // Pas de filtre actif : trie par richesse globale du profil (plus de liens = plus "central")
     score += (c.perimetres.length + c.instances.length + c.gts.length +
               c.actions.length + c.taches.length + c.communautes.length +
               c.competences.length) * 0.1;
@@ -322,7 +303,6 @@ function renderCards(list) {
 
   list.forEach(c => {
     const node = tmpl.content.cloneNode(true);
-    const card = node.querySelector('.card');
 
     node.querySelector('.avatar').src = c.avatar;
     node.querySelector('.avatar').alt = `${c.prenom} ${c.nom}`;
@@ -333,7 +313,7 @@ function renderCards(list) {
     const emailEl = node.querySelector('.email');
     if (c.email) { emailEl.textContent = c.email; emailEl.href = `mailto:${c.email}`; }
     const telEl = node.querySelector('.tel');
-    if (c.tel) telEl.textContent = `☎ ${c.tel}`;
+    if (c.tel) telEl.textContent = 'Tel: ' + c.tel;
 
     const tagsWrap = node.querySelector('.card-tags');
     appendTags(tagsWrap, c.perimetres, 'perimetre');
@@ -361,9 +341,10 @@ function appendTags(container, values, cat) {
 }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, m => ({
-    '&':'&','<':'<','>':'>','"':'"',"'":'''
-  }[m]));
+  return String(s).replace(/[&<>"']/g, function (m) {
+    const map = { '&': '&', '<': '<', '>': '>', '"': '"', "'": ''' };
+    return map[m];
+  });
 }
 
 /* ============ EVENTS ============ */
