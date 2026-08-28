@@ -1,69 +1,54 @@
 /* ============ CONFIG ============ */
+
 const CATEGORY_ORDER = ['competence', 'instance', 'gt', 'action', 'tache', 'communaute', 'etablissement', 'role'];
+
 const CATEGORY_META = {
-  competence:    { label: 'Compétences',     color: '#8b5cf6' },
-  instance:      { label: 'Instances',       color: '#06b6d4' },
-  gt:            { label: 'GT',              color: '#ec4899' },
-  action:        { label: 'Actions',         color: '#f59e0b' },
-  tache:         { label: 'Tâches',          color: '#10b981' },
-  communaute:    { label: 'Communautés',     color: '#6366f1' },
-  etablissement: { label: 'Établissement',   color: '#14b8a6' },
-  role:          { label: 'Rôle',            color: '#f97316' },
+  competence:    { label: 'Compétences',     color: '#8B5CF6', weight: 2 },
+  instance:      { label: 'Instances',       color: '#3B82F6', weight: 3 },
+  gt:            { label: 'Groupes de travail', color: '#06B6D4', weight: 2 },
+  action:        { label: 'Actions',         color: '#10B981', weight: 2 },
+  tache:         { label: 'Tâches',          color: '#F59E0B', weight: 2 },
+  communaute:    { label: 'Communautés',     color: '#EF4444', weight: 2 },
+  etablissement: { label: 'Établissement',   color: '#6366F1', weight: 1 },
+  role:          { label: 'Rôle PUI',        color: '#EC4899', weight: 1 },
 };
 
 /* ============ STATE ============ */
+
 let rawRecords = [];
 let contacts = [];
 let activeFilters = {};
 CATEGORY_ORDER.forEach(k => activeFilters[k] = new Set());
 let searchTerm = '';
-let openDropdown = null;
+let refTables = {
+  Perimetres: {}, Instances: {}, GT: {}, Actions: {},
+  Taches: {}, Communautees: {}, Etablissements: {}, Role_Dans_le_PUI: {}
+};
 
 /* ============ GRIST INIT ============ */
+
 console.log('[INIT] App starting...');
 
 if (typeof grist === 'undefined') {
-  console.error('[GRIST] grist is NOT defined! Waiting...');
-  let attempts = 0;
-  const waitForGrist = setInterval(() => {
-    attempts++;
-    if (typeof grist !== 'undefined') {
-      console.log('[GRIST] grist object is NOW available');
-      clearInterval(waitForGrist);
-      initGrist();
-    }
-    if (attempts > 50) {
-      console.error('[GRIST] Timeout waiting for grist');
-      clearInterval(waitForGrist);
-    }
-  }, 100);
+  console.error('[GRIST] ❌ grist object is NOT available!');
 } else {
-  console.log('[GRIST] grist object is available');
-  initGrist();
-}
-
-function initGrist() {
+  console.log('[GRIST] ✅ grist object is available');
+  grist.ready({ requiredAccess: 'read table' });
   console.log('[GRIST] grist.ready() called');
-  grist.ready({
-    requiredAccess: 'read table',
-  });
 
-  console.log('[GRIST] grist.onRecords() registered');
   grist.onRecords((records) => {
-    console.log('[GRIST] onRecords() called with ' + records.length + ' records');
-    rawRecords = records;
-    const filtered = rawRecords.filter(r => {
-      const perimetres = safeArray(r.perimetre_all);
-      return perimetres.length > 0;
-    });
-    console.log('[FILTER] After backend filter: ' + filtered.length + ' records remain');
-    contacts = filtered.map(normalizeRecord);
-    console.log('[NORMALIZE] After normalization: ' + contacts.length + ' contacts');
+    console.log(`[GRIST] 📥 onRecords() called with ${records.length} records`);
+    rawRecords = records.filter(r => r.perimetre_all && r.perimetre_all.length > 0);
+    console.log(`[FILTER] After backend filter: ${rawRecords.length} records remain`);
+    contacts = rawRecords.map(normalizeRecord);
+    console.log(`[NORMALIZE] After normalization: ${contacts.length} contacts`);
     loadRefTables();
   });
+  console.log('[GRIST] grist.onRecords() registered');
 }
 
 /* ============ NORMALIZATION ============ */
+
 function safeArray(v) {
   if (!v) return [];
   if (Array.isArray(v)) {
@@ -74,8 +59,8 @@ function safeArray(v) {
 
 function normalizeRecord(r) {
   const competences = [];
-  for (let i = 1; i <= 15; i++) {
-    const v = r['competence_' + i] || r['competences_' + i];
+  for (let i = 4; i <= 15; i++) {
+    const v = r[`competence_${i}`];
     if (v && String(v).trim()) competences.push(String(v).trim());
   }
 
@@ -88,27 +73,24 @@ function normalizeRecord(r) {
     tel: r.numero_de_telephone || '',
     genre: r.Genre || '',
     structure: r.Etablissement2 || '',
-    competences: competences,
+    competences,
     perimetreIds: safeArray(r.perimetre_all),
     instanceIds: safeArray(r.Instances),
     gtIds: safeArray(r.GT),
     actionIds: safeArray(r.Actions),
     tacheIds: safeArray(r.Taches),
-    communauteIds: safeArray(r.Communautee_s),
+    communauteIds: safeArray(r.Communautees),
     etablissementId: r.Etablissement || null,
     roleId: r.Role_dans_le_PUI || null,
   };
 }
 
-/* ============ RESOLUTION DES REFERENCES ============ */
-let refTables = {
-  Perimetres: {}, Instances: {}, GT: {}, Actions: {},
-  Taches: {}, Communautees: {}, Etablissements: {}, Role_Dans_le_PUI: {}
-};
+/* ============ LOAD REFERENCE TABLES ============ */
 
 async function loadRefTables() {
   console.log('[REFS] Loading reference tables...');
   const specs = [
+    ['Perimetres', 'Perimetre'],
     ['Instances', 'nom_instance'],
     ['GT', 'nom'],
     ['Actions', 'Action'],
@@ -117,46 +99,35 @@ async function loadRefTables() {
     ['Etablissements', 'nom_complet'],
     ['Role_Dans_le_PUI', 'Role'],
   ];
-  
+
   await Promise.all(specs.map(async ([table, field]) => {
-    console.log('[REFS] Fetching ' + table + '...');
     try {
+      console.log(`[REFS] Fetching ${table}...`);
       const data = await grist.docApi.fetchTable(table);
       const map = {};
-      data.id.forEach((id, idx) => { map[id] = data[field] ? data[field][idx] : '#' + id; });
+      data.id.forEach((id, idx) => {
+        map[id] = data[field] ? data[field][idx] : `#${id}`;
+      });
       refTables[table] = map;
+      console.log(`[REFS]   ✅ ${table}: ${Object.keys(map).length} entries`);
     } catch (e) {
-      console.warn('[REFS] Could not load ' + table, e);
+      console.warn(`[REFS] ❌ Impossible de charger ${table}:`, e);
     }
   }));
-  console.log('[REFS] Reference tables loaded');
+
+  console.log('[RENDER] Starting render with', contacts.length, 'contacts');
   render();
 }
 
 function label(table, id) {
   if (!id) return null;
-  return refTables[table] && refTables[table][id] ? refTables[table][id] : null;
+  return refTables[table] ? (refTables[table][id] || null) : null;
 }
 
 function enrich(c) {
   return {
-    id: c.id,
-    nom: c.nom,
-    prenom: c.prenom,
-    fonction: c.fonction,
-    email: c.email,
-    tel: c.tel,
-    genre: c.genre,
-    structure: c.structure,
-    competences: c.competences,
-    perimetreIds: c.perimetreIds,
-    instanceIds: c.instanceIds,
-    gtIds: c.gtIds,
-    actionIds: c.actionIds,
-    tacheIds: c.tacheIds,
-    communauteIds: c.communauteIds,
-    etablissementId: c.etablissementId,
-    roleId: c.roleId,
+    ...c,
+    perimetres: c.perimetreIds.map(id => label('Perimetres', id)).filter(Boolean),
     instances: c.instanceIds.map(id => label('Instances', id)).filter(Boolean),
     gts: c.gtIds.map(id => label('GT', id)).filter(Boolean),
     actions: c.actionIds.map(id => label('Actions', id)).filter(Boolean),
@@ -167,32 +138,32 @@ function enrich(c) {
   };
 }
 
-/* ============ FILTER PANEL CONSTRUCTION ============ */
+/* ============ FILTER COUNTING ============ */
+
 function collectFacetValues(enrichedContacts) {
   const facets = {};
   CATEGORY_ORDER.forEach(cat => facets[cat] = new Map());
 
   enrichedContacts.forEach(c => {
-    CATEGORY_ORDER.forEach(cat => {
-      let values = [];
-      if (cat === 'competence') values = c.competences || [];
-      else if (cat === 'instance') values = c.instances || [];
-      else if (cat === 'gt') values = c.gts || [];
-      else if (cat === 'action') values = c.actions || [];
-      else if (cat === 'tache') values = c.taches || [];
-      else if (cat === 'communaute') values = c.communautes || [];
-      else if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
-      else if (cat === 'role') values = c.role ? [c.role] : [];
-      
-      values.forEach(v => {
-        facets[cat].set(v, (facets[cat].get(v) || 0) + 1);
-      });
-    });
+    if (c.competences) c.competences.forEach(v => bump(facets.competence, v));
+    if (c.instances) c.instances.forEach(v => bump(facets.instance, v));
+    if (c.gts) c.gts.forEach(v => bump(facets.gt, v));
+    if (c.actions) c.actions.forEach(v => bump(facets.action, v));
+    if (c.taches) c.taches.forEach(v => bump(facets.tache, v));
+    if (c.communautes) c.communautes.forEach(v => bump(facets.communaute, v));
+    if (c.etablissement) bump(facets.etablissement, c.etablissement);
+    if (c.role) bump(facets.role, c.role);
   });
+
   return facets;
 }
 
+function bump(map, key) {
+  map.set(key, (map.get(key) || 0) + 1);
+}
+
 /* ============ FILTERING LOGIC ============ */
+
 function matchesSearch(c) {
   if (!searchTerm) return true;
   const t = searchTerm.toLowerCase();
@@ -207,17 +178,17 @@ function matchesFilters(c) {
     if (selected.size === 0) continue;
 
     let values = [];
-    if (cat === 'competence') values = c.competences || [];
-    else if (cat === 'instance') values = c.instances || [];
-    else if (cat === 'gt') values = c.gts || [];
-    else if (cat === 'action') values = c.actions || [];
-    else if (cat === 'tache') values = c.taches || [];
-    else if (cat === 'communaute') values = c.communautes || [];
-    else if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
+    if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
     else if (cat === 'role') values = c.role ? [c.role] : [];
+    else {
+      const fieldMap = {
+        competence: 'competences', instance: 'instances', gt: 'gts',
+        action: 'actions', tache: 'taches', communaute: 'communautes',
+      };
+      values = c[fieldMap[cat]] || [];
+    }
 
-    const hasAny = [...selected].some(v => values.includes(v));
-    if (!hasAny) return false;
+    if (!values.some(v => selected.has(v))) return false;
   }
   return true;
 }
@@ -230,33 +201,36 @@ function relevanceScore(c) {
     CATEGORY_ORDER.forEach(cat => {
       const selected = activeFilters[cat];
       if (selected.size === 0) return;
-      
-      let values = [];
-      if (cat === 'competence') values = c.competences || [];
-      else if (cat === 'instance') values = c.instances || [];
-      else if (cat === 'gt') values = c.gts || [];
-      else if (cat === 'action') values = c.actions || [];
-      else if (cat === 'tache') values = c.taches || [];
-      else if (cat === 'communaute') values = c.communautes || [];
-      else if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
-      else if (cat === 'role') values = c.role ? [c.role] : [];
 
-      const matches = [...selected].filter(v => values.includes(v)).length;
-      score += matches * 10;
+      let values = [];
+      if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
+      else if (cat === 'role') values = c.role ? [c.role] : [];
+      else {
+        const fieldMap = {
+          competence: 'competences', instance: 'instances', gt: 'gts',
+          action: 'actions', tache: 'taches', communaute: 'communautes',
+        };
+        values = c[fieldMap[cat]] || [];
+      }
+
+      const matchCount = values.filter(v => selected.has(v)).length;
+      score += matchCount * (CATEGORY_META[cat].weight || 1);
     });
-    score += (Object.keys(c).length / 100);
+  } else {
+    score += (c.competences.length + c.instances.length + c.gts.length +
+              c.actions.length + c.taches.length + c.communautes.length) * 0.1;
   }
   return score;
 }
 
 /* ============ RENDER ============ */
+
 function render() {
-  console.log('[RENDER] Starting render with ' + contacts.length + ' contacts');
+  console.log('[RENDER] Starting render with', contacts.length, 'contacts');
   const enriched = contacts.map(enrich);
-  console.log('[RENDER] After enrichment: ' + enriched.length + ' contacts');
-  
+  console.log('[RENDER] After enrichment:', enriched.length, 'contacts');
   const facets = collectFacetValues(enriched);
-  console.log('[FACETS] Collected facets');
+  console.log('[FACETS] Collected facets:', Object.keys(facets));
 
   renderFilterBubbles(facets);
   renderActiveFilters();
@@ -265,6 +239,8 @@ function render() {
     .filter(matchesSearch)
     .filter(matchesFilters);
 
+  console.log('[FILTER] After filtering:', filtered.length, 'contacts match');
+
   const sorted = filtered.sort((a, b) => {
     const s = relevanceScore(b) - relevanceScore(a);
     if (s !== 0) return s;
@@ -272,27 +248,29 @@ function render() {
   });
 
   renderCards(sorted);
-  
+
   const resultEl = document.getElementById('resultCount');
   if (resultEl) {
-    resultEl.textContent = sorted.length + ' contact' + (sorted.length > 1 ? 's' : '');
+    resultEl.textContent = `${sorted.length} contact${sorted.length > 1 ? 's' : ''}`;
   }
-  
   const emptyEl = document.getElementById('emptyState');
   if (emptyEl) {
     emptyEl.hidden = sorted.length > 0;
   }
-  console.log('[RENDER] Render complete - ' + sorted.length + ' contacts displayed');
+
+  console.log('[RENDER] ✅ Render complete');
 }
 
 /* ============ RENDER FILTER BUBBLES ============ */
+
 function renderFilterBubbles(facets) {
   console.log('[FILTERS] Rendering filter bubbles...');
-  const container = document.getElementById('filterCategories');
+  const container = document.getElementById('filterBubbles');
   if (!container) {
-    console.error('[FILTERS] filterCategories not found in DOM');
+    console.log('[FILTERS] ❌ filterBubbles not found in DOM!');
     return;
   }
+
   container.innerHTML = '';
 
   CATEGORY_ORDER.forEach(cat => {
@@ -300,90 +278,61 @@ function renderFilterBubbles(facets) {
     const values = [...facets[cat].entries()].sort((a, b) => b[1] - a[1]);
     if (values.length === 0) return;
 
+    const activeCount = activeFilters[cat].size;
+
+    // Créer la bulle
     const bubble = document.createElement('div');
-    bubble.className = 'filter-category-bubble';
+    bubble.className = 'filter-bubble';
+    bubble.style.borderColor = meta.color;
+    bubble.style.color = meta.color;
+    bubble.innerHTML = `
+      ${meta.label}
+      ${activeCount > 0 ? ` <span class="badge">${activeCount}</span>` : ''}
+      <span class="chevron">▼</span>
+    `;
 
-    const toggle = document.createElement('button');
-    toggle.className = 'filter-category-toggle';
-    toggle.setAttribute('data-category', cat);
-    toggle.style.borderColor = meta.color;
-    toggle.style.color = meta.color;
+    // Créer le dropdown
+    const dropdown = document.createElement('div');
+    dropdown.className = 'filter-dropdown';
+    dropdown.style.borderTopColor = meta.color;
 
-    const selectedCount = activeFilters[cat].size;
-    toggle.innerHTML = meta.label + (selectedCount > 0 ? ' <span class="count">' + selectedCount + '</span>' : '') + ' <span style="font-size: 0.75rem; margin-left: 0.25rem;">▼</span>';
-
-    toggle.addEventListener('click', () => toggleDropdown(cat, values, bubble, meta));
-    bubble.appendChild(toggle);
-
-    container.appendChild(bubble);
-  });
-}
-
-/* ============ TOGGLE DROPDOWN ============ */
-function toggleDropdown(cat, values, bubble, meta) {
-  if (openDropdown === cat) {
-    closeDropdown();
-    return;
-  }
-  
-  closeDropdown();
-  openDropdown = cat;
-
-  const dropdown = document.createElement('div');
-  dropdown.className = 'filter-dropdown open';
-
-  values.forEach(pair => {
-    const value = pair[0];
-    const count = pair[1];
-    
-    const option = document.createElement('div');
-    option.className = 'filter-option';
-    if (activeFilters[cat].has(value)) option.classList.add('selected');
-    option.style.color = meta.color;
-
-    const isSelected = activeFilters[cat].has(value);
-    option.innerHTML = '<div class="filter-option-label"><div class="filter-option-checkbox" style="' + (isSelected ? 'background: ' + meta.color + '; border-color: ' + meta.color + ';' : '') + '"></div><span>' + value + '</span></div><div class="filter-option-count">' + count + '</div>';
-
-    option.addEventListener('click', () => {
-      toggleFilter(cat, value);
-      renderFilterBubbles(collectFacetValues(contacts.map(enrich)));
-      render();
+    values.forEach(([val, count]) => {
+      const isChecked = activeFilters[cat].has(val);
+      const option = document.createElement('label');
+      option.className = 'filter-option';
+      option.innerHTML = `
+        <input type="checkbox" ${isChecked ? 'checked' : ''} data-cat="${cat}" data-val="${val}">
+        <span>${val}</span>
+        <span class="count">${count}</span>
+      `;
+      dropdown.appendChild(option);
     });
 
-    dropdown.appendChild(option);
-  });
-
-  bubble.appendChild(dropdown);
-}
-
-function closeDropdown() {
-  if (openDropdown) {
-    const dropdown = document.querySelector('.filter-dropdown.open');
-    if (dropdown) dropdown.remove();
-    openDropdown = null;
-  }
-}
-
-/* ============ RENDER ACTIVE FILTERS ============ */
-function renderActiveFilters() {
-  const container = document.getElementById('activeFiltersDisplay');
-  if (!container) return;
-  container.innerHTML = '';
-
-  CATEGORY_ORDER.forEach(cat => {
-    const meta = CATEGORY_META[cat];
-    const values = [...activeFilters[cat]];
-    values.forEach(value => {
-      const chip = document.createElement('div');
-      chip.className = 'active-filter-chip';
-      chip.style.background = meta.color;
-      chip.innerHTML = value + ' <button type="button">x</button>';
-      chip.querySelector('button').addEventListener('click', () => {
-        toggleFilter(cat, value);
-        render();
+    // Event listener pour les checkboxes
+    dropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const cat = e.target.getAttribute('data-cat');
+        const val = e.target.getAttribute('data-val');
+        console.log('[FILTERS] toggleFilter called:', cat, val, e.target.checked);
+        toggleFilter(cat, val);
       });
-      container.appendChild(chip);
     });
+
+    // Wrapper pour bulle + dropdown
+    const wrapper = document.createElement('div');
+    wrapper.className = 'filter-bubble-wrapper';
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(dropdown);
+
+    // Event listener pour la bulle
+    bubble.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('[FILTERS] Bubble clicked:', cat);
+      dropdown.classList.toggle('open');
+    });
+
+    container.appendChild(wrapper);
+    console.log(`[FILTERS]   ✅ ${meta.label}: ${values.length} options`);
   });
 }
 
@@ -391,89 +340,147 @@ function toggleFilter(cat, val) {
   const set = activeFilters[cat];
   if (set.has(val)) set.delete(val);
   else set.add(val);
+  console.log('[FILTERS] After toggle, activeFilters:', cat, set.size);
+  render();
+}
+
+/* ============ RENDER ACTIVE FILTERS ============ */
+
+function renderActiveFilters() {
+  const container = document.getElementById('activeFilters');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  CATEGORY_ORDER.forEach(cat => {
+    const meta = CATEGORY_META[cat];
+    const selected = activeFilters[cat];
+    selected.forEach(val => {
+      const chip = document.createElement('div');
+      chip.className = 'active-filter-chip';
+      chip.style.backgroundColor = meta.color;
+      chip.innerHTML = `
+        ${val}
+        <button class="chip-close" data-cat="${cat}" data-val="${val}">✕</button>
+      `;
+      chip.querySelector('.chip-close').addEventListener('click', () => {
+        toggleFilter(cat, val);
+      });
+      container.appendChild(chip);
+    });
+  });
 }
 
 /* ============ RENDER CARDS ============ */
+
 function renderCards(list) {
+  console.log('[CARDS] Rendering', list.length, 'cards');
   const grid = document.getElementById('cardsGrid');
-  const tmpl = document.getElementById('cardTemplate');
-  
   if (!grid) {
-    console.error('[CARDS] cardsGrid not found in DOM');
+    console.log('[CARDS] ❌ cardsGrid not found in DOM!');
     return;
   }
+
+  const tmpl = document.getElementById('cardTemplate');
   if (!tmpl) {
-    console.error('[CARDS] cardTemplate not found in DOM');
+    console.log('[CARDS] ❌ cardTemplate not found in DOM!');
     return;
   }
-  
-  console.log('[CARDS] Rendering ' + list.length + ' cards');
+
   grid.innerHTML = '';
 
-  list.forEach(c => {
+  list.forEach((c, idx) => {
     const node = tmpl.content.cloneNode(true);
-    const card = node.querySelector('.card');
+    const card = node.querySelector('.contact-card');
 
-    node.querySelector('.card-name').textContent = (c.prenom + ' ' + c.nom).trim();
-    node.querySelector('.card-fonction').textContent = c.fonction || '';
-    node.querySelector('.card-structure').textContent = c.structure || '';
+    // Avatar placeholder
+    const avatar = node.querySelector('.card-avatar');
+    if (avatar) {
+      const initials = `${(c.prenom || '').charAt(0)}${(c.nom || '').charAt(0)}`.toUpperCase();
+      avatar.textContent = initials;
+      avatar.style.backgroundColor = `hsl(${(idx * 60) % 360}, 70%, 60%)`;
+    }
 
+    // Infos basiques
+    const nameEl = node.querySelector('.card-name');
+    if (nameEl) nameEl.textContent = `${c.prenom} ${c.nom}`.trim();
+
+    const fonctionEl = node.querySelector('.card-fonction');
+    if (fonctionEl) fonctionEl.textContent = c.fonction || '';
+
+    const structureEl = node.querySelector('.card-structure');
+    if (structureEl) structureEl.textContent = c.structure || '';
+
+    // Email
     const emailEl = node.querySelector('.card-email');
-    if (c.email) {
-      emailEl.textContent = c.email;
-      emailEl.href = 'mailto:' + c.email;
-    } else {
-      emailEl.style.display = 'none';
+    if (emailEl) {
+      if (c.email) {
+        emailEl.textContent = c.email;
+        emailEl.href = `mailto:${c.email}`;
+      } else {
+        emailEl.style.display = 'none';
+      }
     }
 
+    // Téléphone
     const telEl = node.querySelector('.card-tel');
-    if (c.tel) {
-      telEl.textContent = '☎ ' + c.tel;
-    } else {
-      telEl.style.display = 'none';
+    if (telEl) {
+      if (c.tel) {
+        telEl.textContent = `☎ ${c.tel}`;
+      } else {
+        telEl.style.display = 'none';
+      }
     }
 
+    // Tags
     const tagsWrap = node.querySelector('.card-tags');
-    appendTags(tagsWrap, c.competences, 'competence');
-    appendTags(tagsWrap, c.instances, 'instance');
-    appendTags(tagsWrap, c.gts, 'gt');
-    appendTags(tagsWrap, c.actions, 'action');
-    appendTags(tagsWrap, c.taches, 'tache');
-    appendTags(tagsWrap, c.communautes, 'communaute');
-    if (c.etablissement) appendTags(tagsWrap, [c.etablissement], 'etablissement');
-    if (c.role) appendTags(tagsWrap, [c.role], 'role');
+    if (tagsWrap) {
+      tagsWrap.innerHTML = '';
+
+      const allTags = [
+        ...c.competences.map(v => ({ val: v, cat: 'competence' })),
+        ...c.instances.map(v => ({ val: v, cat: 'instance' })),
+        ...c.gts.map(v => ({ val: v, cat: 'gt' })),
+        ...c.actions.map(v => ({ val: v, cat: 'action' })),
+        ...c.taches.map(v => ({ val: v, cat: 'tache' })),
+        ...c.communautes.map(v => ({ val: v, cat: 'communaute' })),
+      ];
+      if (c.etablissement) allTags.push({ val: c.etablissement, cat: 'etablissement' });
+      if (c.role) allTags.push({ val: c.role, cat: 'role' });
+
+      allTags.forEach(({ val, cat }) => {
+        const tag = document.createElement('button');
+        tag.className = 'card-tag';
+        tag.style.backgroundColor = CATEGORY_META[cat].color;
+        tag.textContent = val;
+        tag.addEventListener('click', () => {
+          toggleFilter(cat, val);
+        });
+        tagsWrap.appendChild(tag);
+      });
+    }
 
     grid.appendChild(node);
   });
-}
 
-function appendTags(wrap, values, category) {
-  if (!values || values.length === 0) return;
-  values.forEach(v => {
-    const tag = document.createElement('div');
-    tag.className = 'tag';
-    tag.setAttribute('data-category', category);
-    tag.textContent = v;
-    tag.addEventListener('click', () => {
-      toggleFilter(category, v);
-      render();
-    });
-    wrap.appendChild(tag);
-  });
+  console.log('[CARDS] ✅ Rendered', list.length, 'cards');
 }
 
 /* ============ EVENTS ============ */
-const searchEl = document.getElementById('searchInput');
-if (searchEl) {
-  searchEl.addEventListener('input', (e) => {
+
+const searchInput = document.getElementById('searchInput');
+if (searchInput) {
+  searchInput.addEventListener('input', (e) => {
     searchTerm = e.target.value.trim();
+    console.log('[SEARCH] searchTerm changed to:', searchTerm);
     render();
   });
 }
 
-const resetEl = document.getElementById('resetFilters');
-if (resetEl) {
-  resetEl.addEventListener('click', () => {
+const resetBtn = document.getElementById('resetFilters');
+if (resetBtn) {
+  resetBtn.addEventListener('click', () => {
+    console.log('[FILTERS] Reset clicked');
     CATEGORY_ORDER.forEach(k => activeFilters[k].clear());
     const searchInput = document.getElementById('searchInput');
     if (searchInput) searchInput.value = '';
@@ -482,10 +489,11 @@ if (resetEl) {
   });
 }
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.filter-category-bubble')) {
-    closeDropdown();
-  }
+// Fermer dropdowns quand on clique ailleurs
+document.addEventListener('click', () => {
+  document.querySelectorAll('.filter-dropdown.open').forEach(dd => {
+    dd.classList.remove('open');
+  });
 });
 
-console.log('[INIT] App initialization complete');
+console.log('[INIT] ✅ App initialized, waiting for grist data...');
