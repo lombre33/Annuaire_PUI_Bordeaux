@@ -1,68 +1,57 @@
 /* ============ CONFIG ============ */
-
 const CATEGORY_ORDER = ['competence', 'instance', 'gt', 'action', 'tache', 'communaute', 'etablissement', 'role'];
 
 const CATEGORY_META = {
-  competence:    { label: 'Compétences',     color: '#8B5CF6', weight: 2 },
-  instance:      { label: 'Instances',       color: '#3B82F6', weight: 3 },
-  gt:            { label: 'Groupes de travail', color: '#06B6D4', weight: 2 },
-  action:        { label: 'Actions',         color: '#10B981', weight: 2 },
-  tache:         { label: 'Tâches',          color: '#F59E0B', weight: 2 },
-  communaute:    { label: 'Communautés',     color: '#EF4444', weight: 2 },
-  etablissement: { label: 'Établissement',   color: '#6366F1', weight: 1 },
-  role:          { label: 'Rôle PUI',        color: '#EC4899', weight: 1 },
+  competence: { label: 'Compétences', color: '#f59e0b' },
+  instance: { label: 'Instances', color: '#3b82f6' },
+  gt: { label: 'GT', color: '#10b981' },
+  action: { label: 'Actions', color: '#ef4444' },
+  tache: { label: 'Tâches', color: '#8b5cf6' },
+  communaute: { label: 'Communautés', color: '#f97316' },
+  etablissement: { label: 'Établissement', color: '#8b5cf6' },
+  role: { label: 'Rôle', color: '#06b6d4' },
 };
 
-/* ============ STATE ============ */
+const refTables = {};
 
+/* ============ STATE ============ */
 let rawRecords = [];
 let contacts = [];
 let activeFilters = {};
-CATEGORY_ORDER.forEach(k => activeFilters[k] = new Set());
 let searchTerm = '';
-let refTables = {
-  Perimetres: {}, Instances: {}, GT: {}, Actions: {},
-  Taches: {}, Communautees: {}, Etablissements: {}, Role_Dans_le_PUI: {}
-};
+
+CATEGORY_ORDER.forEach(k => activeFilters[k] = new Set());
 
 /* ============ GRIST INIT ============ */
+console.log('[INIT] Initialisation du widget Annuaire');
 
-console.log('[INIT] App starting...');
+grist.ready({
+  requiredAccess: 'read table',
+});
 
-if (typeof grist === 'undefined') {
-  console.error('[GRIST] ❌ grist object is NOT available!');
-} else {
-  console.log('[GRIST] ✅ grist object is available');
-  grist.ready({ requiredAccess: 'read table' });
-  console.log('[GRIST] grist.ready() called');
-
-  grist.onRecords((records) => {
-    console.log(`[GRIST] 📥 onRecords() called with ${records.length} records`);
-    rawRecords = records.filter(r => r.perimetre_all && r.perimetre_all.length > 0);
-    console.log(`[FILTER] After backend filter: ${rawRecords.length} records remain`);
-    contacts = rawRecords.map(normalizeRecord);
-    console.log(`[NORMALIZE] After normalization: ${contacts.length} contacts`);
-    loadRefTables();
-  });
-  console.log('[GRIST] grist.onRecords() registered');
-}
+grist.onRecords((records) => {
+  console.log('[GRIST] Reçu', records.length, 'enregistrements bruts');
+  rawRecords = records;
+  contacts = rawRecords
+    .map(normalizeRecord)
+    .filter(c => c.perimetreIds && c.perimetreIds.length > 0); // Filter vides
+  console.log('[GRIST] Après normalisation et filtrage:', contacts.length, 'contacts');
+  loadRefTables();
+});
 
 /* ============ NORMALIZATION ============ */
-
-function safeArray(v) {
-  if (!v) return [];
-  if (Array.isArray(v)) {
-    return v.filter(x => x !== 'L' && x !== null && x !== undefined && x !== 0);
-  }
+function safeArray(val) {
+  if (Array.isArray(val)) return val.flat();
+  if (val) return [val];
   return [];
 }
 
 function normalizeRecord(r) {
-  const competences = [];
-  for (let i = 4; i <= 15; i++) {
-    const v = r[`competence_${i}`];
-    if (v && String(v).trim()) competences.push(String(v).trim());
-  }
+  const competences = [
+    r.competence_4, r.competence_5, r.competence_6, r.competence_7,
+    r.competence_8, r.competence_9, r.competence_10, r.competence_11,
+    r.competence_12, r.competence_13, r.competence_14, r.competence_15
+  ].filter(Boolean);
 
   return {
     id: r.id,
@@ -73,22 +62,26 @@ function normalizeRecord(r) {
     tel: r.numero_de_telephone || '',
     genre: r.Genre || '',
     structure: r.Etablissement2 || '',
+    avatar: defaultAvatar(),
     competences,
-    perimetreIds: safeArray(r.perimetre_all),
+    perimetreIds: safeArray(r.perimetre_all || [r.perimetre_1, r.perimetre_2].filter(Boolean)),
     instanceIds: safeArray(r.Instances),
     gtIds: safeArray(r.GT),
     actionIds: safeArray(r.Actions),
     tacheIds: safeArray(r.Taches),
-    communauteIds: safeArray(r.Communautees),
+    communauteIds: safeArray(r.Communautee_s_),
     etablissementId: r.Etablissement || null,
     roleId: r.Role_dans_le_PUI || null,
   };
 }
 
-/* ============ LOAD REFERENCE TABLES ============ */
+function defaultAvatar() {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="70" height="70"><rect width="70" height="70" rx="35" fill="#4f46e5" opacity="0.1"/><text x="50%" y="55%" text-anchor="middle" font-size="28" fill="#4f46e5" font-family="sans-serif" font-weight="bold">?</text></svg>';
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
 
+/* ============ LOAD REFERENCE TABLES ============ */
 async function loadRefTables() {
-  console.log('[REFS] Loading reference tables...');
   const specs = [
     ['Perimetres', 'Perimetre'],
     ['Instances', 'nom_instance'],
@@ -102,26 +95,24 @@ async function loadRefTables() {
 
   await Promise.all(specs.map(async ([table, field]) => {
     try {
-      console.log(`[REFS] Fetching ${table}...`);
       const data = await grist.docApi.fetchTable(table);
       const map = {};
       data.id.forEach((id, idx) => {
         map[id] = data[field] ? data[field][idx] : `#${id}`;
       });
       refTables[table] = map;
-      console.log(`[REFS]   ✅ ${table}: ${Object.keys(map).length} entries`);
+      console.log(`[REFS] Chargé ${table}:`, Object.keys(map).length, 'entrées');
     } catch (e) {
-      console.warn(`[REFS] ❌ Impossible de charger ${table}:`, e);
+      console.warn('[REFS] Impossible de charger', table, e);
     }
   }));
 
-  console.log('[RENDER] Starting render with', contacts.length, 'contacts');
   render();
 }
 
 function label(table, id) {
-  if (!id) return null;
-  return refTables[table] ? (refTables[table][id] || null) : null;
+  if (!refTables[table]) return null;
+  return refTables[table][id] || null;
 }
 
 function enrich(c) {
@@ -139,31 +130,32 @@ function enrich(c) {
 }
 
 /* ============ FILTER COUNTING ============ */
-
 function collectFacetValues(enrichedContacts) {
   const facets = {};
   CATEGORY_ORDER.forEach(cat => facets[cat] = new Map());
 
   enrichedContacts.forEach(c => {
-    if (c.competences) c.competences.forEach(v => bump(facets.competence, v));
-    if (c.instances) c.instances.forEach(v => bump(facets.instance, v));
-    if (c.gts) c.gts.forEach(v => bump(facets.gt, v));
-    if (c.actions) c.actions.forEach(v => bump(facets.action, v));
-    if (c.taches) c.taches.forEach(v => bump(facets.tache, v));
-    if (c.communautes) c.communautes.forEach(v => bump(facets.communaute, v));
-    if (c.etablissement) bump(facets.etablissement, c.etablissement);
-    if (c.role) bump(facets.role, c.role);
+    CATEGORY_ORDER.forEach(cat => {
+      let values = [];
+      if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
+      else if (cat === 'role') values = c.role ? [c.role] : [];
+      else {
+        const fieldMap = {
+          competence: 'competences', instance: 'instances', gt: 'gts',
+          action: 'actions', tache: 'taches', communaute: 'communautes',
+        };
+        values = c[fieldMap[cat]] || [];
+      }
+      values.forEach(v => {
+        if (v) facets[cat].set(v, (facets[cat].get(v) || 0) + 1);
+      });
+    });
   });
 
   return facets;
 }
 
-function bump(map, key) {
-  map.set(key, (map.get(key) || 0) + 1);
-}
-
 /* ============ FILTERING LOGIC ============ */
-
 function matchesSearch(c) {
   if (!searchTerm) return true;
   const t = searchTerm.toLowerCase();
@@ -213,24 +205,28 @@ function relevanceScore(c) {
         values = c[fieldMap[cat]] || [];
       }
 
-      const matchCount = values.filter(v => selected.has(v)).length;
-      score += matchCount * (CATEGORY_META[cat].weight || 1);
+      const matches = values.filter(v => selected.has(v)).length;
+      score += matches * 10;
     });
-  } else {
-    score += (c.competences.length + c.instances.length + c.gts.length +
-              c.actions.length + c.taches.length + c.communautes.length) * 0.1;
   }
+
+  const dataRichness = [
+    c.instances?.length || 0,
+    c.gts?.length || 0,
+    c.actions?.length || 0,
+    c.taches?.length || 0,
+    c.communautes?.length || 0,
+  ].reduce((a, b) => a + b, 0);
+  score += dataRichness;
+
   return score;
 }
 
 /* ============ RENDER ============ */
-
 function render() {
-  console.log('[RENDER] Starting render with', contacts.length, 'contacts');
+  console.log('[RENDER] Début du rendu');
   const enriched = contacts.map(enrich);
-  console.log('[RENDER] After enrichment:', enriched.length, 'contacts');
   const facets = collectFacetValues(enriched);
-  console.log('[FACETS] Collected facets:', Object.keys(facets));
 
   renderFilterBubbles(facets);
   renderActiveFilters();
@@ -239,8 +235,6 @@ function render() {
     .filter(matchesSearch)
     .filter(matchesFilters);
 
-  console.log('[FILTER] After filtering:', filtered.length, 'contacts match');
-
   const sorted = filtered.sort((a, b) => {
     const s = relevanceScore(b) - relevanceScore(a);
     if (s !== 0) return s;
@@ -248,29 +242,17 @@ function render() {
   });
 
   renderCards(sorted);
-
-  const resultEl = document.getElementById('resultCount');
-  if (resultEl) {
-    resultEl.textContent = `${sorted.length} contact${sorted.length > 1 ? 's' : ''}`;
-  }
-  const emptyEl = document.getElementById('emptyState');
-  if (emptyEl) {
-    emptyEl.hidden = sorted.length > 0;
-  }
-
-  console.log('[RENDER] ✅ Render complete');
+  updateResultCount(sorted.length);
+  console.log('[RENDER] Fin - affichage de', sorted.length, 'contacts');
 }
 
-/* ============ RENDER FILTER BUBBLES ============ */
-
 function renderFilterBubbles(facets) {
-  console.log('[FILTERS] Rendering filter bubbles...');
+  console.log('[FILTERS] Rendu des bulles de filtres');
   const container = document.getElementById('filterBubbles');
   if (!container) {
-    console.log('[FILTERS] ❌ filterBubbles not found in DOM!');
+    console.error('[FILTERS] ❌ filterBubbles not found in DOM!');
     return;
   }
-
   container.innerHTML = '';
 
   CATEGORY_ORDER.forEach(cat => {
@@ -278,222 +260,191 @@ function renderFilterBubbles(facets) {
     const values = [...facets[cat].entries()].sort((a, b) => b[1] - a[1]);
     if (values.length === 0) return;
 
-    const activeCount = activeFilters[cat].size;
-
-    // Créer la bulle
     const bubble = document.createElement('div');
     bubble.className = 'filter-bubble';
-    bubble.style.borderColor = meta.color;
-    bubble.style.color = meta.color;
-    bubble.innerHTML = `
-      ${meta.label}
-      ${activeCount > 0 ? ` <span class="badge">${activeCount}</span>` : ''}
-      <span class="chevron">▼</span>
+
+    const activeCount = activeFilters[cat].size;
+    const btn = document.createElement('button');
+    btn.className = 'filter-bubble-btn' + (activeCount > 0 ? ' active' : '');
+    btn.innerHTML = `
+      <span>${meta.label}</span>
+      ${activeCount > 0 ? `<span class="filter-badge">${activeCount}</span>` : ''}
     `;
 
-    // Créer le dropdown
     const dropdown = document.createElement('div');
     dropdown.className = 'filter-dropdown';
-    dropdown.style.borderTopColor = meta.color;
+    if (activeCount > 0) dropdown.classList.add('open');
 
     values.forEach(([val, count]) => {
-      const isChecked = activeFilters[cat].has(val);
       const option = document.createElement('label');
       option.className = 'filter-option';
       option.innerHTML = `
-        <input type="checkbox" ${isChecked ? 'checked' : ''} data-cat="${cat}" data-val="${val}">
-        <span>${val}</span>
-        <span class="count">${count}</span>
+        <input type="checkbox" ${activeFilters[cat].has(val) ? 'checked' : ''}>
+        <span class="filter-option-label">${val}</span>
+        <span class="filter-option-count">${count}</span>
       `;
+      option.querySelector('input').addEventListener('change', () => {
+        toggleFilter(cat, val);
+      });
       dropdown.appendChild(option);
     });
 
-    // Event listener pour les checkboxes
-    dropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-      cb.addEventListener('change', (e) => {
-        const cat = e.target.getAttribute('data-cat');
-        const val = e.target.getAttribute('data-val');
-        console.log('[FILTERS] toggleFilter called:', cat, val, e.target.checked);
-        toggleFilter(cat, val);
-      });
-    });
-
-    // Wrapper pour bulle + dropdown
-    const wrapper = document.createElement('div');
-    wrapper.className = 'filter-bubble-wrapper';
-    wrapper.appendChild(bubble);
-    wrapper.appendChild(dropdown);
-
-    // Event listener pour la bulle
-    bubble.addEventListener('click', (e) => {
+    btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      console.log('[FILTERS] Bubble clicked:', cat);
       dropdown.classList.toggle('open');
+      btn.classList.toggle('active');
     });
 
-    container.appendChild(wrapper);
-    console.log(`[FILTERS]   ✅ ${meta.label}: ${values.length} options`);
+    bubble.appendChild(btn);
+    bubble.appendChild(dropdown);
+    container.appendChild(bubble);
   });
 }
 
 function toggleFilter(cat, val) {
+  console.log('[FILTER] Toggle:', cat, val);
   const set = activeFilters[cat];
-  if (set.has(val)) set.delete(val);
-  else set.add(val);
-  console.log('[FILTERS] After toggle, activeFilters:', cat, set.size);
+  if (set.has(val)) {
+    set.delete(val);
+  } else {
+    set.add(val);
+  }
   render();
 }
 
-/* ============ RENDER ACTIVE FILTERS ============ */
-
 function renderActiveFilters() {
-  const container = document.getElementById('activeFilters');
+  const container = document.getElementById('activeFiltersChips');
   if (!container) return;
-
   container.innerHTML = '';
 
   CATEGORY_ORDER.forEach(cat => {
-    const meta = CATEGORY_META[cat];
-    const selected = activeFilters[cat];
-    selected.forEach(val => {
+    activeFilters[cat].forEach(val => {
       const chip = document.createElement('div');
-      chip.className = 'active-filter-chip';
-      chip.style.backgroundColor = meta.color;
+      chip.className = 'filter-chip';
       chip.innerHTML = `
-        ${val}
-        <button class="chip-close" data-cat="${cat}" data-val="${val}">✕</button>
+        <span>${val}</span>
+        <span class="filter-chip-remove">✕</span>
       `;
-      chip.querySelector('.chip-close').addEventListener('click', () => {
-        toggleFilter(cat, val);
+      chip.querySelector('.filter-chip-remove').addEventListener('click', () => {
+        activeFilters[cat].delete(val);
+        render();
       });
       container.appendChild(chip);
     });
   });
 }
 
-/* ============ RENDER CARDS ============ */
-
 function renderCards(list) {
-  console.log('[CARDS] Rendering', list.length, 'cards');
+  console.log('[CARDS] Rendu de', list.length, 'cartes');
   const grid = document.getElementById('cardsGrid');
   if (!grid) {
-    console.log('[CARDS] ❌ cardsGrid not found in DOM!');
+    console.error('[CARDS] ❌ cardsGrid not found in DOM!');
     return;
   }
-
   const tmpl = document.getElementById('cardTemplate');
   if (!tmpl) {
-    console.log('[CARDS] ❌ cardTemplate not found in DOM!');
+    console.error('[CARDS] ❌ cardTemplate not found in DOM!');
     return;
   }
 
   grid.innerHTML = '';
 
-  list.forEach((c, idx) => {
+  list.forEach(c => {
     const node = tmpl.content.cloneNode(true);
-    const card = node.querySelector('.contact-card');
+    const card = node.querySelector('.card');
 
-    // Avatar placeholder
-    const avatar = node.querySelector('.card-avatar');
-    if (avatar) {
-      const initials = `${(c.prenom || '').charAt(0)}${(c.nom || '').charAt(0)}`.toUpperCase();
-      avatar.textContent = initials;
-      avatar.style.backgroundColor = `hsl(${(idx * 60) % 360}, 70%, 60%)`;
-    }
+    node.querySelector('.card-avatar').src = c.avatar;
+    node.querySelector('.card-avatar').alt = `${c.prenom} ${c.nom}`;
+    node.querySelector('.card-name').textContent = `${c.prenom} ${c.nom}`.trim() || 'Sans nom';
+    node.querySelector('.card-fonction').textContent = c.fonction || '';
+    node.querySelector('.card-structure').textContent = c.structure || '';
 
-    // Infos basiques
-    const nameEl = node.querySelector('.card-name');
-    if (nameEl) nameEl.textContent = `${c.prenom} ${c.nom}`.trim();
-
-    const fonctionEl = node.querySelector('.card-fonction');
-    if (fonctionEl) fonctionEl.textContent = c.fonction || '';
-
-    const structureEl = node.querySelector('.card-structure');
-    if (structureEl) structureEl.textContent = c.structure || '';
-
-    // Email
     const emailEl = node.querySelector('.card-email');
-    if (emailEl) {
-      if (c.email) {
-        emailEl.textContent = c.email;
-        emailEl.href = `mailto:${c.email}`;
-      } else {
-        emailEl.style.display = 'none';
-      }
+    if (c.email) {
+      emailEl.textContent = c.email;
+      emailEl.href = `mailto:${c.email}`;
+    } else {
+      emailEl.style.display = 'none';
     }
 
-    // Téléphone
     const telEl = node.querySelector('.card-tel');
-    if (telEl) {
-      if (c.tel) {
-        telEl.textContent = `☎ ${c.tel}`;
-      } else {
-        telEl.style.display = 'none';
-      }
+    if (c.tel) {
+      telEl.textContent = `☎ ${c.tel}`;
+    } else {
+      telEl.style.display = 'none';
     }
 
-    // Tags
     const tagsWrap = node.querySelector('.card-tags');
-    if (tagsWrap) {
-      tagsWrap.innerHTML = '';
-
-      const allTags = [
-        ...c.competences.map(v => ({ val: v, cat: 'competence' })),
-        ...c.instances.map(v => ({ val: v, cat: 'instance' })),
-        ...c.gts.map(v => ({ val: v, cat: 'gt' })),
-        ...c.actions.map(v => ({ val: v, cat: 'action' })),
-        ...c.taches.map(v => ({ val: v, cat: 'tache' })),
-        ...c.communautes.map(v => ({ val: v, cat: 'communaute' })),
-      ];
-      if (c.etablissement) allTags.push({ val: c.etablissement, cat: 'etablissement' });
-      if (c.role) allTags.push({ val: c.role, cat: 'role' });
-
-      allTags.forEach(({ val, cat }) => {
-        const tag = document.createElement('button');
-        tag.className = 'card-tag';
-        tag.style.backgroundColor = CATEGORY_META[cat].color;
-        tag.textContent = val;
-        tag.addEventListener('click', () => {
-          toggleFilter(cat, val);
-        });
-        tagsWrap.appendChild(tag);
-      });
-    }
+    appendTags(tagsWrap, c.competences, 'competence');
+    appendTags(tagsWrap, c.instances, 'instance');
+    appendTags(tagsWrap, c.gts, 'gt');
+    appendTags(tagsWrap, c.actions, 'action');
+    appendTags(tagsWrap, c.taches, 'tache');
+    appendTags(tagsWrap, c.communautes, 'communaute');
+    if (c.etablissement) appendTags(tagsWrap, [c.etablissement], 'etablissement');
+    if (c.role) appendTags(tagsWrap, [c.role], 'role');
 
     grid.appendChild(node);
   });
+}
 
-  console.log('[CARDS] ✅ Rendered', list.length, 'cards');
+function appendTags(container, values, category) {
+  if (!Array.isArray(values)) values = [values];
+  values.filter(Boolean).forEach(val => {
+    const tag = document.createElement('div');
+    tag.className = `tag ${category}`;
+    tag.textContent = val;
+    tag.addEventListener('click', () => {
+      activeFilters[category].add(val);
+      render();
+    });
+    container.appendChild(tag);
+  });
+}
+
+function updateResultCount(count) {
+  const el = document.getElementById('resultCount');
+  if (!el) return;
+  el.textContent = `${count} contact${count > 1 ? 's' : ''}`;
+  const emptyState = document.getElementById('emptyState');
+  if (emptyState) {
+    if (count === 0) {
+      emptyState.classList.add('show');
+    } else {
+      emptyState.classList.remove('show');
+    }
+  }
 }
 
 /* ============ EVENTS ============ */
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[EVENTS] Attachement des event listeners');
 
-const searchInput = document.getElementById('searchInput');
-if (searchInput) {
-  searchInput.addEventListener('input', (e) => {
-    searchTerm = e.target.value.trim();
-    console.log('[SEARCH] searchTerm changed to:', searchTerm);
-    render();
-  });
-}
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchTerm = e.target.value.trim();
+      render();
+    });
+  }
 
-const resetBtn = document.getElementById('resetFilters');
-if (resetBtn) {
-  resetBtn.addEventListener('click', () => {
-    console.log('[FILTERS] Reset clicked');
-    CATEGORY_ORDER.forEach(k => activeFilters[k].clear());
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) searchInput.value = '';
-    searchTerm = '';
-    render();
-  });
-}
+  const resetBtn = document.getElementById('resetFilters');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      CATEGORY_ORDER.forEach(k => activeFilters[k].clear());
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) searchInput.value = '';
+      searchTerm = '';
+      render();
+    });
+  }
 
-// Fermer dropdowns quand on clique ailleurs
-document.addEventListener('click', () => {
-  document.querySelectorAll('.filter-dropdown.open').forEach(dd => {
-    dd.classList.remove('open');
+  // Close dropdowns on outside click
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.filter-dropdown.open').forEach(dd => {
+      dd.classList.remove('open');
+    });
   });
 });
 
-console.log('[INIT] ✅ App initialized, waiting for grist data...');
+console.log('[BOOT] Widget Annuaire prêt!');

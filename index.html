@@ -7,69 +7,65 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- HEADER -->
-  <header class="app-header">
-    <div class="header-content">
+  <div id="app">
+    <!-- HEADER -->
+    <header class="header">
       <div class="header-left">
-        <h1 class="app-title">📄 Annuaire</h1>
-        <p class="app-subtitle">Répertoire de contacts</p>
+        <h1 class="logo">📋 Annuaire</h1>
+        <p class="subtitle">Répertoire de contacts</p>
       </div>
       <div class="header-right">
-        <div class="search-wrapper">
-          <span class="search-icon">🔍</span>
-          <input
-            type="text"
-            id="searchInput"
-            class="search-input"
-            placeholder="Rechercher par nom, fonction, structure..."
-          />
-        </div>
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input" 
+          placeholder="Rechercher par nom, fonction, structure..."
+        >
       </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- FILTER BUBBLES -->
-  <div class="filters-section">
-    <div id="filterBubbles" class="filter-bubbles"></div>
-    <button id="resetFilters" class="reset-btn">✕ Réinitialiser</button>
-  </div>
-
-  <!-- ACTIVE FILTERS CHIPS -->
-  <div id="activeFilters" class="active-filters"></div>
-
-  <!-- MAIN CONTENT -->
-  <main class="app-main">
-    <!-- RESULT COUNT -->
-    <div class="results-header">
-      <span id="resultCount" class="result-count">0 contacts</span>
+    <!-- FILTERS SECTION -->
+    <div class="filters-section">
+      <div class="filter-bubbles" id="filterBubbles"></div>
+      <button id="resetFilters" class="reset-btn">✕ Réinitialiser</button>
     </div>
 
-    <!-- EMPTY STATE -->
-    <div id="emptyState" class="empty-state" hidden>
-      <p>🔍 Aucun contact ne correspond à votre recherche</p>
+    <!-- ACTIVE FILTERS CHIPS -->
+    <div class="active-filters" id="activeFiltersChips"></div>
+
+    <!-- RESULTS COUNT -->
+    <div class="results-info">
+      <span id="resultCount">0 contacts</span>
     </div>
 
     <!-- CARDS GRID -->
-    <div id="cardsGrid" class="cards-grid"></div>
-  </main>
+    <div class="cards-container">
+      <div class="cards-grid" id="cardsGrid"></div>
+      <div class="empty-state" id="emptyState">
+        <p>Aucun contact ne correspond à votre recherche.</p>
+      </div>
+    </div>
+  </div>
 
   <!-- CARD TEMPLATE -->
   <template id="cardTemplate">
-    <div class="contact-card">
-      <div class="card-header">
-        <div class="card-avatar"></div>
+    <div class="card">
+      <div class="card-avatar-section">
+        <img class="card-avatar" src="" alt="">
       </div>
-      <div class="card-body">
+      <div class="card-content">
         <h3 class="card-name"></h3>
         <p class="card-fonction"></p>
         <p class="card-structure"></p>
-        <a class="card-email" href="#"></a>
+        <a class="card-email" href=""></a>
         <p class="card-tel"></p>
       </div>
       <div class="card-tags"></div>
     </div>
   </template>
-<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+  <!-- SCRIPTS - ORDER MATTERS! -->
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
