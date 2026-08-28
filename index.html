@@ -3,54 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Annuaire Contacts - Grist Widget</title>
+  <title>Annuaire - Grist Widget</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://grist.incubateur.net/grist-plugin-api.js"></script>
 </head>
 <body>
-  <div id="app">
-    <!-- Header -->
-    <header class="header">
-      <h1>Annuaire des Contacts</h1>
-    </header>
-
-    <!-- Filter Panel -->
-    <div class="filters-container">
-      <div class="filters-controls">
-        <input type="text" id="searchInput" placeholder="Rechercher un contact..." class="search-input">
-        <button id="toggleFilters" class="toggle-btn">Filtrer</button>
-        <button id="resetFilters" class="reset-btn">Réinitialiser</button>
-      </div>
-      <div id="filtersPanel" class="filters-panel">
-        <div id="filtersContainer" class="filters-content"></div>
-      </div>
+  <!-- Bandeau de filtres horizontal -->
+  <div id="filtersPanel" class="filters-panel">
+    <div class="filters-header">
+      <button id="toggleFilters" class="toggle-filters">🔽 Filtres</button>
+      <button id="resetFilters" class="reset-filters">↻ Réinitialiser</button>
     </div>
-
-    <!-- Results -->
-    <div class="results-container">
-      <div id="resultCount" class="result-count">0 contacts</div>
-      <div id="emptyState" class="empty-state" hidden>
-        <p>Aucun contact ne correspond à vos critères.</p>
-      </div>
-      <div id="contactsGrid" class="contacts-grid"></div>
-    </div>
+    <div id="filtersContainer" class="filters-container"></div>
   </div>
 
-  <!-- Card Template -->
-  <template id="cardTemplate">
-    <div class="contact-card">
-      <img class="avatar" src="" alt="" />
-      <div class="card-content">
-        <div class="name"></div>
-        <div class="fonction"></div>
-        <div class="structure"></div>
-        <a class="email" href="#"></a>
-        <div class="tel"></div>
-      </div>
-      <div class="card-tags"></div>
-    </div>
-  </template>
+  <!-- Barre de recherche -->
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Rechercher par nom, prénom, fonction, structure...">
+    <span id="resultCount" class="result-count">0 contacts</span>
+  </div>
 
+  <!-- Grille de cartes -->
+  <div id="cardsGrid" class="cards-grid"></div>
+
+  <!-- État vide -->
+  <div id="emptyState" class="empty-state" hidden>
+    <p>Aucun contact ne correspond à vos critères.</p>
+  </div>
+
+  <!-- Scripts -->
+  <!-- Charger Grist en premier -->
+  <script src="https://grist.incubateur.net/grist-plugin-api.js"></script>
+  <!-- Ensuite style et app -->
+  <script src="style.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
