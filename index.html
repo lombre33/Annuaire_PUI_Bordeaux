@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annuaire</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1>Annuaire</h1>
+      <span class="count-badge" id="resultCount">0 contacts</span>
+    </div>
+    <div class="topbar-right">
+      <input type="search" id="searchInput" placeholder="Rechercher un nom, une fonction…" />
+      <button id="resetFilters" class="btn-ghost">Réinitialiser les filtres</button>
+      <button id="toggleFilters" class="btn-ghost mobile-only">Filtres</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside class="filters-panel" id="filtersPanel">
+      <div class="filters-scroll" id="filtersContainer">
+        <!-- généré dynamiquement -->
+      </div>
+    </aside>
+
+    <main class="cards-area">
+      <div class="cards-grid" id="cardsGrid"></div>
+      <div class="empty-state" id="emptyState" hidden>
+        Aucun contact ne correspond aux filtres sélectionnés.
+      </div>
+    </main>
+  </div>
+</div>
+
+<template id="cardTemplate">
+  <article class="card">
+    <div class="card-head">
+      <img class="avatar" src="" alt="" />
+      <div class="identity">
+        <h3 class="name"></h3>
+        <p class="fonction"></p>
+        <p class="structure"></p>
+      </div>
+    </div>
+    <div class="card-contact">
+      <a class="email" href="#"></a>
+      <span class="tel"></span>
+    </div>
+    <div class="card-tags"></div>
+  </article>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>
