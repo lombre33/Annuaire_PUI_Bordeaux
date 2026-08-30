@@ -68,9 +68,9 @@ function normalizeRecord(r) {
     email: r.Email || '',
     fonction: r.fonction || '',
     tel: r.numero_de_telephone || '',
-    structure: r.Etablissement2 || '',
+    structure: r.Etablissement2 || r.Etablissement_nom || '',
     competences,
-    perimetreIds: safeArray(r.perimetre_all || [r.perimetre_1, r.perimetre_2].filter(Boolean)),
+    perimetreIds: safeArray(r.perimetre_all),
     instanceIds: safeArray(r.Instances),
     gtIds: safeArray(r.GT),
     actionIds: safeArray(r.Actions),
@@ -104,7 +104,7 @@ async function loadRefTables() {
       const data = await grist.docApi.fetchTable(table);
       const map = {};
       data.id.forEach((id, idx) => {
-        map[id] = data[field] ? data[field][idx] : `#${id}`;
+        map[id] = (data[field] && data[field][idx]) || (data.nom && data.nom[idx]) || (data.communaute && data.communaute[idx]) || `#${id}`;
       });
       refTables[table] = map;
       console.log('[REFS] Chargé', table, ':', Object.keys(map).length, 'entrées');
@@ -131,7 +131,7 @@ function enrich(c) {
     actions: c.actionIds.map(id => label('Actions', id)).filter(Boolean),
     taches: c.tacheIds.map(id => label('Taches', id)).filter(Boolean),
     communautes: c.communauteIds.map(id => label('Communautees', id)).filter(Boolean),
-    etablissement: label('Etablissements', c.etablissementId),
+    etablissement: label('Etablissements', c.etablissementId) || c.structure || '',
     role: label('Role_Dans_le_PUI', c.roleId),
   };
 }
@@ -271,6 +271,8 @@ function renderFilterBubbles(facets) {
 
     const activeCount = activeFilters[cat].size;
     const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.category = cat;
     btn.className = 'filter-bubble-btn' + (activeCount > 0 ? ' active' : '');
     btn.innerHTML = `
       <span>${meta.label}</span>
@@ -308,7 +310,7 @@ function renderFilterBubbles(facets) {
 }
 
 function toggleFilter(cat, val) {
-  console.log('[FILTER] Toggle:', cat, val);
+  console.log('[FILTERS] Toggle:', cat, val);
   const set = activeFilters[cat];
   if (set.has(val)) {
     set.delete(val);
@@ -340,6 +342,7 @@ function renderActiveFilters() {
   });
 }
 
+/* ============ RENDER CARDS ============ */
 function renderCards(list) {
   console.log('[CARDS] Rendu de', list.length, 'cartes');
   const grid = document.getElementById('cardsGrid');
@@ -358,11 +361,11 @@ function renderCards(list) {
   list.forEach(c => {
     const node = tmpl.content.cloneNode(true);
 
-    node.querySelector('.card-avatar').src = c.avatar;
-    node.querySelector('.card-avatar').alt = `${c.prenom} ${c.nom}`;
+    const avatar = node.querySelector('.avatar-placeholder');
+    if (avatar) avatar.textContent = (c.prenom || c.nom || '?').trim().charAt(0).toUpperCase() || '?';
     node.querySelector('.card-name').textContent = `${c.prenom} ${c.nom}`.trim() || 'Sans nom';
     node.querySelector('.card-fonction').textContent = c.fonction || '';
-    node.querySelector('.card-structure').textContent = c.structure || '';
+    node.querySelector('.card-structure').textContent = c.etablissement || c.structure || '';
 
     const emailEl = node.querySelector('.card-email');
     if (c.email) {
@@ -414,8 +417,10 @@ function updateResultCount(count) {
   const emptyState = document.getElementById('emptyState');
   if (emptyState) {
     if (count === 0) {
+      emptyState.hidden = false;
       emptyState.classList.add('show');
     } else {
+      emptyState.hidden = true;
       emptyState.classList.remove('show');
     }
   }

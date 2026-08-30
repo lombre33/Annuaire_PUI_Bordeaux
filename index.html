@@ -3,68 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Annuaire - Widget Grist</title>
+  <title>Annuaire - Contacts</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <!-- HEADER -->
+  <div class="app-container">
     <header class="header">
-      <div class="header-left">
-        <h1 class="logo">📋 Annuaire</h1>
-        <p class="subtitle">Répertoire de contacts</p>
-      </div>
-      <div class="header-right">
-        <input 
-          type="text" 
-          id="searchInput" 
-          class="search-input" 
-          placeholder="Rechercher par nom, fonction, structure..."
-        >
+      <div class="header-content">
+        <div class="logo-section">
+          <h1 class="logo">📇 Annuaire</h1>
+          <p class="subtitle">Répertoire de contacts</p>
+        </div>
+        <div class="search-section">
+          <input type="search" id="searchInput" class="search-input" placeholder="Rechercher par nom, fonction, structure..." autocomplete="off">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+        </div>
       </div>
     </header>
 
-    <!-- FILTERS SECTION -->
-    <div class="filters-section">
-      <div class="filter-bubbles" id="filterBubbles"></div>
-      <button id="resetFilters" class="reset-btn">✕ Réinitialiser</button>
-    </div>
-
-    <!-- ACTIVE FILTERS CHIPS -->
-    <div class="active-filters" id="activeFilters"></div>
-
-    <!-- RESULTS COUNT -->
-    <div class="results-info">
-      <span id="resultCount">0 contacts</span>
-    </div>
-
-    <!-- CARDS GRID -->
-    <div class="cards-container">
-      <div class="cards-grid" id="cardsGrid"></div>
-      <div class="empty-state" id="emptyState">
-        <p>🔍 Aucun contact ne correspond à votre recherche.</p>
+    <section class="filter-banner" aria-label="Filtres">
+      <div class="filter-banner-content">
+        <div class="filter-bubbles" id="filterBubbles"></div>
+        <button id="resetFilters" class="reset-btn" type="button">✕ Réinitialiser</button>
       </div>
-    </div>
+    </section>
+
+    <main class="main-content">
+      <div class="active-filters" id="activeFilters" aria-live="polite"></div>
+      <div class="results-header"><span id="resultCount">0 contacts</span></div>
+      <div class="cards-grid" id="cardsGrid"></div>
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="empty-state-icon">📭</div>
+        <h2>Aucun contact trouvé</h2>
+        <p>Modifiez vos filtres ou votre recherche.</p>
+      </div>
+    </main>
   </div>
 
-  <!-- CARD TEMPLATE -->
   <template id="cardTemplate">
-    <div class="card">
-      <div class="card-avatar-section">
-        <img class="card-avatar" src="" alt="">
-      </div>
+    <article class="card">
+      <div class="card-avatar"><div class="avatar-placeholder" aria-hidden="true">?</div></div>
       <div class="card-content">
         <h3 class="card-name"></h3>
         <p class="card-fonction"></p>
         <p class="card-structure"></p>
-        <a class="card-email" href=""></a>
-        <p class="card-tel"></p>
+        <div class="card-contact">
+          <a class="card-email" href="#"></a>
+          <span class="card-tel"></span>
+        </div>
+        <div class="card-tags"></div>
       </div>
-      <div class="card-tags"></div>
-    </div>
+    </article>
   </template>
 
-  <!-- SCRIPTS - ORDER MATTERS! -->
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="app.js"></script>
 </body>
