@@ -1,45 +1,10 @@
-# Version 0.9 - STABLE RELEASE 🎉
+# Version 0.95 - Stable
 
-**Commit:** `57de74d0dcb99da6a44ee8953395e20c9002e487`  
-**Date:** 31 Août 2026
+Point de sauvegarde créé le 2026-08-31.
 
-## ✅ Ce qui fonctionne parfaitement
+- Commit de référence : 4f187cae7229b9c0d5863d3090924c8a492fd0bb
+- État : contacts affichés, 7 filtres peuplés et fonctionnels (Actions / Tâches / Communautés / GT / Compétences / Instances / Établissement)
+- Filtre back-end `perimetre_all` appliqué (seuls les contacts avec ce champ renseigné sont affichés)
+- Cartes contact complètes avec catégories cliquables
 
-### Filtres
-- ✅ Instances (depuis table `Instances`)
-- ✅ Actions (depuis table `Actions`)
-- ✅ GT (depuis table `GT`)
-- ✅ Communautés (depuis table `Communautees`)
-- ✅ Rôle PUI (depuis table `Role_Dans_le_PUI`)
-
-### Cartes de Contact
-- ✅ Avatar avec initiales
-- ✅ Nom/Prénom
-- ✅ Fonction
-- ✅ Établissement (clickable)
-- ✅ Email
-- ✅ Téléphone (si renseigné)
-- ✅ 6 Catégories clickables (Instances, Actions, GT, Communautés, Rôle PUI)
-
-### Fonctionnalités
-- ✅ Filtrage par sélection de bulles
-- ✅ Défilement des cartes
-- ✅ Récupération correcte des données Grist en format colonnes
-- ✅ Conversion `tableToRows()` fonctionnelle
-- ✅ Gestion des références multiples
-
-## 📌 Point de rollback
-
-Si des problèmes surgissent après cette version, revenir au commit:
-```
-git checkout 57de74d0dcb99da6a44ee8953395e20c9002e487
-```
-
-## 🚀 Prochaines améliorations possibles
-- Amélioration du design/UX
-- Optimisations de performance
-- Nouvelles fonctionnalités
-
----
-
-**Cette version est production-ready !** ✨
+Cette version sert de point de rollback fiable avant les corrections finales prévues pour la V1.
