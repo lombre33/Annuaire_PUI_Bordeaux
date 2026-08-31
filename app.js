@@ -293,7 +293,7 @@ window.grist.onRecords(async records => {
     console.log('[GRIST] Enregistrements reçus:', rows.length);
 
     const scopedRecords = rows.filter(r => {
-      const p = r.$perimetre_all;
+      const p = r.perimetre_all;
       if (Array.isArray(p)) return p.length > 0;
       if (p === null || p === undefined) return false;
       return typeof p === 'string' ? p.trim() !== '' : true;
@@ -324,4 +324,6 @@ window.grist.onRecords(async records => {
 document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
+
+
 
