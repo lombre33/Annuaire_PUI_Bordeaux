@@ -31,6 +31,7 @@ const TAG_GROUPS = [
 let allContacts = [];
 let referenceMaps = {};
 let activeFilters = {};
+let searchTerm = '';
 
 FILTERS.forEach(f => {
   activeFilters[f.key] = new Set();
@@ -160,7 +161,6 @@ function createFilterUI() {
     button.innerHTML = `
       <span class="filter-dot"></span>
       <span>${filter.label}</span>
-      <span class="filter-count">${activeFilters[filter.key].size}</span>
       <span class="chevron">▾</span>
     `;
     button.querySelector('.filter-dot').style.backgroundColor = filter.color;
@@ -212,11 +212,15 @@ function displayContacts() {
   if (!grid) return;
   grid.innerHTML = '';
 
+  const term = searchTerm.toLocaleLowerCase('fr-FR');
   const filtered = allContacts.filter(contact => {
+    if (term && ![contact.Nom, contact.Prenom].some(value => text(value).toLocaleLowerCase('fr-FR').includes(term))) return false;
     for (const filter of FILTERS) {
       const selected = activeFilters[filter.key];
       if (selected.size === 0) continue;
-      const labels = contact[`${filter.key}_labels`] || [];
+      const labels = filter.key === 'etablissement'
+        ? (contact.etablissement_label ? [contact.etablissement_label] : [])
+        : (contact[`${filter.key}_labels`] || []);
       if (!labels.some(label => selected.has(label))) return false;
     }
     return true;
@@ -234,11 +238,10 @@ function displayContacts() {
       fonction.textContent = contact.fonction;
       fonction.classList.add('visible');
     }
-    const etablissement = clone.querySelector('.etablissement');
+    const etablissement = clone.querySelector('.etablissement-tag');
     if (contact.etablissement_label) {
       etablissement.textContent = contact.etablissement_label;
       etablissement.classList.add('visible');
-      etablissement.style.cursor = 'pointer';
       etablissement.addEventListener('click', () => toggleFilter('etablissement', contact.etablissement_label));
     }
     const email = clone.querySelector('.email');
@@ -284,6 +287,18 @@ function displayContacts() {
     `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   document.getElementById('emptyState').hidden = filtered.length !== 0;
 }
+
+document.getElementById('searchInput').addEventListener('input', event => {
+  searchTerm = event.target.value.trim();
+  displayContacts();
+});
+
+document.getElementById('resetFilters').addEventListener('click', () => {
+  Object.values(activeFilters).forEach(set => set.clear());
+  searchTerm = '';
+  document.getElementById('searchInput').value = '';
+  displayContacts();
+});
 
 window.grist.ready({ requiredAccess: 'read table' });
 
