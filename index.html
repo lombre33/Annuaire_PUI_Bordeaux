@@ -1,19 +1,17 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <title>Annuaire PUI</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Annuaire - Grist Widget</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="widget-shell">
-    <header class="page-header"><div><p class="eyebrow">Agenda PUI Bordeaux</p><h1>Annuaire des membres</h1><p class="subtitle">Retrouvez les contacts et les groupes du PUI.</p></div><div id="resultCount" class="result-count" aria-live="polite">0 contact</div></header>
-    <section class="toolbar" aria-label="Recherche et filtres"><label class="search-box" for="searchInput"><span class="search-icon" aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Rechercher par nom ou prénom…" autocomplete="off"></label><div id="filtersContainer" class="filters-container" aria-label="Filtres"></div><button id="resetFilters" class="reset-button" type="button">Réinitialiser</button></section>
-    <div id="activeFilters" class="active-filters" aria-live="polite"></div><section id="cardsGrid" class="cards-grid" aria-live="polite"></section>
-    <section id="emptyState" class="empty-state" hidden><div class="empty-mark">✦</div><h2>Aucun contact trouvé</h2><p>Modifiez votre recherche ou réinitialisez les filtres.</p></section>
-  </main>
-  <template id="cardTemplate"><article class="contact-card"><div class="card-topline"></div><div class="card-body"><div class="avatar" aria-hidden="true"></div><div class="identity"><h2 class="name"></h2><p class="fonction"></p></div><div class="details"><p class="structure detail-row"></p><a class="email detail-row" rel="noopener"></a><p class="tel detail-row"></p></div><div class="card-tags"></div></div></article></template>
+  <div id="filtersPanel" class="filters-panel"><div class="filters-header"><button id="toggleFilters" class="toggle-filters" type="button">🔽 Filtres</button><button id="resetFilters" class="reset-filters" type="button">↻ Réinitialiser</button></div><div id="filtersContainer" class="filters-container"></div></div>
+  <div class="search-bar"><input type="search" id="searchInput" placeholder="Rechercher par nom, prénom, fonction, structure..." autocomplete="off"><span id="resultCount" class="result-count">0 contacts</span></div>
+  <div id="cardsGrid" class="cards-grid"></div><div id="emptyState" class="empty-state" hidden><p>Aucun contact ne correspond à vos critères.</p></div>
+  <template id="cardTemplate"><article class="contact-card"><img class="avatar" alt=""><div class="card-content"><div class="name"></div><div class="fonction"></div><div class="structure"></div><a class="email"></a><div class="tel"></div><div class="card-tags"></div></div></article></template>
   <script src="app.js"></script>
 </body>
 </html>
