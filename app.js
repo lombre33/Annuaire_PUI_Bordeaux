@@ -10,9 +10,9 @@
 const FILTERS = [
   { key: 'actions', label: 'Actions', table: 'Actions', field: 'Action', color: '#f28a54' },
   { key: 'taches', label: 'Tâches', table: 'Taches', field: 'taches', color: '#ff9800' },
-  { key: 'communautes', label: 'Communautés', table: 'Communautes', field: 'communaute', color: '#d85b9d' },
+  { key: 'communautes', label: 'Communautés', table: 'Communautees', field: 'communaute', color: '#d85b9d' },
   { key: 'gt', label: 'GT', table: 'GT', field: 'nom', color: '#1ba99a' },
-  { key: 'competences', label: 'Compétences', table: 'Competences', field: 'libelle', color: '#9c27b0' },
+  { key: 'competences', label: 'Compétences', table: 'Competances', field: 'Competences', color: '#9c27b0' },
   { key: 'instances', label: 'Instances', table: 'Instances', field: 'nom_instance', color: '#4f8ee8' },
   { key: 'etablissement', label: 'Établissement', table: 'Etablissements', field: 'acronyme', color: '#147c72' }
 ];
@@ -32,7 +32,6 @@ let allContacts = [];
 let referenceMaps = {};
 let activeFilters = {};
 
-// Initialiser les filtres
 FILTERS.forEach(f => {
   activeFilters[f.key] = new Set();
 });
@@ -99,37 +98,31 @@ function enrich(contact) {
     role_label: ''
   };
 
-  // Instances
   const instanceIds = safeValues(contact.Instances);
   enriched.instances_labels = instanceIds
     .map(id => referenceMaps['Instances']?.[String(id)] || text(id))
     .filter(Boolean);
 
-  // Actions
   const actionIds = safeValues(contact.Actions);
   enriched.actions_labels = actionIds
     .map(id => referenceMaps['Actions']?.[String(id)] || text(id))
     .filter(Boolean);
 
-  // GT
   const gtIds = safeValues(contact.GT);
   enriched.gt_labels = gtIds
     .map(id => referenceMaps['GT']?.[String(id)] || text(id))
     .filter(Boolean);
 
-  // Communautés (attention à la colonne Communautee_s_)
   const communauteIds = safeValues(contact.Communautee_s_);
   enriched.communautes_labels = communauteIds
-    .map(id => referenceMaps['Communautes']?.[String(id)] || text(id))
+    .map(id => referenceMaps['Communautees']?.[String(id)] || text(id))
     .filter(Boolean);
 
-  // Tâches
   const tachesIds = safeValues(contact.Taches);
   enriched.taches_labels = tachesIds
     .map(id => referenceMaps['Taches']?.[String(id)] || text(id))
     .filter(Boolean);
 
-  // Compétences (colonnes competences_1 à competences_15)
   const competences = [];
   for (let i = 1; i <= 15; i++) {
     const value = text(contact[`competences_${i}`]);
@@ -137,19 +130,15 @@ function enrich(contact) {
   }
   enriched.competences_labels = competences;
 
-  // Établissement
   const etablissementId = contact.Etablissement;
-  enriched.etablissement_label = 
-    (etablissementId && referenceMaps['Etablissements']?.[String(etablissementId)]) || 
-    text(contact.Etablissement2) ||
-    '';
+  enriched.etablissement_label =
+    (etablissementId && referenceMaps['Etablissements']?.[String(etablissementId)]) ||
+    text(contact.Etablissement2) || '';
 
-  // Rôle dans le PUI
   const roleId = contact.Role_dans_le_PUI;
-  enriched.role_label = 
-    (roleId && referenceMaps['Role_Dans_le_PUI']?.[String(roleId)]) || 
-    text(roleId) ||
-    '';
+  enriched.role_label =
+    (roleId && referenceMaps['Role_Dans_le_PUI']?.[String(roleId)]) ||
+    text(roleId) || '';
 
   return enriched;
 }
@@ -180,23 +169,19 @@ function createFilterUI() {
     menu.className = 'filter-menu';
     menu.style.borderTopColor = filter.color;
 
-    // Récupérer les valeurs de la table de référence
     const refMap = referenceMaps[filter.table] || {};
     const values = [...new Set(Object.values(refMap))].sort();
 
     values.forEach(value => {
       const option = document.createElement('label');
       option.className = 'filter-option';
-
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = activeFilters[filter.key].has(value);
       checkbox.addEventListener('change', () => toggleFilter(filter.key, value));
-
       const label = document.createElement('span');
       label.className = 'option-label';
       label.textContent = value;
-
       option.append(checkbox, label);
       menu.appendChild(option);
     });
@@ -215,61 +200,40 @@ function createFilterUI() {
   });
 }
 
-// ===== BASCULER UN FILTRE =====
 function toggleFilter(filterKey, value) {
   if (!activeFilters[filterKey]) activeFilters[filterKey] = new Set();
-  
-  if (activeFilters[filterKey].has(value)) {
-    activeFilters[filterKey].delete(value);
-  } else {
-    activeFilters[filterKey].add(value);
-  }
-
+  if (activeFilters[filterKey].has(value)) activeFilters[filterKey].delete(value);
+  else activeFilters[filterKey].add(value);
   displayContacts();
 }
 
-// ===== FILTRER ET AFFICHER LES CONTACTS =====
 function displayContacts() {
   const grid = document.getElementById('cardsGrid');
   if (!grid) return;
-
   grid.innerHTML = '';
 
   const filtered = allContacts.filter(contact => {
-    // Filtrer selon les filtres actifs
     for (const filter of FILTERS) {
       const selected = activeFilters[filter.key];
       if (selected.size === 0) continue;
-
       const labels = contact[`${filter.key}_labels`] || [];
-      const hasMatch = labels.some(label => selected.has(label));
-      
-      if (!hasMatch) return false;
+      if (!labels.some(label => selected.has(label))) return false;
     }
-
     return true;
   });
 
   const template = document.getElementById('cardTemplate');
   filtered.forEach(contact => {
     const clone = template.content.cloneNode(true);
-
-    // Avatar
-    clone.querySelector('.avatar').textContent = 
+    clone.querySelector('.avatar').textContent =
       `${(contact.Prenom || '').charAt(0)}${(contact.Nom || '').charAt(0)}`.toUpperCase() || '?';
-
-    // Nom Prénom
-    clone.querySelector('.name').textContent = 
+    clone.querySelector('.name').textContent =
       `${contact.Prenom || ''} ${contact.Nom || ''}`.trim() || 'Sans nom';
-
-    // Fonction
     const fonction = clone.querySelector('.fonction');
     if (contact.fonction) {
       fonction.textContent = contact.fonction;
       fonction.classList.add('visible');
     }
-
-    // Établissement (juste après l'email)
     const etablissement = clone.querySelector('.etablissement');
     if (contact.etablissement_label) {
       etablissement.textContent = contact.etablissement_label;
@@ -277,40 +241,30 @@ function displayContacts() {
       etablissement.style.cursor = 'pointer';
       etablissement.addEventListener('click', () => toggleFilter('etablissement', contact.etablissement_label));
     }
-
-    // Email
     const email = clone.querySelector('.email');
     if (contact.Email) {
       email.textContent = contact.Email;
       email.href = `mailto:${contact.Email}`;
       email.classList.add('visible');
     }
-
-    // Téléphone
     const tel = clone.querySelector('.tel');
     if (contact.numero_de_telephone) {
       tel.textContent = `☎ ${contact.numero_de_telephone}`;
       tel.classList.add('visible');
     }
-
-    // Catégories
     const tags = clone.querySelector('.card-tags');
     TAG_GROUPS.forEach(group => {
       const labels = contact[`${group.key}_labels`] || [];
       if (labels.length === 0) return;
-
       const section = document.createElement('section');
       section.className = 'tag-group';
-
       const title = document.createElement('h3');
       title.className = 'tag-group-title';
       title.textContent = group.label;
       title.style.color = group.color;
       section.appendChild(title);
-
       const values = document.createElement('div');
       values.className = 'tag-group-values';
-      
       labels.forEach(value => {
         const tag = document.createElement('button');
         tag.type = 'button';
@@ -320,20 +274,17 @@ function displayContacts() {
         tag.addEventListener('click', () => toggleFilter(group.key, value));
         values.appendChild(tag);
       });
-
       section.appendChild(values);
       tags.appendChild(section);
     });
-
     grid.appendChild(clone);
   });
 
-  document.getElementById('resultCount').textContent = 
+  document.getElementById('resultCount').textContent =
     `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   document.getElementById('emptyState').hidden = filtered.length !== 0;
 }
 
-// ===== INITIALISATION =====
 window.grist.ready({ requiredAccess: 'read table' });
 
 window.grist.onRecords(async records => {
@@ -341,27 +292,23 @@ window.grist.onRecords(async records => {
     const rows = Array.isArray(records) ? records : (records?.records || []);
     console.log('[GRIST] Enregistrements reçus:', rows.length);
 
-    // Charger les tables de référence
     await Promise.all([
       fetchTable('Actions', 'Action'),
       fetchTable('Taches', 'taches'),
-      fetchTable('Communautes', 'communaute'),
+      fetchTable('Communautees', 'communaute'),
       fetchTable('GT', 'nom'),
-      fetchTable('Competences', 'libelle'),
+      fetchTable('Competances', 'Competences'),
       fetchTable('Instances', 'nom_instance'),
       fetchTable('Etablissements', 'acronyme'),
       fetchTable('Role_Dans_le_PUI', 'Role')
     ]);
 
-    // Enrichir et filtrer les contacts
     allContacts = rows
       .map(enrich)
-      .filter(c => c.nom || c.prenom); // Garder les contacts avec au moins un nom
+      .filter(c => c.Nom || c.Prenom);
 
-    // Créer l'UI
     createFilterUI();
     displayContacts();
-
   } catch (error) {
     console.error('Erreur dans le traitement des contacts:', error);
   }
