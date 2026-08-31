@@ -26,7 +26,8 @@ Features
   *  Les Instances, Actions, GT, communautés Role dans le PUI auxquelles la personne fait partie (le cas échéant)
 * Filtres
   * Un champs de texte libre qui recherche sur le nom prénom
-  * 4 filtres pour les intances, actions, GT et communauté
+  * 6 filtres pour les instances, actions, GT, Taches compétances et communauté
+
 
 
 
