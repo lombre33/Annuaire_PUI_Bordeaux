@@ -38,13 +38,41 @@ let filterState = {
 };
 
 // ===== CRÉER L'INTERFACE DES FILTRES =====
-function createFilterUI(filterKey, values) {
+const filterUiRetryTimers = {};
+const FILTER_UI_RETRY_DELAY = 100;
+const FILTER_UI_MAX_RETRIES = 50;
+
+function createFilterUI(filterKey, values, retryCount = 0) {
   const config = filterConfig[filterKey];
-  const container = document.getElementById(config.containerId);
-  
-  if (!container) {
-    console.error(`Conteneur non trouvé: ${config.containerId}`);
+
+  // Ne jamais tenter de manipuler le DOM si la configuration est invalide.
+  if (!config || !config.containerId) {
+    console.error(`Configuration de filtre invalide: ${filterKey}`);
     return;
+  }
+
+  const container = document.getElementById(config.containerId);
+
+  // Le widget Grist peut recevoir les données avant que le HTML soit monté.
+  // On réessaie brièvement, sans bloquer le thread et sans multiplier les timers.
+  if (!container) {
+    if (retryCount < FILTER_UI_MAX_RETRIES) {
+      if (retryCount === 0) {
+        console.warn(`Conteneur non trouvé: ${config.containerId}. Nouvelle tentative...`);
+      }
+      filterUiRetryTimers[filterKey] = setTimeout(() => {
+        delete filterUiRetryTimers[filterKey];
+        createFilterUI(filterKey, values, retryCount + 1);
+      }, FILTER_UI_RETRY_DELAY);
+    } else {
+      console.error(`Conteneur non trouvé après attente: ${config.containerId}`);
+    }
+    return;
+  }
+
+  if (filterUiRetryTimers[filterKey]) {
+    clearTimeout(filterUiRetryTimers[filterKey]);
+    delete filterUiRetryTimers[filterKey];
   }
 
   container.innerHTML = '';
