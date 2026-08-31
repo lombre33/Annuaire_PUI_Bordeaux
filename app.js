@@ -1,138 +1,224 @@
-/* ============ CONFIG ============ */
-(function() {
+/* Grist widget for contact directory filtering */
+
 const FILTERS = [
-  { key: 'instances', label: 'Instances', table: 'Instances', field: 'nom_instance', color: '#4f8ee8' },
-  { key: 'actions', label: 'Actions', table: 'Actions', field: 'Action', color: '#f28a54' },
-  { key: 'gt', label: 'GT', table: 'GT', field: 'nom', color: '#1ba99a' },
-  { key: 'taches', label: 'Tâches', table: 'Taches', field: 'taches', color: '#d79a25' },
-  { key: 'competences', label: 'Compétences', table: 'Competances', field: 'Competences', color: '#6257d9' },
-  { key: 'communautes', label: 'Communautés', table: 'Communautees', field: 'communaute', color: '#d85b9d' }
+  { key: 'instances', label: 'Instances', table: 'Instances', field: 'nom_instance', color: '#4f8' },
+  { key: 'actions', label: 'Actions', table: 'Actions', field: 'Action', color: '#48f' },
+  { key: 'gts', label: 'GT', table: 'GT', field: 'nom', color: '#84f' },
+  { key: 'taches', label: 'Tâches', table: 'Taches', field: 'taches', color: '#f84' },
+  { key: 'competences', label: 'Compétences', table: 'Competances', field: 'competance', color: '#8f4' },
+  { key: 'communautes', label: 'Communautés', table: 'Communautees_', field: 'communaute', color: '#f48' },
 ];
-const TAG_GROUPS = FILTERS.concat([{ key: 'etablissement', label: 'Établissement', color: '#147c72' }, { key: 'role', label: 'Rôle PUI', color: '#8b5fc4' }]);
 
-/* ============ INITIALIZATION ============ */
-window.grist.ready({ requiredAccess: 'read table' });
-window.grist.onRecords(async function(records) {
-  const enrichedRecords = await Promise.all(records.map(enrich));
-  renderUI(enrichedRecords);
-});
+const TAG_GROUPS = [
+  { key: 'instances', label: 'Instances' },
+  { key: 'actions', label: 'Actions' },
+  { key: 'gts', label: 'GT' },
+  { key: 'taches', label: 'Tâches' },
+  { key: 'competences', label: 'Compétences' },
+  { key: 'communautes', label: 'Communautés' },
+  { key: 'etablissement', label: 'Établissement' },
+  { key: 'role', label: 'Rôle PUI' },
+];
 
-async function enrich(record) {
-  const refMaps = {};
-  for (const f of FILTERS) {
-    refMaps[f.key] = await fetchTable(f.table, f.field);
+// Convert Grist column-oriented format {id: [...], col: [...]} to row-oriented [{id, col}, ...]
+function tableToRows(table) {
+  if (!table || typeof table !== 'object') return [];
+  if (Array.isArray(table)) return table; // Already row-oriented
+  
+  const id = table.id || [];
+  const rows = [];
+  for (let i = 0; i < id.length; i++) {
+    const row = { id: id[i] };
+    for (const [key, values] of Object.entries(table)) {
+      if (key !== 'id' && Array.isArray(values)) {
+        row[key] = values[i] || null;
+      }
+    }
+    rows.push(row);
   }
-  refMaps['etablissement'] = await fetchTable('Etablissements', 'nom_complet');
-  refMaps['role'] = await fetchTable('Role_Dans_le_PUI', 'Role');
-  return {
-    ...record,
-    instances: safeValues(record.Instances).map(id => refMaps['instances'].get(id) || ''),
-    actions: safeValues(record.Actions).map(id => refMaps['actions'].get(id) || ''),
-    gt: safeValues(record.GT).map(id => refMaps['gt'].get(id) || ''),
-    taches: safeValues(record.Taches).map(id => refMaps['taches'].get(id) || ''),
-    competences: Array.from({length: 15}, (_, i) => record[`competences_${i+1}`] || '').filter(Boolean),
-    communautes: safeValues(record.Communautee_s_).map(id => refMaps['communautes'].get(id) || ''),
-    etablissement: refMaps['etablissement'].get(record.Etablissement) || '',
-    role: refMaps['role'].get(record.Role_dans_le_PUI) || ''
-  };
+  return rows;
 }
 
-async function fetchTable(tableName, fieldName) {
+// Fetch a reference table and create a lookup map
+async function fetchTable(tableName, keyField, labelField) {
   const table = await window.grist.docApi.fetchTable(tableName);
-  const map = new Map();
-  table.forEach(row => map.set(row.id, row[fieldName]));
+  const rows = tableToRows(table);
+  const map = {};
+  rows.forEach(row => {
+    if (row[keyField] && row[labelField]) {
+      map[row[keyField]] = row[labelField];
+    }
+  });
   return map;
 }
 
-function safeValues(val) {
-  return Array.isArray(val) ? val : (val ? [val] : []);
-}
-
-/* ============ UI RENDERING ============ */
-function renderUI(records) {
-  const facets = collectFacets(records);
-  const container = document.getElementById('container');
-  container.innerHTML = '';
-  const filterBar = document.createElement('div');
-  filterBar.id = 'filter-bar';
-  FILTERS.forEach(f => {
-    const values = Array.from(facets[f.key].keys()).sort();
-    const div = createFilterBubbles(f, values, records);
-    filterBar.appendChild(div);
-  });
-  container.appendChild(filterBar);
-  renderCards(records, {});
-}
-
-function collectFacets(list) {
-  const facets = Object.fromEntries(FILTERS.map(f => [f.key, new Map()]));
-  list.forEach(record => {
-    FILTERS.forEach(f => {
-      safeValues(record[f.key.charAt(0).toUpperCase() + f.key.slice(1)]).forEach(v => {
-        facets[f.key].set(v, (facets[f.key].get(v) || 0) + 1);
-      });
+// Enrich records with label lookups
+async function enrich(records) {
+  const refMaps = {};
+  
+  for (const filter of FILTERS) {
+    refMaps[filter.key] = await fetchTable(filter.table, 'id', filter.field);
+  }
+  
+  // Additional single-value lookups
+  refMaps.etablissement = await fetchTable('Etablissements', 'id', 'nom_complet');
+  refMaps.role = await fetchTable('Role_Dans_le_PUI', 'id', 'Role');
+  
+  return records.map(record => {
+    const enriched = { ...record };
+    
+    // Map array references (lists)
+    ['instances', 'actions', 'gts', 'taches', 'competences', 'communautes'].forEach(key => {
+      const refIds = record[key] || [];
+      enriched[`${key}Labels`] = Array.isArray(refIds)
+        ? refIds.map(id => refMaps[key][id] || id).filter(Boolean)
+        : [];
     });
+    
+    // Map single references
+    enriched.etablissementLabel = refMaps.etablissement[record.Etablissement] || record.Etablissement;
+    enriched.roleLabel = refMaps.role[record.Role_dans_le_PUI] || record.Role_dans_le_PUI;
+    
+    return enriched;
   });
-  return facets;
 }
 
-function createFilterBubbles(filter, values, records) {
-  const div = document.createElement('div');
-  div.className = 'filter-group';
-  const label = document.createElement('strong');
-  label.textContent = filter.label + ':';
-  div.appendChild(label);
-  values.forEach(v => {
-    if (!v) return;
-    const bubble = document.createElement('button');
-    bubble.className = 'bubble';
-    bubble.style.backgroundColor = filter.color;
-    bubble.textContent = v;
-    bubble.onclick = () => filterCards(records, filter.key, v);
-    div.appendChild(bubble);
+// Initialize filters and render
+let allRecords = [];
+let activeFilters = {};
+
+window.grist.onRecords(async (records) => {
+  allRecords = await enrich(records);
+  initializeFilters();
+  filterAndRender();
+});
+
+async function initializeFilters() {
+  const filterContainer = document.getElementById('filters');
+  filterContainer.innerHTML = '';
+  
+  for (const filter of FILTERS) {
+    const uniqueValues = new Set();
+    allRecords.forEach(record => {
+      const labels = record[`${filter.key}Labels`] || [];
+      labels.forEach(label => uniqueValues.add(label));
+    });
+    
+    const filterDiv = document.createElement('div');
+    filterDiv.className = 'filter-group';
+    filterDiv.innerHTML = `<h3>${filter.label}</h3><div class="bubbles"></div>`;
+    
+    const bubblesDiv = filterDiv.querySelector('.bubbles');
+    uniqueValues.forEach(value => {
+      const bubble = document.createElement('button');
+      bubble.className = 'bubble';
+      bubble.style.backgroundColor = filter.color;
+      bubble.textContent = value;
+      bubble.onclick = () => toggleFilter(filter.key, value, bubble);
+      bubblesDiv.appendChild(bubble);
+    });
+    
+    filterContainer.appendChild(filterDiv);
+  }
+}
+
+function toggleFilter(filterKey, value, element) {
+  if (!activeFilters[filterKey]) {
+    activeFilters[filterKey] = new Set();
+  }
+  
+  if (activeFilters[filterKey].has(value)) {
+    activeFilters[filterKey].delete(value);
+    element.classList.remove('active');
+  } else {
+    activeFilters[filterKey].add(value);
+    element.classList.add('active');
+  }
+  
+  filterAndRender();
+}
+
+function filterAndRender() {
+  const filtered = allRecords.filter(record => {
+    for (const [key, values] of Object.entries(activeFilters)) {
+      if (values.size === 0) continue; // No filter for this key
+      
+      const recordValues = record[`${key}Labels`] || [];
+      const match = Array.from(values).some(v => recordValues.includes(v));
+      if (!match) return false;
+    }
+    return true;
   });
-  return div;
+  
+  renderCards(filtered);
 }
 
-function filterCards(records, filterKey, value) {
-  const filtered = records.filter(r => safeValues(r[filterKey]).includes(value));
-  renderCards(filtered, {});
-}
-
-function renderCards(records, filters) {
-  const container = document.getElementById('container');
-  const cardsContainer = document.getElementById('cards') || document.createElement('div');
-  cardsContainer.id = 'cards';
+function renderCards(records) {
+  const cardsContainer = document.getElementById('cards');
   cardsContainer.innerHTML = '';
+  
   records.forEach(record => {
     const card = document.createElement('div');
-    card.className = 'contact-card';
+    card.className = 'card';
+    
+    // Avatar with initials
+    const initials = (record.Nom || 'X')[0] + (record.Prenom || 'X')[0];
+    const avatarColor = generateColor(record.Nom + record.Prenom);
+    
+    let tagsHtml = '';
+    TAG_GROUPS.forEach(group => {
+      const labels = record[`${group.key}Labels`] || [record[`${group.key}Label`]] || [];
+      const validLabels = labels.filter(Boolean);
+      if (validLabels.length > 0) {
+        tagsHtml += `
+          <div class="tag-category">
+            <strong>${group.label}:</strong>
+            ${validLabels.map(label => `
+              <span class="tag clickable" onclick="applyFilter('${group.key}', '${label.replace(/'/g, "\\'")}')"
+                    title="Filtrer par ${label}">${label}</span>
+            `).join('')}
+          </div>
+        `;
+      }
+    });
+    
     card.innerHTML = `
       <div class="card-header">
-        <div class="avatar">${getInitials(record['Nom Prénom'] || '')}</div>
-        <div class="basic-info">
-          <h3>${record['Nom Prénom'] || 'N/A'}</h3>
+        <div class="avatar" style="background-color: ${avatarColor}">${initials}</div>
+        <div class="header-info">
+          <h3>${record.Nom} ${record.Prenom}</h3>
           <p class="fonction">${record.Fonction || ''}</p>
         </div>
       </div>
-      <div class="card-body">
+      <div class="card-contact">
         <p><strong>Email:</strong> ${record.Email || 'N/A'}</p>
-        ${record.Tel ? `<p><strong>Tel:</strong> ${record.Tel}</p>` : ''}
-        <div class="tags-section">
-          ${TAG_GROUPS.map(g => {
-            const values = safeValues(record[g.key]).filter(Boolean);
-            return values.length ? `<div class="tag-group"><strong>${g.label}:</strong> ${values.map(v => `<span class="tag" style="background-color:${g.color}">${v}</span>`).join('')}</div>` : '';
-          }).join('')}
-        </div>
+        ${record.Tel ? `<p><strong>Tél:</strong> ${record.Tel}</p>` : ''}
+      </div>
+      <div class="card-tags">
+        ${tagsHtml}
       </div>
     `;
+    
     cardsContainer.appendChild(card);
   });
-  if (!document.getElementById('cards')) container.appendChild(cardsContainer);
-  else document.getElementById('cards').replaceWith(cardsContainer);
 }
 
-function getInitials(name) {
-  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+function applyFilter(filterKey, value) {
+  if (!activeFilters[filterKey]) {
+    activeFilters[filterKey] = new Set();
+  }
+  activeFilters[filterKey].add(value);
+  filterAndRender();
+  initializeFilters(); // Update bubble states
 }
-})();
+
+function generateColor(text) {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = text.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = hash % 360;
+  return `hsl(${hue}, 70%, 60%)`;
+}
+
+window.grist.ready();
