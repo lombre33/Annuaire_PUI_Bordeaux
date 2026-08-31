@@ -1,39 +1,19 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Annuaire</title>
+  <meta charset="utf-8">
+  <title>Annuaire PUI</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
-  <div class="app">
-    <header class="topbar">
-      <div class="topbar-heading">
-        <div class="eyebrow">PUI Bordeaux</div>
-        <div class="title-row"><h1>Annuaire</h1><span class="count-badge" id="resultCount">0 contacts</span></div>
-      </div>
-      <div class="topbar-actions">
-        <label class="search-field" for="searchInput"><span class="search-icon" aria-hidden="true">⌕</span><input type="search" id="searchInput" placeholder="Rechercher un nom, une fonction…" autocomplete="off"></label>
-        <button id="resetFilters" class="btn-ghost" type="button">Réinitialiser</button>
-        <button id="toggleFilters" class="btn-ghost mobile-only" type="button">Filtres</button>
-      </div>
-      <div class="filters-panel" id="filtersPanel">
-        <div class="filter-bar-label">Filtrer par</div>
-        <div class="filters-scroll" id="filtersContainer">
-          <div class="filter-group collapsed" data-category="instance"><button class="filter-group-title" type="button"><span class="dot dot-instance"></span>Instances <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
-          <div class="filter-group collapsed" data-category="action"><button class="filter-group-title" type="button"><span class="dot dot-action"></span>Actions <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
-          <div class="filter-group collapsed" data-category="gt"><button class="filter-group-title" type="button"><span class="dot dot-gt"></span>GT <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
-          <div class="filter-group collapsed" data-category="tache"><button class="filter-group-title" type="button"><span class="dot dot-tache"></span>Tâches <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
-          <div class="filter-group collapsed" data-category="competence"><button class="filter-group-title" type="button"><span class="dot dot-competence"></span>Compétences <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
-          <div class="filter-group collapsed" data-category="communaute"><button class="filter-group-title" type="button"><span class="dot dot-communaute"></span>Communautés <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
-        </div>
-      </div>
-    </header>
-    <main class="cards-area"><div class="cards-grid" id="cardsGrid"></div><div class="empty-state" id="emptyState" hidden>Aucun contact ne correspond aux filtres sélectionnés.</div></main>
-  </div>
-  <template id="cardTemplate"><article class="card"><div class="card-head"><img class="avatar" src="" alt=""><div class="identity"><h3 class="name"></h3><p class="fonction"></p><p class="structure"></p></div></div><div class="card-contact"><a class="email" href="#"></a><span class="tel"></span></div><div class="card-tags" aria-label="Tags"></div></article></template>
+  <main class="widget-shell">
+    <header class="page-header"><div><p class="eyebrow">Agenda PUI Bordeaux</p><h1>Annuaire des membres</h1><p class="subtitle">Retrouvez les contacts et les groupes du PUI.</p></div><div id="resultCount" class="result-count" aria-live="polite">0 contact</div></header>
+    <section class="toolbar" aria-label="Recherche et filtres"><label class="search-box" for="searchInput"><span class="search-icon" aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Rechercher par nom ou prénom…" autocomplete="off"></label><div id="filtersContainer" class="filters-container" aria-label="Filtres"></div><button id="resetFilters" class="reset-button" type="button">Réinitialiser</button></section>
+    <div id="activeFilters" class="active-filters" aria-live="polite"></div><section id="cardsGrid" class="cards-grid" aria-live="polite"></section>
+    <section id="emptyState" class="empty-state" hidden><div class="empty-mark">✦</div><h2>Aucun contact trouvé</h2><p>Modifiez votre recherche ou réinitialisez les filtres.</p></section>
+  </main>
+  <template id="cardTemplate"><article class="contact-card"><div class="card-topline"></div><div class="card-body"><div class="avatar" aria-hidden="true"></div><div class="identity"><h2 class="name"></h2><p class="fonction"></p></div><div class="details"><p class="structure detail-row"></p><a class="email detail-row" rel="noopener"></a><p class="tel detail-row"></p></div><div class="card-tags"></div></div></article></template>
   <script src="app.js"></script>
 </body>
 </html>

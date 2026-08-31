@@ -1,99 +1,45 @@
-/* ============ CONFIG ============ */
-const CATEGORY_META = {
-  competence: { label: 'Compétences', color: 'competence', weight: 2 },
-  instance: { label: 'Instances', color: 'instance', weight: 3 },
-  gt: { label: 'Groupes de travail', color: 'gt', weight: 2 },
-  action: { label: 'Actions', color: 'action', weight: 2 },
-  tache: { label: 'Tâches', color: 'tache', weight: 2 },
-  communaute: { label: 'Communautés', color: 'communaute', weight: 2 },
-  etablissement: { label: 'Établissement', color: 'etablissement', weight: 1 },
-  role: { label: 'Rôle PUI', color: 'role', weight: 1 },
-};
-const CATEGORY_ORDER = Object.keys(CATEGORY_META);
-const FILTER_ORDER = ['instance', 'action', 'gt', 'tache', 'competence', 'communaute'];
-const FIELD_FOR = {
-  competence: 'competences', instance: 'instances', gt: 'gts',
-  action: 'actions', tache: 'taches', communaute: 'communautes',
-};
+'use strict';
 
-let rawRecords = [];
-let contacts = [];
-let searchTerm = '';
-let referencesPromise = null;
-const activeFilters = {};
-CATEGORY_ORDER.forEach((category) => { activeFilters[category] = new Set(); });
-console.log('[INIT] Widget Annuaire initialisé; filtres:', FILTER_ORDER.join(', '));
-const refTables = {};
+const FILTERS = [
+  { key: 'instances', label: 'Instances', table: 'Instances', field: 'nom_instance', source: 'Instances', color: '#4f8ee8' },
+  { key: 'actions', label: 'Actions', table: 'Actions', field: 'Action', source: 'Actions', color: '#f28a54' },
+  { key: 'gt', label: 'GT', table: 'GT', field: 'nom', source: 'GT', color: '#1ba99a' },
+  { key: 'taches', label: 'Tâches', table: 'Taches', field: 'taches', source: 'Taches', color: '#d79a25' },
+  { key: 'competences', label: 'Compétences', table: 'Competances', field: 'Competences', source: 'Competances', color: '#6257d9' },
+  { key: 'communautes', label: 'Communautés', table: 'Communautees', field: 'communaute', source: 'Communautees', color: '#d85b9d' }
+];
+const TAG_GROUPS = FILTERS.concat([{ key: 'etablissement', label: 'Établissement', color: '#147c72' }, { key: 'role', label: 'Rôle PUI', color: '#8b5fc4' }]);
+const activeFilters = Object.fromEntries(FILTERS.map(f => [f.key, new Set()]));
+const refMaps = {};
+let contacts = [], searchTerm = '', referencesPromise = null;
 
+console.log('[INIT] Démarrage du widget Annuaire PUI');
 grist.ready({ requiredAccess: 'read table' });
-grist.onRecords(async (records) => {
-  rawRecords = records.filter((record) => safeArray(record.perimetre_all).length > 0);
-  console.log('[GRIST] Records reçus:', records.length, '| conservés via perimetre_all:', rawRecords.length);
-  try { await loadRefTables(); } catch (error) { console.error('[REFS] Chargement global interrompu:', error); }
-  contacts = rawRecords.map(normalizeRecord);
-  console.log('[RENDER] Références chargées, rendu initial');
+console.log('[GRIST] Accès lecture demandé');
+grist.onRecords(async records => {
+  console.log('[GRIST] Records reçus:', records.length);
+  contacts = records.filter(record => safeValues(record.perimetre_all).length > 0).map(normalizeRecord);
+  console.log('[FILTERS] Records conservés avec perimetre_all:', contacts.length);
+  await loadReferenceTables();
   render();
 });
-
-function normalizeId(value) {
-  if (value === null || value === undefined || value === '' || value === 'Blank') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-function safeArray(value) {
-  if (value === null || value === undefined || value === '') return [];
-  const values = Array.isArray(value) ? value : [value];
-  const flattened = values.reduce((result, item) => result.concat(Array.isArray(item) ? item : [item]), []);
-  return flattened.slice(0, 1)[0] === 'L' ? flattened.slice(1) : flattened;
-}
+function safeValues(value) { if (Array.isArray(value)) return value.filter(item => item !== 'L' && item !== null && item !== undefined && item !== 0 && item !== ''); return value === null || value === undefined || value === '' || value === 0 ? [] : [value]; }
 function text(value) { return value === null || value === undefined ? '' : String(value).trim(); }
-function normalizeRecord(record) {
-  const competences = [];
-  for (let index = 1; index <= 15; index += 1) { const value = text(record['competences_' + index]); if (value) competences.push(value); }
-  return {
-    id: record.id, nom: text(record.Nom), prenom: text(record.Prenom), fonction: text(record.fonction), email: text(record.Email),
-    tel: text(record.numero_de_telephone), structure: text(record.Etablissement2), avatar: text(record.Lien_avatar), competences,
-    instanceIds: safeArray(record.Instances).map(normalizeId).filter((id) => id !== null), gtIds: safeArray(record.GT).map(normalizeId).filter((id) => id !== null),
-    actionIds: safeArray(record.Actions).map(normalizeId).filter((id) => id !== null), tacheIds: safeArray(record.Taches).map(normalizeId).filter((id) => id !== null),
-    communauteIds: safeArray(record.Communautee_s_).map(normalizeId).filter((id) => id !== null), etablissementId: normalizeId(record.Etablissement), roleId: normalizeId(record.Role_dans_le_PUI),
-  };
-}
-function label(table, id) { const normalized = normalizeId(id); return normalized === null || !refTables[table] ? null : refTables[table].get(normalized) || null; }
-function enrich(contact) {
-  return Object.assign({}, contact, {
-    instances: contact.instanceIds.map((id) => label('Instances', id)).filter(Boolean), gts: contact.gtIds.map((id) => label('GT', id)).filter(Boolean), actions: contact.actionIds.map((id) => label('Actions', id)).filter(Boolean),
-    taches: contact.tacheIds.map((id) => label('Taches', id)).filter(Boolean), communautes: contact.communauteIds.map((id) => label('Communautees', id)).filter(Boolean),
-    etablissement: label('Etablissements', contact.etablissementId) || contact.structure, role: label('Role_Dans_le_PUI', contact.roleId),
-  });
-}
-function valuesFor(contact, category) { if (category === 'etablissement') return contact.etablissement ? [contact.etablissement] : []; if (category === 'role') return contact.role ? [contact.role] : []; return contact[FIELD_FOR[category]] || []; }
-function collectFacetValues(enrichedContacts) { const facets = {}; CATEGORY_ORDER.forEach((category) => { facets[category] = new Map(); }); enrichedContacts.forEach((contact) => CATEGORY_ORDER.forEach((category) => valuesFor(contact, category).forEach((value) => { const clean = text(value); if (clean) facets[category].set(clean, (facets[category].get(clean) || 0) + 1); }))); console.log('[FACETS]', CATEGORY_ORDER.map((category) => category + '=' + facets[category].size).join(', ')); return facets; }
-function matchesSearch(contact) { if (!searchTerm) return true; const term = searchTerm.toLowerCase(); return [contact.nom, contact.prenom, contact.fonction, contact.structure, contact.etablissement].filter(Boolean).some((value) => String(value).toLowerCase().includes(term)); }
-function matchesFilters(contact) { return CATEGORY_ORDER.every((category) => { const selected = activeFilters[category]; return selected.size === 0 || valuesFor(contact, category).some((value) => selected.has(value)); }); }
-function relevanceScore(contact) { return CATEGORY_ORDER.reduce((score, category) => score + valuesFor(contact, category).filter((value) => activeFilters[category].has(value)).length * (CATEGORY_META[category].weight || 1), 0); }
-function render() {
-  const enriched = contacts.map(enrich); const facets = collectFacetValues(enriched); renderFilterPanel(facets);
-  const visible = enriched.filter(matchesSearch).filter(matchesFilters).sort((a, b) => relevanceScore(b) - relevanceScore(a) || a.nom.localeCompare(b.nom, 'fr'));
-  renderCards(visible); console.log('[CARDS] Cartes affichées:', visible.length); const count = document.getElementById('resultCount'); if (count) count.textContent = visible.length + ' contact' + (visible.length > 1 ? 's' : '');
-  const empty = document.getElementById('emptyState'); if (empty) empty.hidden = visible.length > 0;
-}
-function renderFilterPanel(facets) {
-  const container = document.getElementById('filtersContainer'); if (!container) return;
-  FILTER_ORDER.forEach((category) => {
-    const group = container.querySelector('.filter-group[data-category="' + category + '"]'); if (!group) return;
-    const title = group.querySelector('.filter-group-title'); const options = group.querySelector('.filter-options'); const count = group.querySelector('.filter-selected-count');
-    const entries = Array.from(facets[category].entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr')); if (count) count.textContent = activeFilters[category].size ? '(' + activeFilters[category].size + ')' : ''; options.innerHTML = '';
-    entries.forEach(([value, number]) => { const option = document.createElement('button'); option.type = 'button'; option.className = 'filter-option'; if (activeFilters[category].has(value)) option.classList.add('active'); const labelEl = document.createElement('span'); labelEl.textContent = value; const countEl = document.createElement('span'); countEl.className = 'opt-count'; countEl.textContent = number; option.append(labelEl, countEl); option.addEventListener('click', (event) => { event.stopPropagation(); if (activeFilters[category].has(value)) activeFilters[category].delete(value); else activeFilters[category].add(value); console.log('[FILTERS] Toggle:', category, value); render(); }); options.appendChild(option); });
-    title.onclick = () => group.classList.toggle('collapsed');
-  }); console.log('[FILTERS] 6 catégories rendues:', FILTER_ORDER.join(', '));
-}
-function renderCards(list) {
-  const grid = document.getElementById('cardsGrid'); const template = document.getElementById('cardTemplate'); if (!grid || !template) return; grid.innerHTML = '';
-  list.forEach((contact) => { const node = template.content.cloneNode(true); const avatar = node.querySelector('.avatar'); if (avatar) { if (contact.avatar) avatar.src = contact.avatar; else { const fallback = document.createElement('div'); fallback.className = 'avatar'; fallback.textContent = ((contact.prenom[0] || '') + (contact.nom[0] || '?')).toUpperCase(); avatar.replaceWith(fallback); } } node.querySelector('.name').textContent = (contact.prenom + ' ' + contact.nom).trim(); node.querySelector('.fonction').textContent = contact.fonction; node.querySelector('.structure').textContent = contact.etablissement || contact.structure; const email = node.querySelector('.email'); if (contact.email) { email.textContent = contact.email; email.href = 'mailto:' + contact.email; } else email.hidden = true; const tel = node.querySelector('.tel'); if (contact.tel) tel.textContent = '☎ ' + contact.tel; else tel.hidden = true; const tags = node.querySelector('.card-tags'); appendTagGroup(tags, 'instance', contact.instances); appendTagGroup(tags, 'action', contact.actions); appendTagGroup(tags, 'gt', contact.gts); appendTagGroup(tags, 'tache', contact.taches); appendTagGroup(tags, 'competence', contact.competences); appendTagGroup(tags, 'communaute', contact.communautes); appendTagGroup(tags, 'etablissement', contact.etablissement ? [contact.etablissement] : []); appendTagGroup(tags, 'role', contact.role ? [contact.role] : []); grid.appendChild(node); });
-}
-function appendTagGroup(container, category, values) { if (!container || !values.length) return; const group = document.createElement('div'); group.className = 'tag-group tag-group-' + category; const heading = document.createElement('span'); heading.className = 'tag-category-label'; heading.textContent = CATEGORY_META[category].label; group.appendChild(heading); values.forEach((value) => { const tag = document.createElement('button'); tag.type = 'button'; tag.className = 'tag tag-' + category; tag.textContent = value; tag.addEventListener('click', () => { if (activeFilters[category]) activeFilters[category].add(value); render(); }); group.appendChild(tag); }); container.appendChild(group); }
-function loadRefTables() {
-  if (referencesPromise) return referencesPromise; const specs = [['Instances', 'nom_instance'], ['GT', 'nom'], ['Actions', 'Action'], ['Taches', 'taches'], ['Communautees', 'communaute'], ['Etablissements', 'nom_complet'], ['Role_Dans_le_PUI', 'Role']];
-  referencesPromise = Promise.all(specs.map(async ([table, field]) => { try { const data = await grist.docApi.fetchTable(table); const map = new Map(); (data.id || []).forEach((id, index) => { const key = normalizeId(id); const value = text((data[field] || [])[index]); if (key !== null && value) map.set(key, value); }); refTables[table] = map; console.log('[REFS] ' + table + ': ' + map.size + ' entrées'); } catch (error) { refTables[table] = new Map(); console.warn('[REFS] Échec ' + table, error); } })); return referencesPromise;
-}
-document.addEventListener('DOMContentLoaded', () => { document.getElementById('searchInput')?.addEventListener('input', (event) => { searchTerm = event.target.value.trim(); render(); }); document.getElementById('resetFilters')?.addEventListener('click', () => { CATEGORY_ORDER.forEach((category) => activeFilters[category].clear()); searchTerm = ''; const input = document.getElementById('searchInput'); if (input) input.value = ''; render(); }); document.getElementById('toggleFilters')?.addEventListener('click', () => document.getElementById('filtersPanel')?.classList.toggle('open')); });
+function normalizeRecord(record) { const competences = []; for (let i = 1; i <= 15; i += 1) { const value = text(record['competences_' + i]); if (value) competences.push(value); } return { id: record.id, nom: text(record.Nom), prenom: text(record.Prenom), fonction: text(record.fonction), email: text(record.Email), telephone: text(record.numero_de_telephone), etablissementId: record.Etablissement, etablissementFallback: text(record.Etablissement2), instanceIds: safeValues(record.Instances), actionIds: safeValues(record.Actions), gtIds: safeValues(record.GT), tacheIds: safeValues(record.Taches), communauteIds: safeValues(record.Communautee_s_), competences, roleId: record.Role_dans_le_PUI }; }
+async function fetchRef(table, field, aliases = []) { for (const name of [table].concat(aliases)) { try { const data = await grist.docApi.fetchTable(name); const ids = Array.isArray(data.id) ? data.id : []; const labels = data[field] || data.nom || data.name || []; refMaps[table] = {}; ids.forEach((id, i) => { const label = text(labels[i]); if (label) refMaps[table][String(id)] = label; }); console.log('[REFS] ' + table + ': ' + Object.keys(refMaps[table]).length + ' entrées (' + name + ')'); return; } catch (error) { console.warn('[REFS] Échec pour ' + name, error); } } refMaps[table] = {}; }
+function loadReferenceTables() { if (!referencesPromise) { console.log('[REFS] Chargement des tables de référence'); referencesPromise = Promise.all(FILTERS.map(f => fetchRef(f.source, f.field, f.source === 'Competances' ? ['Competences'] : []))).then(() => Promise.all([fetchRef('Etablissements', 'nom_complet'), fetchRef('Role_Dans_le_PUI', 'Role')])); } return referencesPromise; }
+function lookup(table, id) { return id === null || id === undefined || id === '' ? '' : (refMaps[table] || {})[String(id)] || ''; }
+function enrich(c) { return Object.assign({}, c, { instances: c.instanceIds.map(id => lookup('Instances', id)).filter(Boolean), actions: c.actionIds.map(id => lookup('Actions', id)).filter(Boolean), gts: c.gtIds.map(id => lookup('GT', id)).filter(Boolean), taches: c.tacheIds.map(id => lookup('Taches', id)).filter(Boolean), communautes: c.communauteIds.map(id => lookup('Communautees', id)).filter(Boolean), etablissement: lookup('Etablissements', c.etablissementId) || c.etablissementFallback, role: lookup('Role_Dans_le_PUI', c.roleId) }); }
+function collectFacets(list) { const facets = Object.fromEntries(FILTERS.map(f => [f.key, new Map()])); list.forEach(c => FILTERS.forEach(f => (c[f.key] || []).forEach(value => facets[f.key].set(value, (facets[f.key].get(value) || 0) + 1)))); console.log('[FILTERS] Facettes:', Object.fromEntries(FILTERS.map(f => [f.key, facets[f.key].size]))); return facets; }
+function matches(c) { const term = searchTerm.toLocaleLowerCase('fr-FR'); if (term && ![c.nom, c.prenom].some(v => v.toLocaleLowerCase('fr-FR').includes(term))) return false; return FILTERS.every(f => !activeFilters[f.key].size || (c[f.key] || []).some(v => activeFilters[f.key].has(v))); }
+function render() { console.log('[RENDER] Mise à jour des filtres et des cartes'); const enriched = contacts.map(enrich); renderFilters(collectFacets(enriched)); const visible = enriched.filter(matches).sort((a, b) => a.nom.localeCompare(b.nom, 'fr-FR') || a.prenom.localeCompare(b.prenom, 'fr-FR')); renderActiveFilters(); renderCards(visible); document.getElementById('resultCount').textContent = visible.length + ' contact' + (visible.length > 1 ? 's' : ''); document.getElementById('emptyState').hidden = visible.length !== 0; console.log('[CARDS] Cartes affichées:', visible.length); }
+function renderFilters(facets) { console.log('[FILTERS] Rendu des 6 catégories'); const container = document.getElementById('filtersContainer'); container.innerHTML = ''; FILTERS.forEach(f => { const wrapper = document.createElement('div'); wrapper.className = 'filter'; const button = document.createElement('button'); button.type = 'button'; button.className = 'filter-button'; button.innerHTML = '<span class="filter-dot"></span><span>' + f.label + '</span><span class="filter-count">' + activeFilters[f.key].size + '</span><span class="chevron">▾</span>'; button.querySelector('.filter-dot').style.backgroundColor = f.color; const menu = document.createElement('div'); menu.className = 'filter-menu'; menu.style.borderTopColor = f.color; [...facets[f.key].entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr-FR')).forEach(([value, count]) => { const option = document.createElement('label'); option.className = 'filter-option'; const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = activeFilters[f.key].has(value); checkbox.addEventListener('change', () => toggleFilter(f.key, value)); const label = document.createElement('span'); label.className = 'option-label'; label.textContent = value; const countEl = document.createElement('span'); countEl.className = 'option-count'; countEl.textContent = count; option.append(checkbox, label, countEl); menu.appendChild(option); }); button.addEventListener('click', event => { event.stopPropagation(); document.querySelectorAll('.filter.open').forEach(item => { if (item !== wrapper) item.classList.remove('open'); }); wrapper.classList.toggle('open'); }); menu.addEventListener('click', event => event.stopPropagation()); wrapper.append(button, menu); container.appendChild(wrapper); }); }
+function toggleFilter(key, value) { activeFilters[key].has(value) ? activeFilters[key].delete(value) : activeFilters[key].add(value); render(); }
+function renderActiveFilters() { const target = document.getElementById('activeFilters'); target.innerHTML = ''; FILTERS.forEach(f => activeFilters[f.key].forEach(value => { const chip = document.createElement('span'); chip.className = 'active-chip'; chip.textContent = f.label + ' : ' + value; target.appendChild(chip); })); }
+function renderCards(list) { const grid = document.getElementById('cardsGrid'); grid.innerHTML = ''; const template = document.getElementById('cardTemplate'); list.forEach(c => { const node = template.content.cloneNode(true); node.querySelector('.avatar').textContent = ((c.prenom[0] || '') + (c.nom[0] || '')).toUpperCase() || '?'; node.querySelector('.name').textContent = (c.prenom + ' ' + c.nom).trim() || 'Sans nom'; setText(node.querySelector('.fonction'), c.fonction); setText(node.querySelector('.structure'), c.etablissement); setText(node.querySelector('.tel'), c.telephone ? '☎ ' + c.telephone : ''); const email = node.querySelector('.email'); if (c.email) { email.textContent = c.email; email.href = 'mailto:' + c.email; email.classList.add('visible'); } const tags = node.querySelector('.card-tags'); TAG_GROUPS.forEach(g => appendTagGroup(tags, g, g.key === 'etablissement' ? (c.etablissement ? [c.etablissement] : []) : g.key === 'role' ? (c.role ? [c.role] : []) : c[g.key] || [])); grid.appendChild(node); }); }
+function appendTagGroup(container, group, list) { if (!list.length) return; const section = document.createElement('section'); section.className = 'tag-group'; const title = document.createElement('h3'); title.className = 'tag-group-title'; title.textContent = group.label; title.style.color = group.color; section.appendChild(title); const values = document.createElement('div'); values.className = 'tag-group-values'; list.forEach(value => { const tag = document.createElement('button'); tag.type = 'button'; tag.className = 'tag tag-' + group.key; tag.style.backgroundColor = group.color; tag.textContent = value; if (activeFilters[group.key]) tag.addEventListener('click', () => toggleFilter(group.key, value)); values.appendChild(tag); }); section.appendChild(values); container.appendChild(section); }
+function setText(element, value) { if (value) { element.textContent = value; element.classList.add('visible'); } }
+document.getElementById('searchInput').addEventListener('input', e => { searchTerm = e.target.value.trim(); render(); });
+document.getElementById('resetFilters').addEventListener('click', () => { FILTERS.forEach(f => activeFilters[f.key].clear()); searchTerm = ''; document.getElementById('searchInput').value = ''; render(); });
+document.addEventListener('click', () => document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open')));
+console.log('[INIT] ✅ App initialisé, en attente des données Grist');
