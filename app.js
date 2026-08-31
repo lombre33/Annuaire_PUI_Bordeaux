@@ -55,6 +55,14 @@ async function fetchTable(tableName, keyField, labelField) {
 // Enrich records with label lookups
 async function enrich(records) {
   const refMaps = {};
+
+  // Backend-fixed scope: only contacts with a non-empty $perimetre_all are displayed.
+  const scopedRecords = records.filter(record => {
+    const perimeter = record.$perimetre_all;
+    if (Array.isArray(perimeter)) return perimeter.length > 0;
+    if (perimeter === null || perimeter === undefined) return false;
+    return typeof perimeter === 'string' ? perimeter.trim() !== '' : true;
+  });
   
   for (const filter of FILTERS) {
     refMaps[filter.key] = await fetchTable(filter.table, 'id', filter.field);
@@ -64,14 +72,6 @@ async function enrich(records) {
   refMaps.etablissement = await fetchTable('Etablissements', 'id', 'nom_complet');
   refMaps.role = await fetchTable('Role_Dans_le_PUI', 'id', 'Role');
   
-  // Backend-fixed scope: only contacts with a non-empty $perimetre_all are displayed.
-  const scopedRecords = records.filter(record => {
-    const perimeter = record.$perimetre_all;
-    if (Array.isArray(perimeter)) return perimeter.length > 0;
-    if (perimeter === null || perimeter === undefined) return false;
-    return typeof perimeter === 'string' ? perimeter.trim() !== '' : true;
-  });
-
   return scopedRecords.map(record => {
     const enriched = { ...record };
     
