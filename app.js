@@ -1,299 +1,138 @@
-/* Grist widget for contact directory filtering */
-
+/* ============ CONFIG ============ */
+(function() {
 const FILTERS = [
   { key: 'instances', label: 'Instances', table: 'Instances', field: 'nom_instance', color: '#4f8ee8' },
   { key: 'actions', label: 'Actions', table: 'Actions', field: 'Action', color: '#f28a54' },
-  { key: 'gts', label: 'GT', table: 'GT', field: 'nom', color: '#1ba99a' },
+  { key: 'gt', label: 'GT', table: 'GT', field: 'nom', color: '#1ba99a' },
   { key: 'taches', label: 'Tâches', table: 'Taches', field: 'taches', color: '#d79a25' },
   { key: 'competences', label: 'Compétences', table: 'Competances', field: 'Competences', color: '#6257d9' },
-  { key: 'communautes', label: 'Communautés', table: 'Communautees', field: 'communaute', color: '#d85b9d' },
-  { key: 'etablissement', label: 'Établissement', table: 'Etablissements', field: 'nom_complet', color: '#9b59b6' },
-  { key: 'role', label: 'Rôle PUI', table: 'Role_Dans_le_PUI', field: 'Role', color: '#e74c3c' }
+  { key: 'communautes', label: 'Communautés', table: 'Communautees', field: 'communaute', color: '#d85b9d' }
 ];
+const TAG_GROUPS = FILTERS.concat([{ key: 'etablissement', label: 'Établissement', color: '#147c72' }, { key: 'role', label: 'Rôle PUI', color: '#8b5fc4' }]);
 
-const TAG_GROUPS = [
-  { key: 'instances', label: 'Instances', color: '#4f8ee8' },
-  { key: 'actions', label: 'Actions', color: '#f28a54' },
-  { key: 'gts', label: 'GT', color: '#1ba99a' },
-  { key: 'taches', label: 'Tâches', color: '#d79a25' },
-  { key: 'competences', label: 'Compétences', color: '#6257d9' },
-  { key: 'communautes', label: 'Communautés', color: '#d85b9d' },
-  { key: 'etablissement', label: 'Établissement', color: '#9b59b6' },
-  { key: 'role', label: 'Rôle PUI', color: '#e74c3c' }
-];
+/* ============ INITIALIZATION ============ */
+window.grist.ready({ requiredAccess: 'read table' });
+window.grist.onRecords(async function(records) {
+  const enrichedRecords = await Promise.all(records.map(enrich));
+  renderUI(enrichedRecords);
+});
 
-let grist;
-let refMaps = {};
-let activeFilters = {};
-let contacts = [];
-
-async function init() {
-  grist = window.grist;
-  
-  FILTERS.forEach(f => {
-    activeFilters[f.key] = new Set();
-  });
-
-  try {
-    // Load all reference tables
-    for (const filter of FILTERS) {
-      const table = await grist.docApi.fetchTable(filter.table);
-      refMaps[filter.key] = {};
-      table.forEach(row => {
-        const id = row.id;
-        const label = row[filter.field] || '';
-        refMaps[filter.key][id] = label;
-      });
-    }
-
-    // Load Annuaire data and enrich it
-    const annuaireTable = await grist.docApi.fetchTable('Annuaire');
-    contacts = annuaireTable.map(enrich);
-
-    // Initial render
-    render();
-  } catch (error) {
-    console.error('Init error:', error);
+async function enrich(record) {
+  const refMaps = {};
+  for (const f of FILTERS) {
+    refMaps[f.key] = await fetchTable(f.table, f.field);
   }
+  refMaps['etablissement'] = await fetchTable('Etablissements', 'nom_complet');
+  refMaps['role'] = await fetchTable('Role_Dans_le_PUI', 'Role');
+  return {
+    ...record,
+    instances: safeValues(record.Instances).map(id => refMaps['instances'].get(id) || ''),
+    actions: safeValues(record.Actions).map(id => refMaps['actions'].get(id) || ''),
+    gt: safeValues(record.GT).map(id => refMaps['gt'].get(id) || ''),
+    taches: safeValues(record.Taches).map(id => refMaps['taches'].get(id) || ''),
+    competences: Array.from({length: 15}, (_, i) => record[`competences_${i+1}`] || '').filter(Boolean),
+    communautes: safeValues(record.Communautee_s_).map(id => refMaps['communautes'].get(id) || ''),
+    etablissement: refMaps['etablissement'].get(record.Etablissement) || '',
+    role: refMaps['role'].get(record.Role_dans_le_PUI) || ''
+  };
 }
 
-function enrich(record) {
-  const lookup = (key, id) => refMaps[key] && refMaps[key][id] ? refMaps[key][id] : '';
-
-  const c = {
-    id: record.id,
-    nom: record.Nom || '',
-    prenom: record.Prénom || '',
-    fonction: record.Fonction || '',
-    email: record.Email || '',
-    tel: record.Tel || '',
-    etablissementId: record.Etablissement || null,
-    roleId: record.Role_dans_le_PUI || null,
-    perimetre: record.perimetre_all || 'Hors PUI',
-    
-    instanceIds: safeValues(record.Instances),
-    actionIds: safeValues(record.Actions),
-    gtIds: safeValues(record.GT),
-    tacheId: safeValues(record.Taches),
-    competenceValues: safeValues(record.competences_1)
-      .concat(safeValues(record.competences_2))
-      .concat(safeValues(record.competences_3))
-      .concat(safeValues(record.competences_4))
-      .concat(safeValues(record.competences_5))
-      .concat(safeValues(record.competences_6))
-      .concat(safeValues(record.competences_7))
-      .concat(safeValues(record.competences_8))
-      .concat(safeValues(record.competences_9))
-      .concat(safeValues(record.competences_10))
-      .concat(safeValues(record.competences_11))
-      .concat(safeValues(record.competences_12))
-      .concat(safeValues(record.competences_13))
-      .concat(safeValues(record.competences_14))
-      .concat(safeValues(record.competences_15))
-      .filter(Boolean),
-    communauteIds: safeValues(record.Communautee_s_)
-  };
-
-  // Resolve lazy properties
-  c.instances = c.instanceIds.map(id => lookup('instances', id)).filter(Boolean);
-  c.actions = c.actionIds.map(id => lookup('actions', id)).filter(Boolean);
-  c.gts = c.gtIds.map(id => lookup('gts', id)).filter(Boolean);
-  c.taches = c.tacheId.map(id => lookup('taches', id)).filter(Boolean);
-  c.competences = c.competenceValues;
-  c.communautes = c.communauteIds.map(id => lookup('communautes', id)).filter(Boolean);
-  c.etablissement = c.etablissementId ? lookup('etablissement', c.etablissementId) : '';
-  c.role = c.roleId ? lookup('role', c.roleId) : '';
-
-  return c;
+async function fetchTable(tableName, fieldName) {
+  const table = await window.grist.docApi.fetchTable(tableName);
+  const map = new Map();
+  table.forEach(row => map.set(row.id, row[fieldName]));
+  return map;
 }
 
 function safeValues(val) {
-  if (!val) return [];
-  if (Array.isArray(val)) return val;
-  return [val];
+  return Array.isArray(val) ? val : (val ? [val] : []);
 }
 
-function render() {
-  updateFacets();
-  renderCards();
-  updateActiveFiltersDisplay();
-}
-
-function updateFacets() {
-  const container = document.getElementById('facets');
+/* ============ UI RENDERING ============ */
+function renderUI(records) {
+  const facets = collectFacets(records);
+  const container = document.getElementById('container');
   container.innerHTML = '';
+  const filterBar = document.createElement('div');
+  filterBar.id = 'filter-bar';
+  FILTERS.forEach(f => {
+    const values = Array.from(facets[f.key].keys()).sort();
+    const div = createFilterBubbles(f, values, records);
+    filterBar.appendChild(div);
+  });
+  container.appendChild(filterBar);
+  renderCards(records, {});
+}
 
-  FILTERS.forEach(filter => {
-    const facetValues = new Set();
-    contacts.forEach(c => {
-      const values = c[filter.key];
-      if (Array.isArray(values)) {
-        values.forEach(v => facetValues.add(v));
-      } else if (values) {
-        facetValues.add(values);
-      }
-    });
-
-    const facetDiv = document.createElement('div');
-    facetDiv.className = 'facet';
-    facetDiv.innerHTML = `<strong>${filter.label}</strong>`;
-
-    const buttonsDiv = document.createElement('div');
-    buttonsDiv.className = 'facet-buttons';
-
-    Array.from(facetValues).sort().forEach(value => {
-      const btn = document.createElement('button');
-      btn.textContent = value;
-      btn.className = 'facet-button';
-      if (activeFilters[filter.key].has(value)) {
-        btn.classList.add('active');
-      }
-      btn.addEventListener('click', () => {
-        toggleFilter(filter.key, value);
+function collectFacets(list) {
+  const facets = Object.fromEntries(FILTERS.map(f => [f.key, new Map()]));
+  list.forEach(record => {
+    FILTERS.forEach(f => {
+      safeValues(record[f.key.charAt(0).toUpperCase() + f.key.slice(1)]).forEach(v => {
+        facets[f.key].set(v, (facets[f.key].get(v) || 0) + 1);
       });
-      buttonsDiv.appendChild(btn);
     });
-
-    facetDiv.appendChild(buttonsDiv);
-    container.appendChild(facetDiv);
   });
+  return facets;
 }
 
-function toggleFilter(key, value) {
-  if (activeFilters[key].has(value)) {
-    activeFilters[key].delete(value);
-  } else {
-    activeFilters[key].add(value);
-  }
-  render();
+function createFilterBubbles(filter, values, records) {
+  const div = document.createElement('div');
+  div.className = 'filter-group';
+  const label = document.createElement('strong');
+  label.textContent = filter.label + ':';
+  div.appendChild(label);
+  values.forEach(v => {
+    if (!v) return;
+    const bubble = document.createElement('button');
+    bubble.className = 'bubble';
+    bubble.style.backgroundColor = filter.color;
+    bubble.textContent = v;
+    bubble.onclick = () => filterCards(records, filter.key, v);
+    div.appendChild(bubble);
+  });
+  return div;
 }
 
-function renderCards() {
-  const container = document.getElementById('cards');
-  container.innerHTML = '';
+function filterCards(records, filterKey, value) {
+  const filtered = records.filter(r => safeValues(r[filterKey]).includes(value));
+  renderCards(filtered, {});
+}
 
-  const filtered = contacts.filter(matches);
-
-  filtered.forEach(c => {
+function renderCards(records, filters) {
+  const container = document.getElementById('container');
+  const cardsContainer = document.getElementById('cards') || document.createElement('div');
+  cardsContainer.id = 'cards';
+  cardsContainer.innerHTML = '';
+  records.forEach(record => {
     const card = document.createElement('div');
-    card.className = 'card';
-
-    const avatar = document.createElement('div');
-    avatar.className = 'card-avatar';
-    const initials = (c.prenom.charAt(0) + c.nom.charAt(0)).toUpperCase();
-    avatar.textContent = initials;
-    card.appendChild(avatar);
-
-    const info = document.createElement('div');
-    info.className = 'card-info';
-
-    const name = document.createElement('div');
-    name.className = 'card-name';
-    name.textContent = `${c.prenom} ${c.nom}`;
-    info.appendChild(name);
-
-    const fonction = document.createElement('div');
-    fonction.className = 'card-fonction';
-    fonction.textContent = c.fonction || '';
-    info.appendChild(fonction);
-
-    const contact = document.createElement('div');
-    contact.className = 'card-contact';
-    contact.textContent = `📧 ${c.email}`;
-    if (c.tel) contact.textContent += ` | 📱 ${c.tel}`;
-    info.appendChild(contact);
-
-    card.appendChild(info);
-
-    const tags = document.createElement('div');
-    tags.className = 'card-tags';
-    TAG_GROUPS.forEach(group => {
-      const values = group.key === 'etablissement' ? 
-        (c.etablissement ? [c.etablissement] : []) :
-        group.key === 'role' ? 
-        (c.role ? [c.role] : []) :
-        c[group.key] || [];
-      
-      appendTagGroup(tags, group, values);
-    });
-    card.appendChild(tags);
-
-    container.appendChild(card);
+    card.className = 'contact-card';
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="avatar">${getInitials(record['Nom Prénom'] || '')}</div>
+        <div class="basic-info">
+          <h3>${record['Nom Prénom'] || 'N/A'}</h3>
+          <p class="fonction">${record.Fonction || ''}</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <p><strong>Email:</strong> ${record.Email || 'N/A'}</p>
+        ${record.Tel ? `<p><strong>Tel:</strong> ${record.Tel}</p>` : ''}
+        <div class="tags-section">
+          ${TAG_GROUPS.map(g => {
+            const values = safeValues(record[g.key]).filter(Boolean);
+            return values.length ? `<div class="tag-group"><strong>${g.label}:</strong> ${values.map(v => `<span class="tag" style="background-color:${g.color}">${v}</span>`).join('')}</div>` : '';
+          }).join('')}
+        </div>
+      </div>
+    `;
+    cardsContainer.appendChild(card);
   });
+  if (!document.getElementById('cards')) container.appendChild(cardsContainer);
+  else document.getElementById('cards').replaceWith(cardsContainer);
 }
 
-function appendTagGroup(container, group, values) {
-  if (!values || values.length === 0) return;
-
-  const groupDiv = document.createElement('div');
-  groupDiv.className = 'tag-group';
-
-  const label = document.createElement('span');
-  label.className = 'tag-group-label';
-  label.textContent = group.label + ':';
-  label.style.color = group.color;
-  groupDiv.appendChild(label);
-
-  values.forEach(value => {
-    const tag = document.createElement('span');
-    tag.className = 'tag';
-    tag.textContent = value;
-    tag.style.borderColor = group.color;
-    tag.style.color = group.color;
-    tag.addEventListener('click', () => {
-      toggleFilter(group.key, value);
-    });
-    groupDiv.appendChild(tag);
-  });
-
-  const separator = document.createElement('div');
-  separator.className = 'tag-separator';
-  groupDiv.appendChild(separator);
-
-  container.appendChild(groupDiv);
+function getInitials(name) {
+  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 }
-
-function matches(contact) {
-  for (const filter of FILTERS) {
-    if (activeFilters[filter.key].size === 0) continue;
-
-    const values = contact[filter.key];
-    const matchesFilter = Array.isArray(values) ?
-      values.some(v => activeFilters[filter.key].has(v)) :
-      values && activeFilters[filter.key].has(values);
-
-    if (!matchesFilter) return false;
-  }
-  return true;
-}
-
-function updateActiveFiltersDisplay() {
-  const display = document.getElementById('active-filters');
-  display.innerHTML = '';
-
-  let hasFilters = false;
-  FILTERS.forEach(filter => {
-    if (activeFilters[filter.key].size > 0) {
-      hasFilters = true;
-      const values = Array.from(activeFilters[filter.key]);
-      const text = `${filter.label}: ${values.join(', ')}`;
-      const span = document.createElement('span');
-      span.textContent = text;
-      display.appendChild(span);
-    }
-  });
-
-  if (hasFilters) {
-    const resetBtn = document.createElement('button');
-    resetBtn.textContent = 'Réinitialiser';
-    resetBtn.addEventListener('click', () => {
-      FILTERS.forEach(f => activeFilters[f.key].clear());
-      render();
-    });
-    display.appendChild(resetBtn);
-  } else {
-    display.textContent = 'Aucun filtre actif';
-  }
-}
-
-window.addEventListener('load', init);
+})();
