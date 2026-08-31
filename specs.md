@@ -27,6 +27,7 @@ Features
 * Filtres
   * Un champs de texte libre qui recherche sur le nom prénom
   * 6 filtres pour les instances, actions, GT, Taches compétances et communauté
+  * Nous n'afficherons QUE les contacts ayant au moins une valeur dans perimètre_all (meme si nous n'avons pas clairement les périmètre la colones sert juste à cela)
 
 
 
