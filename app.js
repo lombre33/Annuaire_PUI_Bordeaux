@@ -1,309 +1,299 @@
-/* ============ CONFIG ============ */
+/* Grist widget for contact directory filtering */
+
 const FILTERS = [
+  { key: 'instances', label: 'Instances', table: 'Instances', field: 'nom_instance', color: '#4f8ee8' },
+  { key: 'actions', label: 'Actions', table: 'Actions', field: 'Action', color: '#f28a54' },
+  { key: 'gts', label: 'GT', table: 'GT', field: 'nom', color: '#1ba99a' },
+  { key: 'taches', label: 'Tâches', table: 'Taches', field: 'taches', color: '#d79a25' },
+  { key: 'competences', label: 'Compétences', table: 'Competances', field: 'Competences', color: '#6257d9' },
+  { key: 'communautes', label: 'Communautés', table: 'Communautees', field: 'communaute', color: '#d85b9d' },
+  { key: 'etablissement', label: 'Établissement', table: 'Etablissements', field: 'nom_complet', color: '#9b59b6' },
+  { key: 'role', label: 'Rôle PUI', table: 'Role_Dans_le_PUI', field: 'Role', color: '#e74c3c' }
+];
+
+const TAG_GROUPS = [
   { key: 'instances', label: 'Instances', color: '#4f8ee8' },
   { key: 'actions', label: 'Actions', color: '#f28a54' },
   { key: 'gts', label: 'GT', color: '#1ba99a' },
   { key: 'taches', label: 'Tâches', color: '#d79a25' },
   { key: 'competences', label: 'Compétences', color: '#6257d9' },
-  { key: 'communautes', label: 'Communautés', color: '#d85b9d' }
+  { key: 'communautes', label: 'Communautés', color: '#d85b9d' },
+  { key: 'etablissement', label: 'Établissement', color: '#9b59b6' },
+  { key: 'role', label: 'Rôle PUI', color: '#e74c3c' }
 ];
 
-// Les deux derniers groupes sont affichés sur les cartes mais ne sont pas
-// des filtres dans l'interface (comme prévu par le cahier des charges).
-const TAG_GROUPS = FILTERS.concat([
-  { key: 'etablissement', label: 'Établissement', color: '#147c72' },
-  { key: 'role', label: 'Rôle PUI', color: '#8b5fc4' }
-]);
-
-const activeFilters = Object.fromEntries(
-  FILTERS.map(function (filter) { return [filter.key, new Set()]; })
-);
+let grist;
+let refMaps = {};
+let activeFilters = {};
 let contacts = [];
-let searchTerm = '';
 
-console.log('[INIT] Démarrage du widget Annuaire PUI');
-grist.ready({ requiredAccess: 'read table' });
-console.log('[GRIST] Accès lecture demandé');
-
-grist.onRecords(function (records) {
-  console.log('[GRIST] Records reçus:', records.length);
-  contacts = records.filter(hasPerimetre).map(normalizeRecord);
-  console.log('[FILTERS] Records conservés avec perimetre_all:', contacts.length);
-  render();
-});
-
-function safeValues(value) {
-  if (Array.isArray(value)) {
-    return value.filter(function (item) {
-      return item !== 'L' && item !== null && item !== undefined && item !== 0 && item !== '';
-    });
-  }
-  return value === null || value === undefined || value === '' || value === 0 ? [] : [value];
-}
-
-function hasPerimetre(record) {
-  return safeValues(record.perimetre_all).length > 0;
-}
-
-function text(value) {
-  return value === null || value === undefined ? '' : String(value).trim();
-}
-
-/*
- * Les colonnes Reference/ReferenceList sont reçues comme objets Grist.
- * Ces helpers lisent uniquement les champs affichables des objets : aucun ID
- * de référence n'est utilisé comme libellé dans l'application.
- */
-function referenceLabel(reference, field) {
-  if (!reference || typeof reference !== 'object') return '';
-  return text(reference[field]);
-}
-
-function referenceLabels(references, field) {
-  return safeValues(references)
-    .map(function (reference) { return referenceLabel(reference, field); })
-    .filter(Boolean);
-}
-
-function normalizeRecord(record) {
-  const competences = [];
-  for (let i = 1; i <= 15; i += 1) {
-    const value = text(record['competences_' + i]);
-    if (value) competences.push(value);
-  }
-
-  return {
-    id: record.id,
-    nom: text(record.Nom),
-    prenom: text(record.Prenom),
-    fonction: text(record.fonction),
-    email: text(record.Email),
-    telephone: text(record.numero_de_telephone),
-    perimetre: record.perimetre_all,
-    // On conserve les objets de référence jusqu'à enrich(), sans IDs.
-    instanceRefs: record.Instances,
-    actionRefs: record.Actions,
-    gtRefs: record.GT,
-    tacheRefs: record.Taches,
-    communauteRefs: record.Communautee_s_,
-    etablissementRef: record.Etablissement,
-    roleRef: record.Role_dans_le_PUI,
-    competences: competences,
-    etablissementFallback: text(record.Etablissement2)
-  };
-}
-
-/*
- * Extrait les noms affichables directement depuis les objets de référence :
- * Instances[i].nom_instance, Actions[i].Action, GT[i].nom,
- * Taches[i].taches, Communautee_s_[i].communaute,
- * Etablissement.nom_complet et Role_dans_le_PUI.Role.
- */
-function enrich(record) {
-  return Object.assign({}, record, {
-    instances: referenceLabels(record.instanceRefs, 'nom_instance'),
-    actions: referenceLabels(record.actionRefs, 'Action'),
-    gts: referenceLabels(record.gtRefs, 'nom'),
-    taches: referenceLabels(record.tacheRefs, 'taches'),
-    communautes: referenceLabels(record.communauteRefs, 'communaute'),
-    etablissement: referenceLabel(record.etablissementRef, 'nom_complet') || record.etablissementFallback,
-    role: referenceLabel(record.roleRef, 'Role')
+async function init() {
+  grist = window.grist;
+  
+  FILTERS.forEach(f => {
+    activeFilters[f.key] = new Set();
   });
-}
 
-function facetValues(contact, key) {
-  return contact[key] || [];
-}
-
-function collectFacets(list) {
-  const facets = Object.fromEntries(
-    FILTERS.map(function (filter) { return [filter.key, new Map()]; })
-  );
-  list.forEach(function (contact) {
-    FILTERS.forEach(function (filter) {
-      facetValues(contact, filter.key).forEach(function (value) {
-        if (value) facets[filter.key].set(value, (facets[filter.key].get(value) || 0) + 1);
+  try {
+    // Load all reference tables
+    for (const filter of FILTERS) {
+      const table = await grist.docApi.fetchTable(filter.table);
+      refMaps[filter.key] = {};
+      table.forEach(row => {
+        const id = row.id;
+        const label = row[filter.field] || '';
+        refMaps[filter.key][id] = label;
       });
-    });
-  });
-  return facets;
+    }
+
+    // Load Annuaire data and enrich it
+    const annuaireTable = await grist.docApi.fetchTable('Annuaire');
+    contacts = annuaireTable.map(enrich);
+
+    // Initial render
+    render();
+  } catch (error) {
+    console.error('Init error:', error);
+  }
 }
 
-function matches(contact) {
-  const term = searchTerm.toLocaleLowerCase('fr-FR');
-  if (term && ![contact.nom, contact.prenom].some(function (value) {
-    return value.toLocaleLowerCase('fr-FR').includes(term);
-  })) return false;
+function enrich(record) {
+  const lookup = (key, id) => refMaps[key] && refMaps[key][id] ? refMaps[key][id] : '';
 
-  // Les sélections sont des noms et sont comparées aux noms enrichis.
-  return FILTERS.every(function (filter) {
-    const selected = activeFilters[filter.key];
-    return selected.size === 0 || facetValues(contact, filter.key).some(function (name) {
-      return selected.has(name);
-    });
-  });
+  const c = {
+    id: record.id,
+    nom: record.Nom || '',
+    prenom: record.Prénom || '',
+    fonction: record.Fonction || '',
+    email: record.Email || '',
+    tel: record.Tel || '',
+    etablissementId: record.Etablissement || null,
+    roleId: record.Role_dans_le_PUI || null,
+    perimetre: record.perimetre_all || 'Hors PUI',
+    
+    instanceIds: safeValues(record.Instances),
+    actionIds: safeValues(record.Actions),
+    gtIds: safeValues(record.GT),
+    tacheId: safeValues(record.Taches),
+    competenceValues: safeValues(record.competences_1)
+      .concat(safeValues(record.competences_2))
+      .concat(safeValues(record.competences_3))
+      .concat(safeValues(record.competences_4))
+      .concat(safeValues(record.competences_5))
+      .concat(safeValues(record.competences_6))
+      .concat(safeValues(record.competences_7))
+      .concat(safeValues(record.competences_8))
+      .concat(safeValues(record.competences_9))
+      .concat(safeValues(record.competences_10))
+      .concat(safeValues(record.competences_11))
+      .concat(safeValues(record.competences_12))
+      .concat(safeValues(record.competences_13))
+      .concat(safeValues(record.competences_14))
+      .concat(safeValues(record.competences_15))
+      .filter(Boolean),
+    communauteIds: safeValues(record.Communautee_s_)
+  };
+
+  // Resolve lazy properties
+  c.instances = c.instanceIds.map(id => lookup('instances', id)).filter(Boolean);
+  c.actions = c.actionIds.map(id => lookup('actions', id)).filter(Boolean);
+  c.gts = c.gtIds.map(id => lookup('gts', id)).filter(Boolean);
+  c.taches = c.tacheId.map(id => lookup('taches', id)).filter(Boolean);
+  c.competences = c.competenceValues;
+  c.communautes = c.communauteIds.map(id => lookup('communautes', id)).filter(Boolean);
+  c.etablissement = c.etablissementId ? lookup('etablissement', c.etablissementId) : '';
+  c.role = c.roleId ? lookup('role', c.roleId) : '';
+
+  return c;
+}
+
+function safeValues(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  return [val];
 }
 
 function render() {
-  console.log('[RENDER] Mise à jour des filtres et des cartes');
-  const enriched = contacts.map(enrich);
-  renderFilters(collectFacets(enriched));
-  const visible = enriched
-    .filter(matches)
-    .sort(function (a, b) {
-      return a.nom.localeCompare(b.nom, 'fr-FR') || a.prenom.localeCompare(b.prenom, 'fr-FR');
-    });
-  renderActiveFilters();
-  renderCards(visible);
-  document.getElementById('resultCount').textContent = visible.length + ' contact' + (visible.length > 1 ? 's' : '');
-  document.getElementById('emptyState').hidden = visible.length !== 0;
-  console.log('[CARDS] Cartes affichées:', visible.length);
+  updateFacets();
+  renderCards();
+  updateActiveFiltersDisplay();
 }
 
-function renderFilters(facets) {
-  console.log('[FILTERS] Rendu des 6 catégories');
-  const container = document.getElementById('filtersContainer');
+function updateFacets() {
+  const container = document.getElementById('facets');
   container.innerHTML = '';
-  FILTERS.forEach(function (filter) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'filter';
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'filter-button';
-    button.dataset.category = filter.key;
-    button.innerHTML = '<span class="filter-dot"></span><span>' + filter.label + '</span><span class="filter-count">' + activeFilters[filter.key].size + '</span><span class="chevron">▾</span>';
-    button.querySelector('.filter-dot').style.backgroundColor = filter.color;
 
-    const menu = document.createElement('div');
-    menu.className = 'filter-menu';
-    menu.style.borderTopColor = filter.color;
-    Array.from(facets[filter.key].entries())
-      .sort(function (a, b) { return a[0].localeCompare(b[0], 'fr-FR'); })
-      .forEach(function (entry) {
-        const option = document.createElement('label');
-        option.className = 'filter-option';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = activeFilters[filter.key].has(entry[0]);
-        checkbox.addEventListener('change', function () { toggleFilter(filter.key, entry[0]); });
-        const label = document.createElement('span');
-        label.className = 'option-label';
-        label.textContent = entry[0];
-        const count = document.createElement('span');
-        count.className = 'option-count';
-        count.textContent = entry[1];
-        option.append(checkbox, label, count);
-        menu.appendChild(option);
-      });
-
-    button.addEventListener('click', function (event) {
-      event.stopPropagation();
-      document.querySelectorAll('.filter.open').forEach(function (item) {
-        if (item !== wrapper) item.classList.remove('open');
-      });
-      wrapper.classList.toggle('open');
+  FILTERS.forEach(filter => {
+    const facetValues = new Set();
+    contacts.forEach(c => {
+      const values = c[filter.key];
+      if (Array.isArray(values)) {
+        values.forEach(v => facetValues.add(v));
+      } else if (values) {
+        facetValues.add(values);
+      }
     });
-    menu.addEventListener('click', function (event) { event.stopPropagation(); });
-    wrapper.append(button, menu);
-    container.appendChild(wrapper);
+
+    const facetDiv = document.createElement('div');
+    facetDiv.className = 'facet';
+    facetDiv.innerHTML = `<strong>${filter.label}</strong>`;
+
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.className = 'facet-buttons';
+
+    Array.from(facetValues).sort().forEach(value => {
+      const btn = document.createElement('button');
+      btn.textContent = value;
+      btn.className = 'facet-button';
+      if (activeFilters[filter.key].has(value)) {
+        btn.classList.add('active');
+      }
+      btn.addEventListener('click', () => {
+        toggleFilter(filter.key, value);
+      });
+      buttonsDiv.appendChild(btn);
+    });
+
+    facetDiv.appendChild(buttonsDiv);
+    container.appendChild(facetDiv);
   });
 }
 
 function toggleFilter(key, value) {
-  if (activeFilters[key].has(value)) activeFilters[key].delete(value);
-  else activeFilters[key].add(value);
+  if (activeFilters[key].has(value)) {
+    activeFilters[key].delete(value);
+  } else {
+    activeFilters[key].add(value);
+  }
   render();
 }
 
-function renderActiveFilters() {
-  const target = document.getElementById('activeFilters');
-  target.innerHTML = '';
-  FILTERS.forEach(function (filter) {
-    activeFilters[filter.key].forEach(function (value) {
-      const chip = document.createElement('span');
-      chip.className = 'active-chip';
-      chip.textContent = filter.label + ' : ' + value;
-      target.appendChild(chip);
+function renderCards() {
+  const container = document.getElementById('cards');
+  container.innerHTML = '';
+
+  const filtered = contacts.filter(matches);
+
+  filtered.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'card-avatar';
+    const initials = (c.prenom.charAt(0) + c.nom.charAt(0)).toUpperCase();
+    avatar.textContent = initials;
+    card.appendChild(avatar);
+
+    const info = document.createElement('div');
+    info.className = 'card-info';
+
+    const name = document.createElement('div');
+    name.className = 'card-name';
+    name.textContent = `${c.prenom} ${c.nom}`;
+    info.appendChild(name);
+
+    const fonction = document.createElement('div');
+    fonction.className = 'card-fonction';
+    fonction.textContent = c.fonction || '';
+    info.appendChild(fonction);
+
+    const contact = document.createElement('div');
+    contact.className = 'card-contact';
+    contact.textContent = `📧 ${c.email}`;
+    if (c.tel) contact.textContent += ` | 📱 ${c.tel}`;
+    info.appendChild(contact);
+
+    card.appendChild(info);
+
+    const tags = document.createElement('div');
+    tags.className = 'card-tags';
+    TAG_GROUPS.forEach(group => {
+      const values = group.key === 'etablissement' ? 
+        (c.etablissement ? [c.etablissement] : []) :
+        group.key === 'role' ? 
+        (c.role ? [c.role] : []) :
+        c[group.key] || [];
+      
+      appendTagGroup(tags, group, values);
     });
+    card.appendChild(tags);
+
+    container.appendChild(card);
   });
 }
 
-/* Affiche les 8 groupes de tags avec les noms harmonisés par enrich(). */
-function renderCards(list) {
-  const grid = document.getElementById('cardsGrid');
-  grid.innerHTML = '';
-  const template = document.getElementById('cardTemplate');
+function appendTagGroup(container, group, values) {
+  if (!values || values.length === 0) return;
 
-  list.forEach(function (contact) {
-    const node = template.content.cloneNode(true);
-    node.querySelector('.avatar').textContent = ((contact.prenom.charAt(0) || '') + (contact.nom.charAt(0) || '')).toUpperCase() || '?';
-    node.querySelector('.name').textContent = (contact.prenom + ' ' + contact.nom).trim() || 'Sans nom';
-    setText(node.querySelector('.fonction'), contact.fonction);
-    setText(node.querySelector('.structure'), contact.etablissement);
-    setText(node.querySelector('.tel'), contact.telephone ? '☎ ' + contact.telephone : '');
+  const groupDiv = document.createElement('div');
+  groupDiv.className = 'tag-group';
 
-    const email = node.querySelector('.email');
-    if (contact.email) {
-      email.textContent = contact.email;
-      email.href = 'mailto:' + contact.email;
-      email.classList.add('visible');
-    }
+  const label = document.createElement('span');
+  label.className = 'tag-group-label';
+  label.textContent = group.label + ':';
+  label.style.color = group.color;
+  groupDiv.appendChild(label);
 
-    const tags = node.querySelector('.card-tags');
-    TAG_GROUPS.forEach(function (group) {
-      const values = group.key === 'etablissement'
-        ? (contact.etablissement ? [contact.etablissement] : [])
-        : group.key === 'role'
-          ? (contact.role ? [contact.role] : [])
-          : contact[group.key];
-      appendTagGroup(tags, group, values || []);
-    });
-    grid.appendChild(node);
-  });
-}
-
-function appendTagGroup(container, group, list) {
-  if (!list.length) return;
-  const section = document.createElement('section');
-  section.className = 'tag-group';
-  const title = document.createElement('h3');
-  title.className = 'tag-group-title';
-  title.textContent = group.label;
-  title.style.color = group.color;
-  section.appendChild(title);
-  const values = document.createElement('div');
-  values.className = 'tag-group-values';
-  list.forEach(function (value) {
-    const tag = document.createElement('button');
-    tag.type = 'button';
-    tag.className = 'tag tag-' + group.key;
-    tag.style.backgroundColor = group.color;
+  values.forEach(value => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
     tag.textContent = value;
-    if (activeFilters[group.key]) tag.addEventListener('click', function () { toggleFilter(group.key, value); });
-    values.appendChild(tag);
+    tag.style.borderColor = group.color;
+    tag.style.color = group.color;
+    tag.addEventListener('click', () => {
+      toggleFilter(group.key, value);
+    });
+    groupDiv.appendChild(tag);
   });
-  section.appendChild(values);
-  container.appendChild(section);
+
+  const separator = document.createElement('div');
+  separator.className = 'tag-separator';
+  groupDiv.appendChild(separator);
+
+  container.appendChild(groupDiv);
 }
 
-function setText(element, value) {
-  if (value) {
-    element.textContent = value;
-    element.classList.add('visible');
+function matches(contact) {
+  for (const filter of FILTERS) {
+    if (activeFilters[filter.key].size === 0) continue;
+
+    const values = contact[filter.key];
+    const matchesFilter = Array.isArray(values) ?
+      values.some(v => activeFilters[filter.key].has(v)) :
+      values && activeFilters[filter.key].has(values);
+
+    if (!matchesFilter) return false;
+  }
+  return true;
+}
+
+function updateActiveFiltersDisplay() {
+  const display = document.getElementById('active-filters');
+  display.innerHTML = '';
+
+  let hasFilters = false;
+  FILTERS.forEach(filter => {
+    if (activeFilters[filter.key].size > 0) {
+      hasFilters = true;
+      const values = Array.from(activeFilters[filter.key]);
+      const text = `${filter.label}: ${values.join(', ')}`;
+      const span = document.createElement('span');
+      span.textContent = text;
+      display.appendChild(span);
+    }
+  });
+
+  if (hasFilters) {
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = 'Réinitialiser';
+    resetBtn.addEventListener('click', () => {
+      FILTERS.forEach(f => activeFilters[f.key].clear());
+      render();
+    });
+    display.appendChild(resetBtn);
+  } else {
+    display.textContent = 'Aucun filtre actif';
   }
 }
 
-document.getElementById('searchInput').addEventListener('input', function (event) {
-  searchTerm = event.target.value.trim();
-  render();
-});
-document.getElementById('resetFilters').addEventListener('click', function () {
-  FILTERS.forEach(function (filter) { activeFilters[filter.key].clear(); });
-  searchTerm = '';
-  document.getElementById('searchInput').value = '';
-  render();
-});
-document.addEventListener('click', function () {
-  document.querySelectorAll('.filter.open').forEach(function (filter) { filter.classList.remove('open'); });
-});
-console.log('[INIT] ✅ App initialisé, en attente des données Grist');
+window.addEventListener('load', init);
