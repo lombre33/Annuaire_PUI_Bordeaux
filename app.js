@@ -1,459 +1,172 @@
-/* ============ CONFIG ============ */
-const CATEGORY_ORDER = ['competence', 'instance', 'gt', 'action', 'tache', 'communaute', 'etablissement', 'role'];
+'use strict';
 
-const CATEGORY_META = {
-  competence: { label: 'Compétences', color: '#f59e0b' },
-  instance: { label: 'Instances', color: '#3b82f6' },
-  gt: { label: 'GT', color: '#10b981' },
-  action: { label: 'Actions', color: '#ef4444' },
-  tache: { label: 'Tâches', color: '#8b5cf6' },
-  communaute: { label: 'Communautés', color: '#f97316' },
-  etablissement: { label: 'Établissement', color: '#8b5cf6' },
-  role: { label: 'Rôle', color: '#06b6d4' },
-};
-
-const refTables = {};
-
-/* ============ STATE ============ */
-let rawRecords = [];
+const FILTERS = [
+  { key: 'instances', label: 'Instances', table: 'Instances', field: 'nom_instance', color: '#4f8ee8' },
+  { key: 'actions', label: 'Actions', table: 'Actions', field: 'Action', color: '#f28a54' },
+  { key: 'gt', label: 'GT', table: 'GT', field: 'nom', color: '#1ba99a' },
+  { key: 'communautes', label: 'Communautés', table: 'Communautees', field: 'communaute', color: '#d85b9d' }
+];
+const activeFilters = Object.fromEntries(FILTERS.map(function(filter) { return [filter.key, new Set()]; }));
+const refMaps = { Instances: {}, Actions: {}, GT: {}, Communautees: {}, Etablissements: {}, Role_Dans_le_PUI: {} };
 let contacts = [];
-let activeFilters = {};
 let searchTerm = '';
 
-CATEGORY_ORDER.forEach(k => activeFilters[k] = new Set());
+console.log('[INIT] Démarrage du widget Annuaire PUI');
 
-/* ============ GRIST INIT ============ */
-console.log('[INIT] Initialisation du widget Annuaire');
-
-if (typeof grist === 'undefined') {
-  console.error('[GRIST] ❌ grist object NOT available');
-} else {
-  console.log('[GRIST] ✅ grist object available');
-  
-  grist.ready({
-    requiredAccess: 'read table',
-  });
-  console.log('[GRIST] grist.ready() called');
-
-  grist.onRecords((records) => {
-    console.log('[GRIST] Reçu', records.length, 'enregistrements bruts');
-    rawRecords = records;
-    contacts = rawRecords
-      .map(normalizeRecord)
-      .filter(c => c.perimetreIds && c.perimetreIds.length > 0);
-    console.log('[GRIST] Après normalisation et filtrage:', contacts.length, 'contacts');
-    loadRefTables();
-  });
-  console.log('[GRIST] grist.onRecords() registered');
-}
-
-/* ============ NORMALIZATION ============ */
-function safeArray(val) {
-  if (Array.isArray(val)) return val.flat();
-  if (val) return [val];
-  return [];
-}
-
-function normalizeRecord(r) {
-  const competences = [
-    r.competence_4, r.competence_5, r.competence_6, r.competence_7,
-    r.competence_8, r.competence_9, r.competence_10, r.competence_11,
-    r.competence_12, r.competence_13, r.competence_14, r.competence_15
-  ].filter(Boolean);
-
-  return {
-    id: r.id,
-    prenom: r.Prenom || '',
-    nom: r.Nom || '',
-    email: r.Email || '',
-    fonction: r.fonction || '',
-    tel: r.numero_de_telephone || '',
-    structure: r.Etablissement2 || r.Etablissement_nom || '',
-    competences,
-    perimetreIds: safeArray(r.perimetre_all),
-    instanceIds: safeArray(r.Instances),
-    gtIds: safeArray(r.GT),
-    actionIds: safeArray(r.Actions),
-    tacheIds: safeArray(r.Taches),
-    communauteIds: safeArray(r.Communautee_s_),
-    etablissementId: r.Etablissement || null,
-    roleId: r.Role_dans_le_PUI || null,
-  };
-}
-
-function defaultAvatar() {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="70" height="70"><rect width="70" height="70" rx="35" fill="#4f46e5" opacity="0.1"/><text x="50%" y="55%" text-anchor="middle" font-size="28" fill="#4f46e5" font-family="sans-serif" font-weight="bold">?</text></svg>';
-  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-}
-
-/* ============ LOAD REFERENCE TABLES ============ */
-async function loadRefTables() {
-  const specs = [
-    ['Perimetres', 'Perimetre'],
-    ['Instances', 'nom_instance'],
-    ['GT', 'nom_gt'],
-    ['Actions', 'Action'],
-    ['Taches', 'taches'],
-    ['Communautees', 'Communaute'],
-    ['Etablissements', 'nom_complet'],
-    ['Role_Dans_le_PUI', 'Role'],
-  ];
-
-  await Promise.all(specs.map(async ([table, field]) => {
-    try {
-      const data = await grist.docApi.fetchTable(table);
-      const map = {};
-      data.id.forEach((id, idx) => {
-        map[id] = (data[field] && data[field][idx]) || (data.nom && data.nom[idx]) || (data.communaute && data.communaute[idx]) || `#${id}`;
-      });
-      refTables[table] = map;
-      console.log('[REFS] Chargé', table, ':', Object.keys(map).length, 'entrées');
-    } catch (e) {
-      console.warn('[REFS] Impossible de charger', table, e);
-    }
-  }));
-
+grist.ready({ requiredAccess: 'read table' });
+console.log('[GRIST] Accès lecture demandé');
+grist.onRecords(function(records) {
+  console.log('[GRIST] Records reçus:', records.length);
+  contacts = records.map(normalizeRecord);
   render();
+});
+
+function values(value) {
+  if (Array.isArray(value)) return value.filter(function(item) { return item !== 'L' && item !== null && item !== undefined && item !== 0; });
+  return value === null || value === undefined || value === '' ? [] : [value];
 }
 
-function label(table, id) {
-  if (!refTables[table]) return null;
-  return refTables[table][id] || null;
-}
-
-function enrich(c) {
+function normalizeRecord(record) {
   return {
-    ...c,
-    avatar: defaultAvatar(),
-    competences: c.competences.map(v => String(v).trim()).filter(Boolean),
-    instances: c.instanceIds.map(id => label('Instances', id)).filter(Boolean),
-    gts: c.gtIds.map(id => label('GT', id)).filter(Boolean),
-    actions: c.actionIds.map(id => label('Actions', id)).filter(Boolean),
-    taches: c.tacheIds.map(id => label('Taches', id)).filter(Boolean),
-    communautes: c.communauteIds.map(id => label('Communautees', id)).filter(Boolean),
-    etablissement: label('Etablissements', c.etablissementId) || c.structure || '',
-    role: label('Role_Dans_le_PUI', c.roleId),
+    id: record.id,
+    nom: String(record.Nom || '').trim(),
+    prenom: String(record.Prenom || '').trim(),
+    fonction: String(record.fonction || '').trim(),
+    email: String(record.Email || '').trim(),
+    telephone: record.numero_de_telephone === null || record.numero_de_telephone === undefined ? '' : String(record.numero_de_telephone).trim(),
+    etablissementId: record.Etablissement,
+    etablissementFallback: String(record.Etablissement2 || '').trim(),
+    instanceIds: values(record.Instances),
+    actionIds: values(record.Actions),
+    gtIds: values(record.GT),
+    communauteIds: values(record.Communautee_s_),
+    roleId: record.Role_dans_le_PUI
   };
 }
 
-/* ============ FILTER COUNTING ============ */
-function collectFacetValues(enrichedContacts) {
-  const facets = {};
-  CATEGORY_ORDER.forEach(cat => facets[cat] = new Map());
+function lookup(table, id) {
+  if (id === null || id === undefined || id === '') return '';
+  return refMaps[table][String(id)] || '';
+}
 
-  enrichedContacts.forEach(c => {
-    CATEGORY_ORDER.forEach(cat => {
-      let values = [];
-      if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
-      else if (cat === 'role') values = c.role ? [c.role] : [];
-      else {
-        const fieldMap = {
-          competence: 'competences', instance: 'instances', gt: 'gts',
-          action: 'actions', tache: 'taches', communaute: 'communautes',
-        };
-        values = c[fieldMap[cat]] || [];
-      }
-      values.forEach(v => {
-        if (v) facets[cat].set(v, (facets[cat].get(v) || 0) + 1);
-      });
+function enrich(contact) {
+  return Object.assign({}, contact, {
+    instances: contact.instanceIds.map(function(id) { return lookup('Instances', id); }).filter(Boolean),
+    actions: contact.actionIds.map(function(id) { return lookup('Actions', id); }).filter(Boolean),
+    gts: contact.gtIds.map(function(id) { return lookup('GT', id); }).filter(Boolean),
+    communautes: contact.communauteIds.map(function(id) { return lookup('Communautees', id); }).filter(Boolean),
+    etablissement: lookup('Etablissements', contact.etablissementId) || contact.etablissementFallback,
+    role: lookup('Role_Dans_le_PUI', contact.roleId)
+  });
+}
+
+function facetValues(contact, key) { return contact[key] || []; }
+function collectFacets(list) {
+  const facets = Object.fromEntries(FILTERS.map(function(filter) { return [filter.key, new Map()]; }));
+  list.forEach(function(contact) {
+    FILTERS.forEach(function(filter) {
+      facetValues(contact, filter.key).forEach(function(value) { facets[filter.key].set(value, (facets[filter.key].get(value) || 0) + 1); });
     });
   });
-
   return facets;
 }
 
-/* ============ FILTERING LOGIC ============ */
-function matchesSearch(c) {
-  if (!searchTerm) return true;
-  const t = searchTerm.toLowerCase();
-  return [c.nom, c.prenom, c.fonction, c.structure]
-    .filter(Boolean)
-    .some(v => String(v).toLowerCase().includes(t));
+function matches(contact) {
+  const term = searchTerm.toLocaleLowerCase('fr-FR');
+  const nameMatches = !term || [contact.nom, contact.prenom].some(function(value) { return value.toLocaleLowerCase('fr-FR').includes(term); });
+  if (!nameMatches) return false;
+  return FILTERS.every(function(filter) {
+    const selected = activeFilters[filter.key];
+    return selected.size === 0 || facetValues(contact, filter.key).some(function(value) { return selected.has(value); });
+  });
 }
 
-function matchesFilters(c) {
-  for (const cat of CATEGORY_ORDER) {
-    const selected = activeFilters[cat];
-    if (selected.size === 0) continue;
-
-    let values = [];
-    if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
-    else if (cat === 'role') values = c.role ? [c.role] : [];
-    else {
-      const fieldMap = {
-        competence: 'competences', instance: 'instances', gt: 'gts',
-        action: 'actions', tache: 'taches', communaute: 'communautes',
-      };
-      values = c[fieldMap[cat]] || [];
-    }
-
-    if (!values.some(v => selected.has(v))) return false;
-  }
-  return true;
-}
-
-function relevanceScore(c) {
-  let score = 0;
-  const totalSelected = CATEGORY_ORDER.reduce((s, cat) => s + activeFilters[cat].size, 0);
-
-  if (totalSelected > 0) {
-    CATEGORY_ORDER.forEach(cat => {
-      const selected = activeFilters[cat];
-      if (selected.size === 0) return;
-      let values;
-      if (cat === 'etablissement') values = c.etablissement ? [c.etablissement] : [];
-      else if (cat === 'role') values = c.role ? [c.role] : [];
-      else {
-        const fieldMap = {
-          competence: 'competences', instance: 'instances', gt: 'gts',
-          action: 'actions', tache: 'taches', communaute: 'communautes',
-        };
-        values = c[fieldMap[cat]] || [];
-      }
-
-      const matches = values.filter(v => selected.has(v)).length;
-      score += matches * 10;
-    });
-  }
-
-  const dataRichness = [
-    c.instances?.length || 0,
-    c.gts?.length || 0,
-    c.actions?.length || 0,
-    c.taches?.length || 0,
-    c.communautes?.length || 0,
-  ].reduce((a, b) => a + b, 0);
-  score += dataRichness;
-
-  return score;
-}
-
-/* ============ RENDER ============ */
 function render() {
-  console.log('[RENDER] Début du rendu');
+  console.log('[RENDER] Mise à jour des filtres et des cartes');
   const enriched = contacts.map(enrich);
-  const facets = collectFacetValues(enriched);
-
-  renderFilterBubbles(facets);
+  renderFilters(collectFacets(enriched));
+  const visible = enriched.filter(matches).sort(function(a, b) { return a.nom.localeCompare(b.nom, 'fr-FR') || a.prenom.localeCompare(b.prenom, 'fr-FR'); });
   renderActiveFilters();
-
-  const filtered = enriched
-    .filter(matchesSearch)
-    .filter(matchesFilters);
-
-  const sorted = filtered.sort((a, b) => {
-    const s = relevanceScore(b) - relevanceScore(a);
-    if (s !== 0) return s;
-    return (a.nom || '').localeCompare(b.nom || '', 'fr');
-  });
-
-  renderCards(sorted);
-  updateResultCount(sorted.length);
-  console.log('[RENDER] Fin - affichage de', sorted.length, 'contacts');
+  renderCards(visible);
+  document.getElementById('resultCount').textContent = visible.length + ' contact' + (visible.length > 1 ? 's' : '');
+  document.getElementById('emptyState').hidden = visible.length !== 0;
+  console.log('[CARDS] Cartes affichées:', visible.length);
 }
 
-function renderFilterBubbles(facets) {
-  console.log('[FILTERS] Rendu des bulles de filtres');
-  const container = document.getElementById('filterBubbles');
-  if (!container) {
-    console.error('[FILTERS] ❌ filterBubbles not found in DOM!');
-    return;
-  }
+function renderFilters(facets) {
+  const container = document.getElementById('filtersContainer');
   container.innerHTML = '';
-
-  CATEGORY_ORDER.forEach(cat => {
-    const meta = CATEGORY_META[cat];
-    const values = [...facets[cat].entries()].sort((a, b) => b[1] - a[1]);
-    if (values.length === 0) return;
-
-    const bubble = document.createElement('div');
-    bubble.className = 'filter-bubble';
-
-    const activeCount = activeFilters[cat].size;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.category = cat;
-    btn.className = 'filter-bubble-btn' + (activeCount > 0 ? ' active' : '');
-    btn.innerHTML = `
-      <span>${meta.label}</span>
-      ${activeCount > 0 ? `<span class="filter-badge">${activeCount}</span>` : ''}
-    `;
-
-    const dropdown = document.createElement('div');
-    dropdown.className = 'filter-dropdown';
-    if (activeCount > 0) dropdown.classList.add('open');
-
-    values.forEach(([val, count]) => {
-      const option = document.createElement('label');
-      option.className = 'filter-option';
-      option.innerHTML = `
-        <input type="checkbox" ${activeFilters[cat].has(val) ? 'checked' : ''}>
-        <span class="filter-option-label">${val}</span>
-        <span class="filter-option-count">${count}</span>
-      `;
-      option.querySelector('input').addEventListener('change', () => {
-        toggleFilter(cat, val);
-      });
-      dropdown.appendChild(option);
+  FILTERS.forEach(function(filter) {
+    const wrapper = document.createElement('div'); wrapper.className = 'filter';
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'filter-button';
+    button.innerHTML = '<span class="filter-dot"></span><span>' + filter.label + '</span><span class="filter-count">' + activeFilters[filter.key].size + '</span><span class="chevron">▾</span>';
+    button.querySelector('.filter-dot').style.backgroundColor = filter.color;
+    const menu = document.createElement('div'); menu.className = 'filter-menu';
+    const entries = Array.from(facets[filter.key].entries()).sort(function(a, b) { return a[0].localeCompare(b[0], 'fr-FR'); });
+    entries.forEach(function(entry) {
+      const label = document.createElement('label'); label.className = 'filter-option';
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = activeFilters[filter.key].has(entry[0]);
+      checkbox.addEventListener('change', function() { toggleFilter(filter.key, entry[0]); });
+      const text = document.createElement('span'); text.className = 'option-label'; text.textContent = entry[0];
+      const count = document.createElement('span'); count.className = 'option-count'; count.textContent = entry[1];
+      label.append(checkbox, text, count); menu.appendChild(label);
     });
-
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdown.classList.toggle('open');
-      btn.classList.toggle('active');
-    });
-
-    bubble.appendChild(btn);
-    bubble.appendChild(dropdown);
-    container.appendChild(bubble);
+    button.addEventListener('click', function(event) { event.stopPropagation(); document.querySelectorAll('.filter.open').forEach(function(item) { if (item !== wrapper) item.classList.remove('open'); }); wrapper.classList.toggle('open'); });
+    wrapper.append(button, menu); container.appendChild(wrapper);
   });
+  console.log('[FILTERS] 4 catégories rendues');
 }
 
-function toggleFilter(cat, val) {
-  console.log('[FILTERS] Toggle:', cat, val);
-  const set = activeFilters[cat];
-  if (set.has(val)) {
-    set.delete(val);
-  } else {
-    set.add(val);
-  }
-  render();
-}
-
+function toggleFilter(key, value) { if (activeFilters[key].has(value)) activeFilters[key].delete(value); else activeFilters[key].add(value); render(); }
 function renderActiveFilters() {
-  const container = document.getElementById('activeFilters');
-  if (!container) return;
-  container.innerHTML = '';
-
-  CATEGORY_ORDER.forEach(cat => {
-    activeFilters[cat].forEach(val => {
-      const chip = document.createElement('div');
-      chip.className = 'filter-chip';
-      chip.innerHTML = `
-        <span>${val}</span>
-        <span class="filter-chip-remove">✕</span>
-      `;
-      chip.querySelector('.filter-chip-remove').addEventListener('click', () => {
-        activeFilters[cat].delete(val);
-        render();
-      });
-      container.appendChild(chip);
-    });
-  });
+  const target = document.getElementById('activeFilters'); target.innerHTML = '';
+  FILTERS.forEach(function(filter) { activeFilters[filter.key].forEach(function(value) { const chip = document.createElement('span'); chip.className = 'active-chip'; chip.textContent = filter.label + ' : ' + value; target.appendChild(chip); }); });
 }
 
-/* ============ RENDER CARDS ============ */
 function renderCards(list) {
-  console.log('[CARDS] Rendu de', list.length, 'cartes');
-  const grid = document.getElementById('cardsGrid');
-  if (!grid) {
-    console.error('[CARDS] ❌ cardsGrid not found in DOM!');
-    return;
-  }
-  const tmpl = document.getElementById('cardTemplate');
-  if (!tmpl) {
-    console.error('[CARDS] ❌ cardTemplate not found in DOM!');
-    return;
-  }
-
-  grid.innerHTML = '';
-
-  list.forEach(c => {
-    const node = tmpl.content.cloneNode(true);
-
-    const avatar = node.querySelector('.avatar-placeholder');
-    if (avatar) avatar.textContent = (c.prenom || c.nom || '?').trim().charAt(0).toUpperCase() || '?';
-    node.querySelector('.card-name').textContent = `${c.prenom} ${c.nom}`.trim() || 'Sans nom';
-    node.querySelector('.card-fonction').textContent = c.fonction || '';
-    node.querySelector('.card-structure').textContent = c.etablissement || c.structure || '';
-
-    const emailEl = node.querySelector('.card-email');
-    if (c.email) {
-      emailEl.textContent = c.email;
-      emailEl.href = `mailto:${c.email}`;
-    } else {
-      emailEl.style.display = 'none';
-    }
-
-    const telEl = node.querySelector('.card-tel');
-    if (c.tel) {
-      telEl.textContent = '☎ ' + c.tel;
-    } else {
-      telEl.style.display = 'none';
-    }
-
-    const tagsWrap = node.querySelector('.card-tags');
-    appendTags(tagsWrap, c.competences, 'competence');
-    appendTags(tagsWrap, c.instances, 'instance');
-    appendTags(tagsWrap, c.gts, 'gt');
-    appendTags(tagsWrap, c.actions, 'action');
-    appendTags(tagsWrap, c.taches, 'tache');
-    appendTags(tagsWrap, c.communautes, 'communaute');
-    if (c.etablissement) appendTags(tagsWrap, [c.etablissement], 'etablissement');
-    if (c.role) appendTags(tagsWrap, [c.role], 'role');
-
+  const grid = document.getElementById('cardsGrid'); grid.innerHTML = '';
+  const template = document.getElementById('cardTemplate');
+  list.forEach(function(contact) {
+    const node = template.content.cloneNode(true);
+    const initials = ((contact.prenom.charAt(0) || '') + (contact.nom.charAt(0) || '')).toUpperCase() || '?';
+    node.querySelector('.avatar').textContent = initials;
+    node.querySelector('.name').textContent = (contact.prenom + ' ' + contact.nom).trim() || 'Sans nom';
+    setText(node.querySelector('.fonction'), contact.fonction);
+    setText(node.querySelector('.structure'), contact.etablissement);
+    setText(node.querySelector('.tel'), contact.telephone ? '☎ ' + contact.telephone : '');
+    const email = node.querySelector('.email');
+    if (contact.email) { email.textContent = contact.email; email.href = 'mailto:' + contact.email; email.classList.add('visible'); }
+    appendTags(node.querySelector('.card-tags'), contact.instances, 'instances', 'instance');
+    appendTags(node.querySelector('.card-tags'), contact.actions, 'actions', 'action');
+    appendTags(node.querySelector('.card-tags'), contact.gts, 'gt', 'gt');
+    appendTags(node.querySelector('.card-tags'), contact.communautes, 'communautes', 'communaute');
+    appendTags(node.querySelector('.card-tags'), contact.role ? [contact.role] : [], null, 'role');
     grid.appendChild(node);
   });
 }
-
-function appendTags(container, values, category) {
-  if (!Array.isArray(values)) values = [values];
-  values.filter(Boolean).forEach(val => {
-    const tag = document.createElement('div');
-    tag.className = 'tag ' + category;
-    tag.textContent = val;
-    tag.addEventListener('click', () => {
-      activeFilters[category].add(val);
-      render();
-    });
-    container.appendChild(tag);
-  });
+function setText(element, value) { if (value) { element.textContent = value; element.classList.add('visible'); } }
+function appendTags(container, list, filterKey, cssName) {
+  list.forEach(function(value) { const tag = document.createElement('button'); tag.type = 'button'; tag.className = 'tag tag-' + cssName + (filterKey ? ' tag-clickable' : ''); tag.textContent = value; if (filterKey) tag.addEventListener('click', function() { toggleFilter(filterKey, value); }); container.appendChild(tag); });
 }
 
-function updateResultCount(count) {
-  const el = document.getElementById('resultCount');
-  if (!el) return;
-  el.textContent = `${count} contact${count !== 1 ? 's' : ''}`;
-  const emptyState = document.getElementById('emptyState');
-  if (emptyState) {
-    if (count === 0) {
-      emptyState.hidden = false;
-      emptyState.classList.add('show');
-    } else {
-      emptyState.hidden = true;
-      emptyState.classList.remove('show');
-    }
-  }
+document.getElementById('searchInput').addEventListener('input', function(event) { searchTerm = event.target.value.trim(); render(); });
+document.getElementById('resetFilters').addEventListener('click', function() { FILTERS.forEach(function(filter) { activeFilters[filter.key].clear(); }); searchTerm = ''; document.getElementById('searchInput').value = ''; render(); });
+document.addEventListener('click', function() { document.querySelectorAll('.filter.open').forEach(function(filter) { filter.classList.remove('open'); }); });
+
+async function loadReferenceTables() {
+  console.log('[REFS] Chargement des 6 tables de référence');
+  const specs = FILTERS.concat([
+    { table: 'Etablissements', field: 'nom_complet' },
+    { table: 'Role_Dans_le_PUI', field: 'Role' }
+  ]);
+  await Promise.all(specs.map(async function(spec) {
+    try {
+      const data = await grist.docApi.fetchTable(spec.table);
+      refMaps[spec.table] = {};
+      (data.id || []).forEach(function(id, index) { refMaps[spec.table][String(id)] = String((data[spec.field] || [])[index] || '').trim(); });
+    } catch (error) { console.warn('[REFS] Échec pour ' + spec.table, error); }
+  }));
+  console.log('[REFS] Tables de référence chargées');
+  render();
 }
-
-/* ============ EVENTS ============ */
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('[EVENTS] Attachement des event listeners');
-
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      searchTerm = e.target.value.trim();
-      render();
-    });
-  }
-
-  const resetBtn = document.getElementById('resetFilters');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      CATEGORY_ORDER.forEach(k => activeFilters[k].clear());
-      const searchInput = document.getElementById('searchInput');
-      if (searchInput) searchInput.value = '';
-      searchTerm = '';
-      render();
-    });
-  }
-
-  document.addEventListener('click', () => {
-    document.querySelectorAll('.filter-dropdown.open').forEach(dd => {
-      dd.classList.remove('open');
-    });
-  });
-});
-
-console.log('[BOOT] Widget Annuaire prêt!');
+loadReferenceTables();

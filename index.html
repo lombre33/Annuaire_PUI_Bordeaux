@@ -1,62 +1,59 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Annuaire - Contacts</title>
+  <meta charset="utf-8">
+  <title>Annuaire PUI</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
-  <div class="app-container">
-    <header class="header">
-      <div class="header-content">
-        <div class="logo-section">
-          <h1 class="logo">📇 Annuaire</h1>
-          <p class="subtitle">Répertoire de contacts</p>
-        </div>
-        <div class="search-section">
-          <input type="search" id="searchInput" class="search-input" placeholder="Rechercher par nom, fonction, structure..." autocomplete="off">
-          <span class="search-icon" aria-hidden="true">⌕</span>
-        </div>
+  <main class="widget-shell">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Agenda PUI Bordeaux</p>
+        <h1>Annuaire des membres</h1>
+        <p class="subtitle">Retrouvez les contacts et les groupes du PUI.</p>
       </div>
+      <div id="resultCount" class="result-count" aria-live="polite">0 contact</div>
     </header>
 
-    <section class="filter-banner" aria-label="Filtres">
-      <div class="filter-banner-content">
-        <div class="filter-bubbles" id="filterBubbles"></div>
-        <button id="resetFilters" class="reset-btn" type="button">✕ Réinitialiser</button>
-      </div>
+    <section class="toolbar" aria-label="Recherche et filtres">
+      <label class="search-box" for="searchInput">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="searchInput" type="search" placeholder="Rechercher par nom ou prénom…" autocomplete="off">
+      </label>
+      <div id="filtersContainer" class="filters-container" aria-label="Filtres"></div>
+      <button id="resetFilters" class="reset-button" type="button">Réinitialiser</button>
     </section>
 
-    <main class="main-content">
-      <div class="active-filters" id="activeFilters" aria-live="polite"></div>
-      <div class="results-header"><span id="resultCount">0 contacts</span></div>
-      <div class="cards-grid" id="cardsGrid"></div>
-      <div class="empty-state" id="emptyState" hidden>
-        <div class="empty-state-icon">📭</div>
-        <h2>Aucun contact trouvé</h2>
-        <p>Modifiez vos filtres ou votre recherche.</p>
-      </div>
-    </main>
-  </div>
+    <div id="activeFilters" class="active-filters" aria-live="polite"></div>
+    <section id="cardsGrid" class="cards-grid" aria-live="polite"></section>
+    <section id="emptyState" class="empty-state" hidden>
+      <div class="empty-mark">✦</div>
+      <h2>Aucun contact trouvé</h2>
+      <p>Modifiez votre recherche ou réinitialisez les filtres.</p>
+    </section>
+  </main>
 
   <template id="cardTemplate">
-    <article class="card">
-      <div class="card-avatar"><div class="avatar-placeholder" aria-hidden="true">?</div></div>
-      <div class="card-content">
-        <h3 class="card-name"></h3>
-        <p class="card-fonction"></p>
-        <p class="card-structure"></p>
-        <div class="card-contact">
-          <a class="card-email" href="#"></a>
-          <span class="card-tel"></span>
+    <article class="contact-card">
+      <div class="card-topline"></div>
+      <div class="card-body">
+        <div class="avatar" aria-hidden="true"></div>
+        <div class="identity">
+          <h2 class="name"></h2>
+          <p class="fonction"></p>
+        </div>
+        <div class="details">
+          <p class="structure detail-row"></p>
+          <a class="email detail-row" rel="noopener"></a>
+          <p class="tel detail-row"></p>
         </div>
         <div class="card-tags"></div>
       </div>
     </article>
   </template>
 
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
