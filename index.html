@@ -3,15 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Annuaire - Grist Widget</title>
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <title>Annuaire</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
-  <div id="filtersPanel" class="filters-panel"><div class="filters-header"><button id="toggleFilters" class="toggle-filters" type="button">🔽 Filtres</button><button id="resetFilters" class="reset-filters" type="button">↻ Réinitialiser</button></div><div id="filtersContainer" class="filters-container"></div></div>
-  <div class="search-bar"><input type="search" id="searchInput" placeholder="Rechercher par nom, prénom, fonction, structure..." autocomplete="off"><span id="resultCount" class="result-count">0 contacts</span></div>
-  <div id="cardsGrid" class="cards-grid"></div><div id="emptyState" class="empty-state" hidden><p>Aucun contact ne correspond à vos critères.</p></div>
-  <template id="cardTemplate"><article class="contact-card"><img class="avatar" alt=""><div class="card-content"><div class="name"></div><div class="fonction"></div><div class="structure"></div><a class="email"></a><div class="tel"></div><div class="card-tags"></div></div></article></template>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-heading">
+        <div class="eyebrow">PUI Bordeaux</div>
+        <div class="title-row"><h1>Annuaire</h1><span class="count-badge" id="resultCount">0 contacts</span></div>
+      </div>
+      <div class="topbar-actions">
+        <label class="search-field" for="searchInput"><span class="search-icon" aria-hidden="true">⌕</span><input type="search" id="searchInput" placeholder="Rechercher un nom, une fonction…" autocomplete="off"></label>
+        <button id="resetFilters" class="btn-ghost" type="button">Réinitialiser</button>
+        <button id="toggleFilters" class="btn-ghost mobile-only" type="button">Filtres</button>
+      </div>
+      <div class="filters-panel" id="filtersPanel">
+        <div class="filter-bar-label">Filtrer par</div>
+        <div class="filters-scroll" id="filtersContainer">
+          <div class="filter-group collapsed" data-category="instance"><button class="filter-group-title" type="button"><span class="dot dot-instance"></span>Instances <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
+          <div class="filter-group collapsed" data-category="action"><button class="filter-group-title" type="button"><span class="dot dot-action"></span>Actions <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
+          <div class="filter-group collapsed" data-category="gt"><button class="filter-group-title" type="button"><span class="dot dot-gt"></span>GT <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
+          <div class="filter-group collapsed" data-category="tache"><button class="filter-group-title" type="button"><span class="dot dot-tache"></span>Tâches <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
+          <div class="filter-group collapsed" data-category="competence"><button class="filter-group-title" type="button"><span class="dot dot-competence"></span>Compétences <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
+          <div class="filter-group collapsed" data-category="communaute"><button class="filter-group-title" type="button"><span class="dot dot-communaute"></span>Communautés <span class="filter-selected-count"></span><span class="arrow">▾</span></button><div class="filter-options"></div></div>
+        </div>
+      </div>
+    </header>
+    <main class="cards-area"><div class="cards-grid" id="cardsGrid"></div><div class="empty-state" id="emptyState" hidden>Aucun contact ne correspond aux filtres sélectionnés.</div></main>
+  </div>
+  <template id="cardTemplate"><article class="card"><div class="card-head"><img class="avatar" src="" alt=""><div class="identity"><h3 class="name"></h3><p class="fonction"></p><p class="structure"></p></div></div><div class="card-contact"><a class="email" href="#"></a><span class="tel"></span></div><div class="card-tags" aria-label="Tags"></div></article></template>
   <script src="app.js"></script>
 </body>
 </html>
