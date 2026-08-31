@@ -1,13 +1,1 @@
-# Version 0.98 — base restaurée + correctif Établissement
-
-Base fonctionnelle v0.98 restaurée, avec le filtre et le tag Établissement utilisant la colonne `acronyme`.
-
-## Filtres disponibles
-
-- Actions
-- Tâches
-- Communautés
-- GT
-- Compétences
-- Instances
-- Établissement
+# Version 0.97 — base v0.98 (7 filtres: Actions/Tâches/Communautés/GT/Compétences/Instances/Établissement) confirmée + filtre etablissement fonctionnel avec champ acronyme, filtre back-end perimetre_all actif

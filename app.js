@@ -1,9 +1,10 @@
-/* Annuaire PUI — version fusionnée stable pour Grist
- *
+/* Annuaire PUI — version 0.9 stable avec corrections noms de colonnes
  * Révisions:
  * - Conserve tableToRows() et fetchTable() qui fonctionnent
+ * - Conserve la structure onRecords qui marche
+ * - Ajoute les corrections de noms de colonnes du commit 57de74d0
  * - Ajoute filtres Tâches et Établissement
- * - Recherche texte sur nom, prénom, fonction, établissement et tags
+ * - Réorganise 7 filtres: Actions / Tâches / Communautés / GT / Compétences / Instances / Établissement
  */
 
 const FILTERS = [
@@ -37,17 +38,17 @@ FILTERS.forEach(f => {
 });
 
 function text(value) {
-  if (value === null || value === undefined) return '';
-  if (Array.isArray(value)) return value.filter(v => v !== null && v !== undefined).map(v => String(v)).join(', ');
-  return String(value).trim();
+  return value === null || value === undefined ? '' : String(value).trim();
 }
 
 function safeValues(value) {
-  if (Array.isArray(value)) return value.flatMap(v => Array.isArray(v) ? v : [v]);
-  if (value === null || value === undefined || value === '') return [];
-  return [value];
+  if (Array.isArray(value)) {
+    return value.filter(item => item !== 'L' && item !== null && item !== undefined && item !== 0 && item !== '');
+  }
+  return value === null || value === undefined || value === '' || value === 0 ? [] : [value];
 }
 
+// ===== CONVERSION GRIST: Column-oriented → Row-oriented =====
 function tableToRows(table) {
   if (!table || typeof table !== 'object') return [];
   if (Array.isArray(table)) return table;
@@ -72,14 +73,15 @@ async function fetchTable(tableName, labelField) {
     const map = {};
     rows.forEach(row => {
       const label = text(row[labelField]);
-      if (label) {
+      if (row.id !== null && row.id !== undefined && label) {
         map[String(row.id)] = label;
       }
     });
     referenceMaps[tableName] = map;
+    console.info(`[REFS] ${tableName}: ${Object.keys(map).length} entrées`);
   } catch (error) {
-    console.warn(`Impossible de charger la table ${tableName}:`, error);
     referenceMaps[tableName] = {};
+    console.warn(`[REFS] Impossible de charger ${tableName}`, error);
   }
 }
 
@@ -161,13 +163,14 @@ function createFilterUI() {
       <span>${filter.label}</span>
       <span class="chevron">▾</span>
     `;
+    button.querySelector('.filter-dot').style.backgroundColor = filter.color;
 
     const menu = document.createElement('div');
     menu.className = 'filter-menu';
     menu.style.borderTopColor = filter.color;
 
     const refMap = referenceMaps[filter.table] || {};
-    const values = Object.values(refMap).sort((a, b) => a.localeCompare(b, 'fr'));
+    const values = [...new Set(Object.values(refMap))].sort();
 
     values.forEach(value => {
       const option = document.createElement('label');
@@ -191,12 +194,14 @@ function createFilterUI() {
       wrapper.classList.toggle('open');
     });
 
+    menu.addEventListener('click', event => event.stopPropagation());
     wrapper.append(button, menu);
     container.appendChild(wrapper);
   });
 }
 
 function toggleFilter(filterKey, value) {
+  if (!activeFilters[filterKey]) activeFilters[filterKey] = new Set();
   if (activeFilters[filterKey].has(value)) activeFilters[filterKey].delete(value);
   else activeFilters[filterKey].add(value);
   displayContacts();
@@ -209,13 +214,7 @@ function displayContacts() {
 
   const term = searchTerm.toLocaleLowerCase('fr-FR');
   const filtered = allContacts.filter(contact => {
-    if (term) {
-      const haystack = [contact.Nom, contact.Prenom, contact.fonction, contact.Email, contact.etablissement_label,
-        ...contact.instances_labels, ...contact.actions_labels, ...contact.gt_labels,
-        ...contact.communautes_labels, ...contact.taches_labels, ...contact.competences_labels]
-        .filter(Boolean).join(' ').toLocaleLowerCase('fr-FR');
-      if (!haystack.includes(term)) return false;
-    }
+    if (term && ![contact.Nom, contact.Prenom].some(value => text(value).toLocaleLowerCase('fr-FR').includes(term))) return false;
     for (const filter of FILTERS) {
       const selected = activeFilters[filter.key];
       if (selected.size === 0) continue;
@@ -227,10 +226,13 @@ function displayContacts() {
     return true;
   });
 
+  const template = document.getElementById('cardTemplate');
   filtered.forEach(contact => {
     const clone = template.content.cloneNode(true);
-    clone.querySelector('.avatar').textContent = `${(contact.Prenom || '?')[0]}${(contact.Nom || '?')[0]}`.toUpperCase();
-    clone.querySelector('.name').textContent = `${contact.Prenom || ''} ${contact.Nom || ''}`.trim();
+    clone.querySelector('.avatar').textContent =
+      `${(contact.Prenom || '').charAt(0)}${(contact.Nom || '').charAt(0)}`.toUpperCase() || '?';
+    clone.querySelector('.name').textContent =
+      `${contact.Prenom || ''} ${contact.Nom || ''}`.trim() || 'Sans nom';
     const fonction = clone.querySelector('.fonction');
     if (contact.fonction) {
       fonction.textContent = contact.fonction;
@@ -250,14 +252,12 @@ function displayContacts() {
     }
     const tel = clone.querySelector('.tel');
     if (contact.numero_de_telephone) {
-      tel.textContent = contact.numero_de_telephone;
+      tel.textContent = `☎ ${contact.numero_de_telephone}`;
       tel.classList.add('visible');
     }
     const tags = clone.querySelector('.card-tags');
     TAG_GROUPS.forEach(group => {
-      const labels = group.key === 'etablissement'
-        ? (contact.etablissement_label ? [contact.etablissement_label] : [])
-        : (contact[`${group.key}_labels`] || []);
+      const labels = contact[`${group.key}_labels`] || [];
       if (labels.length === 0) return;
       const section = document.createElement('section');
       section.className = 'tag-group';
@@ -283,21 +283,20 @@ function displayContacts() {
     grid.appendChild(clone);
   });
 
-  document.getElementById('resultCount').textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
+  document.getElementById('resultCount').textContent =
+    `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
+  document.getElementById('emptyState').hidden = filtered.length !== 0;
 }
 
-const searchInput = document.getElementById('searchInput');
-if (searchInput) searchInput.addEventListener('input', event => {
+document.getElementById('searchInput').addEventListener('input', event => {
   searchTerm = event.target.value.trim();
   displayContacts();
 });
 
-const resetButton = document.getElementById('resetFilters');
-if (resetButton) resetButton.addEventListener('click', () => {
-  FILTERS.forEach(f => activeFilters[f.key].clear());
+document.getElementById('resetFilters').addEventListener('click', () => {
+  Object.values(activeFilters).forEach(set => set.clear());
   searchTerm = '';
   document.getElementById('searchInput').value = '';
-  createFilterUI();
   displayContacts();
 });
 
@@ -340,3 +339,7 @@ window.grist.onRecords(async records => {
 document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
+
+
+
+
