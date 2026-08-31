@@ -6,7 +6,7 @@ const FILTERS = [
   { key: 'gts', label: 'GT', table: 'GT', field: 'nom', color: '#84f' },
   { key: 'taches', label: 'Tâches', table: 'Taches', field: 'taches', color: '#f84' },
   { key: 'competences', label: 'Compétences', table: 'Competances', field: 'competance', color: '#8f4' },
-  { key: 'communautes', label: 'Communautés', table: 'Communautees_', field: 'communaute', color: '#f48' },
+  { key: 'communautes', label: 'Communautés', table: 'Communautes', field: 'communaute', color: '#f48' },
 ];
 
 const TAG_GROUPS = [
