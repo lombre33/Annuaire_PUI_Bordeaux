@@ -14,10 +14,13 @@ Table Annuaire (table principale, liée à la section du widget)
   fonction          : Text
   numero_de_telephone : Numeric
   Etablissement     : Reference(Etablissements)
+    Encodage brut renvoyé par l'API Grist pour une Référence UNIQUE (à ne pas
+    confondre avec ReferenceList, cf. perimetre_all plus bas) :
+    ['R', tableId, rowId] — pas un simple nombre. Voir refId() dans grist-data.js.
   Etablissement2    : Text   (repli affiché si Etablissement n'est pas renseigné)
   Actions           : ReferenceList(Actions)
   Communautee_s_    : ReferenceList(Communautees)
-  Role_dans_le_PUI  : Reference(Role_Dans_le_PUI)
+  Role_dans_le_PUI  : Reference(Role_Dans_le_PUI) — même encodage ['R', ...] qu'Etablissement.
   Taches            : ReferenceList(Taches)
   Instances         : ReferenceList(Instances)
   GT                : ReferenceList(GT)

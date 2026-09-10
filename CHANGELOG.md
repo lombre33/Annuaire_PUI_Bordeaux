@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.1.1 — Établissement toujours invisible : mauvais encodage de la Référence
+
+Le correctif 1.1.0 n'avait aucun effet visible (confirmé par test en conditions
+réelles) : il traitait le mauvais problème. La vraie cause :
+
+- **Correctif** : `contact.Etablissement` est une colonne Référence **unique**
+  (pas une liste). L'API Grist encode ce type `['R', tableId, rowId]`, pas un
+  simple nombre — contrairement à une ReferenceList, dont les éléments internes
+  restent des nombres nus une fois le marqueur `['L', ...]` retiré (c'est pour
+  ça que les filtres Instances/Actions/GT etc. fonctionnaient déjà). Le code
+  faisait `String(contact.Etablissement)` en supposant un nombre brut, ce qui
+  donnait une clé du type `"R,Etablissements,42"` ne correspondant à rien dans
+  la table de référence — échec silencieux, quel que soit l'état d'`acronyme`/
+  `nom_complet`. Nouvelle fonction `refId()` qui normalise `['R', ...]` (ou un
+  id déjà nu) vers l'id numérique. Appliquée à `Etablissement` et
+  `Role_dans_le_PUI` (même type de colonne, même bug potentiel).
+- **Outillage** : le diagnostic console `[ETABLISSEMENT] ...` affiche
+  maintenant un exemple de valeur brute (avec son type JS) en plus des
+  comptages, pour confirmer l'encodage réel sans avoir à deviner.
+
 ## 1.1.0 — Établissement invisible sur les cartes / filtre non fonctionnel
 
 - **Correctif** : la référence `Etablissement` était bien renseignée côté

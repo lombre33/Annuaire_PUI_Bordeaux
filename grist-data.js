@@ -38,6 +38,20 @@ export function pickLabel(row, fields) {
   return fields.map(field => text(row[field])).find(Boolean) || '';
 }
 
+// Une colonne Référence UNIQUE (pas ReferenceList) est encodée par l'API Grist
+// sous la forme ['R', tableId, rowId] — contrairement à une ReferenceList, qui
+// arrive en ['L', id1, id2, ...] avec des id déjà "nus" (voir safeValues()).
+// Ce marqueur sert à distinguer une Référence d'une simple valeur Numeric qui
+// aurait, par coïncidence, la même valeur que le rowId visé.
+// refId() normalise les deux formes (encodée ou déjà nue) vers l'id numérique,
+// ou null si la référence est vide.
+export function refId(value) {
+  if (Array.isArray(value)) {
+    return value[0] === 'R' && value.length >= 3 ? value[2] : null;
+  }
+  return value || null;
+}
+
 // ===== CHARGER UNE TABLE DE RÉFÉRENCE (id -> libellé) =====
 // labelFields accepte un nom de colonne unique, ou un tableau de colonnes
 // essayées dans l'ordre (la première non vide gagne) — utile quand la colonne
@@ -113,15 +127,13 @@ export function enrich(contact, referenceMaps) {
   }
   enriched.competences_labels = competences;
 
-  const etablissementId = contact.Etablissement;
+  const etablissementId = refId(contact.Etablissement);
   enriched.etablissement_label =
     (etablissementId && referenceMaps['Etablissements']?.[String(etablissementId)]) ||
     text(contact.Etablissement2) || '';
 
-  const roleId = contact.Role_dans_le_PUI;
-  enriched.role_label =
-    (roleId && referenceMaps['Role_Dans_le_PUI']?.[String(roleId)]) ||
-    text(roleId) || '';
+  const roleId = refId(contact.Role_dans_le_PUI);
+  enriched.role_label = (roleId && referenceMaps['Role_Dans_le_PUI']?.[String(roleId)]) || '';
 
   return enriched;
 }

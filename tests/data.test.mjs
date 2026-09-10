@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { safeValues, tableToRows, isInScope, text, pickLabel, enrich } from '../grist-data.js';
+import { safeValues, tableToRows, isInScope, text, pickLabel, enrich, refId } from '../grist-data.js';
 import { filterContacts, createEmptyFilterState } from '../filters.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
@@ -69,11 +69,23 @@ test('pickLabel falls back to the next field when the first is empty', () => {
   assert.equal(pickLabel({ acronyme: null, nom_complet: null }, ['acronyme', 'nom_complet']), '');
 });
 
-test('enrich: établissement resolves via the reference map, with an Etablissement2 fallback', () => {
+test('refId extracts the row id from the ["R", tableId, rowId] Grist encoding', () => {
+  assert.equal(refId(['R', 'Etablissements', 42]), 42);
+  assert.equal(refId(42), 42, 'un id déjà nu doit rester tel quel');
+  assert.equal(refId(0), null);
+  assert.equal(refId(null), null);
+  assert.equal(refId(undefined), null);
+  assert.equal(refId([]), null, 'tableau vide/mal formé: pas de crash, pas d\'id');
+});
+
+test('enrich: établissement resolves via the reference map (encoded ["R", ...] Reference), with an Etablissement2 fallback', () => {
   const referenceMaps = { Etablissements: { 12: 'CHU' } };
+  // Encodage réel envoyé par Grist pour une Référence unique.
+  assert.equal(enrich({ Etablissement: ['R', 'Etablissements', 12] }, referenceMaps).etablissement_label, 'CHU');
+  // Id déjà nu (au cas où) : doit aussi fonctionner.
   assert.equal(enrich({ Etablissement: 12 }, referenceMaps).etablissement_label, 'CHU');
   // Référence présente mais introuvable dans la table (id orphelin) : repli sur Etablissement2.
-  assert.equal(enrich({ Etablissement: 999, Etablissement2: 'Clinique du Parc' }, referenceMaps).etablissement_label, 'Clinique du Parc');
+  assert.equal(enrich({ Etablissement: ['R', 'Etablissements', 999], Etablissement2: 'Clinique du Parc' }, referenceMaps).etablissement_label, 'Clinique du Parc');
   assert.equal(enrich({}, referenceMaps).etablissement_label, '');
 });
 

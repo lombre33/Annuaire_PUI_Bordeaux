@@ -1,7 +1,7 @@
 // Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
 // grist-data.js / filters.js / render.js et est testée séparément.
 
-import { fetchTable, enrich, isInScope } from './grist-data.js';
+import { fetchTable, enrich, isInScope, refId } from './grist-data.js';
 import { createEmptyFilterState, filterContacts } from './filters.js';
 import { createFilterUI, renderCards } from './render.js';
 
@@ -66,20 +66,28 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
 
-// Aide au diagnostic (console navigateur) : distingue "pas de référence
-// Etablissement du tout" de "référence présente mais introuvable dans la
-// table Etablissements" (id orphelin) — les deux donnent le même symptôme
-// (rien ne s'affiche) mais n'ont pas la même cause.
+// Aide au diagnostic (console navigateur) : montre la valeur brute telle
+// qu'envoyée par Grist (pour confirmer son encodage), puis distingue "pas de
+// référence du tout" de "référence présente mais dont l'id ne résout aucun
+// libellé dans la table Etablissements" — mêmes symptôme, causes différentes.
 function logEtablissementDiagnostics(records, referenceMaps) {
-  const withReference = records.filter(r => r.Etablissement);
-  const orphaned = withReference.filter(r => !referenceMaps['Etablissements']?.[String(r.Etablissement)]);
+  const withRaw = records.filter(r => r.Etablissement !== null && r.Etablissement !== undefined && r.Etablissement !== '' && r.Etablissement !== 0);
+  const sample = withRaw[0];
+  if (sample) {
+    console.info('[ETABLISSEMENT] Exemple de valeur brute (contact.Etablissement):', sample.Etablissement,
+      `— type JS: ${Array.isArray(sample.Etablissement) ? 'array' : typeof sample.Etablissement}`);
+  }
+  const unresolved = withRaw.filter(r => {
+    const id = refId(r.Etablissement);
+    return !id || !referenceMaps['Etablissements']?.[String(id)];
+  });
   console.info(
-    `[ETABLISSEMENT] ${withReference.length}/${records.length} contact(s) ont une référence Etablissement`
-    + (orphaned.length ? ` — ${orphaned.length} pointent vers un id absent de la table Etablissements.` : '.')
+    `[ETABLISSEMENT] ${withRaw.length}/${records.length} contact(s) ont une valeur Etablissement`
+    + (unresolved.length ? ` — ${unresolved.length} ne résolvent aucun libellé.` : '.')
   );
-  if (orphaned.length) {
-    console.warn('[ETABLISSEMENT] ids orphelins (contact.id -> Etablissement id):',
-      orphaned.map(r => ({ contactId: r.id, etablissementId: r.Etablissement })));
+  if (unresolved.length) {
+    console.warn('[ETABLISSEMENT] non résolus (contact.id -> valeur brute Etablissement):',
+      unresolved.slice(0, 20).map(r => ({ contactId: r.id, raw: r.Etablissement })));
   }
 }
 
