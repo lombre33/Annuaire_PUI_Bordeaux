@@ -24,6 +24,20 @@ export function createFilterUI(container, referenceMaps, activeFilters, onToggle
     menu.className = 'filter-menu';
     menu.style.borderTopColor = filter.color;
 
+    const search = document.createElement('input');
+    search.type = 'text';
+    search.className = 'filter-search-input';
+    search.placeholder = `Rechercher dans ${filter.label}…`;
+    search.autocomplete = 'off';
+    search.addEventListener('input', () => {
+      const term = search.value.trim().toLocaleLowerCase('fr-FR');
+      menu.querySelectorAll('.filter-option').forEach(option => {
+        const label = option.querySelector('.option-label').textContent.toLocaleLowerCase('fr-FR');
+        option.hidden = term !== '' && !label.includes(term);
+      });
+    });
+    menu.appendChild(search);
+
     const refMap = referenceMaps[filter.table] || {};
     const values = [...new Set(Object.values(refMap))].sort();
 

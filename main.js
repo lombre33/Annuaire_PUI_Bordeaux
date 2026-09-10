@@ -59,6 +59,9 @@ elements.resetFilters.addEventListener('click', () => {
   Object.values(state.activeFilters).forEach(set => set.clear());
   state.searchTerm = '';
   elements.searchInput.value = '';
+  // Reconstruit l'UI des filtres pour vider aussi les champs de recherche
+  // internes à chaque dropdown (pas seulement les cases cochées).
+  createFilterUI(elements.filtersContainer, state.referenceMaps, state.activeFilters, toggleFilter);
   refreshCards();
 });
 

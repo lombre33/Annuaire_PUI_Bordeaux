@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0 — Recherche libre dans chaque dropdown de filtre
+
+- **Feature** : un champ de texte apparaît en haut de chaque menu de filtre
+  (Actions, Établissement, Instances...) pour rechercher parmi les options par
+  nom, sans avoir à faire défiler la liste. Filtrage purement visuel côté DOM
+  (`option.hidden`), n'affecte pas les cases cochées ni les contacts affichés.
+  Le bouton "Réinitialiser" vide aussi ces champs (l'UI des filtres est
+  reconstruite, comme pour les cases à cocher).
+
 ## 1.1.2 — Établissement : encodage réel confirmé (texte déjà résolu)
 
 Le correctif 1.1.1 (hypothèse `['R', tableId, rowId]`) n'avait toujours aucun
