@@ -1,7 +1,7 @@
 // Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
 // grist-data.js / filters.js / render.js et est testée séparément.
 
-import { fetchTable, enrich, isInScope, refId } from './grist-data.js';
+import { fetchTable, enrich, isInScope, refLabel } from './grist-data.js';
 import { createEmptyFilterState, filterContacts } from './filters.js';
 import { createFilterUI, renderCards } from './render.js';
 
@@ -67,9 +67,9 @@ document.addEventListener('click', () => {
 });
 
 // Aide au diagnostic (console navigateur) : montre la valeur brute telle
-// qu'envoyée par Grist (pour confirmer son encodage), puis distingue "pas de
-// référence du tout" de "référence présente mais dont l'id ne résout aucun
-// libellé dans la table Etablissements" — mêmes symptôme, causes différentes.
+// qu'envoyée par Grist (utile car son encodage dépend de la config de la
+// table liée — texte déjà résolu, id nu, ou ['R', table, id], voir refLabel()
+// dans grist-data.js), puis liste les contacts qui restent sans libellé.
 function logEtablissementDiagnostics(records, referenceMaps) {
   const withRaw = records.filter(r => r.Etablissement !== null && r.Etablissement !== undefined && r.Etablissement !== '' && r.Etablissement !== 0);
   const sample = withRaw[0];
@@ -77,13 +77,10 @@ function logEtablissementDiagnostics(records, referenceMaps) {
     console.info('[ETABLISSEMENT] Exemple de valeur brute (contact.Etablissement):', sample.Etablissement,
       `— type JS: ${Array.isArray(sample.Etablissement) ? 'array' : typeof sample.Etablissement}`);
   }
-  const unresolved = withRaw.filter(r => {
-    const id = refId(r.Etablissement);
-    return !id || !referenceMaps['Etablissements']?.[String(id)];
-  });
+  const unresolved = withRaw.filter(r => !refLabel(r.Etablissement, referenceMaps['Etablissements']) && !r.Etablissement2);
   console.info(
     `[ETABLISSEMENT] ${withRaw.length}/${records.length} contact(s) ont une valeur Etablissement`
-    + (unresolved.length ? ` — ${unresolved.length} ne résolvent aucun libellé.` : '.')
+    + (unresolved.length ? ` — ${unresolved.length} ne résolvent aucun libellé (ni Etablissement, ni Etablissement2).` : '.')
   );
   if (unresolved.length) {
     console.warn('[ETABLISSEMENT] non résolus (contact.id -> valeur brute Etablissement):',

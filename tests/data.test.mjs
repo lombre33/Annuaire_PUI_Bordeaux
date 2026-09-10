@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { safeValues, tableToRows, isInScope, text, pickLabel, enrich, refId } from '../grist-data.js';
+import { safeValues, tableToRows, isInScope, text, pickLabel, enrich, refId, refLabel } from '../grist-data.js';
 import { filterContacts, createEmptyFilterState } from '../filters.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
@@ -69,22 +69,37 @@ test('pickLabel falls back to the next field when the first is empty', () => {
   assert.equal(pickLabel({ acronyme: null, nom_complet: null }, ['acronyme', 'nom_complet']), '');
 });
 
-test('refId extracts the row id from the ["R", tableId, rowId] Grist encoding', () => {
+test('refId extracts the row id from the ["R", tableId, rowId] Grist encoding, but not from a string', () => {
   assert.equal(refId(['R', 'Etablissements', 42]), 42);
   assert.equal(refId(42), 42, 'un id déjà nu doit rester tel quel');
+  assert.equal(refId('UBM'), null, 'une chaîne est du texte déjà résolu, pas un id — voir refLabel()');
   assert.equal(refId(0), null);
   assert.equal(refId(null), null);
   assert.equal(refId(undefined), null);
   assert.equal(refId([]), null, 'tableau vide/mal formé: pas de crash, pas d\'id');
 });
 
-test('enrich: établissement resolves via the reference map (encoded ["R", ...] Reference), with an Etablissement2 fallback', () => {
+test('refLabel resolves a Reference cell in any of the 3 shapes Grist can send', () => {
+  const referenceMap = { 12: 'CHU' };
+  // Cas réel constaté en prod : la table liée a une "visible column" configurée,
+  // Grist envoie déjà le texte d'affichage résolu ("UBM") plutôt qu'un id.
+  assert.equal(refLabel('UBM', referenceMap), 'UBM');
+  // Encodage brut d'une Référence : ['R', tableId, rowId].
+  assert.equal(refLabel(['R', 'Etablissements', 12], referenceMap), 'CHU');
+  // Id déjà nu.
+  assert.equal(refLabel(12, referenceMap), 'CHU');
+  // Référence vide ou introuvable.
+  assert.equal(refLabel(0, referenceMap), '');
+  assert.equal(refLabel(['R', 'Etablissements', 999], referenceMap), '');
+});
+
+test('enrich: établissement resolves whether Grist sends resolved text, a raw id, or an ["R", ...] reference', () => {
   const referenceMaps = { Etablissements: { 12: 'CHU' } };
-  // Encodage réel envoyé par Grist pour une Référence unique.
+  // Cas réel constaté en prod (visible column configurée sur la table liée).
+  assert.equal(enrich({ Etablissement: 'UBM' }, referenceMaps).etablissement_label, 'UBM');
   assert.equal(enrich({ Etablissement: ['R', 'Etablissements', 12] }, referenceMaps).etablissement_label, 'CHU');
-  // Id déjà nu (au cas où) : doit aussi fonctionner.
   assert.equal(enrich({ Etablissement: 12 }, referenceMaps).etablissement_label, 'CHU');
-  // Référence présente mais introuvable dans la table (id orphelin) : repli sur Etablissement2.
+  // Référence introuvable dans la table : repli sur Etablissement2.
   assert.equal(enrich({ Etablissement: ['R', 'Etablissements', 999], Etablissement2: 'Clinique du Parc' }, referenceMaps).etablissement_label, 'Clinique du Parc');
   assert.equal(enrich({}, referenceMaps).etablissement_label, '');
 });

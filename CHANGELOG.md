@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.1.2 — Établissement : encodage réel confirmé (texte déjà résolu)
+
+Le correctif 1.1.1 (hypothèse `['R', tableId, rowId]`) n'avait toujours aucun
+effet visible. Le diagnostic console ajouté dans ce même correctif a permis de
+trancher sans deviner : `contact.Etablissement` arrive en réalité comme une
+**chaîne déjà résolue** (ex: `"UBM"`), pas un id ni un tableau encodé. La table
+`Etablissements` a une "visible column" configurée côté Grist (probablement
+`acronyme`), donc l'API renvoie directement le texte d'affichage — alors que
+d'autres tables liées (Instances, Actions...) n'ont pas cette config et
+renvoient un id brut à résoudre nous-mêmes. Le code faisait
+`referenceMaps['Etablissements'][String(contact.Etablissement)]`, soit
+`referenceMaps['Etablissements']["UBM"]` — une map indexée par id numérique,
+donc échec systématique et silencieux, pour 100% des contacts (319/319 dans
+les logs), indépendamment de l'état d'`acronyme`/`nom_complet` en base.
+
+- **Correctif** : nouvelle fonction `refLabel(value, referenceMap)` qui gère
+  les 3 formes possibles d'une Référence unique (texte déjà résolu / id nu /
+  `['R', ...]`) plutôt que d'en supposer une seule. Appliquée à `Etablissement`
+  et `Role_dans_le_PUI`. `refId()` est conservé comme brique interne mais ne
+  traite plus une chaîne comme un id.
+- **Tests** : cas `refLabel('UBM', ...)` ajouté — c'est la forme réellement
+  observée en production, désormais couverte explicitement.
+
 ## 1.1.1 — Établissement toujours invisible : mauvais encodage de la Référence
 
 Le correctif 1.1.0 n'avait aucun effet visible (confirmé par test en conditions

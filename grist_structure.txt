@@ -14,13 +14,17 @@ Table Annuaire (table principale, liée à la section du widget)
   fonction          : Text
   numero_de_telephone : Numeric
   Etablissement     : Reference(Etablissements)
-    Encodage brut renvoyé par l'API Grist pour une Référence UNIQUE (à ne pas
-    confondre avec ReferenceList, cf. perimetre_all plus bas) :
-    ['R', tableId, rowId] — pas un simple nombre. Voir refId() dans grist-data.js.
+    ATTENTION — encodage constaté en prod, différent de ce qu'on pourrait
+    supposer : la table Etablissements a une "visible column" configurée
+    (acronyme), donc Grist envoie DÉJÀ le texte résolu (ex: "UBM"), pas un id.
+    Une Référence unique peut en réalité arriver sous 3 formes selon la config
+    de la table liée : texte déjà résolu (string), id nu (number), ou encodée
+    ['R', tableId, rowId]. Voir refLabel()/refId() dans grist-data.js, qui
+    gèrent les 3 cas — ne jamais supposer une seule forme pour une Référence.
   Etablissement2    : Text   (repli affiché si Etablissement n'est pas renseigné)
   Actions           : ReferenceList(Actions)
   Communautee_s_    : ReferenceList(Communautees)
-  Role_dans_le_PUI  : Reference(Role_Dans_le_PUI) — même encodage ['R', ...] qu'Etablissement.
+  Role_dans_le_PUI  : Reference(Role_Dans_le_PUI) — même ambiguïté d'encodage qu'Etablissement.
   Taches            : ReferenceList(Taches)
   Instances         : ReferenceList(Instances)
   GT                : ReferenceList(GT)

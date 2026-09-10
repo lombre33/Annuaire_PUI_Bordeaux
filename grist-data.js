@@ -38,18 +38,29 @@ export function pickLabel(row, fields) {
   return fields.map(field => text(row[field])).find(Boolean) || '';
 }
 
-// Une colonne Référence UNIQUE (pas ReferenceList) est encodée par l'API Grist
-// sous la forme ['R', tableId, rowId] — contrairement à une ReferenceList, qui
-// arrive en ['L', id1, id2, ...] avec des id déjà "nus" (voir safeValues()).
-// Ce marqueur sert à distinguer une Référence d'une simple valeur Numeric qui
-// aurait, par coïncidence, la même valeur que le rowId visé.
-// refId() normalise les deux formes (encodée ou déjà nue) vers l'id numérique,
-// ou null si la référence est vide.
+// Une colonne Référence UNIQUE (pas ReferenceList) peut arriver sous 3 formes
+// différentes depuis l'API Grist, selon que la table liée a une "visible
+// column" configurée ou non :
+//   - déjà résolue en texte d'affichage (ex: "UBM") si une visible column
+//     est configurée sur la table liée — cas réel constaté sur Etablissements ;
+//   - encodée ['R', tableId, rowId] ;
+//   - un id numérique déjà nu.
+// refId() n'extrait un id que dans les 2 derniers cas (une chaîne n'est PAS
+// un id, c'est du texte déjà résolu — refLabel() la traite séparément).
 export function refId(value) {
   if (Array.isArray(value)) {
     return value[0] === 'R' && value.length >= 3 ? value[2] : null;
   }
+  if (typeof value === 'string') return null;
   return value || null;
+}
+
+// Résout une colonne Référence unique vers son libellé affichable, quelle
+// que soit la forme sous laquelle Grist l'a envoyée (voir refId() ci-dessus).
+export function refLabel(value, referenceMap) {
+  if (typeof value === 'string') return text(value);
+  const id = refId(value);
+  return (id && referenceMap?.[String(id)]) || '';
 }
 
 // ===== CHARGER UNE TABLE DE RÉFÉRENCE (id -> libellé) =====
@@ -127,13 +138,11 @@ export function enrich(contact, referenceMaps) {
   }
   enriched.competences_labels = competences;
 
-  const etablissementId = refId(contact.Etablissement);
   enriched.etablissement_label =
-    (etablissementId && referenceMaps['Etablissements']?.[String(etablissementId)]) ||
+    refLabel(contact.Etablissement, referenceMaps['Etablissements']) ||
     text(contact.Etablissement2) || '';
 
-  const roleId = refId(contact.Role_dans_le_PUI);
-  enriched.role_label = (roleId && referenceMaps['Role_Dans_le_PUI']?.[String(roleId)]) || '';
+  enriched.role_label = refLabel(contact.Role_dans_le_PUI, referenceMaps['Role_Dans_le_PUI']);
 
   return enriched;
 }
