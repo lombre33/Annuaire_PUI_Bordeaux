@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.0 — Carte contact compacte, grille à 4 colonnes
+
+Suite à trois maquettes comparées (dense/tags résumés+N/ligne condensée), la
+direction "dense, même structure" a été retenue et implémentée (CSS uniquement,
+structure HTML/JS inchangée) :
+
+- Avatar 54px -> 38px, nom 18px -> 14px, badges/tags/titres de groupe resserrés
+  d'environ 30%, espacements entre sections réduits.
+- Grille de cartes : 3 colonnes (min 280px) -> 4 colonnes (min 210px), gap
+  16px -> 14px. Le minimum de 210px reste sous la largeur réellement
+  disponible à la largeur plancher du widget (`body{min-width:980px}`) pour
+  éviter un débordement horizontal du dernier au premier chargement.
+- Nom et badge établissement tronqués en ellipse (`text-overflow:ellipsis`)
+  au-delà d'une largeur donnée — la carte compacte laisse moins de place aux
+  cas rares de nom ou d'acronyme d'établissement très long.
+
 ## 1.2.0 — Recherche libre dans chaque dropdown de filtre
 
 - **Feature** : un champ de texte apparaît en haut de chaque menu de filtre
