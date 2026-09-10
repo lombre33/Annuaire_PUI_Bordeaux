@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1 — Retour à 3 colonnes
+
+La grille à 4 colonnes (1.3.0) ne convainc pas à l'usage. Retour à 3 colonnes
+en gardant la carte compacte : `repeat(4,minmax(210px,1fr))` ->
+`repeat(3,minmax(240px,1fr))`, gap inchangé (14px). Le style de carte
+(avatar/police/tags resserrés) n'est pas concerné.
+
 ## 1.3.0 — Carte contact compacte, grille à 4 colonnes
 
 Suite à trois maquettes comparées (dense/tags résumés+N/ligne condensée), la
