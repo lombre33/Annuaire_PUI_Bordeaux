@@ -40,4 +40,7 @@ Tables de référence (id -> libellé, chargées via fetchTable)
   Competances        : Competences (Text)
   Instances          : nom_instance (Text)
   Etablissements     : acronyme (Text), nom_complet (Text)
+    Libellé = acronyme, avec repli sur nom_complet si acronyme est vide pour
+    cette ligne (certaines lignes n'ont que nom_complet de renseigné — cause
+    du bug "établissement invisible sur les cartes", cf. CHANGELOG).
   Role_Dans_le_PUI   : Role (Text)

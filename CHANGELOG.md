@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.1.0 — Établissement invisible sur les cartes / filtre non fonctionnel
+
+- **Correctif** : la référence `Etablissement` était bien renseignée côté
+  Grist pour la plupart des contacts, mais son libellé ne se résolvait pas
+  systématiquement — certaines lignes de la table `Etablissements` n'ont que
+  `nom_complet` de rempli, pas `acronyme` (seule colonne utilisée jusqu'ici
+  pour construire le libellé). `fetchTable()` accepte désormais une liste de
+  colonnes de repli (`['acronyme', 'nom_complet']`) ; la première non vide
+  gagne. Comme le filtre "Établissement" (dropdown + correspondance carte)
+  est construit sur les mêmes libellés que les cartes, ce correctif répare
+  aussi le filtre, sans logique supplémentaire côté filtre.
+- **Outillage** : ajout d'un diagnostic console (`[ETABLISSEMENT] ...`) au
+  chargement du widget, qui distingue "pas de référence Etablissement du
+  tout" de "référence présente mais id introuvable dans la table
+  Etablissements" (référence orpheline) — les deux donnent le même symptôme
+  (rien ne s'affiche) mais pas la même cause côté données. Si un contact reste
+  sans établissement après ce correctif, la console navigateur (F12) indique
+  lequel des deux cas s'applique.
+- **Tests** : `pickLabel()` (choix de la colonne de repli) et `enrich()`
+  (résolution du libellé établissement, y compris le cas d'une référence
+  orpheline) sont couverts par de nouveaux tests unitaires.
+
 ## 1.0.0 — Audit & stabilisation
 
 - **Sécurité** : purge complète de l'historique git (`git filter-repo`) — l'ancien schéma complet du document Grist (fichiers `grist_structure.txt` et `grist_structure`) n'est plus reachable dans aucun commit, sur aucune branche. Historique réécrit, tous les hash de commit ont changé.

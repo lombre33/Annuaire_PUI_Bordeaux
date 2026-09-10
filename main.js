@@ -12,7 +12,9 @@ const REFERENCE_TABLES = [
   ['GT', 'nom'],
   ['Competances', 'Competences'],
   ['Instances', 'nom_instance'],
-  ['Etablissements', 'acronyme'],
+  // acronyme d'abord, nom_complet en repli si l'acronyme n'est pas renseigné
+  // pour cette ligne (cf. CHANGELOG — cause du bug "établissement invisible").
+  ['Etablissements', ['acronyme', 'nom_complet']],
   ['Role_Dans_le_PUI', 'Role']
 ];
 
@@ -64,6 +66,23 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
 
+// Aide au diagnostic (console navigateur) : distingue "pas de référence
+// Etablissement du tout" de "référence présente mais introuvable dans la
+// table Etablissements" (id orphelin) — les deux donnent le même symptôme
+// (rien ne s'affiche) mais n'ont pas la même cause.
+function logEtablissementDiagnostics(records, referenceMaps) {
+  const withReference = records.filter(r => r.Etablissement);
+  const orphaned = withReference.filter(r => !referenceMaps['Etablissements']?.[String(r.Etablissement)]);
+  console.info(
+    `[ETABLISSEMENT] ${withReference.length}/${records.length} contact(s) ont une référence Etablissement`
+    + (orphaned.length ? ` — ${orphaned.length} pointent vers un id absent de la table Etablissements.` : '.')
+  );
+  if (orphaned.length) {
+    console.warn('[ETABLISSEMENT] ids orphelins (contact.id -> Etablissement id):',
+      orphaned.map(r => ({ contactId: r.id, etablissementId: r.Etablissement })));
+  }
+}
+
 window.grist.ready({ requiredAccess: 'full' });
 
 window.grist.onRecords(async records => {
@@ -81,6 +100,8 @@ window.grist.onRecords(async records => {
     state.allContacts = scopedRecords
       .map(record => enrich(record, state.referenceMaps))
       .filter(c => c.Nom || c.Prenom);
+
+    logEtablissementDiagnostics(scopedRecords, state.referenceMaps);
 
     createFilterUI(elements.filtersContainer, state.referenceMaps, state.activeFilters, toggleFilter);
     refreshCards();

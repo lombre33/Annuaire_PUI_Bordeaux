@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { safeValues, tableToRows, isInScope, text } from '../grist-data.js';
+import { safeValues, tableToRows, isInScope, text, pickLabel, enrich } from '../grist-data.js';
 import { filterContacts, createEmptyFilterState } from '../filters.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
@@ -61,6 +61,20 @@ test('filterContacts applies a category filter (etablissement)', () => {
   const result = filterContacts(contacts, activeFilters, '');
   assert.equal(result.length, 1);
   assert.equal(result[0].Nom, 'A');
+});
+
+test('pickLabel falls back to the next field when the first is empty', () => {
+  assert.equal(pickLabel({ acronyme: 'CHU', nom_complet: 'CHU de Bordeaux' }, ['acronyme', 'nom_complet']), 'CHU');
+  assert.equal(pickLabel({ acronyme: '', nom_complet: 'CHU de Bordeaux' }, ['acronyme', 'nom_complet']), 'CHU de Bordeaux');
+  assert.equal(pickLabel({ acronyme: null, nom_complet: null }, ['acronyme', 'nom_complet']), '');
+});
+
+test('enrich: établissement resolves via the reference map, with an Etablissement2 fallback', () => {
+  const referenceMaps = { Etablissements: { 12: 'CHU' } };
+  assert.equal(enrich({ Etablissement: 12 }, referenceMaps).etablissement_label, 'CHU');
+  // Référence présente mais introuvable dans la table (id orphelin) : repli sur Etablissement2.
+  assert.equal(enrich({ Etablissement: 999, Etablissement2: 'Clinique du Parc' }, referenceMaps).etablissement_label, 'Clinique du Parc');
+  assert.equal(enrich({}, referenceMaps).etablissement_label, '');
 });
 
 test('filterContacts applies a tag-list filter (e.g. instances)', () => {

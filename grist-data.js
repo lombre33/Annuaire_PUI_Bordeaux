@@ -33,19 +33,33 @@ export function tableToRows(table) {
   });
 }
 
+// Première valeur non vide parmi plusieurs colonnes candidates, dans l'ordre.
+export function pickLabel(row, fields) {
+  return fields.map(field => text(row[field])).find(Boolean) || '';
+}
+
 // ===== CHARGER UNE TABLE DE RÉFÉRENCE (id -> libellé) =====
-export async function fetchTable(tableName, labelField) {
+// labelFields accepte un nom de colonne unique, ou un tableau de colonnes
+// essayées dans l'ordre (la première non vide gagne) — utile quand la colonne
+// "principale" (ex: acronyme) n'est pas systématiquement renseignée.
+export async function fetchTable(tableName, labelFields) {
+  const fields = Array.isArray(labelFields) ? labelFields : [labelFields];
   try {
     const table = await window.grist.docApi.fetchTable(tableName);
     const rows = tableToRows(table);
     const map = {};
+    let rowsWithoutLabel = 0;
     rows.forEach(row => {
-      const label = text(row[labelField]);
-      if (row.id !== null && row.id !== undefined && label) {
+      const label = pickLabel(row, fields);
+      if (row.id === null || row.id === undefined) return;
+      if (label) {
         map[String(row.id)] = label;
+      } else {
+        rowsWithoutLabel += 1;
       }
     });
-    console.info(`[REFS] ${tableName}: ${Object.keys(map).length} entrées`);
+    console.info(`[REFS] ${tableName}: ${Object.keys(map).length} entrées`
+      + (rowsWithoutLabel ? ` (${rowsWithoutLabel} ligne(s) sans ${fields.join('/')})` : ''));
     return map;
   } catch (error) {
     console.warn(`[REFS] Impossible de charger ${tableName}`, error);
