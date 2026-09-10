@@ -2,6 +2,8 @@
 
 ## 1.0.0 — Audit & stabilisation
 
+- **Sécurité** : purge complète de l'historique git (`git filter-repo`) — l'ancien schéma complet du document Grist (fichiers `grist_structure.txt` et `grist_structure`) n'est plus reachable dans aucun commit, sur aucune branche. Historique réécrit, tous les hash de commit ont changé.
+- **Sécurité** : `manifest.yml` et `window.grist.ready(...)` déclarent désormais `accessLevel: full`, confirmé comme l'accès réellement accordé au widget côté Grist (l'ancienne déclaration `read table` ne reflétait pas la réalité — le widget lit plusieurs tables tierces via `fetchTable`).
 - **Sécurité** : `grist_structure.txt` ne contient plus que les tables/colonnes
   effectivement utilisées par le widget. La version précédente exposait, sur un
   dépôt public, le schéma complet du document Grist source (dont une table

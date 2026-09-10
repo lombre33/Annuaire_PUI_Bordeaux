@@ -63,16 +63,21 @@ production immédiatement pour tous les documents Grist qui l'utilisent — pas
 de rollback automatique. Taguer les versions stables (`git tag vX.Y.Z`) pour
 pouvoir revenir en arrière facilement si besoin.
 
-## Accès à la donnée Grist (à vérifier)
+## Accès à la donnée Grist
 
-Le widget déclare `requiredAccess: 'read table'` (dans `manifest.yml` et
-`window.grist.ready(...)`), mais lit aussi plusieurs tables tierces via
-`grist.docApi.fetchTable(...)` (`Actions`, `Taches`, `Etablissements`, etc.).
-Il faut vérifier, dans le panneau d'accès du widget côté Grist, quel niveau
-d'accès est réellement accordé en pratique (`read table` ou `full`) et mettre
-`manifest.yml` en cohérence — un accès `full` donnerait au widget une visibilité
-sur l'ensemble du document Grist, pas seulement sur les tables listées
-ci-dessus.
+Confirmé côté Grist (panneau d'accès du widget) : l'accès réel est `full`,
+pas `read table`. C'est cohérent avec le code, qui lit plusieurs tables
+tierces via `grist.docApi.fetchTable(...)` (`Actions`, `Taches`,
+`Etablissements`, etc.) — `read table` n'aurait donné accès qu'à la table
+liée à la section du widget. `manifest.yml` et `window.grist.ready(...)`
+déclarent maintenant `full` pour refléter la réalité.
+
+Implication : ce widget a une visibilité en lecture sur l'ensemble du
+document Grist, pas seulement sur les tables listées dans ce README — y
+compris sur des tables sans rapport avec l'annuaire. Réduire ce périmètre
+(par exemple en isolant l'annuaire et ses tables de référence dans un
+document Grist dédié, ou en repensant l'accès) est une piste à évaluer
+séparément ; ce n'est pas traité par cet audit.
 
 ## Note de sécurité
 

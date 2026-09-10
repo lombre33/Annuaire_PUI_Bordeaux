@@ -1,0 +1,43 @@
+# Schéma Grist utilisé par le widget (extrait volontairement réduit)
+#
+# ATTENTION : ce fichier ne doit lister QUE les tables et colonnes effectivement
+# lues par le widget (main.js / grist-data.js). Le document Grist source contient
+# d'autres tables sans rapport avec ce widget (dont une table d'identifiants/session
+# et une réplique d'un système d'authentification tiers) qui n'ont RIEN à faire ici,
+# a fortiori dans un dépôt public. Si vous avez besoin du schéma complet pour du
+# debug, gardez-le en local, jamais dans git.
+
+Table Annuaire (table principale, liée à la section du widget)
+  Prenom            : Text
+  Nom               : Text
+  Email             : Text
+  fonction          : Text
+  numero_de_telephone : Numeric
+  Etablissement     : Reference(Etablissements)
+  Etablissement2    : Text   (repli affiché si Etablissement n'est pas renseigné)
+  Actions           : ReferenceList(Actions)
+  Communautee_s_    : ReferenceList(Communautees)
+  Role_dans_le_PUI  : Reference(Role_Dans_le_PUI)
+  Taches            : ReferenceList(Taches)
+  Instances         : ReferenceList(Instances)
+  GT                : ReferenceList(GT)
+  competences_1 .. competences_15 : Text
+
+  perimetre_all : ReferenceList(Perimetres) — formule qui concatène perimetre_1..25.
+    Sert uniquement à savoir si le contact a au moins un périmètre renseigné
+    (cf. specs.md — "Nous n'afficherons QUE les contacts ayant au moins une
+    valeur dans perimètre_all"). Ne pas réutiliser les colonnes perimetre_*
+    individuelles côté widget.
+    Encodage brut renvoyé par l'API Grist pour les colonnes liste :
+    ['L', id1, id2, ...] — une liste vide est donc ['L'] (longueur 1) et non [].
+    Voir isInScope() / safeValues() dans grist-data.js.
+
+Tables de référence (id -> libellé, chargées via fetchTable)
+  Actions            : Action (Text)
+  Taches             : taches (Text)
+  Communautees       : communaute (Text)
+  GT                 : nom (Text)
+  Competances        : Competences (Text)
+  Instances          : nom_instance (Text)
+  Etablissements     : acronyme (Text), nom_complet (Text)
+  Role_Dans_le_PUI   : Role (Text)

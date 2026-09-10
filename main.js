@@ -64,7 +64,7 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
 
-window.grist.ready({ requiredAccess: 'read table' });
+window.grist.ready({ requiredAccess: 'full' });
 
 window.grist.onRecords(async records => {
   try {
