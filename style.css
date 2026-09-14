@@ -4,3 +4,7 @@
 .filter-option[hidden]{display:none}
 .filter-option.checked{background:#f1f0ff}
 .tag-static{cursor:default}
+.scope-toggle{display:flex;flex:0 0 auto;align-items:center;gap:3px;height:46px;padding:4px;background:#f7f8fc;border:1px solid var(--line);border-radius:12px}
+.scope-btn{height:100%;padding:0 13px;color:var(--muted);background:transparent;border:0;border-radius:9px;cursor:pointer;font-size:12px;font-weight:750;white-space:nowrap}
+.scope-btn:hover{color:#443aaf}
+.scope-btn.active{color:#443aaf;background:#fff;box-shadow:0 2px 6px #1b203d1f}

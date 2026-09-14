@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.6.0 — Filtrage par statut d'établissement (fondateur/partenaire/ok_pour_apparaitre)
+
+**Feature** : les cartes ne sont désormais visibles que si l'établissement du
+contact est fondateur OU partenaire (jamais "autres"), ET a validé son
+apparition (colonne `ok_pour_apparaitre`). Ces 4 colonnes booléennes vivent
+dans la table Etablissements (cf. `grist_structure.txt`).
+
+- Nouvelles fonctions pures (`grist-data.js`) : `fetchEtablissementsFlags()`
+  (charge la table Etablissements et indexe fondateur/partenaire/
+  ok_pour_apparaitre par id de ligne ET par libellé résolu — même ambiguïté
+  d'encodage Grist que pour le reste de la table, voir refId()/refLabel()),
+  `etablissementFlags()` (résout les indicateurs d'un contact) et
+  `isEtablissementEligible()` (la règle d'éligibilité : ok_pour_apparaitre ET
+  (fondateur OU partenaire) ; un contact sans établissement identifiable dans
+  la table — repli Etablissement2, référence orpheline — est exclu par
+  défaut, faute de validation à faire valoir).
+- `enrich()` attache `etablissement_fondateur` / `etablissement_partenaire` /
+  `etablissement_ok_pour_apparaitre` à chaque contact (3e paramètre optionnel
+  `etabFlags`, rétrocompatible).
+- `main.js` applique `isEtablissementEligible()` en filtre fixe (non
+  désactivable) avant tout affichage.
+- **UI** : 2 interrupteurs sobres "Fondateurs" / "Partenaires" dans la barre
+  d'outils (cochés par défaut), pour affiner l'affichage parmi les contacts
+  déjà éligibles ci-dessus — pilotés par `filterContacts(..., scope)`
+  (`filters.js`), un 4e paramètre optionnel distinct des menus `FILTERS`
+  existants (2 interrupteurs fixes, pas une liste de valeurs Grist).
+- **Tests** : couverture complète des nouvelles fonctions pures et du
+  paramètre `scope` de `filterContacts()`.
+
 ## 1.5.1 — Correctif urgent : tags Instances/Actions/GT/Communautés/Tâches disparus en prod
 
 Régression introduite par le correctif "#7" de la 1.4.0 (qui retirait

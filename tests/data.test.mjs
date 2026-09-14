@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   safeValues, tableToRows, isInScope, text, pickLabel, enrich, refId, refLabel,
   normalize, compareLabels, formatPhone, fetchTable, createRequestSequencer, referenceMapsEqual,
-  sortWithCheckedFirst, resolveListItem
+  sortWithCheckedFirst, resolveListItem, fetchEtablissementsFlags, etablissementFlags,
+  isEtablissementEligible
 } from '../grist-data.js';
 import { filterContacts, createEmptyFilterState, pruneStaleFilters } from '../filters.js';
 
@@ -311,4 +312,91 @@ test('fetchTable swallows a docApi error and returns an empty map rather than th
   globalThis.window = { grist: { docApi: { fetchTable: async () => { throw new Error('network down'); } } } };
   const map = await fetchTable('Actions', 'Action');
   assert.deepEqual(map, {});
+});
+
+test('fetchEtablissementsFlags indexes the fondateur/partenaire/ok_pour_apparaitre booleans by row id AND by resolved label', async (t) => {
+  t.after(() => { delete globalThis.window; });
+  globalThis.window = { grist: { docApi: { fetchTable: async () => ({
+    id: [1, 2, 3],
+    acronyme: ['CHU', '', 'Clinique'],
+    nom_complet: ['CHU de Bordeaux', 'UBM', 'Clinique du Parc'],
+    fondateur: [true, false, false],
+    partenaire: [false, true, false],
+    autres: [false, false, true],
+    ok_pour_apparaitre: [true, true, false]
+  }) } } };
+  const flags = await fetchEtablissementsFlags();
+  assert.deepEqual(flags.byId['1'], { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
+  assert.deepEqual(flags.byId['2'], { fondateur: false, partenaire: true, ok_pour_apparaitre: true });
+  assert.deepEqual(flags.byId['3'], { fondateur: false, partenaire: false, ok_pour_apparaitre: false });
+  // acronyme prioritaire, repli sur nom_complet si acronyme est vide pour cette ligne (id 2).
+  assert.deepEqual(flags.byLabel['CHU'], flags.byId['1']);
+  assert.deepEqual(flags.byLabel['UBM'], flags.byId['2']);
+  assert.deepEqual(flags.byLabel['Clinique'], flags.byId['3']);
+});
+
+test('fetchEtablissementsFlags swallows a docApi error and returns empty maps rather than throwing', async (t) => {
+  t.after(() => { delete globalThis.window; });
+  globalThis.window = { grist: { docApi: { fetchTable: async () => { throw new Error('network down'); } } } };
+  const flags = await fetchEtablissementsFlags();
+  assert.deepEqual(flags, { byId: {}, byLabel: {} });
+});
+
+test('etablissementFlags resolves via byLabel when Etablissement arrives as already-resolved text (prod encoding)', () => {
+  const etabFlags = { byId: {}, byLabel: { UBM: { fondateur: false, partenaire: true, ok_pour_apparaitre: true } } };
+  assert.deepEqual(etablissementFlags({ Etablissement: 'UBM' }, etabFlags), { fondateur: false, partenaire: true, ok_pour_apparaitre: true });
+});
+
+test('etablissementFlags resolves via byId for a raw id or an ["R", ...] reference', () => {
+  const etabFlags = { byId: { 12: { fondateur: true, partenaire: false, ok_pour_apparaitre: true } }, byLabel: {} };
+  assert.deepEqual(etablissementFlags({ Etablissement: 12 }, etabFlags), { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
+  assert.deepEqual(etablissementFlags({ Etablissement: ['R', 'Etablissements', 12] }, etabFlags), { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
+});
+
+test('etablissementFlags returns null when unresolved (no Etablissement, orphan reference, or Etablissement2-only fallback)', () => {
+  const etabFlags = { byId: { 12: { fondateur: true, partenaire: false, ok_pour_apparaitre: true } }, byLabel: {} };
+  assert.equal(etablissementFlags({}, etabFlags), null);
+  assert.equal(etablissementFlags({ Etablissement: 999 }, etabFlags), null);
+  // Etablissement2 est du texte libre, pas une référence vers Etablissements : jamais d'indicateurs.
+  assert.equal(etablissementFlags({ Etablissement2: 'Clinique du Parc' }, etabFlags), null);
+});
+
+test('isEtablissementEligible requires ok_pour_apparaitre AND (fondateur OR partenaire)', () => {
+  assert.equal(isEtablissementEligible({ etablissement_ok_pour_apparaitre: true, etablissement_fondateur: true, etablissement_partenaire: false }), true);
+  assert.equal(isEtablissementEligible({ etablissement_ok_pour_apparaitre: true, etablissement_fondateur: false, etablissement_partenaire: true }), true);
+  assert.equal(isEtablissementEligible({ etablissement_ok_pour_apparaitre: true, etablissement_fondateur: false, etablissement_partenaire: false }), false, '"autres" (ni fondateur ni partenaire) ne doit jamais être éligible');
+  assert.equal(isEtablissementEligible({ etablissement_ok_pour_apparaitre: false, etablissement_fondateur: true, etablissement_partenaire: true }), false, 'ok_pour_apparaitre=false bloque même un fondateur/partenaire');
+  assert.equal(isEtablissementEligible({}), false);
+});
+
+test('enrich: attaches etablissement_fondateur/partenaire/ok_pour_apparaitre from etabFlags', () => {
+  const referenceMaps = { Etablissements: {} };
+  const etabFlags = { byId: {}, byLabel: { UBM: { fondateur: false, partenaire: true, ok_pour_apparaitre: true } } };
+  const enriched = enrich({ Etablissement: 'UBM' }, referenceMaps, etabFlags);
+  assert.equal(enriched.etablissement_fondateur, false);
+  assert.equal(enriched.etablissement_partenaire, true);
+  assert.equal(enriched.etablissement_ok_pour_apparaitre, true);
+});
+
+test('enrich: etablissement_fondateur/partenaire/ok_pour_apparaitre default to false when etabFlags is omitted or unresolved', () => {
+  const referenceMaps = { Etablissements: {} };
+  const enriched = enrich({ Etablissement: 'UBM' }, referenceMaps);
+  assert.equal(enriched.etablissement_fondateur, false);
+  assert.equal(enriched.etablissement_partenaire, false);
+  assert.equal(enriched.etablissement_ok_pour_apparaitre, false);
+});
+
+test('filterContacts applies the scope toggle (fondateur/partenaire) in addition to the fixed eligibility gate applied upstream', () => {
+  const contacts = [
+    { Nom: 'A', etablissement_fondateur: true, etablissement_partenaire: false },
+    { Nom: 'B', etablissement_fondateur: false, etablissement_partenaire: true }
+  ];
+  const activeFilters = createEmptyFilterState();
+  assert.equal(filterContacts(contacts, activeFilters, '', { fondateur: true, partenaire: true }).length, 2);
+  const onlyFondateurs = filterContacts(contacts, activeFilters, '', { fondateur: true, partenaire: false });
+  assert.equal(onlyFondateurs.length, 1);
+  assert.equal(onlyFondateurs[0].Nom, 'A');
+  assert.equal(filterContacts(contacts, activeFilters, '', { fondateur: false, partenaire: false }).length, 0);
+  // scope omis (ex: anciens appels) : aucun filtrage par scope, comportement inchangé.
+  assert.equal(filterContacts(contacts, activeFilters, '').length, 2);
 });

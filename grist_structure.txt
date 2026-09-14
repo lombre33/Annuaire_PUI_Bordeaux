@@ -46,8 +46,15 @@ Tables de référence (id -> libellé, chargées via fetchTable)
   GT                 : nom (Text)
   Competances        : Competences (Text)
   Instances          : nom_instance (Text)
-  Etablissements     : acronyme (Text), nom_complet (Text)
+  Etablissements     : acronyme (Text), nom_complet (Text),
+                       fondateur (Bool), partenaire (Bool), autres (Bool),
+                       ok_pour_apparaitre (Bool)
     Libellé = acronyme, avec repli sur nom_complet si acronyme est vide pour
     cette ligne (certaines lignes n'ont que nom_complet de renseigné — cause
     du bug "établissement invisible sur les cartes", cf. CHANGELOG).
+    fondateur/partenaire/autres/ok_pour_apparaitre pilotent l'affichage des
+    contacts de cet établissement (cf. specs.md) : seul un établissement
+    fondateur OU partenaire, ET ayant validé (ok_pour_apparaitre = true),
+    laisse voir ses contacts — "autres" n'est jamais affiché. Voir
+    fetchEtablissementsFlags()/isEtablissementEligible() dans grist-data.js.
   Role_Dans_le_PUI   : Role (Text)

@@ -196,7 +196,11 @@ const LIST_REFERENCE_FIELDS = [
 ];
 
 // ===== ENRICHIR UN CONTACT =====
-export function enrich(contact, referenceMaps) {
+// etabFlags (voir fetchEtablissementsFlags() ci-dessus) est optionnel — les
+// appels existants (tests, ancien code) qui ne le passent pas obtiennent
+// simplement des indicateurs à false, ce qui exclut le contact via
+// isEtablissementEligible() plutôt que de planter.
+export function enrich(contact, referenceMaps, etabFlags) {
   const enriched = { ...contact };
 
   LIST_REFERENCE_FIELDS.forEach(([contactField, table, outputKey]) => {
@@ -226,6 +230,11 @@ export function enrich(contact, referenceMaps) {
   // singulière ci-dessus.
   enriched.etablissement_labels = enriched.etablissement_label ? [enriched.etablissement_label] : [];
 
+  const flags = etablissementFlags(contact, etabFlags);
+  enriched.etablissement_fondateur = flags?.fondateur === true;
+  enriched.etablissement_partenaire = flags?.partenaire === true;
+  enriched.etablissement_ok_pour_apparaitre = flags?.ok_pour_apparaitre === true;
+
   const roleLabel = refLabel(contact.Role_dans_le_PUI, referenceMaps['Role_Dans_le_PUI']);
   // Tableau, pas chaîne : TAG_GROUPS (constants.js) et le rendu générique des
   // tags de carte (render.js) attendent `${key}_labels` pour tous les groupes,
@@ -245,4 +254,66 @@ export function enrich(contact, referenceMaps) {
 // perimetre_all vide. Voir tests/data.test.mjs pour le test de non-régression.
 export function isInScope(record) {
   return safeValues(record.perimetre_all).length > 0;
+}
+
+// ===== INDICATEURS DE VISIBILITÉ D'UN ÉTABLISSEMENT =====
+// La table Etablissements porte 4 colonnes booléennes pilotant l'affichage des
+// contacts qui y sont rattachés (cf. specs.md) : fondateur, partenaire, autres
+// (jamais affiché) et ok_pour_apparaitre (validation par l'établissement,
+// verrou global indépendant du statut). Chargées à part de fetchTable()
+// ci-dessus, qui ne renvoie qu'un id->libellé et n'a pas vocation à porter ces
+// indicateurs.
+//
+// Indexées à la fois par id de ligne et par libellé résolu (acronyme, repli
+// nom_complet) car Etablissement (colonne Annuaire) peut arriver sous l'une ou
+// l'autre forme selon la config Grist — même ambiguïté que refId()/refLabel()
+// ci-dessus, la table Etablissements ayant une "visible column" configurée en
+// prod (texte déjà résolu, pas un id).
+export async function fetchEtablissementsFlags() {
+  const empty = { byId: {}, byLabel: {} };
+  try {
+    const table = await window.grist.docApi.fetchTable('Etablissements');
+    const rows = tableToRows(table);
+    const byId = {};
+    const byLabel = {};
+    rows.forEach(row => {
+      if (row.id === null || row.id === undefined) return;
+      const flags = {
+        fondateur: row.fondateur === true,
+        partenaire: row.partenaire === true,
+        ok_pour_apparaitre: row.ok_pour_apparaitre === true
+      };
+      byId[String(row.id)] = flags;
+      const label = pickLabel(row, ['acronyme', 'nom_complet']);
+      if (label) byLabel[label] = flags;
+    });
+    return { byId, byLabel };
+  } catch (error) {
+    console.warn('[REFS] Impossible de charger les indicateurs Etablissements', error);
+    return empty;
+  }
+}
+
+// Résout les indicateurs de l'établissement d'un contact à partir de la
+// colonne Etablissement brute (avant tout repli sur Etablissement2, qui est du
+// texte libre sans lien vers la table Etablissements et n'a donc jamais
+// d'indicateurs). null si l'établissement n'est pas identifiable ou introuvable.
+export function etablissementFlags(contact, etabFlags) {
+  const raw = contact?.Etablissement;
+  if (typeof raw === 'string') {
+    const label = text(raw);
+    return (label && etabFlags?.byLabel?.[label]) || null;
+  }
+  const id = refId(raw);
+  return (id && etabFlags?.byId?.[String(id)]) || null;
+}
+
+// Un contact n'est éligible à l'affichage que si son établissement a validé
+// (ok_pour_apparaitre) ET a le statut fondateur ou partenaire — jamais "autres"
+// (cf. demande). Un contact dont l'établissement n'est pas identifiable dans la
+// table Etablissements (repli Etablissement2, référence orpheline) n'a aucun
+// indicateur à faire valoir : exclu par défaut plutôt qu'affiché sans validation.
+export function isEtablissementEligible(contact) {
+  return contact.etablissement_ok_pour_apparaitre === true &&
+    (contact.etablissement_fondateur === true || contact.etablissement_partenaire === true);
 }

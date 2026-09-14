@@ -11,7 +11,12 @@ export function createEmptyFilterState() {
   return state;
 }
 
-export function filterContacts(contacts, activeFilters, searchTerm) {
+// `scope` (optionnel — les appels qui ne le passent pas, ex. tests existants,
+// gardent l'ancien comportement) bascule l'affichage des contacts entre
+// établissements fondateurs et/ou partenaires (cf. specs.md). Séparé des
+// FILTERS ci-dessus : ce n'est pas un filtre par valeur (menu à cocher), mais
+// 2 interrupteurs indépendants cochés par défaut (voir index.html/main.js).
+export function filterContacts(contacts, activeFilters, searchTerm, scope) {
   const term = normalize(searchTerm);
 
   // Un Set normalisé par filtre actif, calculé une seule fois pour tous les
@@ -24,6 +29,11 @@ export function filterContacts(contacts, activeFilters, searchTerm) {
 
   return contacts.filter(contact => {
     if (term && ![contact.Nom, contact.Prenom].some(value => normalize(value).includes(term))) return false;
+
+    if (scope && !(
+      (scope.fondateur && contact.etablissement_fondateur) ||
+      (scope.partenaire && contact.etablissement_partenaire)
+    )) return false;
 
     for (let i = 0; i < FILTERS.length; i++) {
       const normalizedSelected = normalizedSelections[i];

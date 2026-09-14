@@ -1,8 +1,6 @@
-# Version 1.5.1 — Correctif urgent : tags de référence disparus en prod (voir CHANGELOG.md)
+# Version 1.6.0 — Filtrage par statut d'établissement (voir CHANGELOG.md)
 
-Régression de la 1.4.0 : les tables liées à Instances/Actions/GT/Communautés/
-Tâches ont, en production, une "visible column" configurée — Grist envoie
-donc leurs ReferenceList déjà résolues en texte, pas en id numérique brut
-comme supposé. `enrich()` jetait silencieusement ces items au lieu de les
-afficher. Nouvelle fonction `resolveListItem()` qui gère les deux formes,
-comme `refLabel()`/`refId()` le faisaient déjà pour Établissement/Rôle PUI.
+Les cartes ne sont visibles que si l'établissement du contact est fondateur
+ou partenaire (jamais "autres") ET a validé son apparition
+(`ok_pour_apparaitre`). Nouveaux interrupteurs "Fondateurs" / "Partenaires"
+dans la barre d'outils pour affiner l'affichage parmi ces contacts éligibles.

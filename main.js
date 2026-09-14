@@ -1,7 +1,7 @@
 // Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
 // grist-data.js / filters.js / render.js et est testée séparément.
 
-import { fetchTable, enrich, isInScope, refLabel, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
+import { fetchTable, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, refLabel, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters } from './filters.js';
 import { createFilterUI, renderCards, updateFilterUI } from './render.js';
 import { FILTERS, ROLE_REFERENCE } from './constants.js';
@@ -16,7 +16,12 @@ const state = {
   allContacts: [],
   referenceMaps: {},
   activeFilters: createEmptyFilterState(),
-  searchTerm: ''
+  searchTerm: '',
+  // Affichage des contacts par statut d'établissement (cf. specs.md) — les 2
+  // cochés par défaut : l'utilisateur restreint, il ne part pas d'une liste
+  // vide. Indépendant de FILTERS/activeFilters (pas un menu de valeurs, voir
+  // filterContacts() dans filters.js).
+  scope: { fondateur: true, partenaire: true }
 };
 
 const elements = {
@@ -26,7 +31,8 @@ const elements = {
   resultCount: document.getElementById('resultCount'),
   emptyState: document.getElementById('emptyState'),
   searchInput: document.getElementById('searchInput'),
-  resetFilters: document.getElementById('resetFilters')
+  resetFilters: document.getElementById('resetFilters'),
+  scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
 
 function toggleFilter(filterKey, value) {
@@ -42,7 +48,7 @@ function toggleFilter(filterKey, value) {
 }
 
 function refreshCards() {
-  const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm);
+  const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
   renderCards(elements.grid, elements.template, filtered, toggleFilter);
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
@@ -53,10 +59,25 @@ elements.searchInput.addEventListener('input', event => {
   refreshCards();
 });
 
+elements.scopeButtons.forEach(button => {
+  button.addEventListener('click', () => {
+    const key = button.dataset.scope;
+    state.scope[key] = !state.scope[key];
+    button.classList.toggle('active', state.scope[key]);
+    button.setAttribute('aria-pressed', String(state.scope[key]));
+    refreshCards();
+  });
+});
+
 elements.resetFilters.addEventListener('click', () => {
   Object.values(state.activeFilters).forEach(set => set.clear());
   state.searchTerm = '';
   elements.searchInput.value = '';
+  state.scope = { fondateur: true, partenaire: true };
+  elements.scopeButtons.forEach(button => {
+    button.classList.add('active');
+    button.setAttribute('aria-pressed', 'true');
+  });
   // Reconstruit l'UI des filtres pour vider aussi les champs de recherche
   // internes à chaque dropdown (pas seulement les cases cochées).
   createFilterUI(elements.filtersContainer, state.referenceMaps, state.activeFilters, toggleFilter);
@@ -109,7 +130,10 @@ window.grist.onRecords(debounce(async records => {
 
     const scopedRecords = rows.filter(isInScope);
 
-    const maps = await Promise.all(REFERENCE_TABLES.map(([table, field]) => fetchTable(table, field)));
+    const [maps, etabFlags] = await Promise.all([
+      Promise.all(REFERENCE_TABLES.map(([table, field]) => fetchTable(table, field))),
+      fetchEtablissementsFlags()
+    ]);
     if (!recordsSequencer.isLatest(requestId)) return; // une invocation plus récente a déjà démarré, on jette ce résultat périmé
 
     const newReferenceMaps = {};
@@ -128,8 +152,12 @@ window.grist.onRecords(debounce(async records => {
     pruneStaleFilters(state.activeFilters, state.referenceMaps);
 
     state.allContacts = scopedRecords
-      .map(record => enrich(record, state.referenceMaps))
-      .filter(c => c.Nom || c.Prenom);
+      .map(record => enrich(record, state.referenceMaps, etabFlags))
+      .filter(c => c.Nom || c.Prenom)
+      // Établissement ni fondateur ni partenaire, ou non validé par lui
+      // (ok_pour_apparaitre) : jamais affiché, quels que soient les
+      // interrupteurs Fondateurs/Partenaires de l'UI (cf. specs.md).
+      .filter(isEtablissementEligible);
 
     logEtablissementDiagnostics(scopedRecords, state.referenceMaps);
 
