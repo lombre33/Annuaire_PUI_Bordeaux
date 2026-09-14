@@ -6,7 +6,7 @@ import {
   sortWithCheckedFirst, resolveListItem, fetchEtablissementsFlags, etablissementFlags,
   isEtablissementEligible, filterVisibleEstablishments
 } from '../grist-data.js';
-import { filterContacts, createEmptyFilterState, pruneStaleFilters } from '../filters.js';
+import { filterContacts, createEmptyFilterState, pruneStaleFilters, computeFilterCounts } from '../filters.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
   assert.deepEqual(safeValues(['L']), []);
@@ -414,4 +414,42 @@ test('filterContacts applies the scope toggle (fondateur/partenaire) in addition
   assert.equal(filterContacts(contacts, activeFilters, '', { fondateur: false, partenaire: false }).length, 0);
   // scope omis (ex: anciens appels) : aucun filtrage par scope, comportement inchangé.
   assert.equal(filterContacts(contacts, activeFilters, '').length, 2);
+});
+
+test('filterContacts excludeKey skips one category\'s own selection while still applying every other filter', () => {
+  const contacts = [
+    { Nom: 'A', instances_labels: ['CME'], gt_labels: ['GT1'] },
+    { Nom: 'B', instances_labels: ['COVIRIS'], gt_labels: ['GT1'] },
+    { Nom: 'C', instances_labels: ['CME'], gt_labels: ['GT2'] }
+  ];
+  const activeFilters = createEmptyFilterState();
+  activeFilters.instances.add('CME');
+  activeFilters.gt.add('GT1');
+  // Sans excludeKey : les 2 filtres s'appliquent, seul A matche (CME + GT1).
+  assert.deepEqual(filterContacts(contacts, activeFilters, '').map(c => c.Nom), ['A']);
+  // excludeKey='instances' : le filtre Instances est ignoré, seul GT1 s'applique -> A et B.
+  assert.deepEqual(filterContacts(contacts, activeFilters, '', undefined, 'instances').map(c => c.Nom), ['A', 'B']);
+});
+
+test('computeFilterCounts tallies, per filter category, how many contacts each option would match given every OTHER active filter/search/scope', () => {
+  const contacts = [
+    { Nom: 'Alice', instances_labels: ['CME'], gt_labels: ['GT1'], etablissement_fondateur: true, etablissement_partenaire: false },
+    { Nom: 'Bob', instances_labels: ['COVIRIS'], gt_labels: ['GT1'], etablissement_fondateur: false, etablissement_partenaire: true },
+    { Nom: 'Chloe', instances_labels: ['CME'], gt_labels: ['GT2'], etablissement_fondateur: true, etablissement_partenaire: false }
+  ];
+  const activeFilters = createEmptyFilterState();
+  activeFilters.gt.add('GT1'); // ne doit pas influencer le compte de sa propre catégorie (gt), seulement celui des autres.
+
+  const counts = computeFilterCounts(contacts, activeFilters, '', { fondateur: true, partenaire: true });
+  // instances : filtré par gt=GT1 (l'autre filtre actif) -> Alice(CME) + Bob(COVIRIS), pas Chloe.
+  assert.deepEqual(counts.instances, { cme: 1, coviris: 1 });
+  // gt : sa propre sélection (GT1) est ignorée pour son propre compte -> les 3 contacts comptent.
+  assert.deepEqual(counts.gt, { gt1: 2, gt2: 1 });
+});
+
+test('computeFilterCounts keys are normalized (case/accent-insensitive), matching filterContacts\' own matching rules', () => {
+  const contacts = [{ Nom: 'A', competences_labels: ['oncologie'] }];
+  const activeFilters = createEmptyFilterState();
+  const counts = computeFilterCounts(contacts, activeFilters, '', undefined);
+  assert.equal(counts.competences[normalize('Oncologie')], 1, 'le tally doit matcher un libellé de référence "Oncologie" malgré la casse différente du texte libre');
 });

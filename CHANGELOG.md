@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.7.0 — Défaut Partenaires désactivé, en-tête PUI Bordeaux, compteurs par option
+
+- **Scope Fondateurs/Partenaires** : "Partenaires" est désormais décoché par
+  défaut au chargement (Fondateurs reste coché). Le bouton "Réinitialiser" ne
+  touche plus du tout ces 2 interrupteurs — un choix fait par l'utilisateur
+  pendant la session (ex: activer Partenaires) survit à un clic sur
+  "Réinitialiser", qui ne remet à zéro que les autres filtres/la recherche.
+- **En-tête** : remplace le bloc eyebrow/titre/sous-titre ("Annuaire PUI
+  Bordeaux" / "Annuaire des membres" / "Retrouvez les contacts...") par
+  "PUI Bordeaux" (titre) / "Annuaire des accompagnateurs de l'innovation"
+  (sous-titre) / "Pas de mauvaise porte, toujours le bon interlocuteur"
+  (accroche, nouvelle classe `.tagline`). Classe `.eyebrow` (devenue inutile)
+  retirée du CSS.
+- **Compteurs par option de filtre** : chaque option d'un menu de filtre
+  affiche désormais à droite le nombre de cartes qui correspondraient si on
+  la cochait, compte tenu de tous les AUTRES filtres déjà actifs (recherche,
+  scope, autres catégories) — pas seulement un total brut. Réutilise la
+  classe `.option-count`, présente dans le CSS mais inutilisée jusqu'ici.
+  - `filterContacts()` (filters.js) prend un 5e paramètre optionnel
+    `excludeKey` : saute la vérification d'une catégorie, pour calculer son
+    propre compte sans que sa propre sélection ne le fausse.
+  - Nouvelle fonction pure `computeFilterCounts()` (filters.js), qui tallie
+    par catégorie et par libellé normalisé (cohérent avec le matching
+    insensible casse/accents déjà en place).
+  - `createFilterUI()` affiche le compte initial ; nouvelle fonction
+    `updateFilterCounts()` (render.js) rafraîchit TOUS les menus après
+    chaque `refreshCards()` (recherche, scope, filtre, reset) sans perturber
+    un menu ouvert (même principe que `updateFilterUI()`).
+- **Tests** : couverture de `excludeKey` et `computeFilterCounts()` (45/45
+  tests passent).
+
 ## 1.6.0 — Filtrage par statut d'établissement (fondateur/partenaire/ok_pour_apparaitre)
 
 **Feature** : les cartes ne sont désormais visibles que si l'établissement du

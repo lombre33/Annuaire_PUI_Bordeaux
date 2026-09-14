@@ -1,9 +1,9 @@
 // Rendu DOM — pas de logique métier ici, uniquement de la construction d'éléments.
 
 import { TAG_GROUPS, FILTERS } from './constants.js';
-import { compareLabels, formatPhone, sortWithCheckedFirst } from './grist-data.js';
+import { compareLabels, formatPhone, sortWithCheckedFirst, normalize } from './grist-data.js';
 
-export function createFilterUI(container, referenceMaps, activeFilters, onToggle) {
+export function createFilterUI(container, referenceMaps, activeFilters, onToggle, counts) {
   if (!container) return;
   container.innerHTML = '';
 
@@ -63,7 +63,10 @@ export function createFilterUI(container, referenceMaps, activeFilters, onToggle
       const label = document.createElement('span');
       label.className = 'option-label';
       label.textContent = value;
-      option.append(checkbox, label);
+      const count = document.createElement('span');
+      count.className = 'option-count';
+      count.textContent = String(counts?.[filter.key]?.[normalize(value)] ?? 0);
+      option.append(checkbox, label, count);
       menu.appendChild(option);
     });
 
@@ -120,6 +123,26 @@ export function updateFilterUI(container, filterKey, activeFilters) {
   const badge = wrapper.querySelector('.filter-count');
   badge.textContent = String(selected.size);
   badge.hidden = selected.size === 0;
+}
+
+// Rafraîchit le nombre affiché à droite de CHAQUE option de TOUS les menus
+// (pas seulement celui qu'on vient de cocher : changer un filtre modifie le
+// compte des options de tous les autres, cf. computeFilterCounts() dans
+// filters.js) — appelé à chaque refreshCards(), quel que soit ce qui l'a
+// déclenché (recherche, scope, filtre, reset). Ne touche ni au DOM (ordre,
+// ouverture) ni aux cases à cocher : aucune interférence avec un menu ouvert
+// ou une recherche interne en cours de frappe (même principe que
+// updateFilterUI() ci-dessus).
+export function updateFilterCounts(container, counts) {
+  if (!container) return;
+  container.querySelectorAll('.filter').forEach(wrapper => {
+    const filterKey = wrapper.dataset.filterKey;
+    wrapper.querySelectorAll('.filter-option').forEach(option => {
+      const value = option.querySelector('.option-label').textContent;
+      const countEl = option.querySelector('.option-count');
+      if (countEl) countEl.textContent = String(counts?.[filterKey]?.[normalize(value)] ?? 0);
+    });
+  });
 }
 
 export function renderCards(grid, template, contacts, onToggle) {

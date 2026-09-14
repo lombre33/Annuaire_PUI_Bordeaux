@@ -2,8 +2,8 @@
 // grist-data.js / filters.js / render.js et est testée séparément.
 
 import { fetchTable, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, filterVisibleEstablishments, refLabel, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
-import { createEmptyFilterState, filterContacts, pruneStaleFilters } from './filters.js';
-import { createFilterUI, renderCards, updateFilterUI } from './render.js';
+import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
+import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts } from './render.js';
 import { FILTERS, ROLE_REFERENCE } from './constants.js';
 
 // Dérivé de FILTERS (constants.js) plutôt que dupliqué à la main : les deux
@@ -23,11 +23,13 @@ const state = {
   filterReferenceMaps: {},
   activeFilters: createEmptyFilterState(),
   searchTerm: '',
-  // Affichage des contacts par statut d'établissement (cf. specs.md) — les 2
-  // cochés par défaut : l'utilisateur restreint, il ne part pas d'une liste
-  // vide. Indépendant de FILTERS/activeFilters (pas un menu de valeurs, voir
-  // filterContacts() dans filters.js).
-  scope: { fondateur: true, partenaire: true }
+  // Affichage des contacts par statut d'établissement (cf. specs.md) —
+  // Fondateurs coché par défaut, Partenaires décoché. Indépendant de
+  // FILTERS/activeFilters (pas un menu de valeurs, voir filterContacts() dans
+  // filters.js). Volontairement PAS remis à ce défaut par "Réinitialiser"
+  // (cf. bouton reset ci-dessous) : une fois touché par l'utilisateur pendant
+  // la session, son choix est conservé.
+  scope: { fondateur: true, partenaire: false }
 };
 
 const elements = {
@@ -58,6 +60,12 @@ function refreshCards() {
   renderCards(elements.grid, elements.template, filtered, toggleFilter);
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
+  // Recalculé à chaque changement (recherche, scope, filtre, reset) : le
+  // nombre affiché à côté de chaque option d'un menu reflète le nombre de
+  // cartes qui matcheraient SI cette option était cochée, compte tenu de tous
+  // les autres filtres actifs déjà — pas seulement de celui-ci isolé.
+  const counts = computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
+  updateFilterCounts(elements.filtersContainer, counts);
 }
 
 elements.searchInput.addEventListener('input', event => {
@@ -79,14 +87,14 @@ elements.resetFilters.addEventListener('click', () => {
   Object.values(state.activeFilters).forEach(set => set.clear());
   state.searchTerm = '';
   elements.searchInput.value = '';
-  state.scope = { fondateur: true, partenaire: true };
-  elements.scopeButtons.forEach(button => {
-    button.classList.add('active');
-    button.setAttribute('aria-pressed', 'true');
-  });
+  // Ne touche volontairement PAS à state.scope/elements.scopeButtons : les
+  // interrupteurs Fondateurs/Partenaires ne font pas partie de ce que
+  // "Réinitialiser" remet à zéro (cf. demande) — un choix fait pendant la
+  // session (ex: activer Partenaires) survit au clic sur ce bouton.
   // Reconstruit l'UI des filtres pour vider aussi les champs de recherche
   // internes à chaque dropdown (pas seulement les cases cochées).
-  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter);
+  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter,
+    computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
   refreshCards();
 });
 
@@ -178,7 +186,8 @@ window.grist.onRecords(debounce(async records => {
     logEtablissementDiagnostics(scopedRecords, state.referenceMaps);
 
     if (referenceMapsChanged) {
-      createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter);
+      createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter,
+        computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
     }
     refreshCards();
   } catch (error) {
