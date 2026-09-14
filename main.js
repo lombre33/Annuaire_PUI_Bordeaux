@@ -1,7 +1,7 @@
 // Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
 // grist-data.js / filters.js / render.js et est testée séparément.
 
-import { fetchTable, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, refLabel, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
+import { fetchTable, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, filterVisibleEstablishments, refLabel, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters } from './filters.js';
 import { createFilterUI, renderCards, updateFilterUI } from './render.js';
 import { FILTERS, ROLE_REFERENCE } from './constants.js';
@@ -15,6 +15,12 @@ const REFERENCE_TABLES = [...FILTERS.map(f => [f.table, f.field]), [ROLE_REFEREN
 const state = {
   allContacts: [],
   referenceMaps: {},
+  // Comme referenceMaps, mais la table Etablissements y est restreinte aux
+  // lignes ok_pour_apparaitre (filterVisibleEstablishments()) — sert
+  // uniquement à construire/purger le menu du filtre Établissement, pas à
+  // résoudre le libellé d'un contact (enrich() continue d'utiliser
+  // referenceMaps, non filtré, pour ça).
+  filterReferenceMaps: {},
   activeFilters: createEmptyFilterState(),
   searchTerm: '',
   // Affichage des contacts par statut d'établissement (cf. specs.md) — les 2
@@ -80,7 +86,7 @@ elements.resetFilters.addEventListener('click', () => {
   });
   // Reconstruit l'UI des filtres pour vider aussi les champs de recherche
   // internes à chaque dropdown (pas seulement les cases cochées).
-  createFilterUI(elements.filtersContainer, state.referenceMaps, state.activeFilters, toggleFilter);
+  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter);
   refreshCards();
 });
 
@@ -140,16 +146,26 @@ window.grist.onRecords(debounce(async records => {
     REFERENCE_TABLES.forEach(([table], index) => {
       newReferenceMaps[table] = maps[index];
     });
+    // Menu du filtre Établissement restreint aux établissements ok_pour_apparaitre
+    // (cf. demande) — referenceMaps complet (ci-dessus) reste utilisé pour
+    // résoudre le libellé affiché sur une carte (enrich()), qui ne dépend pas
+    // de cette validation.
+    const newFilterReferenceMaps = {
+      ...newReferenceMaps,
+      Etablissements: filterVisibleEstablishments(newReferenceMaps['Etablissements'], etabFlags)
+    };
     // Ne reconstruit l'UI des filtres (destructive : ferme les menus ouverts,
     // vide leur champ de recherche interne) que si les libellés ont vraiment
     // changé — pas à chaque édition d'un contact sans rapport avec les filtres.
-    const referenceMapsChanged = !referenceMapsEqual(state.referenceMaps, newReferenceMaps);
+    const referenceMapsChanged = !referenceMapsEqual(state.filterReferenceMaps, newFilterReferenceMaps);
     state.referenceMaps = newReferenceMaps;
+    state.filterReferenceMaps = newFilterReferenceMaps;
 
     // Une sélection de filtre dont le libellé a été renommé/supprimé côté
-    // Grist doit être purgée avec les nouvelles tables de référence, avant de
-    // filtrer les cartes.
-    pruneStaleFilters(state.activeFilters, state.referenceMaps);
+    // Grist (ou, pour Établissement, dont ok_pour_apparaitre est passé à
+    // false) doit être purgée avec les nouvelles tables de référence, avant
+    // de filtrer les cartes.
+    pruneStaleFilters(state.activeFilters, state.filterReferenceMaps);
 
     state.allContacts = scopedRecords
       .map(record => enrich(record, state.referenceMaps, etabFlags))
@@ -162,7 +178,7 @@ window.grist.onRecords(debounce(async records => {
     logEtablissementDiagnostics(scopedRecords, state.referenceMaps);
 
     if (referenceMapsChanged) {
-      createFilterUI(elements.filtersContainer, state.referenceMaps, state.activeFilters, toggleFilter);
+      createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter);
     }
     refreshCards();
   } catch (error) {

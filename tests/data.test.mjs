@@ -4,7 +4,7 @@ import {
   safeValues, tableToRows, isInScope, text, pickLabel, enrich, refId, refLabel,
   normalize, compareLabels, formatPhone, fetchTable, createRequestSequencer, referenceMapsEqual,
   sortWithCheckedFirst, resolveListItem, fetchEtablissementsFlags, etablissementFlags,
-  isEtablissementEligible
+  isEtablissementEligible, filterVisibleEstablishments
 } from '../grist-data.js';
 import { filterContacts, createEmptyFilterState, pruneStaleFilters } from '../filters.js';
 
@@ -384,6 +384,21 @@ test('enrich: etablissement_fondateur/partenaire/ok_pour_apparaitre default to f
   assert.equal(enriched.etablissement_fondateur, false);
   assert.equal(enriched.etablissement_partenaire, false);
   assert.equal(enriched.etablissement_ok_pour_apparaitre, false);
+});
+
+test('filterVisibleEstablishments keeps only ok_pour_apparaitre establishments, for the filter dropdown only', () => {
+  const labelMap = { 1: 'CHU', 2: 'UBM', 3: 'ClinX' };
+  const etabFlags = {
+    byId: {
+      1: { fondateur: true, partenaire: false, ok_pour_apparaitre: true },
+      2: { fondateur: false, partenaire: true, ok_pour_apparaitre: false },
+      // id 3 volontairement absent de etabFlags.byId (référence orpheline / table pas encore chargée)
+    },
+    byLabel: {}
+  };
+  assert.deepEqual(filterVisibleEstablishments(labelMap, etabFlags), { 1: 'CHU' });
+  assert.deepEqual(filterVisibleEstablishments({}, etabFlags), {});
+  assert.deepEqual(filterVisibleEstablishments(labelMap, undefined), {}, 'etabFlags absent: aucune option (pas de validation connue)');
 });
 
 test('filterContacts applies the scope toggle (fondateur/partenaire) in addition to the fixed eligibility gate applied upstream', () => {

@@ -317,3 +317,18 @@ export function isEtablissementEligible(contact) {
   return contact.etablissement_ok_pour_apparaitre === true &&
     (contact.etablissement_fondateur === true || contact.etablissement_partenaire === true);
 }
+
+// Restreint un id->libellé d'Etablissements (issu de referenceMaps, voir
+// fetchTable() ci-dessus) aux seules lignes ok_pour_apparaitre — sert
+// uniquement à construire les OPTIONS du menu du filtre Établissement
+// (render.js), pas à résoudre le libellé d'un contact : referenceMaps complet
+// (non filtré) doit rester utilisé pour ça (enrich()/refLabel()), un
+// établissement non validé pouvant quand même être le libellé affiché d'un
+// contact déjà exclu par isEtablissementEligible() en amont.
+export function filterVisibleEstablishments(labelMap, etabFlags) {
+  const result = {};
+  Object.entries(labelMap || {}).forEach(([id, label]) => {
+    if (etabFlags?.byId?.[id]?.ok_pour_apparaitre === true) result[id] = label;
+  });
+  return result;
+}
