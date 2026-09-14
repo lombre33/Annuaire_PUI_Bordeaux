@@ -2,3 +2,5 @@
 .filter-search-input{display:block;width:100%;height:32px;margin-bottom:6px;padding:0 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;outline:0;background:#f7f8fc}
 .filter-search-input:focus{border-color:var(--violet)}
 .filter-option[hidden]{display:none}
+.filter-option.checked{background:#f1f0ff}
+.tag-static{cursor:default}

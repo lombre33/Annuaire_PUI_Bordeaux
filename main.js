@@ -1,22 +1,16 @@
 // Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
 // grist-data.js / filters.js / render.js et est testée séparément.
 
-import { fetchTable, enrich, isInScope, refLabel } from './grist-data.js';
-import { createEmptyFilterState, filterContacts } from './filters.js';
-import { createFilterUI, renderCards } from './render.js';
+import { fetchTable, enrich, isInScope, refLabel, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
+import { createEmptyFilterState, filterContacts, pruneStaleFilters } from './filters.js';
+import { createFilterUI, renderCards, updateFilterUI } from './render.js';
+import { FILTERS, ROLE_REFERENCE } from './constants.js';
 
-const REFERENCE_TABLES = [
-  ['Actions', 'Action'],
-  ['Taches', 'taches'],
-  ['Communautees', 'communaute'],
-  ['GT', 'nom'],
-  ['Competances', 'Competences'],
-  ['Instances', 'nom_instance'],
-  // acronyme d'abord, nom_complet en repli si l'acronyme n'est pas renseigné
-  // pour cette ligne (cf. CHANGELOG — cause du bug "établissement invisible").
-  ['Etablissements', ['acronyme', 'nom_complet']],
-  ['Role_Dans_le_PUI', 'Role']
-];
+// Dérivé de FILTERS (constants.js) plutôt que dupliqué à la main : les deux
+// listes avaient divergé (cf. audit) avant ce refactor. Role_Dans_le_PUI n'a
+// pas de filtre dédié (voir ROLE_REFERENCE) donc pas d'entrée dans FILTERS —
+// ajouté à part.
+const REFERENCE_TABLES = [...FILTERS.map(f => [f.table, f.field]), [ROLE_REFERENCE.table, ROLE_REFERENCE.field]];
 
 const state = {
   allContacts: [],
@@ -40,6 +34,10 @@ function toggleFilter(filterKey, value) {
   const set = state.activeFilters[filterKey];
   if (set.has(value)) set.delete(value);
   else set.add(value);
+  // Que le clic vienne d'une case du menu ou d'une bulle de carte (même
+  // onToggle des deux côtés), le menu du filtre concerné doit refléter la
+  // nouvelle sélection (coché en tête + badge de comptage).
+  updateFilterUI(elements.filtersContainer, filterKey, state.activeFilters);
   refreshCards();
 }
 
@@ -69,31 +67,42 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
 
-// Aide au diagnostic (console navigateur) : montre la valeur brute telle
-// qu'envoyée par Grist (utile car son encodage dépend de la config de la
-// table liée — texte déjà résolu, id nu, ou ['R', table, id], voir refLabel()
-// dans grist-data.js), puis liste les contacts qui restent sans libellé.
+// Aide au diagnostic (console navigateur) : signale les contacts dont la
+// référence Etablissement ne résout à aucun libellé (ni Etablissement, ni
+// Etablissement2) — une référence orpheline côté Grist. (L'ancien diagnostic
+// affichait aussi un échantillon de la valeur brute pour déterminer son
+// encodage réel ; cette question est tranchée depuis la 1.1.2, voir
+// CHANGELOG et refLabel() dans grist-data.js — retiré pour ne pas polluer la
+// console d'un log devenu sans objet à chaque chargement.)
 function logEtablissementDiagnostics(records, referenceMaps) {
   const withRaw = records.filter(r => r.Etablissement !== null && r.Etablissement !== undefined && r.Etablissement !== '' && r.Etablissement !== 0);
-  const sample = withRaw[0];
-  if (sample) {
-    console.info('[ETABLISSEMENT] Exemple de valeur brute (contact.Etablissement):', sample.Etablissement,
-      `— type JS: ${Array.isArray(sample.Etablissement) ? 'array' : typeof sample.Etablissement}`);
-  }
-  const unresolved = withRaw.filter(r => !refLabel(r.Etablissement, referenceMaps['Etablissements']) && !r.Etablissement2);
-  console.info(
-    `[ETABLISSEMENT] ${withRaw.length}/${records.length} contact(s) ont une valeur Etablissement`
-    + (unresolved.length ? ` — ${unresolved.length} ne résolvent aucun libellé (ni Etablissement, ni Etablissement2).` : '.')
-  );
+  const unresolved = withRaw.filter(r => !refLabel(r.Etablissement, referenceMaps['Etablissements']) && !text(r.Etablissement2));
   if (unresolved.length) {
-    console.warn('[ETABLISSEMENT] non résolus (contact.id -> valeur brute Etablissement):',
+    console.warn(`[ETABLISSEMENT] ${unresolved.length}/${records.length} contact(s) sans libellé résolu (référence orpheline) :`,
       unresolved.slice(0, 20).map(r => ({ contactId: r.id, raw: r.Etablissement })));
   }
 }
 
+function debounce(fn, wait) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), wait);
+  };
+}
+
+// Grist peut redéclencher onRecords très souvent (toute édition validée sur
+// n'importe quel champ, par n'importe qui, pendant que le widget est ouvert).
+// Le debounce absorbe les rafales d'éditions rapprochées ; le sequencer (voir
+// grist-data.js) protège en plus contre le cas où deux invocations non
+// absorbées par le debounce se chevauchent quand même et résolvent dans le
+// désordre.
+const recordsSequencer = createRequestSequencer();
+
 window.grist.ready({ requiredAccess: 'full' });
 
-window.grist.onRecords(async records => {
+window.grist.onRecords(debounce(async records => {
+  const requestId = recordsSequencer.next();
   try {
     const rows = Array.isArray(records) ? records : (records?.records || []);
     console.log('[GRIST] Enregistrements reçus:', rows.length);
@@ -101,9 +110,22 @@ window.grist.onRecords(async records => {
     const scopedRecords = rows.filter(isInScope);
 
     const maps = await Promise.all(REFERENCE_TABLES.map(([table, field]) => fetchTable(table, field)));
+    if (!recordsSequencer.isLatest(requestId)) return; // une invocation plus récente a déjà démarré, on jette ce résultat périmé
+
+    const newReferenceMaps = {};
     REFERENCE_TABLES.forEach(([table], index) => {
-      state.referenceMaps[table] = maps[index];
+      newReferenceMaps[table] = maps[index];
     });
+    // Ne reconstruit l'UI des filtres (destructive : ferme les menus ouverts,
+    // vide leur champ de recherche interne) que si les libellés ont vraiment
+    // changé — pas à chaque édition d'un contact sans rapport avec les filtres.
+    const referenceMapsChanged = !referenceMapsEqual(state.referenceMaps, newReferenceMaps);
+    state.referenceMaps = newReferenceMaps;
+
+    // Une sélection de filtre dont le libellé a été renommé/supprimé côté
+    // Grist doit être purgée avec les nouvelles tables de référence, avant de
+    // filtrer les cartes.
+    pruneStaleFilters(state.activeFilters, state.referenceMaps);
 
     state.allContacts = scopedRecords
       .map(record => enrich(record, state.referenceMaps))
@@ -111,9 +133,11 @@ window.grist.onRecords(async records => {
 
     logEtablissementDiagnostics(scopedRecords, state.referenceMaps);
 
-    createFilterUI(elements.filtersContainer, state.referenceMaps, state.activeFilters, toggleFilter);
+    if (referenceMapsChanged) {
+      createFilterUI(elements.filtersContainer, state.referenceMaps, state.activeFilters, toggleFilter);
+    }
     refreshCards();
   } catch (error) {
     console.error('Erreur dans le traitement des contacts:', error);
   }
-});
+}, 250));

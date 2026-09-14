@@ -29,14 +29,17 @@ filtrage/enrichissement est testable indépendamment du DOM et de Grist.
 node --test
 ```
 
-Les tests couvrent les fonctions pures (`grist-data.js`, `filters.js`), y compris
-un test de non-régression sur le filtre `perimetre_all` (voir CHANGELOG).
-Node ≥ 18 suffit (testé avec Node 22), aucune dépendance à installer.
+Les tests couvrent les fonctions pures (`grist-data.js`, `filters.js`) : lecture
+des tables Grist, résolution des Références, enrichissement des contacts,
+filtrage, ainsi que plusieurs tests de non-régression (filtre `perimetre_all`,
+tag "Rôle PUI", fallback établissement — voir CHANGELOG). Node ≥ 18 suffit
+(testé avec Node 22), aucune dépendance à installer.
 
 Il n'y a pas de test end-to-end automatisé contre une vraie instance Grist —
-avant chaque déploiement, valider manuellement dans Grist :
-recherche, chacun des 7 filtres seul puis combinés, bouton Réinitialiser,
-état vide, clic sur un tag (carte ou établissement) pour filtrer.
+`main.js` et `render.js` touchent `window.grist`/le DOM réels et ne sont donc
+pas exercés par `node --test` (pas de dépendance type jsdom ajoutée, cf.
+architecture ci-dessus). Voir [`TESTING.md`](TESTING.md) pour le protocole de
+test manuel complet à exécuter dans Grist avant chaque déploiement.
 
 ## Développement local
 

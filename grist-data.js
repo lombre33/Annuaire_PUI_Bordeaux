@@ -6,6 +6,50 @@ export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
 }
 
+// Compare/recherche insensible à la casse ET aux accents (contrairement à
+// .toLocaleLowerCase('fr-FR') seul) — utilisé pour matcher un tag libre
+// (ex: colonnes competences_1..15, texte tapé à la main) contre une valeur de
+// filtre issue d'une table de référence, qui peut différer par la casse ou les
+// accents sans que ce soit une vraie différence pour l'utilisateur.
+export function normalize(value) {
+  return text(value)
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase('fr-FR');
+}
+
+// Tri alphabétique français (ex: "chu" doit se classer avant "UBM", ce que
+// .sort() par défaut ne fait pas — il compare par code UTF-16, majuscules
+// d'abord).
+export function compareLabels(a, b) {
+  return text(a).localeCompare(text(b), 'fr-FR');
+}
+
+// Remonte les valeurs cochées en tête de liste (chaque groupe restant trié
+// alphabétiquement) — utilisé pour la construction initiale d'un menu de
+// filtre. `sortedValues` doit déjà être trié (ex: via compareLabels) : un
+// filtre stable sur un tableau trié préserve l'ordre à l'intérieur de
+// chaque groupe, pas besoin de retrier.
+export function sortWithCheckedFirst(sortedValues, selected) {
+  const checked = sortedValues.filter(value => selected.has(value));
+  const unchecked = sortedValues.filter(value => !selected.has(value));
+  return [...checked, ...unchecked];
+}
+
+// La colonne numero_de_telephone est typée Numeric côté Grist : un numéro
+// français saisi avec son 0 initial (ex: 0556789012) perd ce 0 en passant par
+// un type numérique (556789012). On le rétablit pour l'affichage. Formats
+// inattendus (longueur différente, texte libre) : renvoyés tels quels plutôt
+// que déformés.
+export function formatPhone(value) {
+  if (value === null || value === undefined || value === '' || value === 0) return '';
+  const raw = text(value);
+  const digits = raw.replace(/\D/g, '');
+  if (/^\d{9}$/.test(digits)) return `0${digits}`.match(/.{1,2}/g).join(' ');
+  if (/^0\d{9}$/.test(digits)) return digits.match(/.{1,2}/g).join(' ');
+  return raw;
+}
+
 // Grist encode les colonnes Liste/RéférenceListe sous la forme ['L', item1, item2, ...].
 // Une liste réellement vide est donc ['L'] (longueur 1, pas 0) : il faut retirer ce
 // marqueur avant de savoir si la liste contient de vraies valeurs.
@@ -92,44 +136,64 @@ export async function fetchTable(tableName, labelFields) {
   }
 }
 
+// window.grist.onRecords peut se redéclencher avant qu'un appel précédent
+// n'ait fini de résoudre ses fetchTable() (plusieurs éditions rapprochées dans
+// Grist) ; sans garde, l'appel le plus lent peut résoudre en dernier et écraser
+// un affichage plus récent avec des données périmées. Chaque appel prend un
+// numéro ; seul le numéro le plus récent est autorisé à appliquer son résultat.
+export function createRequestSequencer() {
+  let latest = 0;
+  return {
+    next: () => ++latest,
+    isLatest: id => id === latest
+  };
+}
+
+// Compare deux jeux de tables de référence (id -> libellé) par contenu, pas
+// par référence — sert à ne reconstruire l'UI des filtres (destructive : elle
+// ferme tout menu ouvert et vide les champs de recherche internes) que quand
+// les libellés ont réellement changé, pas à chaque édition d'un contact.
+export function referenceMapsEqual(a, b) {
+  const tablesA = Object.keys(a);
+  const tablesB = Object.keys(b);
+  if (tablesA.length !== tablesB.length) return false;
+  return tablesA.every(table => {
+    const mapA = a[table] || {};
+    const mapB = b[table] || {};
+    const idsA = Object.keys(mapA);
+    const idsB = Object.keys(mapB);
+    if (idsA.length !== idsB.length) return false;
+    return idsA.every(id => mapA[id] === mapB[id]);
+  });
+}
+
+// Colonnes ReferenceList (Grist encode ['L', id1, id2, ...]) résolues via une
+// table de référence : [colonne sur Annuaire, table de référence, clé de sortie].
+// Piloté par données plutôt que 5 blocs copiés-collés — un futur ajout est une
+// ligne ici, pas un bloc dupliqué avec 3 tokens à changer à la main (source de
+// bug si un token est oublié/mal collé).
+const LIST_REFERENCE_FIELDS = [
+  ['Instances', 'Instances', 'instances_labels'],
+  ['Actions', 'Actions', 'actions_labels'],
+  ['GT', 'GT', 'gt_labels'],
+  ['Communautee_s_', 'Communautees', 'communautes_labels'],
+  ['Taches', 'Taches', 'taches_labels']
+];
+
 // ===== ENRICHIR UN CONTACT =====
 export function enrich(contact, referenceMaps) {
-  const enriched = {
-    ...contact,
-    instances_labels: [],
-    actions_labels: [],
-    gt_labels: [],
-    communautes_labels: [],
-    taches_labels: [],
-    competences_labels: [],
-    etablissement_label: '',
-    role_label: ''
-  };
+  const enriched = { ...contact };
 
-  const instanceIds = safeValues(contact.Instances);
-  enriched.instances_labels = instanceIds
-    .map(id => referenceMaps['Instances']?.[String(id)] || text(id))
-    .filter(Boolean);
-
-  const actionIds = safeValues(contact.Actions);
-  enriched.actions_labels = actionIds
-    .map(id => referenceMaps['Actions']?.[String(id)] || text(id))
-    .filter(Boolean);
-
-  const gtIds = safeValues(contact.GT);
-  enriched.gt_labels = gtIds
-    .map(id => referenceMaps['GT']?.[String(id)] || text(id))
-    .filter(Boolean);
-
-  const communauteIds = safeValues(contact.Communautee_s_);
-  enriched.communautes_labels = communauteIds
-    .map(id => referenceMaps['Communautees']?.[String(id)] || text(id))
-    .filter(Boolean);
-
-  const tachesIds = safeValues(contact.Taches);
-  enriched.taches_labels = tachesIds
-    .map(id => referenceMaps['Taches']?.[String(id)] || text(id))
-    .filter(Boolean);
+  LIST_REFERENCE_FIELDS.forEach(([contactField, table, outputKey]) => {
+    // Un id qui ne résout à aucun libellé (ligne de la table de référence sans
+    // libellé renseigné, cf. [REFS] ... sans <champ> dans la console) est
+    // ignoré plutôt que de retomber sur l'id numérique brut : afficher "47"
+    // comme tag sur une carte n'apporte rien à l'utilisateur et ressemble à
+    // une donnée corrompue.
+    enriched[outputKey] = safeValues(contact[contactField])
+      .map(id => referenceMaps[table]?.[String(id)])
+      .filter(Boolean);
+  });
 
   const competences = [];
   for (let i = 1; i <= 15; i++) {
@@ -141,8 +205,18 @@ export function enrich(contact, referenceMaps) {
   enriched.etablissement_label =
     refLabel(contact.Etablissement, referenceMaps['Etablissements']) ||
     text(contact.Etablissement2) || '';
+  // Miroir en tableau (convention _labels commune à tous les groupes) pour que
+  // filters.js n'ait pas besoin d'un cas particulier pour l'établissement — le
+  // badge dédié sur la carte (render.js) continue lui d'utiliser la forme
+  // singulière ci-dessus.
+  enriched.etablissement_labels = enriched.etablissement_label ? [enriched.etablissement_label] : [];
 
-  enriched.role_label = refLabel(contact.Role_dans_le_PUI, referenceMaps['Role_Dans_le_PUI']);
+  const roleLabel = refLabel(contact.Role_dans_le_PUI, referenceMaps['Role_Dans_le_PUI']);
+  // Tableau, pas chaîne : TAG_GROUPS (constants.js) et le rendu générique des
+  // tags de carte (render.js) attendent `${key}_labels` pour tous les groupes,
+  // "role" inclus — une valeur singulière role_label ici ne serait lue nulle
+  // part et le tag "Rôle PUI" resterait invisible sur toutes les cartes.
+  enriched.role_labels = roleLabel ? [roleLabel] : [];
 
   return enriched;
 }

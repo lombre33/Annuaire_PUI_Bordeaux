@@ -1,5 +1,144 @@
 # Changelog
 
+## 1.5.0 — Valeurs cochées en tête de menu + badge de comptage
+
+- **Feature** : dans chaque menu de filtre, la ou les valeurs cochées
+  remontent en tête de liste (le reste des options reste trié
+  alphabétiquement en dessous) — nouvelle fonction pure
+  `sortWithCheckedFirst()` (grist-data.js), utilisée à la construction du
+  menu. Le bouton du filtre affiche en plus un badge avec le nombre de
+  valeurs cochées (`.filter-count` — CSS déjà présente dans le projet mais
+  inutilisée depuis le retrait de cette fonctionnalité en v0.98 ; simplement
+  reconnectée).
+- Une case cochée/décochée met à jour uniquement le menu concerné
+  (`updateFilterUI()`, render.js) sans reconstruire tout le DOM des filtres —
+  un autre menu resté ouvert, ou une recherche tapée dedans, n'est pas
+  perturbé (même principe que le correctif 1.4.0 sur `createFilterUI`).
+  Attention lors de la mise à jour de cette fonction : l'ordre au sein de
+  chaque groupe (coché / non coché) est recalculé par tri explicite à chaque
+  appel, pas déduit de l'ordre DOM existant — une valeur qui passe de cochée
+  à non cochée doit reprendre sa place alphabétique, pas rester figée là où
+  elle se trouvait juste avant (piège identifié et corrigé pendant le
+  développement de cette version, voir le test associé dans
+  `tests/data.test.mjs`).
+- **Même comportement quelle que soit l'origine du clic** : cocher une case
+  dans un menu, cliquer le badge établissement d'une carte, ou cliquer un tag
+  de carte (Instances/Actions/GT/Compétences/Communautés/Tâches) déclenchent
+  tous la même fonction `toggleFilter()` dans `main.js` — `updateFilterUI()`
+  y est appelée une seule fois pour couvrir les trois cas. Point d'attention
+  spécifique aux clics venus d'une carte : ils ne passent jamais par la case
+  à cocher du menu (qui peut même ne pas être montée si le menu n'a jamais
+  été ouvert) — `updateFilterUI()` resynchronise donc explicitement l'état
+  `checked` de la case, pas seulement l'habillage visuel, sans quoi rouvrir
+  le menu après un clic sur une carte aurait montré une case décochée pour un
+  filtre pourtant actif.
+
+## 1.4.0 — Audit & stabilisation (2) : 9 correctifs + refonte enrich()/constants.js
+
+Suite à une revue d'architecture/sécurité complète (agents indépendants sur
+8 angles : correction, invariants, traçage inter-fichiers, réutilisation,
+simplification, efficacité, altitude, conventions — chaque candidat
+re-vérifié indépendamment avant retenue). Aucun changement de périmètre
+fonctionnel : les correctifs alignent le comportement sur `specs.md`, rien
+n'est ajouté ni retiré côté fonctionnalités utilisateur.
+
+**Correctifs (bugs) :**
+
+- **Tag "Rôle PUI" invisible sur toutes les cartes, quelles que soient les
+  données.** `enrich()` ne posait que `role_label` (singulier), jamais lu
+  nulle part — `TAG_GROUPS`/`render.js` attendent `role_labels` (pluriel,
+  convention commune à tous les groupes de tags). `enrich()` pose désormais
+  `role_labels` comme un tableau (0 ou 1 élément), au même titre que les
+  autres catégories.
+- **Numéros de téléphone affichés sans leur 0 initial.** `numero_de_telephone`
+  est une colonne Grist **Numeric** : un numéro saisi `0556789012` est stocké/
+  renvoyé comme `556789012` (un type numérique ne peut pas porter de zéro
+  initial). Nouvelle fonction `formatPhone()` (grist-data.js) qui rétablit le
+  0 pour tout numéro à 9 chiffres et formate par paires ("05 56 78 90 12") ;
+  tout format inattendu est renvoyé tel quel plutôt que déformé.
+- **Filtre "Compétences" silencieusement inefficace en cas de casse/accents
+  différents.** Le menu "Compétences" liste les libellés de la table
+  `Competances`, mais chaque contact a ses tags dans 15 colonnes de texte
+  libre (`competences_1`..`15`) — deux sources jamais recoupées. Nouvelle
+  fonction `normalize()` (casse + accents, via `NFD` + `\p{Diacritic}`)
+  utilisée pour le matching de tous les filtres catégorie ainsi que pour la
+  recherche libre nom/prénom (strictement plus permissive que l'ancien
+  `toLocaleLowerCase('fr-FR')` seul : aucune recherche qui fonctionnait avant
+  ne peut cesser de fonctionner).
+- **Sélection de filtre bloquée silencieusement à 0 résultat après un
+  renommage côté Grist.** `activeFilters` est indexé par libellé (pas par
+  id) ; renommer un établissement/une instance/etc. dans Grist laissait
+  l'ancien libellé coché dans un Set sans case à cocher correspondante pour
+  le décocher — seul "Réinitialiser" (qui vide tout) permettait de s'en
+  sortir. Nouvelle fonction `pruneStaleFilters()` (filters.js), appelée à
+  chaque rafraîchissement des tables de référence : retire une sélection
+  qui n'est plus une option valide du menu, sans toucher à une sélection
+  simplement sans contact correspondant pour l'instant (ce n'est pas la même
+  chose).
+- **Rendu périmé possible en cas d'éditions rapprochées dans Grist.**
+  `window.grist.onRecords` peut se redéclencher avant la fin d'un appel
+  précédent (8 `fetchTable()` en vol) ; sans garde, l'invocation la plus
+  lente pouvait résoudre en dernier et écraser un affichage plus récent avec
+  des données périmées. Nouveau `createRequestSequencer()` (grist-data.js) :
+  seule l'invocation la plus récente est autorisée à appliquer son résultat.
+- **Menus de filtres fermés/vidés à chaque édition, même sans rapport avec
+  les filtres.** `createFilterUI()` (destructive : ferme tout menu ouvert,
+  vide les recherches internes) et le rafraîchissement des 8 tables de
+  référence s'exécutaient à chaque déclenchement de `onRecords`, y compris
+  pour l'édition d'un seul champ d'un seul contact. Nouvelle fonction
+  `referenceMapsEqual()` : la reconstruction des menus n'a lieu que si le
+  contenu des tables de référence a réellement changé. `onRecords` est en
+  plus désormais *debounced* (250 ms) pour absorber les rafales d'éditions.
+- **Libellé de référence vide affichait l'id numérique brut comme tag.** Pour
+  Instances/Actions/GT/Communautés/Tâches, un id sans libellé résolu
+  retombait sur `text(id)` (ex: la carte affichait "47"). `enrich()` ignore
+  désormais un id non résolu plutôt que d'afficher sa valeur numérique brute
+  — cohérent avec le reste du widget, où un champ non renseigné est
+  simplement absent plutôt qu'affiché avec une valeur factice.
+- **Tri des menus de filtres non francophone.** `[...].sort()` par défaut
+  classe par code UTF-16 (majuscules avant minuscules, ex: "UBM" avant
+  "chu"), contrairement au reste du fichier qui utilise déjà
+  `toLocaleLowerCase('fr-FR')`. Nouvelle fonction `compareLabels()`
+  (`localeCompare(..., 'fr-FR')`), réutilisée pour ce tri.
+- **Élément de template mort.** `<p class="structure detail-row">` dans le
+  template de carte (`index.html`) n'était sélectionné nulle part dans
+  `render.js` — retiré (aucun impact visuel, il était déjà invisible).
+
+**Refactor (base saine, sans impact fonctionnel) :**
+
+- `constants.js` est maintenant la seule source de la liste des tables à
+  charger : `main.js` dérive `REFERENCE_TABLES` de `FILTERS` (+ nouveau
+  `ROLE_REFERENCE` pour `Role_Dans_le_PUI`, qui n'a pas de filtre dédié) au
+  lieu de dupliquer table/champ à la main — les deux listes avaient déjà
+  divergé (`FILTERS.etablissement.field` valait encore `'acronyme'` seul).
+- `TAG_GROUPS` ne contient plus `etablissement` (son entrée y était morte :
+  l'établissement a son propre badge dédié sur la carte, pas une section de
+  tags générique) — supprime un faux signal lors de la lecture du code.
+- `enrich()` : les 5 blocs quasi identiques pour Instances/Actions/GT/
+  Communautés/Tâches sont remplacés par une seule boucle pilotée par une
+  table de correspondance (`LIST_REFERENCE_FIELDS`) — un futur ajout de
+  catégorie est une ligne, pas un bloc copié-collé à 3 tokens à modifier
+  (source du risque documenté lors de l'audit).
+- `filters.js` : suppression du cas particulier `etablissement` dans
+  `filterContacts()` — `enrich()` produit maintenant `etablissement_labels`
+  au même format que toutes les autres catégories.
+- Diagnostic console `[ETABLISSEMENT]` (main.js) : retrait de l'échantillon
+  de valeur brute (question tranchée depuis la 1.1.2, devenu bruit à chaque
+  chargement) ; conservation du signalement des références orphelines,
+  toujours utile.
+
+**Tests :** voir [`tests/data.test.mjs`](tests/data.test.mjs) — nouveaux tests
+pour `normalize()`, `compareLabels()`, `formatPhone()`, `createRequestSequencer()`,
+`referenceMapsEqual()`, `pruneStaleFilters()`, `fetchTable()` (succès, repli
+multi-colonnes, erreur réseau — chemins jamais testés jusqu'ici), le
+comportement révisé d'`enrich()` (dont un test qui verrouille explicitement
+le mapping colonne→table→sortie pour les 5 catégories liste, contre une
+future erreur de copier-coller sur `LIST_REFERENCE_FIELDS`). Voir aussi
+[`TESTING.md`](TESTING.md), nouveau protocole de test manuel exhaustif à
+exécuter avant chaque déploiement (complète les tests automatisés, qui ne
+couvrent que les fonctions pures — pas `main.js`/`render.js`, DOM et
+`window.grist` réels non simulables sans dépendance supplémentaire).
+
 ## 1.3.1 — Retour à 3 colonnes
 
 La grille à 4 colonnes (1.3.0) ne convainc pas à l'usage. Retour à 3 colonnes
