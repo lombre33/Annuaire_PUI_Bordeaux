@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   safeValues, tableToRows, isInScope, text, pickLabel, enrich, refId, refLabel,
   normalize, compareLabels, formatPhone, fetchTable, createRequestSequencer, referenceMapsEqual,
-  sortWithCheckedFirst
+  sortWithCheckedFirst, resolveListItem
 } from '../grist-data.js';
 import { filterContacts, createEmptyFilterState, pruneStaleFilters } from '../filters.js';
 
@@ -237,6 +237,27 @@ test('enrich: list-reference categories (Instances/Actions/GT/Communautés/Tâch
   assert.deepEqual(enrich({ Instances: ['L', 7, 999] }, referenceMaps).instances_labels, ['CME'],
     'id 999 introuvable dans la table de référence: ignoré, pas affiché comme "999"');
   assert.deepEqual(enrich({ Instances: ['L'] }, referenceMaps).instances_labels, []);
+});
+
+test('resolveListItem resolves a ReferenceList item whether Grist sends a raw id or already-resolved text', () => {
+  // Régression prod du 14/09 (voir CHANGELOG 1.5.1) : une ReferenceList peut
+  // arriver avec des items déjà résolus en texte (visible column configurée
+  // sur la table liée), pas seulement des ids numériques — même ambiguïté que
+  // refId()/refLabel() pour une Référence unique, mais jamais gérée ici avant
+  // ce correctif. Résultat en prod : tags Instances/Actions/GT/Communautés/
+  // Tâches disparus de toutes les cartes.
+  const referenceMap = { 7: 'CME' };
+  assert.equal(resolveListItem('CME', referenceMap), 'CME', 'texte déjà résolu: utilisé tel quel');
+  assert.equal(resolveListItem(7, referenceMap), 'CME', 'id numérique brut: résolu via la table de référence');
+  assert.equal(resolveListItem(999, referenceMap), '', 'id numérique introuvable: chaîne vide, pas de valeur fantôme');
+  assert.equal(resolveListItem('', referenceMap), '');
+});
+
+test('enrich: list-reference categories resolve correctly when Grist sends pre-resolved text instead of numeric ids (production regression, 2026-09-14)', () => {
+  const referenceMaps = { Instances: { 7: 'CME' } };
+  // ['L', 'CME'] : la table Instances a une visible column configurée en
+  // prod, donc Grist envoie directement le texte, pas ['L', 7].
+  assert.deepEqual(enrich({ Instances: ['L', 'CME'] }, referenceMaps).instances_labels, ['CME']);
 });
 
 test('enrich: each list-reference category reads its own Annuaire column and its own reference table, not another\'s', () => {

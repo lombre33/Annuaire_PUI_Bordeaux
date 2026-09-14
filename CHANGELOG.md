@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.5.1 — Correctif urgent : tags Instances/Actions/GT/Communautés/Tâches disparus en prod
+
+Régression introduite par le correctif "#7" de la 1.4.0 (qui retirait
+l'affichage d'un id numérique brut quand une référence ne résolvait à aucun
+libellé). Constatée en production le jour même du déploiement de 1.4.0/1.5.0 :
+plus aucun tag Instances/Actions/GT/Communautés/Tâches sur aucune carte,
+filtres correspondants inopérants (Établissement et recherche libre non
+affectés).
+
+**Cause réelle** : les tables liées à ces 5 colonnes ReferenceList ont, en
+production, une "visible column" configurée — Grist envoie donc les items de
+la liste déjà résolus en texte (ex. `['L', 'CME']`), pas en id numérique brut
+(`['L', 7]`) comme supposé. `enrich()` cherchait
+`referenceMaps['Instances'][String('CME')]`, qui échoue nécessairement (la
+table est indexée par id numérique, pas par texte) — l'item était alors jeté
+par le correctif 1.4.0 au lieu d'être affiché. Avant 1.4.0, un fallback
+`|| text(id)` masquait ce cas par coïncidence (`text('CME') === 'CME'`) ; ce
+même fallback affichait aussi, à tort, l'id numérique brut ("47") quand une
+référence était réellement introuvable — les deux cas partageaient le même
+code et ne pouvaient pas être distingués sans le corriger correctement.
+
+C'est exactement le risque identifié — mais classé comme non confirmé,
+donc non traité — lors de l'audit archi/sécurité (angle "invariants",
+voir historique de la revue) : la même ambiguïté texte-déjà-résolu/id-brut
+qui avait cassé Établissement (CHANGELOG 1.1.0-1.1.2) pouvait aussi affecter
+les colonnes ReferenceList. Elle s'est avérée réelle.
+
+- **Correctif** : nouvelle fonction `resolveListItem(item, referenceMap)`
+  (grist-data.js), utilisée par `enrich()` pour chaque item d'une
+  ReferenceList — gère le texte déjà résolu (retourné tel quel) ET l'id
+  numérique brut (résolu via la table de référence, `''` si introuvable,
+  toujours filtré ensuite). Signature volontairement proche de
+  `refLabel()`/`refId()`, qui géraient déjà ce même risque pour les
+  Références uniques (Établissement, Rôle PUI).
+- **Tests** : régression figée explicitement — `resolveListItem` testé sur
+  les 2 formes, et un test `enrich()` dédié reproduit le scénario exact
+  constaté en prod (items ReferenceList pré-résolus en texte).
+
 ## 1.5.0 — Valeurs cochées en tête de menu + badge de comptage
 
 - **Feature** : dans chaque menu de filtre, la ou les valeurs cochées

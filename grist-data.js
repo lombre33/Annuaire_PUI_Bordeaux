@@ -167,6 +167,21 @@ export function referenceMapsEqual(a, b) {
   });
 }
 
+// Un élément d'une ReferenceList peut lui aussi arriver déjà résolu en texte
+// d'affichage (ex: "CME") plutôt qu'en id numérique brut — même ambiguïté que
+// pour une Référence unique (voir refId()/refLabel() plus haut), selon que la
+// table liée a une "visible column" configurée. RÉGRESSION CONSTATÉE EN PROD
+// (14/09, voir CHANGELOG 1.5.1) : la version précédente supposait toujours un
+// id numérique nu et cherchait `referenceMap[String("CME")]`, qui échoue
+// puisque la table est indexée par id numérique — l'item était alors
+// silencieusement jeté au lieu d'être affiché. Tags Instances/Actions/GT/
+// Communautés/Tâches disparus de toutes les cartes tant que ce cas ne gérait
+// pas le texte déjà résolu.
+export function resolveListItem(item, referenceMap) {
+  if (typeof item === 'string') return text(item);
+  return referenceMap?.[String(item)] || '';
+}
+
 // Colonnes ReferenceList (Grist encode ['L', id1, id2, ...]) résolues via une
 // table de référence : [colonne sur Annuaire, table de référence, clé de sortie].
 // Piloté par données plutôt que 5 blocs copiés-collés — un futur ajout est une
@@ -185,13 +200,13 @@ export function enrich(contact, referenceMaps) {
   const enriched = { ...contact };
 
   LIST_REFERENCE_FIELDS.forEach(([contactField, table, outputKey]) => {
-    // Un id qui ne résout à aucun libellé (ligne de la table de référence sans
-    // libellé renseigné, cf. [REFS] ... sans <champ> dans la console) est
-    // ignoré plutôt que de retomber sur l'id numérique brut : afficher "47"
-    // comme tag sur une carte n'apporte rien à l'utilisateur et ressemble à
-    // une donnée corrompue.
+    // resolveListItem() gère texte déjà résolu ET id numérique brut (voir sa
+    // doc ci-dessus). Un id numérique qui ne résout à aucun libellé (ligne de
+    // la table de référence sans libellé renseigné, cf. [REFS] ... sans
+    // <champ> dans la console) reste ignoré plutôt que d'afficher l'id brut :
+    // "47" comme tag sur une carte n'apporte rien à l'utilisateur.
     enriched[outputKey] = safeValues(contact[contactField])
-      .map(id => referenceMaps[table]?.[String(id)])
+      .map(id => resolveListItem(id, referenceMaps[table]))
       .filter(Boolean);
   });
 
