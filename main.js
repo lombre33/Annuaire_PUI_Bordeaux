@@ -1,7 +1,7 @@
 // Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
 // grist-data.js / filters.js / render.js et est testée séparément.
 
-import { fetchTable, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, filterVisibleEstablishments, refLabel, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
+import { fetchTable, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, filterVisibleEstablishments, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
 import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts } from './render.js';
 import { FILTERS, ROLE_REFERENCE } from './constants.js';
@@ -102,19 +102,17 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
 
-// Aide au diagnostic (console navigateur) : signale les contacts dont la
-// référence Etablissement ne résout à aucun libellé (ni Etablissement, ni
-// Etablissement2) — une référence orpheline côté Grist. (L'ancien diagnostic
-// affichait aussi un échantillon de la valeur brute pour déterminer son
-// encodage réel ; cette question est tranchée depuis la 1.1.2, voir
-// CHANGELOG et refLabel() dans grist-data.js — retiré pour ne pas polluer la
-// console d'un log devenu sans objet à chaque chargement.)
-function logEtablissementDiagnostics(records, referenceMaps) {
-  const withRaw = records.filter(r => r.nom_de_domaine !== null && r.nom_de_domaine !== undefined && r.nom_de_domaine !== '' && r.nom_de_domaine !== 0);
-  const unresolved = withRaw.filter(r => !refLabel(r.nom_de_domaine, referenceMaps['Etablissements']) && !text(r.Etablissement2));
+// Aide au diagnostic (console navigateur) : signale les contacts sans
+// Etablissement2 renseigné (colonne Text, formule côté Grist = acronyme de
+// l'établissement déduit de l'email — cf. etablissementFlags()/enrich() dans
+// grist-data.js) — ces contacts n'ont aucun indicateur fondateur/partenaire/
+// ok_pour_apparaitre à faire valoir et sont donc exclus par
+// isEtablissementEligible().
+function logEtablissementDiagnostics(records) {
+  const unresolved = records.filter(r => !text(r.Etablissement2));
   if (unresolved.length) {
-    console.warn(`[ETABLISSEMENT] ${unresolved.length}/${records.length} contact(s) sans libellé résolu (référence orpheline) :`,
-      unresolved.slice(0, 20).map(r => ({ contactId: r.id, raw: r.nom_de_domaine })));
+    console.warn(`[ETABLISSEMENT] ${unresolved.length}/${records.length} contact(s) sans Etablissement2 renseigné :`,
+      unresolved.slice(0, 20).map(r => ({ contactId: r.id, email: r.Email })));
   }
 }
 
@@ -183,7 +181,7 @@ window.grist.onRecords(debounce(async records => {
       // interrupteurs Fondateurs/Partenaires de l'UI (cf. specs.md).
       .filter(isEtablissementEligible);
 
-    logEtablissementDiagnostics(scopedRecords, state.referenceMaps);
+    logEtablissementDiagnostics(scopedRecords);
 
     if (referenceMapsChanged) {
       createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter,

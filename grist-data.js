@@ -221,9 +221,12 @@ export function enrich(contact, referenceMaps, etabFlags) {
   }
   enriched.competences_labels = competences;
 
-  enriched.etablissement_label =
-    refLabel(contact.nom_de_domaine, referenceMaps['Etablissements']) ||
-    text(contact.Etablissement2) || '';
+  // Etablissement2 (Text, formule = rec.nom_de_domaine.acronyme côté Grist)
+  // est la source unique de vérité pour l'établissement d'un contact — pas la
+  // colonne nom_de_domaine elle-même (Reference), dont l'encodage sur une
+  // colonne FORMULE s'est avéré peu fiable en prod (cf. CHANGELOG). Toujours
+  // une chaîne simple, jamais l'ambiguïté texte/id/['R',...] des Références.
+  enriched.etablissement_label = text(contact.Etablissement2) || '';
   // Miroir en tableau (convention _labels commune à tous les groupes) pour que
   // filters.js n'ait pas besoin d'un cas particulier pour l'établissement — le
   // badge dédié sur la carte (render.js) continue lui d'utiliser la forme
@@ -264,13 +267,10 @@ export function isInScope(record) {
 // ci-dessus, qui ne renvoie qu'un id->libellé et n'a pas vocation à porter ces
 // indicateurs.
 //
-// Indexées à la fois par id de ligne et par libellé résolu (acronyme, repli
-// nom_complet) car nom_de_domaine (colonne Annuaire — formule qui déduit
-// l'établissement du domaine de l'email du contact, cf. schéma Grist ;
-// remplace l'ancienne colonne Etablissement, retirée) peut arriver sous l'une
-// ou l'autre forme selon la config Grist — même ambiguïté que refId()/
-// refLabel() ci-dessus, la table Etablissements ayant une "visible column"
-// configurée en prod (texte déjà résolu, pas un id).
+// Indexées par libellé résolu (acronyme, repli nom_complet) — c'est ce
+// libellé (via Etablissement2, cf. etablissementFlags() ci-dessous) qui sert
+// à identifier l'établissement d'un contact. byId reste utilisé par
+// filterVisibleEstablishments() (menu du filtre, indexé par referenceMaps).
 export async function fetchEtablissementsFlags() {
   const empty = { byId: {}, byLabel: {} };
   try {
@@ -296,21 +296,13 @@ export async function fetchEtablissementsFlags() {
   }
 }
 
-// Résout les indicateurs de l'établissement d'un contact à partir de la
-// colonne nom_de_domaine brute (Reference vers Etablissements calculée par
-// Grist depuis le domaine de l'email — remplace l'ancienne colonne
-// Etablissement). Etablissement2 (repli texte pour l'affichage) est lui-même
-// désormais une formule dérivée de nom_de_domaine côté Grist, donc jamais
-// utilisé ici : il ne porte pas d'indicateur propre. null si l'établissement
-// n'est pas identifiable ou introuvable.
+// Résout les indicateurs de l'établissement d'un contact à partir
+// d'Etablissement2 (Text — cf. enrich() ci-dessus pour le choix de cette
+// colonne plutôt que nom_de_domaine). null si vide ou si le libellé ne
+// correspond à aucune ligne de la table Etablissements.
 export function etablissementFlags(contact, etabFlags) {
-  const raw = contact?.nom_de_domaine;
-  if (typeof raw === 'string') {
-    const label = text(raw);
-    return (label && etabFlags?.byLabel?.[label]) || null;
-  }
-  const id = refId(raw);
-  return (id && etabFlags?.byId?.[String(id)]) || null;
+  const label = text(contact?.Etablissement2);
+  return (label && etabFlags?.byLabel?.[label]) || null;
 }
 
 // Un contact n'est éligible à l'affichage que si son établissement a validé
