@@ -222,7 +222,7 @@ export function enrich(contact, referenceMaps, etabFlags) {
   enriched.competences_labels = competences;
 
   enriched.etablissement_label =
-    refLabel(contact.Etablissement, referenceMaps['Etablissements']) ||
+    refLabel(contact.nom_de_domaine, referenceMaps['Etablissements']) ||
     text(contact.Etablissement2) || '';
   // Miroir en tableau (convention _labels commune à tous les groupes) pour que
   // filters.js n'ait pas besoin d'un cas particulier pour l'établissement — le
@@ -265,10 +265,12 @@ export function isInScope(record) {
 // indicateurs.
 //
 // Indexées à la fois par id de ligne et par libellé résolu (acronyme, repli
-// nom_complet) car Etablissement (colonne Annuaire) peut arriver sous l'une ou
-// l'autre forme selon la config Grist — même ambiguïté que refId()/refLabel()
-// ci-dessus, la table Etablissements ayant une "visible column" configurée en
-// prod (texte déjà résolu, pas un id).
+// nom_complet) car nom_de_domaine (colonne Annuaire — formule qui déduit
+// l'établissement du domaine de l'email du contact, cf. schéma Grist ;
+// remplace l'ancienne colonne Etablissement, retirée) peut arriver sous l'une
+// ou l'autre forme selon la config Grist — même ambiguïté que refId()/
+// refLabel() ci-dessus, la table Etablissements ayant une "visible column"
+// configurée en prod (texte déjà résolu, pas un id).
 export async function fetchEtablissementsFlags() {
   const empty = { byId: {}, byLabel: {} };
   try {
@@ -295,11 +297,14 @@ export async function fetchEtablissementsFlags() {
 }
 
 // Résout les indicateurs de l'établissement d'un contact à partir de la
-// colonne Etablissement brute (avant tout repli sur Etablissement2, qui est du
-// texte libre sans lien vers la table Etablissements et n'a donc jamais
-// d'indicateurs). null si l'établissement n'est pas identifiable ou introuvable.
+// colonne nom_de_domaine brute (Reference vers Etablissements calculée par
+// Grist depuis le domaine de l'email — remplace l'ancienne colonne
+// Etablissement). Etablissement2 (repli texte pour l'affichage) est lui-même
+// désormais une formule dérivée de nom_de_domaine côté Grist, donc jamais
+// utilisé ici : il ne porte pas d'indicateur propre. null si l'établissement
+// n'est pas identifiable ou introuvable.
 export function etablissementFlags(contact, etabFlags) {
-  const raw = contact?.Etablissement;
+  const raw = contact?.nom_de_domaine;
   if (typeof raw === 'string') {
     const label = text(raw);
     return (label && etabFlags?.byLabel?.[label]) || null;

@@ -209,17 +209,17 @@ test('refLabel resolves a Reference cell in any of the 3 shapes Grist can send',
 
 test('enrich: établissement resolves whether Grist sends resolved text, a raw id, or an ["R", ...] reference', () => {
   const referenceMaps = { Etablissements: { 12: 'CHU' } };
-  assert.equal(enrich({ Etablissement: 'UBM' }, referenceMaps).etablissement_label, 'UBM');
-  assert.equal(enrich({ Etablissement: ['R', 'Etablissements', 12] }, referenceMaps).etablissement_label, 'CHU');
-  assert.equal(enrich({ Etablissement: 12 }, referenceMaps).etablissement_label, 'CHU');
+  assert.equal(enrich({ nom_de_domaine: 'UBM' }, referenceMaps).etablissement_label, 'UBM');
+  assert.equal(enrich({ nom_de_domaine: ['R', 'Etablissements', 12] }, referenceMaps).etablissement_label, 'CHU');
+  assert.equal(enrich({ nom_de_domaine: 12 }, referenceMaps).etablissement_label, 'CHU');
   // Référence introuvable dans la table : repli sur Etablissement2.
-  assert.equal(enrich({ Etablissement: ['R', 'Etablissements', 999], Etablissement2: 'Clinique du Parc' }, referenceMaps).etablissement_label, 'Clinique du Parc');
+  assert.equal(enrich({ nom_de_domaine: ['R', 'Etablissements', 999], Etablissement2: 'Clinique du Parc' }, referenceMaps).etablissement_label, 'Clinique du Parc');
   assert.equal(enrich({}, referenceMaps).etablissement_label, '');
 });
 
 test('enrich: etablissement_labels mirrors etablissement_label as a single-element array (or empty)', () => {
   const referenceMaps = { Etablissements: { 12: 'CHU' } };
-  assert.deepEqual(enrich({ Etablissement: 12 }, referenceMaps).etablissement_labels, ['CHU']);
+  assert.deepEqual(enrich({ nom_de_domaine: 12 }, referenceMaps).etablissement_labels, ['CHU']);
   assert.deepEqual(enrich({}, referenceMaps).etablissement_labels, []);
 });
 
@@ -344,19 +344,19 @@ test('fetchEtablissementsFlags swallows a docApi error and returns empty maps ra
 
 test('etablissementFlags resolves via byLabel when Etablissement arrives as already-resolved text (prod encoding)', () => {
   const etabFlags = { byId: {}, byLabel: { UBM: { fondateur: false, partenaire: true, ok_pour_apparaitre: true } } };
-  assert.deepEqual(etablissementFlags({ Etablissement: 'UBM' }, etabFlags), { fondateur: false, partenaire: true, ok_pour_apparaitre: true });
+  assert.deepEqual(etablissementFlags({ nom_de_domaine: 'UBM' }, etabFlags), { fondateur: false, partenaire: true, ok_pour_apparaitre: true });
 });
 
 test('etablissementFlags resolves via byId for a raw id or an ["R", ...] reference', () => {
   const etabFlags = { byId: { 12: { fondateur: true, partenaire: false, ok_pour_apparaitre: true } }, byLabel: {} };
-  assert.deepEqual(etablissementFlags({ Etablissement: 12 }, etabFlags), { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
-  assert.deepEqual(etablissementFlags({ Etablissement: ['R', 'Etablissements', 12] }, etabFlags), { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
+  assert.deepEqual(etablissementFlags({ nom_de_domaine: 12 }, etabFlags), { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
+  assert.deepEqual(etablissementFlags({ nom_de_domaine: ['R', 'Etablissements', 12] }, etabFlags), { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
 });
 
 test('etablissementFlags returns null when unresolved (no Etablissement, orphan reference, or Etablissement2-only fallback)', () => {
   const etabFlags = { byId: { 12: { fondateur: true, partenaire: false, ok_pour_apparaitre: true } }, byLabel: {} };
   assert.equal(etablissementFlags({}, etabFlags), null);
-  assert.equal(etablissementFlags({ Etablissement: 999 }, etabFlags), null);
+  assert.equal(etablissementFlags({ nom_de_domaine: 999 }, etabFlags), null);
   // Etablissement2 est du texte libre, pas une référence vers Etablissements : jamais d'indicateurs.
   assert.equal(etablissementFlags({ Etablissement2: 'Clinique du Parc' }, etabFlags), null);
 });
@@ -372,7 +372,7 @@ test('isEtablissementEligible requires ok_pour_apparaitre AND (fondateur OR part
 test('enrich: attaches etablissement_fondateur/partenaire/ok_pour_apparaitre from etabFlags', () => {
   const referenceMaps = { Etablissements: {} };
   const etabFlags = { byId: {}, byLabel: { UBM: { fondateur: false, partenaire: true, ok_pour_apparaitre: true } } };
-  const enriched = enrich({ Etablissement: 'UBM' }, referenceMaps, etabFlags);
+  const enriched = enrich({ nom_de_domaine: 'UBM' }, referenceMaps, etabFlags);
   assert.equal(enriched.etablissement_fondateur, false);
   assert.equal(enriched.etablissement_partenaire, true);
   assert.equal(enriched.etablissement_ok_pour_apparaitre, true);
@@ -380,7 +380,7 @@ test('enrich: attaches etablissement_fondateur/partenaire/ok_pour_apparaitre fro
 
 test('enrich: etablissement_fondateur/partenaire/ok_pour_apparaitre default to false when etabFlags is omitted or unresolved', () => {
   const referenceMaps = { Etablissements: {} };
-  const enriched = enrich({ Etablissement: 'UBM' }, referenceMaps);
+  const enriched = enrich({ nom_de_domaine: 'UBM' }, referenceMaps);
   assert.equal(enriched.etablissement_fondateur, false);
   assert.equal(enriched.etablissement_partenaire, false);
   assert.equal(enriched.etablissement_ok_pour_apparaitre, false);

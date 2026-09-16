@@ -110,11 +110,11 @@ document.addEventListener('click', () => {
 // CHANGELOG et refLabel() dans grist-data.js — retiré pour ne pas polluer la
 // console d'un log devenu sans objet à chaque chargement.)
 function logEtablissementDiagnostics(records, referenceMaps) {
-  const withRaw = records.filter(r => r.Etablissement !== null && r.Etablissement !== undefined && r.Etablissement !== '' && r.Etablissement !== 0);
-  const unresolved = withRaw.filter(r => !refLabel(r.Etablissement, referenceMaps['Etablissements']) && !text(r.Etablissement2));
+  const withRaw = records.filter(r => r.nom_de_domaine !== null && r.nom_de_domaine !== undefined && r.nom_de_domaine !== '' && r.nom_de_domaine !== 0);
+  const unresolved = withRaw.filter(r => !refLabel(r.nom_de_domaine, referenceMaps['Etablissements']) && !text(r.Etablissement2));
   if (unresolved.length) {
     console.warn(`[ETABLISSEMENT] ${unresolved.length}/${records.length} contact(s) sans libellé résolu (référence orpheline) :`,
-      unresolved.slice(0, 20).map(r => ({ contactId: r.id, raw: r.Etablissement })));
+      unresolved.slice(0, 20).map(r => ({ contactId: r.id, raw: r.nom_de_domaine })));
   }
 }
 
