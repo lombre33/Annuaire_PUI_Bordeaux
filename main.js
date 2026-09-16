@@ -1,7 +1,7 @@
 // Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
 // grist-data.js / filters.js / render.js et est testée séparément.
 
-import { fetchTable, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, filterVisibleEstablishments, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
+import { fetchTable, tableToRows, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, filterVisibleEstablishments, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
 import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts } from './render.js';
 import { FILTERS, ROLE_REFERENCE } from './constants.js';
@@ -134,19 +134,27 @@ const recordsSequencer = createRequestSequencer();
 
 window.grist.ready({ requiredAccess: 'full' });
 
-window.grist.onRecords(debounce(async records => {
+// onRecords() ne sert plus qu'à SAVOIR QUAND rafraîchir (son paramètre
+// `records` n'est plus utilisé) : son payload par ligne s'est avéré ne pas
+// forcément inclure toutes les colonnes de la table Annuaire (ex:
+// Etablissement2, colonne formule récente) — dépend de la vue/section sur
+// laquelle le widget est branché côté Grist. fetchTable('Annuaire') (même
+// mécanisme déjà utilisé et fiable pour toutes les tables de référence
+// ci-dessous, avec l'accès 'full' déclaré dans grist.ready()) renvoie
+// TOUJOURS la table complète, sans cette incertitude.
+window.grist.onRecords(debounce(async () => {
   const requestId = recordsSequencer.next();
   try {
-    const rows = Array.isArray(records) ? records : (records?.records || []);
-    console.log('[GRIST] Enregistrements reçus:', rows.length);
-
-    const scopedRecords = rows.filter(isInScope);
-
-    const [maps, etabFlags] = await Promise.all([
+    const [annuaireTable, maps, etabFlags] = await Promise.all([
+      window.grist.docApi.fetchTable('Annuaire'),
       Promise.all(REFERENCE_TABLES.map(([table, field]) => fetchTable(table, field))),
       fetchEtablissementsFlags()
     ]);
     if (!recordsSequencer.isLatest(requestId)) return; // une invocation plus récente a déjà démarré, on jette ce résultat périmé
+
+    const rows = tableToRows(annuaireTable);
+    console.log('[GRIST] Enregistrements reçus:', rows.length);
+    const scopedRecords = rows.filter(isInScope);
 
     const newReferenceMaps = {};
     REFERENCE_TABLES.forEach(([table], index) => {
