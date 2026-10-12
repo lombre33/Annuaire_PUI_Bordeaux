@@ -1,5 +1,82 @@
 # Changelog
 
+## 1.16.0 — Les tâches rangées par action : le menu Tâches se range comme les compétences
+
+À la demande d'Antoine (« pourrais-tu faire pareil pour les tâches ? »), le menu **Tâches**
+est rangé en **groupes d'actions**, exactement comme le menu Compétences l'est par domaine
+depuis la 1.13.0 : une case par action, un détail dépliable, une recherche à deux niveaux.
+Le filtre **Actions** ne change pas. Les cartes, les tags et les données de Grist ne
+changent pas non plus, et **aucune colonne n'est à ajouter** : l'action d'une tâche se lit
+dans le **numéro** de son libellé.
+
+- **L'action d'une tâche, c'est le numéro avant le point.** « 1.3 Animer le réseau » est une
+  tâche de l'action 1, « 5.4 Veille » une tâche de l'action 5. Le numéro d'une action est le
+  début de son libellé : « Action 1 : … » (ou « Action 1: … »). Sont aussi compris « T1.3 »,
+  « Tâche n° 1.3 », « Action n° 1 », « A1 », « 1. … » et « 1 - … ». Le widget lit le libellé
+  affiché : le libellé corrigé quand il est rempli, le brut sinon. À numéro égal, la première
+  ligne d'`Actions` range les tâches.
+- **Un seul bouton, sept filtres.** Le menu « Tâches » range ses tâches par action (les actions
+  dans l'ordre de leur numéro, « Action 2 » avant « Action 10 », chacune repliée au départ).
+  À droite d'une action, le nombre de cartes qui ont **au moins une** de ses tâches. Une action
+  qui n'a aucune tâche ne figure pas dans le menu.
+- **« Sans action » en dernier.** Une tâche sans numéro, ou dont le numéro ne correspond à
+  aucune action, est rangée sous « Sans action », pour que ses personnes restent trouvables.
+  La console liste ses identifiants de ligne (`[REFS] Taches: n ligne(s) sans regroupement pour
+  macroTaches…`) : la numéroter dans Grist, puis recharger.
+- **Le même fonctionnement que les compétences.** Cocher une action coche toutes ses tâches ;
+  la flèche déplie le détail, la case de l'action est à moitié cochée quand une partie
+  seulement l'est ; un seul ensemble de tâches cochées (tout est un OU dans le menu, ET avec les
+  autres filtres) ; le badge du bouton compte une action entière pour **un** ; à l'ouverture,
+  les actions et les tâches cochées passent en tête ; une étiquette de tâche cliquée sur une
+  carte coche cette tâche. La recherche (« Action ou tâche… ») trouve une action comme une
+  tâche, et un numéro aussi : « 2.1 » retrouve la tâche, « action 2 » l'action et toutes ses
+  tâches.
+- **Le filtre Actions ne change pas.** Il reste une liste à plat, qui filtre sur les actions
+  inscrites sur les cartes (`BDD.Actions`) ; il se cumule (ET) avec le menu Tâches, sans que
+  l'un coche l'autre. Ce ne sont pas les mêmes personnes : participer à une action n'est pas
+  avoir l'une de ses tâches.
+- **Sans numéro, le menu reste à plat.** Si aucune tâche ne peut être rangée (aucune action
+  numérotée, aucune tâche numérotée, ou aucun numéro en commun), le menu Tâches reste une liste
+  à plat, comme avant, sans bandeau : la console dit pourquoi (`[REFS] Taches: aucune ligne
+  n'est rattachée à une action pour macroTaches (n sur m ont un numéro, k action(s) en ont
+  un) : le menu reste à plat.`). Son infobulle et son champ de recherche reprennent alors les
+  textes par défaut (« Rechercher dans Tâches… »), qui ne parlent pas d'actions.
+- **Les nombres dans l'ordre, dans tous les menus.** `compareLabels()` trie désormais les
+  nombres comme des nombres : « 1.2 » avant « 1.10 », « Action 2 » avant « Action 10 », et
+  aussi « GT 2 » avant « GT 10 » dans les autres menus. Rien d'autre ne change dans l'ordre
+  alphabétique.
+- **Le formulaire de modification de fiche** range aussi les tâches par action (la liste des
+  actions reste à plat), sans autre changement : la relecture avant/après et l'écriture sont
+  ceux de la 1.12.0.
+- **Pour les développeurs.** `constants.js` : « Actions des tâches » (`macroTaches`) est un
+  regroupement de `Taches` déclaré par `groups: 'taches'`, `fallback: 'Sans action'` et
+  `numberedIn: 'actions'` (le groupe d'une ligne se déduit du numéro de son libellé, pas d'une
+  colonne) ; `grouping: 'macroTaches'` sur « Tâches » ; l'infobulle et le champ de recherche
+  d'un menu rangé par groupe sont ceux de son regroupement (`hint`, `placeholder` passent de
+  « Compétences » à `macro`). `grist-data.js` : `taskActionNumber()`, `actionNumber()`,
+  `completeGroupMap()` déduit le groupe des numéros sans relire de table (une lecture ratée de
+  `Taches` ou d'`Actions` garde donc les libellés précédents). `render.js` : `groupingWording()`.
+  Le composant de la 1.13.0 (`menuGroups()`, `buildGroupedMenu()`, `toggleFilterGroup()`)
+  sert tel quel : aucun nouveau module, aucune table créée, aucune colonne lue de plus.
+- **Documentation et captures.** Le guide utilisateur gagne la section « Actions et tâches », la
+  maintenance les règles de numérotation des libellés (et leurs symptômes), le guide développeur
+  le regroupement par numéros, `TESTING.md` (section 3, spécifique Tâches par action),
+  `specs.md` et `grist_structure.txt` suivent. Le jeu de démonstration numérote ses actions et
+  ses tâches (« Action 1: … », « 1.1 … », une tâche sans numéro) : une capture nouvelle montre
+  le menu Tâches, et les autres sont régénérées, les libellés d'actions et de tâches des cartes
+  portant leur numéro.
+- **Tests** : 622 tests (dont 213 dans un vrai navigateur, optionnels sans Playwright) contre
+  555 (dont 187) avant ce lot. Les tests du rangement par numéros couvrent chaque forme de
+  libellé (positives et négatives), les actions qui se partagent un numéro, l'action 0, le repli
+  « Sans action », les trois cas de menu à plat et la console, les lectures en panne ; dans
+  Chromium, le parcours complet du menu (action entière, détail, case partielle, OU et ET,
+  nombres, recherche d'une action, d'une tâche ou d'un numéro, étiquette de carte,
+  Réinitialiser, données qui changent dans Grist, clavier, aucun contrôle sans nom accessible
+  dans le menu ouvert, formulaire de profil) et la tenue du menu de 280 à 768 px sur des noms
+  d'action très longs. Contrôle négatif : 39 modifications du code ont été essayées une à une ;
+  les tests en ont détecté 38 d'emblée et la dernière (un libellé comme « 12 réunions » pris
+  pour une tâche de l'action 1) après l'ajout de tests que ce contrôle a montrés manquants.
+
 ## 1.15.0 — Le mode admin, et la modification de fiche fidèle à la maquette
 
 Deux choses dans cette version, toutes deux demandées par Antoine le 12 octobre 2026 :

@@ -358,3 +358,160 @@ test('selectionCount counts a skill written under two domains once', () => {
   assert.equal(selectionCount(new Set(['Gestion']), groups), 1, 'le domaine Pilotage est complet, Gestion n\'est pas recomptée à part');
   assert.equal(selectionCount(new Set(['Droit', 'Gestion']), groups), 2, 'Achats et Pilotage entiers');
 });
+
+// ===== Tâches et actions : le même menu par groupe, pour les tâches =====
+// Les actions rangent le menu Tâches comme les domaines rangent le menu Compétences :
+// cocher une action coche toutes ses tâches. Le filtre Actions, lui, reste un menu à plat.
+
+const tachesFilter = FILTERS.find(filter => filter.key === 'taches');
+
+// Les libellés d'une table Taches : id → tâche, id → action (le repli « Sans action » est
+// déjà posé, comme le fait loadDirectory d'après les numéros).
+const RELECTURE = '1.1 Relecture';
+const RAPPEL = '1.2 Rappel vaccinal';
+const INSPECTION = '2.1 Inspection';
+const CARTOGRAPHIE = '2.2 Cartographie';
+const VACCINATION = 'Action 1: Vaccination';
+const AUDIT = 'Action 2: Audit';
+const TASKS = {
+  taches: { 1: RELECTURE, 2: RAPPEL, 3: INSPECTION, 4: 'Veille', 5: CARTOGRAPHIE },
+  macroTaches: { 1: VACCINATION, 2: VACCINATION, 3: AUDIT, 4: 'Sans action', 5: AUDIT }
+};
+
+test('the filter bar has no filter of its own for the actions of the tasks: they are groups of the tasks menu', () => {
+  const state = createEmptyFilterState();
+  assert.ok(!('macroTaches' in state));
+  assert.ok(!FILTERS.some(filter => filter.key === 'macroTaches'));
+  assert.equal(tachesFilter.grouping, 'macroTaches', 'le menu Tâches connaît son regroupement');
+  assert.equal(FILTERS.find(filter => filter.key === 'actions').grouping, undefined, 'le filtre Actions reste à plat');
+});
+
+test('ticking an action keeps the contacts with at least one task in it', () => {
+  const contacts = [
+    { nom: 'A', Taches: ['L', 1, 2] },
+    { nom: 'B', Taches: ['L', 3, 1] },
+    { nom: 'C', Taches: ['L', 4] },
+    { nom: 'D', Taches: ['L'] },
+    { nom: 'E', Taches: ['L', 5] }
+  ].map(contact => enrich(contact, TASKS));
+  const groups = menuGroups(tachesFilter, TASKS);
+  assert.deepEqual(groups.map(group => group.label), [VACCINATION, AUDIT, 'Sans action']);
+
+  groups.forEach(group => {
+    const activeFilters = createEmptyFilterState();
+    toggleGroup(activeFilters.taches, group.values);
+    assert.deepEqual(names(filterContacts(contacts, activeFilters, '')),
+      names(contacts.filter(contact => contact.labels.macroTaches.includes(group.label))),
+      `cocher « ${group.label} » donne les contacts de cette action, ni plus ni moins`);
+  });
+  assert.deepEqual(names(contacts.filter(contact => contact.labels.macroTaches.length === 0)), ['D'], 'sans tâche, aucune action');
+});
+
+test('actions add up (OU) with single tasks, the whole combines (ET) with the other filters, and the skills menu is a filter of its own', () => {
+  const contacts = [
+    { nom: 'A', labels: { taches: [RELECTURE, RAPPEL], competences: ['Oncologie'] } },
+    { nom: 'B', labels: { taches: [INSPECTION, RELECTURE], competences: ['Divers'] } },
+    { nom: 'C', labels: { taches: ['Veille'], competences: ['Oncologie'] } },
+    { nom: 'D', labels: { taches: [CARTOGRAPHIE], competences: ['Oncologie'] } }
+  ];
+  const activeFilters = createEmptyFilterState();
+  toggleGroup(activeFilters.taches, [INSPECTION, CARTOGRAPHIE]); // l'action 2
+  toggleGroup(activeFilters.taches, ['Veille']); // « Sans action »
+  assert.deepEqual(names(filterContacts(contacts, activeFilters, '')), ['B', 'C', 'D'], 'OU entre deux actions');
+
+  activeFilters.taches.add(RELECTURE); // une tâche seule, d'une autre action
+  assert.deepEqual(names(filterContacts(contacts, activeFilters, '')), ['A', 'B', 'C', 'D']);
+
+  activeFilters.competences.add('Oncologie');
+  assert.deepEqual(names(filterContacts(contacts, activeFilters, '')), ['A', 'C', 'D'], 'ET avec le menu Compétences');
+});
+
+test('computeFilterCounts counts a contact once per action, whatever the number of its tasks in that action', () => {
+  const contacts = [
+    { nom: 'A', labels: { macroTaches: [VACCINATION], taches: [RELECTURE, RAPPEL] } },
+    { nom: 'B', labels: { macroTaches: [VACCINATION, AUDIT], taches: [RELECTURE, INSPECTION] } }
+  ];
+  const counts = computeFilterCounts(contacts, createEmptyFilterState(), '', undefined);
+  assert.deepEqual(counts.macroTaches, { [normalize(VACCINATION)]: 2, [normalize(AUDIT)]: 1 });
+  assert.equal(counts.taches[normalize(RELECTURE)], 2);
+});
+
+test('the count of an action ignores the tasks ticked in its own menu, but not the other filters, the search or the scope', () => {
+  const contacts = [
+    { nom: 'Alice', labels: { macroTaches: [VACCINATION], taches: [RELECTURE], instances: ['CME'] }, etablissement_fondateur: true },
+    { nom: 'Bob', labels: { macroTaches: [VACCINATION, AUDIT], taches: [RELECTURE, INSPECTION], instances: ['COVIRIS'] }, etablissement_partenaire: true },
+    { nom: 'Chloe', labels: { macroTaches: [AUDIT], taches: [INSPECTION], instances: ['CME'] }, etablissement_fondateur: true }
+  ];
+  const [vaccination, audit] = [normalize(VACCINATION), normalize(AUDIT)];
+  const scope = { fondateur: true, partenaire: true };
+  const activeFilters = createEmptyFilterState();
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).macroTaches, { [vaccination]: 2, [audit]: 2 });
+
+  activeFilters.taches.add(RELECTURE);
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).macroTaches, { [vaccination]: 2, [audit]: 2 },
+    'cocher une tâche du menu ne change pas le nombre de cartes de son action');
+
+  activeFilters.instances.add('CME');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).macroTaches, { [vaccination]: 1, [audit]: 1 }, 'autre filtre');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, 'chlo', scope).macroTaches, { [audit]: 1 }, 'recherche');
+  assert.deepEqual(computeFilterCounts(contacts, createEmptyFilterState(), '', { fondateur: true, partenaire: false }).macroTaches,
+    { [vaccination]: 1, [audit]: 1 }, 'interrupteur');
+});
+
+test('menuGroups ranges the tasks by action: actions in numeric order, « Sans action » last, tasks in numeric order in each', () => {
+  assert.deepEqual(menuGroups(tachesFilter, TASKS), [
+    { label: VACCINATION, values: [RELECTURE, RAPPEL] },
+    { label: AUDIT, values: [INSPECTION, CARTOGRAPHIE] },
+    { label: 'Sans action', values: ['Veille'] }
+  ]);
+});
+
+test('menuGroups puts action 10 after action 2 and task 1.10 after task 1.2, not between 1 and 2', () => {
+  const groups = menuGroups(tachesFilter, {
+    taches: { 1: '10.1 Évaluation', 2: '2.1 Pilotage', 3: '2.10 Clôture', 4: '2.2 Suivi', 5: '1.1 Cadrage', 6: 'Veille' },
+    macroTaches: {
+      1: 'Action 10: Évaluation', 2: 'Action 2: Pilotage', 3: 'Action 2: Pilotage', 4: 'Action 2: Pilotage', 5: 'Action 1: Cadrage', 6: 'Sans action'
+    }
+  });
+  assert.deepEqual(groups, [
+    { label: 'Action 1: Cadrage', values: ['1.1 Cadrage'] },
+    { label: 'Action 2: Pilotage', values: ['2.1 Pilotage', '2.2 Suivi', '2.10 Clôture'] },
+    { label: 'Action 10: Évaluation', values: ['10.1 Évaluation'] },
+    { label: 'Sans action', values: ['Veille'] }
+  ]);
+});
+
+test('menuGroups files a task with no action under « Sans action », whatever its spelling, and keeps that group last', () => {
+  const groups = menuGroups(tachesFilter, {
+    taches: { 1: 'Alpha', 2: 'Beta', 3: 'Gamma' },
+    macroTaches: { 1: 'sans action', 2: 'Action 1: Zèbre' } // la ligne 3 n'est pas classée du tout
+  });
+  assert.deepEqual(groups, [
+    { label: 'Action 1: Zèbre', values: ['Beta'] },
+    { label: 'sans action', values: ['Alpha', 'Gamma'] }
+  ]);
+});
+
+test('menuGroups leaves the tasks menu flat when no task is tied to an action, and groups only once one is', () => {
+  assert.equal(menuGroups(tachesFilter, { taches: { 1: 'Relecture' }, macroTaches: {} }), null, 'aucun numéro en commun : menu plat');
+  assert.equal(menuGroups(tachesFilter, { taches: { 1: 'Relecture' } }), null, 'aucune lecture des actions');
+  assert.equal(menuGroups(tachesFilter, { taches: {}, macroTaches: {} }), null);
+  assert.deepEqual(menuGroups(tachesFilter, { taches: { 1: RELECTURE }, macroTaches: { 1: VACCINATION } }),
+    [{ label: VACCINATION, values: [RELECTURE] }]);
+});
+
+test('selectionCount counts a whole action once, like a whole domain', () => {
+  const groups = menuGroups(tachesFilter, TASKS);
+  assert.equal(selectionCount(new Set([INSPECTION, CARTOGRAPHIE]), groups), 1, 'l\'action 2 entière');
+  assert.equal(selectionCount(new Set([CARTOGRAPHIE]), groups), 1, 'une tâche seule');
+  assert.equal(selectionCount(new Set([INSPECTION, CARTOGRAPHIE, 'Veille', RELECTURE]), groups), 3, 'deux actions entières et une tâche');
+});
+
+test('pruneStaleFilters drops a ticked task that no longer exists, and has no action selection to purge', () => {
+  const activeFilters = createEmptyFilterState();
+  activeFilters.taches.add('Ancienne tâche');
+  activeFilters.taches.add(RELECTURE);
+  const pruned = pruneStaleFilters(activeFilters, TASKS);
+  assert.deepEqual([...pruned.taches], [RELECTURE]);
+  assert.ok(!('macroTaches' in pruned));
+});

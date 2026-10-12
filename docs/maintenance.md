@@ -1,6 +1,6 @@
 # Maintenance
 
-Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.15.0**.
+Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.16.0**.
 
 Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [documentation développeur](developpeurs.md), [sécurité](securite.md).
 
@@ -47,7 +47,7 @@ Une personne n'est affichée que si **toutes** les conditions suivantes sont vra
 
 Côté écran, les interrupteurs **Fondateurs** et **Partenaires** affinent ensuite l'affichage ([guide utilisateur](utilisateurs.md#fondateurs-et-partenaires)). Le schéma complet des règles est dans la [documentation développeur](developpeurs.md#règles-daffichage).
 
-Quatre précisions sur la version 1.15.0 :
+Quatre précisions sur la version 1.16.0 :
 
 - L'établissement vient de la référence `Etablissement`, résolue par identifiant de ligne. L'ancienne colonne calculée `Etablissement2` n'est plus utilisée depuis la 1.8.0, et deux lignes d'`Etablissements` de même acronyme ne se confondent plus.
 - **Les deux accords sont indépendants.** Valider un établissement (`ok_pour_apparaitre`) ne fait pas apparaître une personne qui n'a pas accepté, et une personne qui a accepté n'apparaît pas tant que son établissement n'est pas validé. Seul « coché » vaut accord.
@@ -100,6 +100,15 @@ Le widget modifie le prénom, le nom, la fonction, le téléphone, le rôle dans
 - Le domaine d'une personne se déduit de ses compétences : une personne sans compétence n'a aucun domaine, et deux compétences d'un même domaine ne la comptent qu'une fois dans ce domaine.
 - La colonne `Comptetences_macr` de `BDD` n'est pas lue.
 
+**Tâches et actions.** Les tâches d'une personne sont une liste de références vers la table `Taches`. Aucune colonne ne relie une tâche à son action : c'est le **numéro** au début du libellé de la tâche qui le fait, et il range le menu **Tâches** par action (on y coche une action entière ou une tâche). Il n'y a rien à ajouter dans Grist, mais la façon d'écrire les libellés compte.
+
+- Une tâche s'écrit **« n.m Libellé »**, où *n* est le numéro de son action : « 1.3 Animer le réseau » est une tâche de l'action 1, « 5.4 Veille » une tâche de l'action 5. Le widget lit le numéro dans le libellé affiché, donc dans `Taches_corrige` quand il est rempli, dans `Taches` sinon. « T1.3 » et « Tâche n° 1.3 » sont aussi compris.
+- Une action s'écrit **« Action n : Libellé »**, avec le même numéro *n*, dans la table `Actions` (colonne `Actions_corrigees` ou `Actions`). « Action 1: … » est aussi compris, comme « Action n° 1 », « A1 », « 1. » et « 1 - ». Si deux actions portent le même numéro, c'est la première ligne de la table qui range les tâches.
+- Une tâche **sans numéro**, ou dont le numéro ne correspond à aucune action, est classée sous « Sans action », en fin de menu. La console liste alors ses identifiants de ligne (`[REFS] Taches: n ligne(s) sans regroupement pour macroTaches…`) : numérotez-la dans Grist, puis rechargez la page.
+- Si **aucune** tâche ne peut être rangée (aucune action numérotée, aucune tâche numérotée, ou aucun numéro en commun), le menu reste une liste à plat, sans bandeau : la console dit pourquoi (`[REFS] Taches: aucune ligne n'est rattachée à une action pour macroTaches (n sur m ont un numéro, k action(s) en ont un) : le menu reste à plat.`).
+- Renuméroter une tâche change son libellé : une sélection de filtre qui portait l'ancien libellé est retirée d'elle-même, comme pour toute valeur renommée. Renommer une action sans toucher à son numéro ne déplace aucune tâche.
+- Le filtre **Actions** n'est pas concerné : il reste une liste à plat, qui lit la colonne `Actions` de `BDD`. Une action sans tâche numérotée n'apparaît pas dans le menu Tâches, mais reste dans ce filtre.
+
 ## Les logos et le bandeau du bas
 
 Depuis la 1.14.0, les logos sont des **pièces jointes du document Grist** : le widget n'en contient aucun. Tout est facultatif, et le [guide utilisateur](utilisateurs.md#les-logos-et-le-bandeau-du-bas) montre le résultat. La mise en place (colonnes à créer, préparation des fichiers) est à l'étape 5 de [`GRIST_SETUP.md`](../GRIST_SETUP.md).
@@ -128,14 +137,14 @@ Après chaque changement de données (ajout, modification, import), vérifier le
 2. **Chaque carte a le logo ou la pastille de son établissement** (colonne `Etablissement` correctement remplie).
 3. **La console du navigateur** (F12), sur les lignes `[GRIST] Enregistrements reçus: N (contacts affichables : M)` et `[ETABLISSEMENT] …` : N est le nombre de lignes de la table, M celui des cartes possibles, et un message `[ETABLISSEMENT]` liste (vingt au plus) les identifiants de ligne des contacts qui ont un périmètre mais pas d'établissement. Un écart entre N et M peut venir de personnes qui n'ont pas accepté d'apparaître (la ligne `[CONSENTEMENT] n/m …` en donne le nombre), d'un établissement non validé, d'un statut « autres » ou d'une référence qui ne désigne plus aucune ligne : ces derniers cas ne sont pas détaillés.
 4. **Aucun bandeau rouge** sous la barre d'outils.
-5. **Le menu Compétences** : s'il montre des domaines et que le dernier s'appelle « Autres », des compétences n'ont pas de domaine (voir [Opérations courantes](#opérations-courantes-dans-grist)).
+5. **Les menus Compétences et Tâches** : si le menu Compétences montre des domaines et que le dernier s'appelle « Autres », des compétences n'ont pas de domaine ; si le menu Tâches montre des actions et que le dernier s'appelle « Sans action », des tâches n'ont pas de numéro d'action (voir [Opérations courantes](#opérations-courantes-dans-grist)).
 6. **« Ma présence »** : ouvert avec son propre compte (dont l'adresse figure dans `BDD.email`), le widget affiche le bandeau, la console dit `[IDENTITE] personne identifiée …` et la table `Annuaire_Sonde` est vide.
 7. **« ✎ Modifier »** : avec ce même compte, la carte de la personne porte « Votre fiche » et le bouton, et aucune autre carte n'en a ; avec un compte administrateur, aucune autre carte n'en a tant que le mode admin est éteint, et toutes les cartes affichées en ont un une fois le mode admin allumé ([`TESTING.md`](../TESTING.md), sections 13 et 16).
 8. **Les logos** : les logos des établissements sur les cartes, ceux des financeurs au centre de l'en-tête, ceux des fondateurs dans l'ordre voulu tout en bas, et aucune ligne `[LOGOS]` dans la console ([`TESTING.md`](../TESTING.md), section 14).
 
 ## Diagnostiquer un problème
 
-La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[REFS]` (entrées par catégorie de filtre, lectures échouées, compétences sans domaine), `[ETABLISSEMENT]` (contacts sans établissement), `[CONSENTEMENT]` (personnes masquées faute d'accord), `[IDENTITE]` (pourquoi la personne connectée n'est pas identifiée), `[PRESENCE]` (écriture refusée), `[PROFIL]` (fiche illisible ou écriture refusée), `[SCHEMA]` (types de colonnes illisibles) et `[LOGOS]` (jeton d'accès aux pièces jointes refusé, habillage impossible). Aucune de ces lignes ne contient de nom, d'adresse ni de jeton, hormis le message brut d'une erreur renvoyée par Grist. Quand un logo ne se charge pas, c'est le navigateur lui-même qui écrit dans la console « Failed to load resource » avec l'adresse de l'image, jeton compris : ne pas partager cette ligne.
+La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[REFS]` (entrées par catégorie de filtre, lectures échouées, compétences sans domaine, tâches sans action), `[ETABLISSEMENT]` (contacts sans établissement), `[CONSENTEMENT]` (personnes masquées faute d'accord), `[IDENTITE]` (pourquoi la personne connectée n'est pas identifiée), `[PRESENCE]` (écriture refusée), `[PROFIL]` (fiche illisible ou écriture refusée), `[SCHEMA]` (types de colonnes illisibles) et `[LOGOS]` (jeton d'accès aux pièces jointes refusé, habillage impossible). Aucune de ces lignes ne contient de nom, d'adresse ni de jeton, hormis le message brut d'une erreur renvoyée par Grist. Quand un logo ne se charge pas, c'est le navigateur lui-même qui écrit dans la console « Failed to load resource » avec l'adresse de l'image, jeton compris : ne pas partager cette ligne.
 
 | Symptôme | Cause probable | Que faire |
 |---|---|---|
@@ -178,6 +187,7 @@ La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[
 | La console dit `[LOGOS] Impossible d'afficher les logos : …` | Erreur inattendue en construisant l'habillage ; les cartes restent affichées | Transmettre la ligne au mainteneur |
 | Une section de tags manque sur une carte | La valeur liée n'a pas de libellé dans sa table de référence | Console : `[REFS] clé (Table): n entrées (k ligne(s) sans …)` ; renseigner le libellé |
 | Le menu Compétences est une liste à plat, sans domaines, ou ne montre que « Autres » | La colonne `Macro_competences` n'existe plus (bandeau « Colonne de libellé introuvable »), ou aucune compétence n'a de domaine | Rétablir la colonne, ou renseigner les domaines, puis recharger |
+| Le menu Tâches est une liste à plat, sans actions, ou ne montre que « Sans action » | Aucun libellé de tâche ne commence par un numéro « n.m », aucune action ne commence par « Action n », ou ces numéros ne se rejoignent pas | Numéroter les tâches et les actions comme indiqué dans [Opérations courantes](#opérations-courantes-dans-grist), puis recharger ; la ligne `[REFS] Taches` de la console donne les comptes |
 | Un établissement manque dans le filtre Établissement | Il n'est pas validé (`ok_pour_apparaitre`) | Le valider, puis recharger |
 | Une modification n'apparaît pas | Elle porte sur une table autre que celle des contacts | Recharger la page ([Limites connues](#limites-connues)) |
 | Un téléphone s'affiche sans son 0 ou dans un format étrange | La colonne est numérique : le widget rétablit le 0 d'un numéro de 9 chiffres et met en forme un numéro de 10 chiffres qui commence par 0 ; toute autre valeur est affichée telle quelle | Corriger la valeur dans Grist |
@@ -367,7 +377,8 @@ Une piste plus durable : le guide de contribution des widgets Grist.Gouv (juille
 - **Établissement sans acronyme.** Le libellé d'un établissement est son acronyme, ou son nom complet quand l'acronyme est vide. Le contact y est rattaché par l'identifiant de ligne de sa référence `Etablissement`, sans dépendre de ce libellé : un établissement sans acronyme s'affiche donc avec son nom complet.
 - **Script de l'API Grist.** `index.html` charge `grist-plugin-api.js` depuis `docs.getgrist.com`, sans version figée. Le charger depuis l'instance utilisée serait plus cohérent, mais cela ne se vérifie que dans un vrai document Grist : ce changement n'a pas été fait.
 - **Accès `full`, choisi délibérément.** Le widget voit tout le document, pas seulement l'annuaire. C'est un choix assumé, que des garde-fous doivent encadrer ([sécurité](securite.md#niveau-daccès-demandé-à-grist)).
-- **Un domaine se déduit des compétences.** Une personne sans compétence n'a aucun domaine : elle n'est comptée dans aucun domaine du menu Compétences.
+- **Un domaine se déduit des compétences.** Une personne sans compétence n'a aucun domaine : elle n'est comptée dans aucun domaine du menu Compétences. Il en va de même pour les actions du menu Tâches, qui se déduisent des tâches.
+- **L'action d'une tâche se lit dans son libellé.** Aucune colonne ne la porte : une tâche dont le libellé n'a pas la forme « n.m … », ou dont le numéro ne correspond à aucune action, est rangée sous « Sans action ». Renumérotée, une tâche change de libellé, donc de valeur de filtre.
 - **« Ma présence » et « ✎ Modifier » sont des verrous d'interface, pas une sécurité.** L'interrupteur n'agit que sur la fiche de la personne connectée et le bouton n'apparaît que sur sa carte (sur toutes les cartes affichées pour un administrateur en mode admin), mais la console du navigateur les contourne : seules les règles d'accès de Grist protègent vraiment `BDD`, y compris `email`, `Etablissement` et `perimetre` ([sécurité](securite.md#écritures-et-règles-daccès)). Les règles proposées dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) n'ont pas été essayées dans un vrai document : à tester sur une copie.
 - **« Ma présence » et la modification de fiche supposent des réglages dans Grist** ([`GRIST_SETUP.md`](../GRIST_SETUP.md)) et un compte qui peut modifier le document : un compte Lecteur n'a ni bandeau ni bouton. La personne n'est retrouvée que si l'adresse de son compte Grist figure dans `BDD.email` (casse et espaces ignorés). Si plusieurs lignes portent la même adresse, son choix de présence s'applique à toutes et le bandeau ne propose pas « Modifier mon profil » (chaque carte garde son bouton « ✎ Modifier »).
 - **Chaque ouverture laisse sans doute une trace dans l'historique du document** (création puis suppression d'une ligne de `Annuaire_Sonde`, avec l'adresse de la personne) ; qui peut la voir et combien de temps elle est conservée sont à vérifier dans l'instance ([sécurité](securite.md#écritures-et-règles-daccès)).

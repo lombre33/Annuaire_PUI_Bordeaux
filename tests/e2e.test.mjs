@@ -19,6 +19,7 @@ import {
 import {
   skip, reload, cardCount, waitForCards, waitForBanner, cardNames, resultCount, bannerText, withWidget
 } from './support/browser.mjs';
+import { groupedMenu, optionCounts } from './support/grouped-menu.mjs';
 
 // ===== Affichage nominal =====
 
@@ -202,23 +203,17 @@ test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ;
 // fixtures.mjs) : Cancérologie (Oncologie, Hématologie : Ana), Pharmacie (Pharmacovigilance :
 // Bob, partenaire) et Autres (Divers : Gina, la compétence que Macro_competences ne classe pas).
 
-const skillsFilter = page => page.locator('.filter[data-filter-key="competences"]');
-const domain = (page, label) => skillsFilter(page).locator(`.filter-group[data-value="${label}"]`);
-const domainBox = (page, label) => domain(page, label).locator('.group-option input');
-const skill = (page, label) => skillsFilter(page).locator('.filter-option', { hasText: label });
-const openSkills = page => skillsFilter(page).locator('.filter-button').click();
-const optionCounts = filter => filter.locator('.filter-option').evaluateAll(options =>
-  Object.fromEntries(options.map(option => [option.querySelector('.option-label').textContent,
-    option.querySelector('.option-count').textContent])));
-const domainCounts = page => skillsFilter(page).locator('.group-head').evaluateAll(heads =>
-  Object.fromEntries(heads.map(head => [head.querySelector('.option-label').textContent,
-    head.querySelector('.option-count').textContent])));
-const domainNames = page => skillsFilter(page).locator('.group-head .option-label').allTextContents();
-const visibleDomains = page => skillsFilter(page).locator('.filter-group').evaluateAll(groups =>
-  groups.filter(group => !group.hidden).map(group => group.dataset.value));
-const visibleSkills = page => skillsFilter(page).locator('.filter-option').evaluateAll(options =>
-  options.filter(option => option.getClientRects().length > 0).map(option => option.dataset.value));
-const badge = page => skillsFilter(page).locator('.filter-count');
+const skills = groupedMenu('competences');
+const skillsFilter = skills.filter;
+const domain = skills.group;
+const domainBox = skills.box;
+const skill = skills.item;
+const openSkills = skills.open;
+const domainCounts = skills.groupCounts;
+const domainNames = skills.groupNames;
+const visibleDomains = skills.visibleGroups;
+const visibleSkills = skills.visibleItems;
+const badge = skills.badge;
 
 test('le filtre Compétences propose le libellé corrigé de la table Competences et filtre dessus', { skip }, () =>
   withWidget({}, async ({ page }) => {
@@ -549,7 +544,9 @@ test('sans colonne Macro_competences : le bandeau le dit, le menu Compétences r
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
     assert.equal(await badge(page).textContent(), '1');
-    assert.equal(await skillsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Domaine ou compétence…');
+    assert.equal(await skillsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Rechercher dans Compétences…',
+      'plus de domaine à chercher : le champ n\'en parle plus');
+    assert.equal(await skillsFilter(page).locator('.filter-button').getAttribute('title'), null, 'ni l\'infobulle sur les domaines à cocher');
   });
 });
 
