@@ -70,10 +70,12 @@ Sans dépendance, un fichier de tests par module :
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 51
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 62
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
-Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
+Fondateurs/Partenaires, recherche, filtres et compteurs, menu Compétences rangé par
+domaine (case de domaine, détail replié, case partielle, recherche à deux niveaux,
+ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
 bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
 double clic, écriture refusée, personne sans fiche).
@@ -88,12 +90,13 @@ action, la fiche modifiée par un administrateur, le téléphone numérique ou t
 refus de Grist, un changement concurrent, une fiche supprimée, le double clic, Échap,
 un prénom piégé, le focus, la tabulation dans la fenêtre et l'affichage de 280 à 360px.
 
-`tests/responsive.test.mjs` y ajoute 15 scénarios sur la mise en page, de 280 à
+`tests/responsive.test.mjs` y ajoute 19 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
-d'outils, menus de filtres entièrement dans le cadre, cibles tactiles (écran
+d'outils, menus de filtres (le menu Compétences déplié compris) entièrement dans le
+cadre, cibles tactiles (écran
 tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
