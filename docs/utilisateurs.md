@@ -338,7 +338,7 @@ En bas de la fenêtre, un résumé dit où vous en êtes : « Aucune modificatio
 
 ### Ma photo de profil
 
-Quand le document Grist a une colonne `Avatar` dans `BDD` (c'est l'administrateur des données qui l'ajoute : [`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 6), le formulaire a une carte **Photo de profil**, sous le bloc d'identité. Sans cette colonne, la carte n'existe pas et rien d'autre ne change : les cartes gardent les initiales. La photo est **facultative** : personne n'est obligé d'en ajouter une.
+Quand le document Grist a une colonne `Avatar` dans `BDD` (c'est l'administrateur des données qui l'ajoute : [`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 6), le formulaire a une carte **Photo de profil**, sous le bloc d'identité. Sans cette colonne, la carte n'existe pas et rien d'autre ne change : les cartes gardent les initiales. La photo est **facultative** : personne n'est obligé d'en ajouter une. Le formulaire de « Créer ma fiche » (pour une personne qui n'a pas encore de fiche) n'a pas cette carte : la photo s'ajoute ensuite, depuis « Modifier mon profil ».
 
 ![Le formulaire « Modifier mon profil » après le choix d'une photo : la carte « Photo de profil » montre l'aperçu de la nouvelle photo, avec les boutons « Changer la photo » et « Retirer la photo » ; le pied de la fenêtre dit « 1 champ modifié »](images/photo-profil-formulaire.png)
 

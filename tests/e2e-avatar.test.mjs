@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sampleTables, withAvatars, withBranding, withIdentity, withSchema, ANA_EMAIL, IRIS_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
+import { sampleTables, withAvatars, withBranding, withIdentity, withSchema, ANA_EMAIL, IRIS_EMAIL, NEW_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
 import { reload, skip, waitForCards, withWidget } from './support/browser.mjs';
 import { FIRST_UPLOAD_ID, MISSING_FILE } from './support/fake-attachments.mjs';
 
@@ -1106,3 +1106,39 @@ async function closeAll(page) {
     await closed(page);
   }
 }
+
+test('« Créer ma fiche » n\'offre pas la photo, qui s\'ajoute ensuite : la fiche créée n\'a pas de colonne Avatar écrite, et « Modifier mon profil » a la carte', { skip }, () =>
+  withWidget({ tables: world(), user: NEW_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    const create = page.locator('#accountBar .account-create');
+    await create.waitFor();
+    await create.click();
+    await dialog(page).waitFor();
+    assert.equal(await heading(page).textContent(), 'Créer ma fiche');
+    assert.equal(await photoField(page).count(), 0, 'pas de carte « Photo de profil » à la création, même si BDD a la colonne Avatar');
+    assert.equal(await dialog(page).locator('.ident .avatar').textContent(), '+', 'le bloc d\'identité garde son signe « + », sans photo');
+    assert.equal(await dialog(page).locator('input[type="file"]').count(), 0);
+
+    await dialog(page).locator('#profile-prenom').fill('Zoé');
+    await dialog(page).locator('#profile-Etablissement').selectOption({ label: 'CHU de Bordeaux' });
+    await press(page, 'Relire ma fiche').click();
+    await headingIs(page, 'Relire avant de créer');
+    assert.equal(await dialog(page).locator('.avatar-zoom, .mark-avatar, .thumb').count(), 0, 'rien de la photo dans la relecture d\'une création');
+    await press(page, 'Créer ma fiche').click();
+    await closed(page);
+
+    const calls = await bddCalls(page);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].action, 'AddRecord');
+    assert.equal('Avatar' in calls[0].values, false, 'la création n\'écrit pas la colonne de la photo');
+    assert.equal((await tokenRequests(page)).filter(request => request.readOnly === false).length, 0, 'et n\'envoie aucun fichier : pas de jeton en écriture');
+
+    // La fiche existe : « Modifier mon profil » offre maintenant la photo.
+    const edit = page.locator('#accountBar .account-edit');
+    await edit.waitFor();
+    await edit.click();
+    await headingIs(page, 'Modifier mon profil');
+    await photoField(page).waitFor();
+    assert.equal(await photoField(page).getByRole('button', { name: 'Ajouter une photo' }).isVisible(), true);
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));

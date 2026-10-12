@@ -125,6 +125,17 @@ export const BOB_EMAIL = 'bob@u-bordeaux-montaigne.fr';
 export const IRIS_EMAIL = 'iris@chu-bordeaux.fr';
 export const ADMIN_EMAIL = 'admin@chu-bordeaux.fr';
 
+// Le document complété de la colonne facultative `email_affiche` de BDD : l'adresse que la carte montre
+// à la place de `email` quand elle n'est pas vide. Bob en a une (une boîte de service), les autres non.
+// NEW_EMAIL est une personne connectée qui n'a ni fiche dans BDD ni ligne dans ACL.
+export const BOB_SHOWN_EMAIL = 'contact@u-bordeaux-montaigne.fr';
+export const NEW_EMAIL = 'zoe.nouvelle@chu-bordeaux.fr';
+export function withShownEmail(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  copy.BDD.email_affiche = copy.BDD.id.map(id => (id === 2 ? BOB_SHOWN_EMAIL : ''));
+  return copy;
+}
+
 // Le document complété des deux tables que le widget lit pour identifier la
 // personne connectée (GRIST_SETUP.md) : ACL, et la table-sonde, vide au repos.
 export function withIdentity(tables = sampleTables()) {

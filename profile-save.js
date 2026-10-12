@@ -1,5 +1,6 @@
 // Enregistrer une fiche modifiée : relire la ligne de BDD, vérifier que la personne a
-// relu ce qui s'y trouve vraiment, puis écrire. Aucun accès au DOM ici.
+// relu ce qui s'y trouve vraiment, puis écrire. Créer la fiche d'une personne qui n'en a pas
+// (une ligne ajoutée à BDD, jamais une table). Aucun accès au DOM ici.
 //
 // Les modifications s'appliquent tout de suite, sans validation ni historique. Pour
 // qu'elles restent sûres :
@@ -178,7 +179,8 @@ export async function prepareReview(docApi, row, draft, { referenceMaps, etabFla
 // que saveProfile() vient d'envoyer, si elle était remplacée.
 export function unsavedLabels(review, saved, referenceMaps, { attachmentId = null } = {}) {
   const { Avatar: photo, ...others } = review.champs;
-  const labels = describeChanges(rebaseChanges(others, saved, referenceMaps, { admin: review.admin === true }).champs).map(line => line.label);
+  const who = { admin: review.admin === true, creating: review.creating === true };
+  const labels = describeChanges(rebaseChanges(others, saved, referenceMaps, who).champs).map(line => line.label);
   if (photo) {
     const now = avatarIdOf(saved.Avatar);
     const kept = photo.action === 'replace' ? attachmentId !== null && now === attachmentId : now === 0;
@@ -247,4 +249,79 @@ export async function saveProfile(docApi, review, { upload, log = console } = {}
     throw new ProfileSaveError(FAILURES[classifyWriteError(error)], error, { leftover: attachmentId });
   }
   return { status: 'saved', values, attachmentId };
+}
+
+// ===== Créer la fiche de la personne connectée =====
+
+// Les phrases dites à la personne quand sa fiche ne peut pas être créée.
+const CREATION_FAILURES = {
+  ...FAILURES,
+  denied: 'Grist a refusé la création : vos droits ne permettent pas d\'ajouter une fiche. Contactez un administrateur.',
+  other: 'La fiche n\'a pas pu être créée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
+  exists: 'Une fiche porte déjà votre adresse : rien n\'a été créé. Rechargez la page pour la retrouver.',
+  noEmailColumn: 'BDD n\'a pas de colonne « email » : la fiche ne pourrait pas être reliée à votre compte. Rien n\'a été créé. Contactez un administrateur.'
+};
+
+// Relit BDD et vérifie que la fiche peut y être créée : la table a une colonne « email » et aucune ligne
+// ne porte déjà cette adresse (créée entre-temps, dans un autre onglet ou par un administrateur).
+// Lève une ProfileSaveError.
+async function checkCanCreate(docApi, email, log) {
+  let table;
+  try {
+    table = await docApi.fetchTable(MAIN_TABLE);
+  } catch (error) {
+    log.error('[PROFIL] lecture de BDD impossible :', error);
+    throw new ProfileSaveError(FAILURES.read, error);
+  }
+  if (!('email' in table)) throw new ProfileSaveError(CREATION_FAILURES.noEmailColumn);
+  const mine = normalizeEmail(email);
+  if (!mine) throw new ProfileSaveError(CREATION_FAILURES.other);
+  if (tableToRows(table).some(row => normalizeEmail(row.email) === mine)) throw new ProfileSaveError(CREATION_FAILURES.exists);
+}
+
+// Prépare la relecture de la fiche qu'une personne veut créer : vérifie qu'elle n'existe pas déjà, ramène
+// le brouillon à ce qui sera écrit et en tire la carte « après ». Rien n'est écrit. `blank` : la fiche
+// vide (blankFiche, avec l'adresse du compte), `email` : l'adresse du compte, jamais celle du brouillon.
+// Renvoie la relecture : { creating, email, champs, values, lines, after, visibility, notice }.
+// Lève une ProfileSaveError.
+export async function prepareCreation(docApi, blank, draft, { email, referenceMaps, etabFlags, log = console }) {
+  await checkCanCreate(docApi, email, log);
+  const { champs, errors } = diffProfile(blank, draft, referenceMaps, { creating: true });
+  if (errors.length > 0 || Object.keys(champs).length === 0) {
+    throw new ProfileSaveError('Il n\'y a rien à relire : corrigez les champs signalés ou remplissez la fiche.');
+  }
+  const columnTypes = await readColumnTypes(docApi, MAIN_TABLE, { log });
+  const built = buildRowUpdate(champs, blank, columnTypes);
+  if (built.error) throw new ProfileSaveError(`Cette fiche ne peut pas être créée : ${built.error}.`);
+  const row = { ...blank, email: normalizeEmail(email) };
+  return {
+    creating: true,
+    email: row.email,
+    champs,
+    values: { email: row.email, ...built.values },
+    lines: describeChanges(champs),
+    after: previewOf(row, built.values, referenceMaps, etabFlags).after,
+    visibility: describeVisibility({ ...row, ...built.values }, referenceMaps, etabFlags),
+    notice: ''
+  };
+}
+
+// Ajoute la ligne de la relecture (prepareCreation) à BDD, en une seule action Grist. Elle porte l'adresse
+// du compte et ce que la personne a rempli ; ni le choix de présence (l'interrupteur « Ma présence » en
+// décide) ni le périmètre (l'affaire de Grist). Renvoie { status: 'created', rowId } ; lève une
+// ProfileSaveError, sans rien écrire, si une fiche porte déjà l'adresse.
+export async function createProfile(docApi, review, { log = console } = {}) {
+  if (review?.creating !== true || !review.email || Object.keys(review.champs).length === 0) {
+    throw new ProfileSaveError('Aucune fiche à créer.');
+  }
+  await checkCanCreate(docApi, review.email, log);
+  let added;
+  try {
+    added = await docApi.applyUserActions([['AddRecord', MAIN_TABLE, null, review.values]]);
+  } catch (error) {
+    log.error('[PROFIL] création impossible :', error);
+    throw new ProfileSaveError(CREATION_FAILURES[classifyWriteError(error)], error);
+  }
+  const rowId = added?.retValues?.[0];
+  return { status: 'created', rowId: Number.isInteger(rowId) ? rowId : null };
 }

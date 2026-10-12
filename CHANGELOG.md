@@ -24,6 +24,8 @@ n'a pas la carte « Photo de profil ». Aucune table n'est créée.
   prépare, « Préparation de l’image… » : les deux boutons et « Relire » attendent, sans que le focus du
   clavier se perde. Choisir une photo puis la retirer, quand on n'en avait pas, ne change rien. Une
   administratrice en mode admin change ou retire la photo de n'importe qui, comme le reste de la fiche.
+  Le formulaire de « Créer ma fiche » (1.18.0) n'a pas cette carte : la photo s'ajoute ensuite, depuis
+  « Modifier mon profil » (`afterCreation` dans `PROFILE_FIELDS`).
 - **À la relecture.** Sur la carte « Après », la photo a un anneau vert et la pastille « photo ajoutée » (ou
   « photo modifiée ») ; un retrait a un anneau rouge et la pastille « photo retirée ». La ligne « Photo de
   profil » du détail montre la photo actuelle, une flèche, puis la nouvelle : deux miniatures qu'un clic
@@ -124,27 +126,28 @@ profil ». La démonstration a une option `?photos` (six visages inventés, part
 
 ### Tests
 
-**888 tests** (dont 319 dans un vrai navigateur, optionnels sans Playwright) contre 800 (dont 283) à
-la sortie de la 1.17.2.
+**899 tests** (dont 322 dans un vrai navigateur, optionnels sans Playwright) contre 808 (dont 285) à
+la sortie de la 1.18.0.
 
-- *Le brouillon* (`tests/profile.test.mjs`, 16 de plus) : la photo en tête du formulaire avec l'identifiant de la
+- *Le brouillon* (`tests/profile.test.mjs`, 17 de plus) : la photo en tête du formulaire avec l'identifiant de la
   pièce jointe actuelle (0 sans photo, quelle que soit la forme d'une cellule vide), seulement quand `BDD` a la
   colonne ; une photo laissée telle quelle n'est pas un changement ; une nouvelle photo remplace, 0 retire (rien à
   retirer : rien) ; le brouillon ne peut jamais viser une autre pièce jointe du document ; la relecture suit une
-  photo changée dans Grist, un retrait déjà fait par un autre, un remplacement après un retrait.
+  photo changée dans Grist, un retrait déjà fait par un autre, un remplacement après un retrait ; une fiche qu'on
+  crée n'a pas la photo, même quand `BDD` a la colonne.
 - *L'écriture* (`tests/profile-save.test.mjs`, 19 de plus) : l'envoi seulement après les vérifications et pour un
   remplacement, la fiche relue après l'envoi, le fichier laissé quand la fiche a changé ou que l'écriture est
   refusée, une seule action atomique (`['L', identifiant]` ou `['L']`), un envoi refusé qui n'écrit rien, une
   colonne qui n'est pas de pièces jointes, l'ajout et le retrait par une administratrice, la vérification de la
   photo après l'écriture.
 - *L'image et l'envoi* (`tests/image-prep.test.mjs` 4, `tests/upload.test.mjs` 2, `tests/attachments.test.mjs` 1,
-  `tests/constants.test.mjs` 1) : les règles de la photo, le carré au centre, la petite photo qui n'est pas
+  `tests/constants.test.mjs` 2) : les règles de la photo, le carré au centre, la petite photo qui n'est pas
   agrandie, le SVG refusé, le conseil de l'appelant dans les phrases d'échec (celui du logo inchangé), la première
   pièce jointe d'une cellule.
 - *La relecture et la source d'une photo* (`tests/preview.test.mjs` 4, `tests/avatar-ui.test.mjs` 3, nouveau) : la
   carte « Après » montre la nouvelle photo ou les initiales ; une photo ne vient que d'une pièce jointe de Grist ou
   d'une adresse `blob:` fabriquée par le navigateur.
-- *Dans un navigateur* (`tests/e2e-avatar.test.mjs`, nouveau : 36 tests) : la photo sur les cartes et ses
+- *Dans un navigateur* (`tests/e2e-avatar.test.mjs`, nouveau : 37 tests) : la photo sur les cartes et ses
   replis, l'agrandissement (souris, clavier, légende, échec de chargement), le bandeau (qui n'est pas repeint quand
   Grist renvoie les mêmes données), le formulaire, une photo choisie (carré, JPEG de 256 px, avant / après, une
   seule action), l'orientation et les métadonnées, JPG et WebP, le PNG transparent sur blanc, les refus avant
@@ -152,7 +155,8 @@ la sortie de la 1.17.2.
   abandonne la photo sans erreur), la relecture et ses miniatures (sans jeton, ou sans miniature, en mots), le
   retrait, l'administratrice, les échecs d'envoi (refus de Grist, en-têtes CORS absents, jeton refusé, écriture
   refusée, fiche changée) avec la phrase du fichier resté, la mise en page de 280 à 390 px (dont la fenêtre de la
-  photo, sans blanc dessous), les noms accessibles et le focus dans la fenêtre modale.
+  photo, sans blanc dessous), les noms accessibles, le focus dans la fenêtre modale et « Créer ma fiche » sans carte
+  photo (puis la carte dans « Modifier mon profil »).
 - *Documentation* (`tests/docs.test.mjs`, 2 de plus) : les phrases citées par le guide sont celles du code (refus
   de l'image, conseil de l'envoi) ; la démonstration `?photos` ajoute la colonne `Avatar` et six photos sans
   changer les cartes, et ne les sert qu'avec le jeton.
@@ -177,6 +181,55 @@ repeint à chaque relecture de Grist, la photo d'une carte de relecture qui devi
 récapitulatif sans miniature qui ne se lit plus en mots, « Relire » qui reste actif et un second choix de fichier
 qui s'ouvre pendant que l'image se prépare, une photo qui arrive après la fermeture de la fenêtre. Les 67 sont
 maintenant détectées.
+
+## 1.18.0 — « Créer ma fiche » et l'e-mail affiché
+
+Deux petites fonctions demandées par Antoine le 12 octobre 2026 (12 h 52), construites sur la fenêtre
+« Modifier mon profil » : son aspect (maquette v5) ne change pas. Une seule version, une seule PR.
+
+- **« Créer ma fiche ».** Un compte que Grist reconnaît mais dont l'adresse ne figure dans aucune ligne de
+  `BDD` (le bandeau disait « Compte absent de l'annuaire », ou « Administrateur ») a un bouton « Créer ma
+  fiche » ; une personne qui a une fiche ne le voit jamais, et il n'y en a pas quand `BDD` n'a pas de
+  colonne `email` (la fiche ne pourrait pas être reliée à la personne). Il ouvre la fenêtre de « Modifier mon
+  profil », avec trois différences : la personne **choisit son établissement** (obligatoire : sans lui la fiche
+  ne pourrait jamais s'afficher, et un établissement ne se change ensuite que par un administrateur) ;
+  l'adresse e-mail est **celle de son compte** et ne se saisit pas ; la relecture montre **une seule carte**,
+  sans repères (il n'y a pas de carte « avant »). « Créer ma fiche » ajoute **une ligne** à `BDD` en une seule
+  action Grist (`AddRecord`) : jamais une table. Elle porte l'adresse du compte (en minuscules) et ce que la
+  personne a rempli, rien d'autre : **ni `Accepte_apparaitre`** (la personne apparaît quand elle active
+  l'interrupteur du bandeau, qui s'affiche dès la création) **ni `perimetre`** (l'affaire de Grist : un
+  administrateur le renseigne). Une fiche créée n'apparaît donc dans l'annuaire qu'une fois ces deux choses
+  faites ; le bandeau et la relecture le disent, comme pour toute fiche masquée, et le nombre de contacts
+  affichés ne change pas à la création. Juste avant d'écrire, le widget relit `BDD` : si une fiche porte déjà
+  l'adresse (créée entre-temps, dans un autre onglet ou par un administrateur), rien n'est écrit.
+- **E-mail affiché.** La colonne facultative `BDD.email_affiche` (texte, déjà ajoutée par Antoine) : quand elle
+  n'est pas vide, la carte, son lien `mailto:` et la carte « Après » de la relecture montrent cette adresse **à
+  la place de** `email`. La fenêtre de modification propose le champ « E-mail affiché » à tout le monde (et à
+  l'administrateur qui modifie la fiche d'un autre) : facultatif, on peut le vider pour revenir à l'adresse du
+  compte, plusieurs fiches peuvent porter la même (une boîte de service), seule sa forme est vérifiée. Sans la
+  colonne, le champ n'est pas proposé. **L'adresse du compte reste la seule identité** : qui est connecté, les
+  droits, la recherche de la fiche d'une personne et l'unicité des adresses lisent `email`, jamais
+  `email_affiche`.
+- **Ce que ça demande à Grist.** (1) Une règle d'accès qui laisse une personne **ajouter une ligne à `BDD` dont
+  `email` est le sien** : la règle de `GRIST_SETUP.md` § 4 (« ajouter ou supprimer une ligne : les
+  administrateurs ») refuse la création, et le widget le dit (« Grist a refusé la création : vos droits ne
+  permettent pas d'ajouter une fiche… ») sans rien écrire. (2) Un périmètre pour toute fiche créée (un
+  administrateur, ou une formule de déclenchement sur `perimetre` pour les nouvelles lignes). (3) Les droits
+  d'écriture sur `email_affiche` comme sur les autres colonnes de la fiche. Non essayé dans un vrai Grist :
+  à tester sur une copie du document.
+- **Pour la passe de documentation** : `docs/utilisateurs.md` (« Pourquoi n'ai-je pas de bouton Modifier ? »,
+  bandeau d'un compte sans fiche, fenêtre de modification), `GRIST_SETUP.md` (colonne, règles d'accès :
+  « le widget ne crée ni ne supprime jamais de fiche » devient faux), `docs/securite.md` et
+  `docs/maintenance.md` (écritures dans `BDD`), `TESTING.md` (essai dans un vrai Grist).
+- **Ce qui ne change pas.** La relecture avant écriture, l'écriture en une seule action Grist, l'identité par
+  la table-sonde, la règle de visibilité (établissement validé et accord de la personne), la colonne
+  `nom_de_domaine` (jamais lue), aucune table créée.
+- **Tests.** 808 tests (285 dans un vrai navigateur, optionnels sans Playwright), 8 de plus qu'à la 1.17.2. Ciblés : `email_affiche` (lecture, saisie, carte, adresse du compte intacte), la fiche vide et le
+  formulaire de création, `createProfile` (une seule ligne, refus d'une fiche déjà là ou d'une écriture
+  refusée) et deux scénarios dans Chromium (création de bout en bout, e-mail affiché saisi puis vidé). Le
+  bandeau « Ma présence » de 320 à 840 px est mesuré avec le nouveau bouton, et sans lui quand `BDD` n'a pas
+  de colonne `email` (le bloc des boutons vide ne prend toujours aucune place).
+- **Revenir en arrière** : `git revert` de la fusion de cette version.
 
 ## 1.17.2 — Bandeau « Ma présence » : le texte garde 200 px, l'interrupteur passe dessous
 

@@ -1,7 +1,7 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
 import { CATEGORIES, TAG_GROUPS, FILTERS, CARD_LOGO } from './constants.js';
-import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, shownEmail, sortWithCheckedFirst, normalize } from './grist-data.js';
 import { el } from './dom.js';
 import { groupState, menuGroups, selectionCount } from './filters.js';
 import { createLogoImage, sizeLogo } from './branding-ui.js';
@@ -590,7 +590,7 @@ function buildCard(template, contact, onToggle, view = {}) {
   if (marks?.texts.etab?.after) markEtablissement(badge, marks.texts.etab);
   const email = card.querySelector('.email');
   if (marks?.texts.email) showTextChange(email, marks.texts.email);
-  else fillEmail(email, contact.email, Boolean(onToggle));
+  else fillEmail(email, shownEmail(contact), Boolean(onToggle));
 
   const tel = card.querySelector('.tel');
   const phone = formatPhone(contact.numero_de_telephone);

@@ -26,8 +26,12 @@ Depuis la 1.17.1, tout le texte des cartes fait 12 px au moins et les pastilles 
 sont plus hautes d'un tiers environ, un écart voulu avec la maquette v5 (audit UI/UX).
 Depuis la 1.17.2, dans un cadre de moins de 860 px, le texte du bandeau « Ma présence » garde 200 px au moins :
 l'interrupteur passe dessous au lieu de le serrer, et le bloc des boutons vide ne prend plus de place (audit UI/UX).
+Depuis la 1.18.0, une personne que Grist reconnaît mais qui n'a pas de ligne dans `BDD` peut créer sa fiche
+(bouton « Créer ma fiche » : une ligne ajoutée à `BDD`, jamais une table ; elle choisit son établissement, son e-mail
+est celui de son compte) et choisir une adresse e-mail à afficher sur sa carte à la place de celle de son compte
+(colonne facultative `email_affiche`, vidée elle revient à l'adresse du compte).
 Depuis la 1.19.0, une personne ajoute, change ou retire sa **photo de profil** (colonne `Avatar` de `BDD`, facultative,
 étape 6 de `GRIST_SETUP.md`) : elle remplace les initiales sur la carte, s'agrandit au clic, passe par la relecture avant et après,
 et le widget l'envoie lui-même à Grist, redessinée en carré de 256 px (JPEG, sans métadonnées ; envoi et règles d'accès non
 essayés dans un vrai Grist).
-888 tests (dont 319 dans un vrai navigateur, optionnels sans Playwright).
+899 tests (dont 322 dans un vrai navigateur, optionnels sans Playwright).

@@ -194,7 +194,7 @@ serveur, réponse illisible, jeton refusé), le fichier resté sans servir, le r
 pendant que la fenêtre est ouverte, Échap, le double clic, le clavier et les noms accessibles, la
 mise en page de 320 à 1280px et l'absence de tout appel réseau autre que l'API simulée.
 
-`tests/e2e-avatar.test.mjs` y ajoute 36 scénarios sur la photo de profil, avec des portraits servis par
+`tests/e2e-avatar.test.mjs` y ajoute 37 scénarios sur la photo de profil, avec des portraits servis par
 `tests/support/fake-attachments.mjs` : la photo à la place des initiales sur les cartes, dans le bandeau « Ma
 présence » et dans la liste des responsables (initiales sans photo, avec un fichier supprimé ou illisible, ou
 sans colonne `Avatar`), l'agrandissement au clic, à Entrée et à Espace et sa fermeture par chaque geste, la
@@ -204,7 +204,7 @@ tout envoi), l'attente pendant la préparation de l'image (préparation ralentie
 « Relire » ne font rien, fermer la fenêtre abandonne la photo sans erreur), la relecture (anneau, pastille,
 miniatures, une photo qui ne se charge pas faute de jeton), le retrait, l'ajout par une administratrice, les
 pannes de l'envoi (refus, jeton, réponse sans en-têtes d'autorisation entre sites), le fichier resté sans
-servir, le conflit pendant l'envoi, l'abandon d'une photo choisie, les cadres de 280 à 390px (dont la fenêtre
+servir, le conflit pendant l'envoi, l'abandon d'une photo choisie, « Créer ma fiche » sans carte photo, les cadres de 280 à 390px (dont la fenêtre
 qui agrandit la photo, sans blanc sous la légende) et les noms accessibles.
 
 `tests/responsive.test.mjs` y ajoute 23 scénarios (et 1 test sans navigateur : le jeu de

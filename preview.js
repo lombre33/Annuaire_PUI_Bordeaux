@@ -7,14 +7,14 @@
 // exactement ce que l'annuaire affichera une fois la fiche enregistrée.
 
 import { TAG_GROUPS } from './constants.js';
-import { displayName, enrich, formatPhone, labelsOf, normalize, text } from './grist-data.js';
+import { displayName, enrich, formatPhone, labelsOf, normalize, shownEmail, text } from './grist-data.js';
 
 // Les lignes de texte d'une carte qui peuvent changer, et comment on les lit.
 const TEXT_PARTS = {
   name: displayName,
   etab: contact => text(contact.etablissement_label),
   fonction: contact => text(contact.Fonction),
-  email: contact => text(contact.email),
+  email: shownEmail,
   tel: contact => formatPhone(contact.numero_de_telephone)
 };
 
