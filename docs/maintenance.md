@@ -185,3 +185,4 @@ Non engagées ; à décider par le propriétaire du dépôt.
 - Ajouter une licence : le dépôt est public et n'en déclare aucune ; par défaut, tous les droits sont réservés.
 - Fusionner les deux simulateurs de l'API Grist ([documentation développeur](developpeurs.md#données-et-captures-de-démonstration)).
 - Paginer ou charger progressivement les cartes si l'annuaire grossit beaucoup.
+- Compléter le [lexique du PUI](utilisateurs.md#lexique-du-pui) : Instances, Actions, Communautés, Tâches, Rôle PUI et périmètre attendent une définition.
