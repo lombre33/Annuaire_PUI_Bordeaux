@@ -17,7 +17,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sampleTables, withOptionalColumns, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME } from './fixtures.mjs';
+import { sampleTables, withoutOptionalColumns, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME } from './fixtures.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
@@ -148,7 +148,7 @@ test('exclut les contacts non éligibles : établissement « autres », non vali
     }
   }));
 
-test('affiche le contenu des cartes : initiales, fonction, e-mail, tags (libellés corrigés), sans téléphone ni rôle PUI', { skip }, () =>
+test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const ana = page.locator('.contact-card').first();
@@ -162,24 +162,33 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, tags (libell�
       ['Instances', ['CME']],
       ['Actions', ['Vaccination']],
       ['Compétences', ['Oncologie']],
-      ['Communautés', ['Réseau douleur']]
+      ['Communautés', ['Réseau douleur']],
+      ['Rôle PUI', ['Référent qualité']]
     ]);
-    assert.equal(await ana.locator('.tel.visible').count(), 0, 'BDD n\'a pas de colonne téléphone : aucune ligne vide');
-    assert.equal(await ana.locator('.tag-static').count(), 0, 'BDD n\'a pas de colonne Rôle PUI');
+    assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
+    assert.equal(await ana.locator('.tag-static').count(), 1, 'le tag Rôle PUI n\'est pas cliquable');
 
     const hugo = page.locator('.contact-card').nth(3);
     assert.equal(await hugo.locator('.email.visible').count(), 0, 'pas de ligne email vide');
     assert.equal(await hugo.locator('.card-tags').locator('.tag').count(), 0, 'id 999 introuvable : aucun tag fantôme');
   }));
 
-test('reprend le téléphone et le rôle PUI si ces colonnes reviennent dans BDD', { skip }, () =>
-  withWidget({ tables: withOptionalColumns(sampleTables()) }, async ({ page }) => {
+test('une carte sans téléphone ni rôle PUI n\'affiche aucune ligne vide', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    const gina = page.locator('.contact-card').nth(2);
+    assert.equal(await gina.locator('.tel.visible').count(), 0);
+    assert.equal(await gina.locator('.tag-static').count(), 0);
+  }));
+
+test('s\'affiche sans erreur si BDD n\'a pas les colonnes facultatives téléphone et rôle PUI', { skip }, () =>
+  withWidget({ tables: withoutOptionalColumns(sampleTables()) }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     const ana = page.locator('.contact-card').first();
-    assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
-    assert.deepEqual(await ana.locator('.tag-group').last().locator('.tag').allTextContents(), ['Référent qualité']);
-    assert.equal(await ana.locator('.tag-static').count(), 1, 'le tag Rôle PUI n\'est pas cliquable');
-    assert.equal(await page.locator('.contact-card').nth(1).locator('.tel.visible').count(), 0);
+    assert.equal(await ana.locator('.tel.visible').count(), 0);
+    assert.equal(await ana.locator('.tag-static').count(), 0);
+    assert.equal(await page.locator('#statusBanner').isHidden(), true);
+    assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
 test('affiche en texte brut un prénom contenant du HTML (aucune injection)', { skip }, () =>

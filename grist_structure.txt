@@ -37,9 +37,10 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
   email             : Text          facultative
   Fonction          : Text          facultative
 
-  Colonnes facultatives, absentes de BDD aujourd'hui : le widget les affiche
-  si elles reviennent, sans autre changement.
-  numero_de_telephone : Numeric     (téléphone de la carte)
+  Colonnes facultatives, rajoutées dans BDD sous ces noms : le widget les
+  affiche quand elles existent, et s'en passe sinon.
+  numero_de_telephone : Numeric     (téléphone de la carte ; le 0 initial qu'un
+                                     type Numeric fait perdre est rétabli)
   Role_dans_le_PUI    : Reference(Role_Dans_le_PUI)   (tag « Rôle PUI »)
 
 Tables de référence (id -> libellé, chargées via fetchTable)

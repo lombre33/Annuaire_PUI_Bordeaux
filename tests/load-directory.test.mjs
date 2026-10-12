@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadDirectory, DirectoryLoadError } from '../grist-data.js';
-import { sampleTables, withOptionalColumns, DEFAULT_CARD_NAMES } from './fixtures.mjs';
+import { sampleTables, withoutOptionalColumns, DEFAULT_CARD_NAMES } from './fixtures.mjs';
 
 // ===== loadDirectory : lecture de Grist → contacts affichables =====
 
@@ -153,18 +153,21 @@ test('loadDirectory falls back to the raw label with a console warning when only
   assert.ok(log.warnings.some(args => String(args[0]).includes('Actions_corrigees')));
 });
 
-test('loadDirectory works without the optional BDD columns (Fonction, email, phone, PUI role) and uses them when they come back', async () => {
-  const bare = sampleTables();
-  delete bare.BDD.Fonction;
-  delete bare.BDD.email;
-  const withoutOptional = await load(bare);
-  assert.equal(withoutOptional.contacts.length, 5);
-  assert.deepEqual(withoutOptional.issues, []);
-
-  const { contacts } = await load(withOptionalColumns(sampleTables()));
+test('loadDirectory reads the phone and the PUI role that BDD now holds', async () => {
+  const { contacts } = await load(sampleTables());
   assert.equal(contacts[0].numero_de_telephone, 556789012);
   assert.deepEqual(contacts[0].labels.role, ['Référent qualité']);
   assert.deepEqual(contacts[1].labels.role, []);
+});
+
+test('loadDirectory works without the optional BDD columns (Fonction, email, phone, PUI role): same contacts, no issue', async () => {
+  const bare = withoutOptionalColumns(sampleTables());
+  delete bare.BDD.Fonction;
+  delete bare.BDD.email;
+  const { contacts, issues } = await load(bare);
+  assert.equal(contacts.length, 5);
+  assert.deepEqual(issues, []);
+  assert.deepEqual(contacts.map(contact => contact.labels.role), contacts.map(() => []));
 });
 
 test('loadDirectory ignores Accepte_apparaitre for now: BDD still holds a formula that returns False for everyone', async () => {

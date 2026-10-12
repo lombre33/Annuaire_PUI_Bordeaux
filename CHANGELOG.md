@@ -29,9 +29,10 @@ aucune règle d'affichage : à données équivalentes, ce sont les mêmes contac
 - **Colonnes obligatoires** de BDD : `nom`, `prenom`, `Etablissement`,
   `perimetre` ; une colonne absente affiche un bandeau explicite au lieu d'un
   « 0 contact ». `email`, `Fonction`, `numero_de_telephone` et
-  `Role_dans_le_PUI` sont facultatives : BDD n'a plus de téléphone ni de rôle
-  PUI, la carte ne les affiche donc plus, et les reprendrait si ces colonnes
-  revenaient sous les mêmes noms.
+  `Role_dans_le_PUI` sont facultatives : absentes, la carte ne les affiche
+  simplement pas. Le téléphone et le rôle PUI, d'abord retirés de BDD, ont été
+  rajoutés sous les mêmes noms : la carte les affiche de nouveau (téléphone, tag
+  « Rôle PUI »).
 - **Colonnes introuvables signalées** : une colonne de visibilité d'Etablissements
   (`fondateur`, `partenaire`, `ok_pour_apparaitre`) absente provoque une erreur
   explicite, comme pour BDD, au lieu d'un annuaire vide. Si aucune colonne de
@@ -40,7 +41,7 @@ aucune règle d'affichage : à données équivalentes, ce sont les mêmes contac
   la colonne corrigée manque, le libellé brut est utilisé et la console avertit.
 - **Pas encore utilisée** : `Accepte_apparaitre` (aujourd'hui une formule qui
   renvoie toujours faux) n'influence pas l'affichage.
-- **Tests** : 97 tests (73 unitaires, 1 règle du projet, 23 dans un vrai
+- **Tests** : 99 tests (74 unitaires, 1 règle du projet, 24 dans un vrai
   navigateur). Le jeu de données `tests/fixtures.mjs` reproduit la structure BDD.
   Nouveaux : lecture des seules tables de la nouvelle structure, libellé
   corrigé prioritaire, colonnes obligatoires, facultatives ou introuvables,

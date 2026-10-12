@@ -33,6 +33,10 @@ export function sampleTables() {
       Taches: [['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L']],
       Competences: [['L', 1], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L']],
       perimetre: [['L', 1], ['L', 2], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L'], ['L', 1], ['L', 3], ['L', 1]],
+      // Colonnes facultatives, rajoutées dans BDD sous ces noms : Numeric (le 0
+      // initial est perdu) et Référence vers Role_Dans_le_PUI (0 = vide).
+      numero_de_telephone: [556789012, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      Role_dans_le_PUI: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       // Colonne de données à créer côté Grist ; aujourd'hui une formule « =False »
       // : elle ne doit donc pas (encore) influencer l'affichage.
       Accepte_apparaitre: [false, false, false, false, false, false, false, false, false, false]
@@ -71,12 +75,12 @@ export function sampleTables() {
   };
 }
 
-// BDD n'a plus de téléphone ni de rôle PUI ; si ces colonnes y reviennent le
-// widget doit les reprendre sans autre changement.
-export function withOptionalColumns(tables) {
+// Un document où les colonnes facultatives de BDD (téléphone, rôle PUI) n'existent
+// pas : le widget doit s'afficher sans elles, sans erreur ni ligne vide.
+export function withoutOptionalColumns(tables) {
   const copy = structuredClone(tables);
-  copy.BDD.numero_de_telephone = [556789012, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  copy.BDD.Role_dans_le_PUI = ['Référent qualité', 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  delete copy.BDD.numero_de_telephone;
+  delete copy.BDD.Role_dans_le_PUI;
   return copy;
 }
 

@@ -39,7 +39,7 @@ Sans dépendance, un fichier de tests par module :
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 23
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 24
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
 Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
