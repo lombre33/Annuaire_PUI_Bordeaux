@@ -66,7 +66,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Actions, Tâches, Communautés, GT, Compétences, Instances, Établissement** | Sept filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
 | **Réinitialiser** | Efface la recherche et décoche tous les filtres |
-| **Cartes** | Une carte par personne, trois par ligne, dans l'ordre de la liste des contacts dans Grist (sans tri) |
+| **Cartes** | Une carte par personne, trois par ligne, triées par nom de famille puis par prénom (ordre alphabétique) |
 | **Bandeau des fondateurs** (tout en bas de la page, sous les cartes) | Les logos des établissements fondateurs, le rond « France 2030 » et la phrase de financement ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Bouton « ✎ Modifier »** et mention **« Votre fiche »** (sous la fonction d'une carte, seulement si vous pouvez modifier cette fiche) | Ouvre le formulaire de modification de la fiche ([Modifier ma fiche](#modifier-ma-fiche)). La capture ci-dessus est celle d'un annuaire consulté sans être reconnu : elle n'a ni bandeau ni bouton |
 
@@ -102,18 +102,19 @@ Les logos de toutes ces captures sont **inventés**, comme le reste du jeu de d�
 
 **Quand un logo manque.** Le nom prend sa place : l'acronyme dans la pastille des cartes, le nom de la structure dans le bandeau du bas et chez les financeurs. L'annuaire reste utilisable. Cela arrive quand le fichier n'a pas été ajouté dans Grist, quand il a été supprimé ou n'est pas une image lisible, ou quand Grist ne donne pas accès aux pièces jointes : ce dernier cas touche **tous** les logos à la fois.
 
-![L'en-tête et les premières cartes quand aucun logo ne se charge : les noms des financeurs remplacent leurs logos et chaque carte porte la pastille de l'acronyme de son établissement (CHD, UDD, ISD)](images/sans-logos.png)
+![L'en-tête et les premières cartes quand aucun logo ne se charge : les noms des financeurs remplacent leurs logos et chaque carte porte la pastille de l'acronyme de son établissement (CHD, UDD, EDD)](images/sans-logos.png)
 
 Un logo absent ou mal affiché se corrige dans Grist, par l'administrateur des données ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 5, et [maintenance](maintenance.md#les-logos-et-le-bandeau-du-bas)). Les tables de logos ne préviennent pas l'annuaire quand on les modifie : après un changement de logo, rechargez la page.
 
 ## Rechercher une personne
 
-Tapez dans **Rechercher par nom ou prénom…** : les cartes se mettent à jour à chaque lettre.
+Tapez dans **Rechercher par nom ou prénom…** : les cartes se mettent à jour dès que vous marquez une courte pause dans la frappe (une fraction de seconde), et réapparaissent toutes aussitôt que vous videz le champ.
 
 ![Recherche « elise » : une seule carte, Élise Marchetti](images/recherche.png)
 
 - La recherche ignore les **majuscules** et les **accents** : « elise » trouve « Élise ».
-- Elle porte sur le nom **ou** le prénom, pas sur la fonction ni sur l'établissement (pour l'établissement, utilisez le filtre Établissement). Tapez l'un ou l'autre : « Élise Marchetti » ne donne aucun résultat, alors que « Élise » ou « Marchetti » trouvent la carte.
+- Elle porte sur le **prénom et le nom**, pas sur la fonction ni sur l'établissement (pour l'établissement, utilisez le filtre Établissement). Tapez l'un, l'autre ou les deux, dans l'ordre que vous voulez : « Élise », « Marchetti », « Élise Marchetti » et « Marchetti Élise » trouvent tous la carte, et quelques lettres de chaque mot suffisent (« eli mar »). Chaque mot tapé doit se trouver dans le prénom ou dans le nom : « Élise Garnier » ne trouve personne si nul ne porte ces deux mots.
+- Les **tirets, les apostrophes et les points** ne comptent pas, et « œ » s'écrit comme on le tape : « marie christine » trouve « Marie-Christine », « darcy » trouve « D'Arcy » et « coeur » trouve « Cœur ».
 - Elle se combine avec les filtres : seules les personnes qui satisfont les deux restent affichées.
 - **Réinitialiser** vide le champ.
 
@@ -237,9 +238,9 @@ Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, votre t
 
 ### Où cliquer
 
-![Le haut de l'annuaire de Camille Rousseau, personne fictive connectée : à droite de l'en-tête, le bandeau « Ma présence » avec l'interrupteur « Apparaître dans l'annuaire » et le bouton « Modifier mon profil », puis des cartes dont la sienne porte la mention « Votre fiche » et le bouton « ✎ Modifier » sous sa fonction](images/modifier-fiche-bouton.png)
+![La dernière rangée de cartes de l'annuaire de Camille Rousseau, personne fictive connectée : sa carte porte la mention « Votre fiche » et le bouton « ✎ Modifier » sous sa fonction, celle de Thomas Vidal, à côté, n'a pas de bouton](images/modifier-fiche-bouton.png)
 
-*Où cliquer : le bouton « Modifier mon profil » du bandeau « Ma présence » et, sur la carte de la personne connectée (la première ici), la mention « Votre fiche » et le bouton « ✎ Modifier » sous la fonction. Les deux autres cartes n'ont pas de bouton.*
+*Où cliquer : sur la carte de la personne connectée, la mention « Votre fiche » et le bouton « ✎ Modifier » sous la fonction (les cartes étant triées par nom, celle de Camille Rousseau est ici sur la dernière rangée). Les autres cartes n'ont pas de bouton. Quant au bouton « Modifier mon profil », c'est celui du bandeau « Ma présence », en haut à droite de la page ([Ma présence](#ma-présence--apparaître-ou-non)).*
 
 - **Sur une carte.** Le bouton **✎ Modifier** se trouve sous la fonction, sur les cartes que vous avez le droit de modifier. Sur la vôtre, la mention **Votre fiche** l'accompagne. Un administrateur qui a allumé son mode admin a un bouton sur toutes les cartes affichées ([Pour les administrateurs](#pour-les-administrateurs)).
 - **Dans le bandeau « Ma présence ».** Le bouton **Modifier mon profil** ouvre le même formulaire. Il est proposé même si votre carte n'apparaît pas dans l'annuaire (par exemple parce que vous avez retiré votre accord d'apparaître) : c'est alors le seul moyen d'ouvrir votre fiche. Si plusieurs fiches portent votre adresse, le bandeau ne le propose pas, car il ne saurait pas laquelle ouvrir : chaque carte garde alors son propre bouton.
@@ -312,7 +313,7 @@ Sous les cartes, le **Détail des changements** donne une ligne par champ modifi
 
 ### Valider, revenir en arrière ou abandonner
 
-![L'annuaire de Camille Rousseau juste après « Valider » : la fenêtre est fermée, sa carte porte la nouvelle fonction et le message « Vos modifications sont enregistrées. » est posé en bas de l'écran, sur les cartes](images/modifier-fiche-confirmation.png)
+![L'annuaire de Camille Rousseau juste après « Valider », la page descendue jusqu'à sa carte, qui est sur la dernière rangée : la fenêtre est fermée, sa carte porte la nouvelle fonction et le message « Vos modifications sont enregistrées. » est posé en bas de l'écran](images/modifier-fiche-confirmation.png)
 
 *Après « Valider » : la fenêtre se ferme, la carte est à jour et un message confirme l'enregistrement.*
 

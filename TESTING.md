@@ -16,7 +16,8 @@ node --test
 Sans dépendance, un fichier de tests par module :
 
 - `tests/grist-data.test.mjs` — décodage et formats des données Grist : `text`,
-  `normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
+  `normalize`, `normalizeForSearch` (œ, apostrophes, tirets, points, espaces),
+  `compareLabels`, `compareContacts` (l'ordre des cartes), `formatPhone`, `safeValues`, `tableToRows`,
   `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `refId`, `refLabel`, `isEmptyReference`,
   `resolveListItem`, `isInScope`, `createRequestSequencer`,
   `referenceMapsEqual`, `mailtoHref`.
@@ -26,11 +27,12 @@ Sans dépendance, un fichier de tests par module :
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
   libellé), `isEtablissementEligible`, `filterVisibleEstablishments`.
-- `tests/filters.test.mjs` — `filterContacts`, `pruneStaleFilters`,
+- `tests/filters.test.mjs` — `filterContacts` (dont la recherche « prénom nom », mot par
+  mot et dans n'importe quel ordre, et ses écritures tolérées), `pruneStaleFilters`,
   `computeFilterCounts` (dont les compteurs des domaines) et le menu rangé par
   domaine : `menuGroups`, `groupState`, `toggleGroup`, `selectionCount`.
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
-  (une lecture par table, aucune ancienne table lue, libellé corrigé
+  (une lecture par table, cartes triées par nom, aucune ancienne table lue, libellé corrigé
   prioritaire, tables indispensables illisibles, table de référence illisible,
   colonnes obligatoires, facultatives ou introuvables, annuaire vide expliqué,
   doublons d'acronymes, domaines des compétences).
@@ -91,10 +93,13 @@ Sans dépendance, un fichier de tests par module :
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 62
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 68
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
-(structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
-Fondateurs/Partenaires, recherche, filtres et compteurs, menu Compétences rangé par
+(structure `BDD`) : nombre de contacts et badge établissement de chaque carte, cartes triées
+par nom (même quand Grist envoie les lignes dans le désordre), interrupteurs
+Fondateurs/Partenaires, recherche (« prénom nom » dans les deux sens, noms composés, tirets,
+apostrophe, œ), attente de la frappe (une seule mise à jour pour quatre lettres tapées d'un coup,
+champ vidé sans attendre, « Réinitialiser » qui annule l'attente), filtres et compteurs, menu Compétences rangé par
 domaine (case de domaine, détail replié, case partielle, recherche à deux niveaux,
 ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
@@ -190,8 +195,23 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 ## 2. Recherche libre
 
 - [ ] Taper un nom existant (ex. 3 premières lettres) → seuls les contacts
-      correspondants restent.
+      correspondants restent, une fraction de seconde après la dernière lettre.
 - [ ] Recherche sur le prénom, pas seulement le nom.
+- [ ] **Prénom et nom ensemble** (1.15.1) : taper « prénom nom » d'une personne réelle
+      → sa carte ; le même couple dans l'autre ordre (« nom prénom ») → la même carte ;
+      quelques lettres de chacun (« pré nom ») → la même carte ; le prénom d'une personne
+      et le nom d'une autre → aucun résultat.
+- [ ] **Écritures tolérées** (1.15.1) : pour un nom composé réel (« Marie-Christine »),
+      taper la même chose avec une espace au lieu du tiret → la carte ; pour un nom avec
+      apostrophe (« D'Arcy »), taper sans apostrophe → la carte. À défaut de tels noms dans
+      le document, le contrôle se fait sur la copie de démonstration.
+- [ ] **Cartes triées** (1.15.1) : sans filtre, les cartes se lisent de A à Z par nom de
+      famille (puis prénom) ; ajouter un contact dans Grist, au bout de la table, le place
+      à sa lettre dans les secondes qui suivent, sans recharger la page.
+- [ ] **Frappe rapide** : taper six lettres d'un coup → la liste ne scintille pas et ne
+      s'affiche qu'à la fin de la frappe ; effacer le champ (Échap ou croix) → toutes les
+      cartes reviennent tout de suite ; cliquer « Réinitialiser » juste après avoir tapé →
+      le champ est vide et toutes les cartes sont là, rien ne se refiltre ensuite.
 - [ ] Recherche insensible à la casse (`DUPONT` = `dupont`).
 - [ ] **Recherche insensible aux accents** (ex. taper `ecole` doit matcher un
       nom contenant `École`, si un tel contact existe — sinon vérifier sur
