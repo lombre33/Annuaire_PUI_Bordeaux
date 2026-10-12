@@ -853,24 +853,36 @@ test('après une erreur, un nouvel essai réussi efface le message d\'erreur', {
     assert.equal(await isSwitchOn(page), true);
   }));
 
-test('une personne identifiée sans fiche dans BDD n\'a pas de bandeau, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: ADMIN_EMAIL }, async ({ page, logs }) => {
+test('une personne identifiée sans fiche dans BDD voit une mention sans interrupteur, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: 'inconnu@example.fr' }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
-    assert.equal(await accountBar(page).isHidden(), true);
+    await accountBar(page).waitFor();
+    assert.equal(await accountBar(page).locator('.account-name').textContent(), 'Compte absent de l\'annuaire');
+    assert.equal(await accountBar(page).locator('.account-avatar').textContent(), '?');
+    assert.equal(await accountBar(page).locator('.account-detail').textContent(),
+      'Connecté avec inconnu@example.fr : cette adresse ne figure pas dans l\'annuaire, il n\'y a donc pas de fiche à modifier.');
+    assert.equal(await presenceSwitch(page).isHidden(), true, 'aucune fiche, aucun choix de présence');
+    assert.equal(await accountBar(page).locator('.account-edit').isHidden(), true);
+    assert.equal(await accountBar(page).locator('.account-admin').isHidden(), true);
     const warning = (await identityLogs(logs)).find(line => line.includes('Aucune ligne de BDD'));
     assert.ok(warning, 'avertissement présent');
     assert.ok(!warning.includes('@'));
   }));
 
-test('BDD sans colonne email : la console l\'explique, pas de bandeau, annuaire intact', { skip }, () => {
+test('BDD sans colonne email : le bandeau accuse la configuration, la console l\'explique, annuaire intact', { skip }, () => {
   const tables = withIdentity();
   delete tables.BDD.email;
-  return withWidget({ tables, user: ANA_EMAIL }, async ({ page, logs }) => {
+  return withWidget({ tables, user: BOB_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
-    assert.equal(await accountBar(page).isHidden(), true);
+    await accountBar(page).waitFor();
+    assert.equal(await accountBar(page).locator('.account-name').textContent(), 'Fiche introuvable');
+    assert.equal(await accountBar(page).locator('.account-detail').textContent(),
+      'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.');
+    assert.equal(await presenceSwitch(page).isHidden(), true);
     assert.ok((await identityLogs(logs)).some(line => line.includes('colonne « email »')));
+    assert.deepEqual(await Promise.all(logs.errors), []);
   });
 });
 

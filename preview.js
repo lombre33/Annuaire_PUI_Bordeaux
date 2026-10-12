@@ -12,12 +12,14 @@ import { displayName, enrich, formatPhone, labelsOf, normalize, text } from './g
 // Les lignes de texte d'une carte qui peuvent changer, et comment on les lit.
 const TEXT_PARTS = {
   name: displayName,
+  etab: contact => text(contact.etablissement_label),
   fonction: contact => text(contact.Fonction),
+  email: contact => text(contact.email),
   tel: contact => formatPhone(contact.numero_de_telephone)
 };
 
 // Ce qui diffère entre deux cartes : { texts, tags }.
-//   texts  { name | fonction | tel → { before, after } } pour chaque ligne modifiée
+//   texts  { name | etab | fonction | email | tel → { before, after } } pour chaque ligne modifiée
 //   tags   { catégorie → { added, removed } } (des libellés) pour chaque catégorie de
 //          tags modifiée. Comparés à la casse et aux accents près, comme partout dans
 //          le widget : un libellé écrit autrement n'est pas un ajout.

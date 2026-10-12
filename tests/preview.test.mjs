@@ -20,8 +20,8 @@ async function directory() {
 }
 
 // Une carte réduite à ce que diffContacts() lit.
-const card = ({ prenom = 'Ana', nom = 'Martin', Fonction = '', numero_de_telephone = 0, labels = {} } = {}) =>
-  ({ prenom, nom, Fonction, numero_de_telephone, labels });
+const card = ({ prenom = 'Ana', nom = 'Martin', Fonction = '', numero_de_telephone = 0, email = '', etablissement_label = '', labels = {} } = {}) =>
+  ({ prenom, nom, Fonction, numero_de_telephone, email, etablissement_label, labels });
 
 // ===== diffContacts =====
 
@@ -155,4 +155,28 @@ test('previewOf does not change the row it is given', async () => {
   previewOf(original, values, referenceMaps, etabFlags);
   assert.deepEqual(original, snapshot);
   assert.deepEqual(values, valuesSnapshot);
+});
+
+test('diffContacts marks a new e-mail address and a new établissement, as lines of text', () => {
+  const before = card({ email: 'ana@chu.fr', etablissement_label: 'CHU' });
+  assert.deepEqual(diffContacts(before, card({ email: 'ana.martin@chu.fr', etablissement_label: 'CHU' })).texts,
+    { email: { before: 'ana@chu.fr', after: 'ana.martin@chu.fr' } });
+  assert.deepEqual(diffContacts(before, card({ email: 'ana@chu.fr', etablissement_label: 'UBM' })).texts,
+    { etab: { before: 'CHU', after: 'UBM' } });
+  assert.deepEqual(diffContacts(card(), card({ email: 'ana@chu.fr' })).texts, { email: { before: '', after: 'ana@chu.fr' } }, 'une adresse ajoutée');
+  assert.equal(hasMarks(diffContacts(before, card({ email: 'ana@chu.fr', etablissement_label: 'UBM' }))), true);
+  assert.equal(hasMarks(diffContacts(before, before)), false);
+});
+
+test('previewOf shows the card after with the new address and the flags of the new établissement', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  const preview = previewOf(row(2), { email: 'nouveau@chu-bordeaux.fr', Etablissement: 1 }, referenceMaps, etabFlags); // Bob, de l'UBM au CHU
+  assert.equal(preview.before.etablissement_label, 'UBM');
+  assert.equal(preview.after.etablissement_label, 'CHU');
+  assert.deepEqual([preview.before.etablissement_fondateur, preview.after.etablissement_fondateur], [false, true]);
+  assert.equal(preview.after.email, 'nouveau@chu-bordeaux.fr');
+  assert.deepEqual(preview.marks.texts, {
+    etab: { before: 'UBM', after: 'CHU' },
+    email: { before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@chu-bordeaux.fr' }
+  });
 });

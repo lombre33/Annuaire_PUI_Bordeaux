@@ -68,16 +68,48 @@ export function describePresence(persons) {
   };
 }
 
+// Ce que le bandeau dit à une personne connectée dont l'adresse ne figure dans aucune
+// ligne de BDD : il n'y a pas de fiche à modifier. Un administrateur y trouve quand même
+// le « mode admin ». Même forme que describePresence, sans interrupteur à montrer
+// (`switchable: false`). `emailColumn: false` : BDD n'a pas de colonne « email », le
+// widget ne peut retrouver la fiche de personne (une affaire de configuration).
+export function describeUnknownAccount({ email, admin, emailColumn = true }) {
+  const name = admin ? 'Administrateur' : 'Compte absent de l\'annuaire';
+  const view = { name, initials: '?', accepted: false, switchable: false, tone: 'info' };
+  if (!emailColumn) {
+    return {
+      ...view,
+      name: admin ? name : 'Fiche introuvable',
+      message: 'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.'
+    };
+  }
+  const who = email ? `Connecté avec ${email} : cette adresse ne figure pas dans l'annuaire` : 'Cette adresse ne figure pas dans l\'annuaire';
+  return {
+    ...view,
+    message: admin
+      ? `${who}, vous n'avez donc pas de fiche à modifier. Le mode admin vous permet de modifier celles des autres.`
+      : `${who}, il n'y a donc pas de fiche à modifier.`
+  };
+}
+
 // Ce que la relecture d'une modification dit d'une fiche absente de l'annuaire : la
 // carte « Après » montre une carte que personne ne verra dans la grille tant que la
 // cause demeure. `status` vient de describeVisibility() ; `own` dit si la fiche est celle
-// de la personne qui relit. Renvoie '' quand la fiche figure dans l'annuaire.
-export function describeHiddenFiche(status, { own }) {
+// de la personne qui relit ; `etablissement` est le nom de son établissement après la
+// modification. Les deux causes les plus courantes ont la phrase de la maquette : un
+// établissement qui n'a pas validé sa présence (quand c'est la seule raison), puis une
+// personne qui n'a pas accepté d'apparaître. Renvoie '' quand la fiche figure dans l'annuaire.
+export function describeHiddenFiche(status, { own, etablissement = '' }) {
   if (status.visible) return '';
+  if (status.etablissement === 'not_validated' && status.named && status.inScope) {
+    return own
+      ? 'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.'
+      : `${etablissement || 'Son établissement'} n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.`;
+  }
   if (!status.accepted) {
     return own
-      ? 'Votre fiche est masquée de l\'annuaire : vous n\'avez pas accepté d\'apparaître (interrupteur « Apparaître dans l\'annuaire » en haut de page).'
-      : 'Cette fiche est masquée de l\'annuaire : la personne n\'a pas accepté d\'apparaître.';
+      ? 'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).'
+      : 'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.';
   }
   const reasons = hiddenReasons([status], own ? VOICES.own : VOICES.admin);
   const why = reasons.length ? ` : ${reasons.join(' ; ')}` : '';

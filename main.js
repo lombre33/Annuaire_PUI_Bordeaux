@@ -6,18 +6,19 @@
 // fenêtre), et branding.js, attachments.js et branding-ui.js (les logos : cartes,
 // financeurs, fondateurs).
 
-import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, text } from './grist-data.js';
+import { CARD_LOGO, ETABLISSEMENT_NAMES } from './constants.js';
+import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
-import { describeHiddenFiche, describePresence, setPresence, PresenceError } from './presence.js';
+import { describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
 import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges } from './profile.js';
 import { ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
 import { createProfileDialog } from './profile-ui.js';
 import { buildBranding, logoForContact } from './branding.js';
 import { createAttachments } from './attachments.js';
-import { createBrandingUI } from './branding-ui.js';
+import { createBrandingUI, createLogoImage, sizeLogo } from './branding-ui.js';
 
 const state = {
   allContacts: [],
@@ -39,8 +40,10 @@ const state = {
   // Logos et financeurs (branding.js), vides tant que Grist n'a pas répondu.
   branding: buildBranding(),
   // Ce que la personne connectée peut faire de chaque fiche (profile.js) : rien tant
-  // qu'elle n'est pas identifiée.
+  // qu'elle n'est pas identifiée. Un administrateur n'a le droit de modifier les fiches
+  // des autres que lorsqu'il a allumé le « mode admin » (adminMode).
   rightsOf: () => null,
+  adminMode: false,
   // Indicateurs des établissements, pour montrer la fiche « après » telle que
   // l'annuaire la présentera.
   etabFlags: null
@@ -55,12 +58,19 @@ const elements = {
   searchInput: document.getElementById('searchInput'),
   resetFilters: document.getElementById('resetFilters'),
   statusBanner: document.getElementById('statusBanner'),
+  adminStrip: document.getElementById('adminStrip'),
+  toast: document.getElementById('toast'),
+  toastLive: document.getElementById('toastLive'),
   scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
 
 // Bandeau « Ma présence » (voir « Ma présence » plus bas) : masqué tant que la
 // personne connectée n'est pas identifiée et retrouvée dans BDD.
-const accountBar = createAccountBar(document.getElementById('accountBar'), { onToggle: togglePresence, onEdit: openOwnProfile });
+const accountBar = createAccountBar(document.getElementById('accountBar'), {
+  onToggle: togglePresence,
+  onEdit: openOwnProfile,
+  onAdminMode: toggleAdminMode
+});
 
 const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
 
@@ -262,15 +272,25 @@ function warnOnce(key, message) {
   console.warn(message);
 }
 
+const isAdmin = () => state.identity?.status === 'ready' && state.identity.admin === true;
+
+// Le bandeau de la personne connectée. Sans identité (pas de table-sonde, compte Lecteur…)
+// ou tant que l'annuaire n'est pas lu, il reste masqué. Une adresse qui ne figure pas dans
+// BDD le dit, au lieu de disparaître sans explication : un administrateur y trouve quand
+// même son « mode admin ».
 function refreshAccount() {
-  const persons = myPersons();
-  if (persons.length === 0) {
+  if (state.identity?.status !== 'ready' || !state.people) {
     accountBar.hide();
-    if (state.identity?.status === 'ready' && state.people) {
-      warnOnce('no-row', state.people.hasEmailColumn
-        ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bandeau « Ma présence ».'
-        : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
-    }
+    return;
+  }
+  const persons = myPersons();
+  const admin = isAdmin();
+  if (persons.length === 0) {
+    warnOnce('no-row', state.people.hasEmailColumn
+      ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bouton « Modifier mon profil ».'
+      : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
+    accountBar.show(describeUnknownAccount({ email: state.identity.email, admin, emailColumn: state.people.hasEmailColumn }));
+    accountBar.setActions({ admin, adminMode: state.adminMode });
     return;
   }
   if (persons.length > 1) {
@@ -280,7 +300,18 @@ function refreshAccount() {
   }
   accountBar.show({ name: persons[0].name || 'Ma fiche', initials: initials(persons[0].row), ...describePresence(persons) });
   // Plusieurs fiches pour la même adresse : on ne sait pas laquelle ouvrir depuis le bandeau.
-  accountBar.setActions({ edit: persons.length === 1 });
+  accountBar.setActions({ edit: persons.length === 1, admin, adminMode: state.adminMode });
+}
+
+// Allume ou éteint le « mode admin » : les boutons « Modifier la fiche » des autres cartes
+// n'existent que pendant qu'il est allumé. Réservé aux administrateurs.
+function toggleAdminMode() {
+  if (!isAdmin()) return;
+  state.adminMode = !state.adminMode;
+  state.rightsOf = rightsFor(state.identity, { adminMode: state.adminMode });
+  elements.adminStrip.hidden = !state.adminMode;
+  refreshAccount();
+  refreshCards();
 }
 
 let togglePending = false;
@@ -311,7 +342,7 @@ async function togglePresence() {
 // n'est identifié et aucune modification n'est proposée.
 readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(identity => {
   state.identity = identity;
-  state.rightsOf = rightsFor(identity);
+  state.rightsOf = rightsFor(identity, { adminMode: state.adminMode });
   refreshAccount();
   refreshCards(); // les boutons « Modifier » apparaissent sur les cartes concernées
 });
@@ -326,17 +357,58 @@ function userFacing(error) {
   return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
 }
 
+// Une adresse e-mail qu'une AUTRE fiche que `rowId` porte déjà (d'après l'annuaire lu) :
+// le nom de la personne quand sa fiche figure dans l'annuaire (on le voit déjà), sinon
+// simplement vrai : le nom d'une fiche masquée ne se dévoile pas.
+const emailTakenElsewhere = rowId => email => {
+  const other = state.people?.findByEmail(email).find(person => person.row.id !== rowId);
+  if (!other) return false;
+  return other.status.visible && other.name ? other.name : true;
+};
+
+// La confirmation d'un enregistrement, en bas de l'écran. Le message visible est masqué aux
+// lecteurs d'écran : une zone `status` toujours présente le leur annonce, ce qu'un élément
+// qui apparaît d'un coup ne garantit pas.
+const TOAST_DURATION = 6000;
+let toastTimer = 0;
+function showToast(message) {
+  elements.toast.textContent = message;
+  elements.toast.hidden = false;
+  elements.toastLive.textContent = message;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    elements.toast.hidden = true;
+    elements.toastLive.textContent = '';
+  }, TOAST_DURATION);
+}
+
+// Le nom complet de l'établissement d'une carte (l'acronyme à défaut), pour les phrases des fenêtres.
+function etablissementName(contact) {
+  const names = state.referenceMaps[ETABLISSEMENT_NAMES] || {};
+  return names[String(refId(contact.Etablissement))] || contact.etablissement_label;
+}
+
+// La mise en garde sous le champ « Établissement » du formulaire : un établissement qui n'a
+// pas validé sa présence (Etablissements.ok_pour_apparaitre) ne laisse voir aucune de ses fiches.
+function etablissementWarning(id) {
+  const flags = state.etabFlags?.byId?.[String(id)];
+  return flags && flags.ok_pour_apparaitre !== true
+    ? 'Cet établissement n’a pas validé sa présence : la fiche ne sera pas visible dans l’annuaire.'
+    : '';
+}
+
 // Ce que le brouillon change (de quoi activer le bouton) et pourquoi il serait refusé.
-function evaluateDraft(row, draft) {
-  const { champs, errors, fieldErrors } = diffProfile(row, draft, state.referenceMaps);
+// `admin` : un administrateur modifie la fiche d'une autre personne (e-mail et établissement compris).
+function evaluateDraft(row, draft, admin) {
+  const { champs, errors, fieldErrors } = diffProfile(row, draft, state.referenceMaps, { admin, emailTaken: emailTakenElsewhere(row.id) });
   return { errors, fieldErrors, lines: describeChanges(champs) };
 }
 
 // Prépare la relecture (profile-save.js) : rien n'est écrit. `row` est la fiche telle que
 // le formulaire l'a montrée.
-async function reviewProfile(row, draft) {
+async function reviewProfile(row, draft, admin) {
   try {
-    return await prepareReview(window.grist.docApi, row, draft, { referenceMaps: state.referenceMaps, etabFlags: state.etabFlags });
+    return await prepareReview(window.grist.docApi, row, draft, { referenceMaps: state.referenceMaps, etabFlags: state.etabFlags, admin });
   } catch (error) {
     throw userFacing(error);
   }
@@ -345,7 +417,7 @@ async function reviewProfile(row, draft) {
 // Écrit ce que la personne a relu. Si la fiche a changé dans Grist depuis la relecture,
 // rien n'est écrit : la personne relit d'abord ce qui s'y trouve. Sinon l'annuaire est
 // relu, et on vérifie que Grist a gardé ce qu'on lui a demandé.
-async function saveReviewed(row, review, draft) {
+async function saveReviewed(row, review, draft, admin) {
   let result;
   try {
     result = await saveProfile(window.grist.docApi, review);
@@ -355,7 +427,7 @@ async function saveReviewed(row, review, draft) {
   if (result.status === 'changed') {
     return {
       status: 'changed',
-      review: await reviewProfile(row, draft),
+      review: await reviewProfile(row, draft, admin),
       notice: 'La fiche a changé dans Grist pendant la relecture. Relisez ce qui suit, puis validez à nouveau.'
     };
   }
@@ -363,6 +435,25 @@ async function saveReviewed(row, review, draft) {
   const saved = outcome === 'applied' ? state.people?.findById(review.rowId)?.row : null;
   const leftovers = saved ? unsavedLabels(review, saved, state.referenceMaps) : [];
   return { status: 'saved', lines: review.lines, leftovers, reloaded: outcome !== 'failed' };
+}
+
+// L'établissement d'une fiche dans le bloc d'identité de la fenêtre de modification : son logo
+// quand Grist en a un, sinon (ou si le fichier ne se charge pas) son nom en pastille.
+function etablissementBadge(row, label) {
+  const pill = () => {
+    const node = document.createElement('span');
+    node.className = 'et-pill';
+    node.textContent = label;
+    return node;
+  };
+  const brand = attachments && state.branding ? logoForContact(state.branding, row) : null;
+  if (!brand?.logo) return pill();
+  const holder = document.createElement('span');
+  holder.className = 'et-logo';
+  holder.title = brand.name;
+  holder.append(createLogoImage(attachments, brand.logo, label, () => holder.replaceWith(pill()),
+    { eager: true, onLoad: image => sizeLogo(image, CARD_LOGO) }));
+  return holder;
 }
 
 // Ouvre la fenêtre de modification de la fiche `rowId`, si la personne connectée en a le
@@ -373,18 +464,24 @@ function openProfile(rowId, returnFocus) {
   const rights = person ? state.rightsOf(person.row) : null;
   if (!rights) return;
   const { row } = person;
-  const model = profileFormModel(row, state.referenceMaps);
+  // L'e-mail et l'établissement ne se changent que depuis la fiche d'une autre personne.
+  const admin = rights === 'admin';
+  const model = profileFormModel(row, state.referenceMaps, { admin });
   profileDialog.open({
     mode: rights,
+    viewerAdmin: isAdmin(),
     person: { name: person.name || 'Sans nom', email: text(row.email), initials: initials(row) },
     etablissement: person.etablissement,
     model,
     draft: draftOf(model),
-    evaluate: draft => evaluateDraft(row, draft),
-    review: draft => reviewProfile(row, draft),
-    hiddenNotice: visibility => describeHiddenFiche(visibility, { own: rights === 'own' }),
-    save: (review, draft) => saveReviewed(row, review, draft),
+    evaluate: draft => evaluateDraft(row, draft, admin),
+    review: draft => reviewProfile(row, draft, admin),
+    hiddenNotice: review => describeHiddenFiche(review.visibility, { own: rights === 'own', etablissement: etablissementName(review.after) }),
+    fieldWarning: (key, value) => (key === 'Etablissement' ? etablissementWarning(value) : ''),
+    save: (review, draft) => saveReviewed(row, review, draft, admin),
     renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks, cardLogos()),
+    renderEtablissement: label => etablissementBadge(row, label),
+    notify: showToast,
     onClose: returnFocus
   });
 }

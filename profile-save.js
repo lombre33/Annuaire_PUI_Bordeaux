@@ -11,7 +11,7 @@
 //   - l'écriture est une seule action Grist, donc atomique.
 
 import { MAIN_TABLE, PROFILE_FIELDS } from './constants.js';
-import { describeVisibility, formatPhone, safeValues, tableToRows, text } from './grist-data.js';
+import { describeVisibility, formatPhone, normalizeEmail, safeValues, tableToRows, text } from './grist-data.js';
 import { classifyWriteError } from './presence.js';
 import { describeChanges, diffProfile, rebaseChanges } from './profile.js';
 import { previewOf } from './preview.js';
@@ -44,7 +44,7 @@ export function buildRowUpdate(champs, row, columnTypes = {}) {
     const change = champs[field.key];
     if (!change) continue;
     if (!(field.key in row)) return { error: `${field.label} : la colonne ${field.key} n'existe pas dans ${MAIN_TABLE}` };
-    if (field.kind === 'text') {
+    if (field.kind === 'text' || field.kind === 'email') {
       values[field.key] = change.apres;
     } else if (field.kind === 'phone') {
       const numeric = phoneIsNumeric(columnTypes, row);
@@ -81,12 +81,14 @@ const FAILURES = {
   read: 'La fiche n\'a pas pu être relue dans Grist : rien n\'a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
   gone: 'Cette fiche n\'existe plus dans Grist : rien n\'a été modifié.',
   denied: 'Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche. Contactez un administrateur.',
+  emailTaken: 'Cette adresse e-mail est maintenant celle d\'une autre fiche : rien n\'a été modifié. Revenez à la fiche et choisissez-en une autre.',
   formula: 'Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md.',
   other: 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.'
 };
 
-// La ligne `rowId` de BDD telle qu'elle est maintenant dans Grist. Lève une ProfileSaveError.
-export async function readRow(docApi, rowId, { log = console } = {}) {
+// Les lignes de BDD telles qu'elles sont maintenant dans Grist, et celle dont l'identifiant
+// est `rowId` : { row, rows }. Lève une ProfileSaveError.
+async function readFiche(docApi, rowId, log) {
   let table;
   try {
     table = await docApi.fetchTable(MAIN_TABLE);
@@ -94,9 +96,22 @@ export async function readRow(docApi, rowId, { log = console } = {}) {
     log.error('[PROFIL] lecture de la fiche impossible :', error);
     throw new ProfileSaveError(FAILURES.read, error);
   }
-  const row = tableToRows(table).find(candidate => candidate.id === rowId);
+  const rows = tableToRows(table);
+  const row = rows.find(candidate => candidate.id === rowId);
   if (!row) throw new ProfileSaveError(FAILURES.gone);
-  return row;
+  return { row, rows };
+}
+
+// La ligne `rowId` de BDD telle qu'elle est maintenant dans Grist. Lève une ProfileSaveError.
+export async function readRow(docApi, rowId, { log = console } = {}) {
+  return (await readFiche(docApi, rowId, log)).row;
+}
+
+// Adresse → vrai si une AUTRE ligne que `rowId` porte déjà cette adresse (sans tenir compte
+// de la casse ni des espaces) : l'adresse retrouve la personne, deux fiches ne la partagent pas.
+function emailTakenBy(rows, rowId) {
+  const owners = new Set(rows.filter(other => other.id !== rowId).map(other => normalizeEmail(other.email)).filter(Boolean));
+  return email => owners.has(normalizeEmail(email));
 }
 
 // Prépare la relecture de ce que la personne a changé : relit la fiche dans Grist, ramène
@@ -104,20 +119,21 @@ export async function readRow(docApi, rowId, { log = console } = {}) {
 // écrit. `row` est la fiche telle que le formulaire l'a montrée : c'est par rapport à elle
 // que se calcule ce que la personne a touché, `draft` ce que le formulaire contient.
 // Renvoie la relecture :
-//   rowId, champs, signature, columnTypes   ce que saveProfile() écrira, et comment
+//   rowId, admin, champs, signature, columnTypes
+//                                           ce que saveProfile() écrira, et comment
 //   before, after, marks, lines             ce qu'on montre (preview.js, describeChanges)
 //   visibility                              describeVisibility() de la fiche après la
 //                                           modification : figure-t-elle dans l'annuaire ?
 //   notice                                  les champs que quelqu'un d'autre a changés
 //                                           depuis l'ouverture du formulaire, ou ''
 // Lève une ProfileSaveError.
-export async function prepareReview(docApi, row, draft, { referenceMaps, etabFlags, log = console }) {
-  const { champs, errors } = diffProfile(row, draft, referenceMaps);
+export async function prepareReview(docApi, row, draft, { referenceMaps, etabFlags, admin = false, log = console }) {
+  const { row: fresh, rows } = await readFiche(docApi, row.id, log);
+  const { champs, errors } = diffProfile(row, draft, referenceMaps, { admin, emailTaken: emailTakenBy(rows, row.id) });
   if (errors.length > 0 || Object.keys(champs).length === 0) {
     throw new ProfileSaveError('Il n\'y a rien à relire : corrigez les champs signalés ou modifiez la fiche.');
   }
-  const fresh = await readRow(docApi, row.id, { log });
-  const { champs: rebased, moved } = rebaseChanges(champs, fresh, referenceMaps);
+  const { champs: rebased, moved } = rebaseChanges(champs, fresh, referenceMaps, { admin });
   if (Object.keys(rebased).length === 0) {
     throw new ProfileSaveError('Ces modifications sont déjà dans la fiche : il n\'y a rien à enregistrer.');
   }
@@ -127,6 +143,7 @@ export async function prepareReview(docApi, row, draft, { referenceMaps, etabFla
   const { before, after, marks } = previewOf(fresh, built.values, referenceMaps, etabFlags);
   return {
     rowId: row.id,
+    admin,
     champs: rebased,
     lines: describeChanges(rebased),
     signature: signatureOf(fresh, Object.keys(rebased)),
@@ -144,7 +161,7 @@ export async function prepareReview(docApi, row, draft, { referenceMaps, etabFla
 // Après l'écriture : les champs de la relecture que la fiche `saved` (relue dans Grist)
 // n'a pas gardés, par leur libellé. Vide quand Grist a tout retenu.
 export function unsavedLabels(review, saved, referenceMaps) {
-  return describeChanges(rebaseChanges(review.champs, saved, referenceMaps).champs).map(line => line.label);
+  return describeChanges(rebaseChanges(review.champs, saved, referenceMaps, { admin: review.admin === true }).champs).map(line => line.label);
 }
 
 // Écrit les changements d'une relecture (prepareReview). Renvoie { status: 'saved',
@@ -153,8 +170,15 @@ export function unsavedLabels(review, saved, referenceMaps) {
 export async function saveProfile(docApi, review, { log = console } = {}) {
   const keys = Object.keys(review.champs);
   if (keys.length === 0) throw new ProfileSaveError('Aucun changement à enregistrer.');
-  const row = await readRow(docApi, review.rowId, { log });
+  // Fermé par défaut : l'e-mail et l'établissement ne s'écrivent que pour un administrateur.
+  if (review.admin !== true && PROFILE_FIELDS.some(field => field.admin && keys.includes(field.key))) {
+    throw new ProfileSaveError('Ces modifications ne peuvent pas être enregistrées : l\'e-mail et l\'établissement sont réservés à un administrateur.');
+  }
+  const { row, rows } = await readFiche(docApi, review.rowId, log);
   if (signatureOf(row, keys) !== review.signature) return { status: 'changed', row };
+  if (review.champs.email && emailTakenBy(rows, review.rowId)(review.champs.email.apres)) {
+    throw new ProfileSaveError(FAILURES.emailTaken);
+  }
 
   const built = buildRowUpdate(review.champs, row, review.columnTypes);
   if (built.error) throw new ProfileSaveError(`Ces modifications ne peuvent pas être enregistrées : ${built.error}.`);

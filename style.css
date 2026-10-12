@@ -215,15 +215,31 @@ h1 {
   .page-header > .account-bar .presence-label {
     line-height: 1.15;
   }
+  /* Les boutons deviennent des éléments de la grille : « Modifier mon profil » sous le nom,
+     à droite de l'interrupteur, et « Mode admin » (réservé aux administrateurs) dans le coin
+     de la première rangée, à droite du nom, pour que l'interrupteur garde sa largeur. Sans
+     interrupteur (un administrateur qui n'a pas de fiche), il reprend la deuxième rangée. */
   .page-header > .account-bar .account-actions {
+    display: contents;
+  }
+  .page-header > .account-bar .account-edit,
+  .page-header > .account-bar .account-admin {
     grid-column: 3;
     grid-row: 2;
+    justify-self: end;
+  }
+  .page-header > .account-bar.admin-corner .account-admin {
+    grid-row: 1;
+  }
+  .page-header > .account-bar.admin-corner .account-identity {
+    grid-column: 2;
   }
   .page-header > .account-bar .account-status {
     grid-column: 1 / -1;
   }
   .page-header > .account-bar .presence-switch,
-  .page-header > .account-bar .account-edit {
+  .page-header > .account-bar .account-edit,
+  .page-header > .account-bar .account-admin {
     height: 36px;
     padding: 0 10px;
     font-size: 12px;
@@ -770,9 +786,13 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
+  grid-row: 3;
   gap: 4px 6px;
-  margin-top: 9px;
+  margin-top: 6px;
+}
+.card-actions[hidden] {
+  display: none;
 }
 .own-flag {
   padding: 2px 7px;
@@ -802,54 +822,6 @@ h1 {
   outline-offset: 2px;
 }
 
-/* Carte « après » de la relecture d'une modification : ce qui change se voit. Un texte
-   modifié ou un tag ajouté est en relief ; ce qui a été retiré reste visible, barré. */
-.mark-new {
-  background: #e6f6f0;
-  border-radius: 4px;
-  box-shadow: 0 0 0 2px #e6f6f0;
-}
-.tag.mark-new {
-  outline: 2px solid var(--teal);
-  outline-offset: 1px;
-}
-.tag.mark-new::before {
-  content: "+ ";
-  font-weight: 900;
-}
-.mark-gone {
-  color: #9b2226;
-  text-decoration: line-through;
-}
-/* Le repère d'une ligne de texte tient à sa valeur, pas à toute la largeur de la carte. */
-:is(.name, .fonction, .detail-row):is(.mark-new, .mark-gone) {
-  width: fit-content;
-  max-width: 100%;
-}
-/* La pastille écrite d'une ligne modifiée. En bloc en ligne, pour que le trait d'une
-   ligne barrée ne la raye pas. */
-.mk-pill {
-  display: inline-block;
-  margin-left: 4px;
-  padding: 1px 7px;
-  color: #fff;
-  background: #0b6b4f;
-  border-radius: 999px;
-  font-size: 9.5px;
-  font-weight: 800;
-  line-height: 1.4;
-  white-space: nowrap;
-  vertical-align: 1px;
-}
-.mk-pill-del {
-  background: #b8303a;
-}
-.tag.mark-gone {
-  color: #fff;
-  opacity: 0.6;
-  outline: 1px dashed #d85b5b;
-  outline-offset: 1px;
-}
 .etablissement-tag:disabled {
   cursor: default;
 }
@@ -1054,7 +1026,9 @@ h1 {
   display: none;
 }
 .account-identity {
-  flex: 1;
+  /* Une largeur de départ : sans elle le texte, dont la base est 0, se laisserait écraser
+     par l'interrupteur au lieu de le faire passer à la ligne. */
+  flex: 1 1 150px;
   min-width: 0;
 }
 .account-name {
@@ -1098,6 +1072,7 @@ h1 {
 }
 .presence-track {
   position: relative;
+  flex: none;
   width: 38px;
   height: 22px;
   background: #c3c9d8;
@@ -1123,6 +1098,7 @@ h1 {
 }
 .account-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .account-status {
@@ -1296,4 +1272,62 @@ h1 {
 .account-edit:focus-visible {
   outline: 2px solid var(--violet);
   outline-offset: 2px;
+}
+
+/* Mode admin : un interrupteur réservé aux administrateurs. Éteint, c'est un bouton
+   discret ; allumé, il est plein et la bande qui suit la barre d'outils le rappelle. */
+.account-admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 46px;
+  padding: 0 14px;
+  color: #8f4519;
+  background: #fff3ea;
+  border: 1px solid #f6d3bd;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.account-admin::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--orange);
+  border-radius: 50%;
+}
+.account-admin:hover {
+  border-color: var(--orange);
+}
+.account-admin[aria-pressed="true"] {
+  color: #fff;
+  background: #8f4519;
+  border-color: #8f4519;
+}
+.account-admin[aria-pressed="true"]::before {
+  background: #fff;
+}
+.account-admin:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+.admin-strip {
+  margin-top: 18px;
+  padding: 8px 14px;
+  color: #8f4519;
+  background: #fff3ea;
+  border: 1px solid #f6d3bd;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.admin-strip[hidden] {
+  display: none;
+}
+/* Sous la bande, les cartes la suivent de près : elle fait déjà la séparation. */
+.admin-strip:not([hidden]) ~ .cards-grid {
+  margin-top: 14px;
 }

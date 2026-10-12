@@ -365,13 +365,52 @@ test('la relecture avant/après montre le logo de l\'établissement sur les deux
     await dialog.waitFor();
     await dialog.locator('#profile-Fonction').fill('Cheffe de service');
     await dialog.getByRole('button', { name: 'Relire mes modifications', exact: true }).click();
-    for (const side of ['.preview-before', '.preview-after']) {
+    for (const side of ['.rv-col-before', '.rv-col-after']) {
       const badge = dialog.locator(`${side} .etablissement-tag`);
       await badge.locator('img.loaded').waitFor();
       assert.equal(await badge.locator('img').getAttribute('src'), logoUrl(11), `${side} : le logo du CHU`);
       assert.equal(await badge.isDisabled(), true, `${side} : le logo n'est pas cliquable dans la relecture`);
     }
   }));
+
+// Dans la maquette validée, le bloc d'identité de la fenêtre de modification porte à droite le logo
+// de l'établissement de la fiche (son nom en pastille quand Grist n'a pas de logo pour lui).
+test('la fenêtre de modification montre le logo de l\'établissement dans son bloc d\'identité, et le nom en pastille sans logo', { skip }, () =>
+  withWidget({ tables: withSchema(withIdentity(withBranding())), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.locator('#accountBar .account-edit').click();
+    const dialog = page.locator('#profileDialog');
+    await dialog.waitFor();
+    const logo = dialog.locator('.ident .et-logo');
+    await logo.locator('img.loaded').waitFor();
+    assert.equal(await logo.locator('img').getAttribute('src'), logoUrl(11), 'le fichier 11 est le logo du CHU');
+    assert.equal(await logo.locator('img').getAttribute('alt'), 'CHU');
+    assert.equal(await logo.getAttribute('title'), 'CHU de Bordeaux', 'le nom complet au survol');
+    assert.equal(await dialog.locator('.ident .et-pill').count(), 0, 'le logo remplace la pastille');
+    assert.equal(await logo.evaluate(element => element.closest('button, a') === null), true, 'rien de cliquable');
+    await dialog.getByRole('button', { name: 'Annuler', exact: true }).click();
+    // Une administratrice ouvre la fiche de Gina (Institut Bergonié, sans logo) : la pastille.
+    await page.locator('#accountBar .account-admin').click();
+    await page.locator('.contact-card', { hasText: 'Gina' }).locator('.card-edit').click();
+    await dialog.locator('.ident .et-pill').waitFor();
+    assert.equal(await dialog.locator('.ident .et-pill').textContent(), 'Institut Bergonié');
+    assert.equal(await dialog.locator('.ident .et-logo').count(), 0);
+  }));
+
+test('si le fichier du logo manque, le bloc d\'identité de la fenêtre garde le nom de l\'établissement', { skip }, () => {
+  const tables = withSchema(withIdentity(withBranding()));
+  tables.Etablissements.logo[0] = ['L', MISSING_FILE];
+  return withWidget({ tables, user: ANA_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.locator('#accountBar .account-edit').click();
+    const dialog = page.locator('#profileDialog');
+    await dialog.waitFor();
+    await dialog.locator('.ident .et-pill').waitFor();
+    assert.equal(await dialog.locator('.ident .et-pill').textContent(), 'CHU');
+    assert.equal(await dialog.locator('.ident .et-logo').count(), 0);
+    assert.deepEqual(await errorsOf(logs), []);
+  });
+});
 
 // ===== Un logo ne casse jamais l'annuaire =====
 
