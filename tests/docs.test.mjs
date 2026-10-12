@@ -523,6 +523,22 @@ test('la documentation développeur cite chaque module du widget', () => {
   assert.deepEqual(missing, [], 'Décrivez ces modules dans docs/developpeurs.md (« Organisation du code »).');
 });
 
+// Le schéma « Organisation du code » dit : « tous les import des fichiers à la racine y figurent ».
+// Chaque flèche est un import réel, et chaque import local en a une.
+test('le schéma des imports de la documentation développeur montre exactement les imports des modules', () => {
+  const section = read('docs/developpeurs.md').split(/^## Organisation du code$/m)[1] ?? '';
+  const diagram = section.match(/```mermaid\n([\s\S]*?)```/)?.[1] ?? '';
+  const files = Object.fromEntries([...diagram.matchAll(/(\w+)\["([\w-]+\.js)(?:<br\/>[^"]*)?"\]/g)].map(match => [match[1], match[2]]));
+  const arrows = [...diagram.matchAll(/^\s*(\w+) --> (\w+)\s*$/gm)];
+  const unknown = arrows.flatMap(([, from, to]) => [from, to]).filter(id => !files[id]);
+  assert.deepEqual([...new Set(unknown)], [], 'Ces identifiants du schéma ne désignent aucun fichier .js déclaré dans le schéma.');
+  const drawn = new Set(arrows.map(([, from, to]) => `${files[from]} → ${files[to]}`));
+  const actual = new Set(fs.readdirSync(ROOT).filter(name => name.endsWith('.js')).flatMap(name =>
+    [...read(name).matchAll(/^import [^;]*? from '\.\/([\w-]+\.js)';/gm)].map(match => `${name} → ${match[1]}`)));
+  assert.deepEqual([...drawn].filter(edge => !actual.has(edge)).sort(), [], 'Ces flèches du schéma de docs/developpeurs.md ne sont pas des imports du code.');
+  assert.deepEqual([...actual].filter(edge => !drawn.has(edge)).sort(), [], 'Ces imports du code manquent au schéma de docs/developpeurs.md (« Organisation du code »).');
+});
+
 test('la page de maintenance donne la table et les colonnes de libellé de chaque filtre à liste', () => {
   const page = read('docs/maintenance.md');
   const names = Object.values(CATEGORIES)
@@ -543,7 +559,7 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
   const sources = WIDGET_SOURCES();
   const used = new Set(sources.flatMap(({ code }) => [...code.matchAll(/\b(?:grist|docApi)\.([A-Za-z_$][\w$]*)/g)].map(match => match[1])));
   used.delete('docApi'); // `grist.docApi` est l'objet qui porte les méthodes, pas une méthode
-  const cited = ['ready', 'onRecords', 'fetchTable', 'listTables', 'applyUserActions'];
+  const cited = ['ready', 'onRecords', 'fetchTable', 'listTables', 'getAccessToken', 'applyUserActions'];
   assert.deepEqual([...used].sort(), [...cited].sort(),
     'Le code emploie d\'autres méthodes de l\'API Grist que celles de docs/securite.md (« Ce que le widget lit, écrit et envoie ») : revoyez cette page, puis ce test.');
   const security = read('docs/securite.md');

@@ -10,30 +10,35 @@
 <body>
   <main class="widget-shell">
     <header class="page-header">
-      <div>
-        <h1>PUI Bordeaux</h1>
+      <div class="page-title">
+        <div class="title-line">
+          <h1>PUI Bordeaux</h1>
+          <div id="resultCount" class="result-count" aria-live="polite">0 contact</div>
+        </div>
         <p class="subtitle">Annuaire des accompagnateurs de l'innovation</p>
         <p class="tagline">Pas de mauvaise porte, toujours le bon interlocuteur</p>
       </div>
-      <div id="resultCount" class="result-count" aria-live="polite">0 contact</div>
+      <div id="funders" class="funders" hidden>
+        <p class="funders-label">Projet financé par l'État dans le cadre de France 2030</p>
+        <ul id="fundersLogos" class="funders-logos" aria-label="Financeurs"></ul>
+      </div>
+      <section id="accountBar" class="account-bar" aria-label="Ma présence dans l'annuaire" hidden>
+        <div class="avatar account-avatar" aria-hidden="true"></div>
+        <div class="account-identity">
+          <p class="account-name"></p>
+          <p class="account-detail"></p>
+        </div>
+        <button type="button" class="presence-switch" role="switch" aria-checked="false">
+          <span class="presence-track" aria-hidden="true"><span class="presence-thumb"></span></span>
+          <span class="presence-label">Apparaître dans l'annuaire</span>
+        </button>
+        <div class="account-actions">
+          <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
+          <button type="button" class="account-admin" aria-pressed="false" hidden>Mode admin</button>
+        </div>
+        <p class="account-status" role="status" data-tone="info"></p>
+      </section>
     </header>
-
-    <section id="accountBar" class="account-bar" aria-label="Ma présence dans l'annuaire" hidden>
-      <div class="avatar account-avatar" aria-hidden="true"></div>
-      <div class="account-identity">
-        <p class="account-name"></p>
-        <p class="account-detail"></p>
-      </div>
-      <button type="button" class="presence-switch" role="switch" aria-checked="false">
-        <span class="presence-track" aria-hidden="true"><span class="presence-thumb"></span></span>
-        <span class="presence-label">Apparaître dans l'annuaire</span>
-      </button>
-      <div class="account-actions">
-        <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
-        <button type="button" class="account-admin" aria-pressed="false" hidden>Mode admin</button>
-      </div>
-      <p class="account-status" role="status" data-tone="info"></p>
-    </section>
 
     <section class="toolbar" aria-label="Recherche et filtres">
       <label class="search-box" for="searchInput">
@@ -57,6 +62,18 @@
       <h2>Aucun contact trouvé</h2>
       <p>Modifiez votre recherche ou réinitialisez les filtres.</p>
     </section>
+
+    <footer class="page-footer">
+      <section id="foundersBand" class="band" aria-label="Établissements fondateurs du PUI" hidden>
+        <div class="band-grid">
+          <div class="band-main">
+            <ul id="bandLogos" class="band-logos"></ul>
+          </div>
+          <div id="bandRoundel" class="band-roundel"></div>
+        </div>
+        <p class="band-sentence">Le <a id="bandLink" target="_blank" rel="noopener noreferrer">Pôle universitaire d'innovation Bordeaux</a> est un projet financé par l'État dans le cadre de France 2030.</p>
+      </section>
+    </footer>
   </main>
 
   <dialog id="profileDialog" class="dlg" aria-labelledby="profileTitle">
@@ -89,7 +106,10 @@
           <span class="own-flag" hidden>Votre fiche</span>
           <button class="card-edit" type="button">✎ Modifier</button>
         </div>
-        <button class="etablissement-tag" type="button"></button>
+        <div class="etab-col">
+          <button class="etablissement-tag" type="button"></button>
+          <div class="etab-actions"></div>
+        </div>
         <div class="details">
           <a class="email detail-row" rel="noopener"></a>
           <p class="tel detail-row"></p>

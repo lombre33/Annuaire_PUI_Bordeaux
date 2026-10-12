@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.14.0 — Le mode admin, et la modification de fiche fidèle à la maquette
+## 1.15.0 — Le mode admin, et la modification de fiche fidèle à la maquette
 
 Deux choses dans cette version, toutes deux demandées par Antoine le 12 octobre 2026 :
 
@@ -91,11 +91,14 @@ ni historique), le widget ne crée aucune table et n'ajoute aucune colonne.
   fenêtre ne reste ouverte (« Fiche enregistrée ») que s'il reste quelque chose à lire : un champ
   que Grist n'a pas gardé, ou un annuaire qui n'a pas pu être rechargé.
 
-- **Le bandeau « Ma présence » à 390 px.** Sur un téléphone, le texte du bandeau (le nom et
-  « Vous apparaissez dans l'annuaire ») se laissait écraser par l'interrupteur « Apparaître dans
-  l'annuaire » et se lisait mal. Le texte garde une largeur de départ (150 px) : c'est
-  l'interrupteur, puis les boutons, qui passent à la ligne. Le bandeau est inchangé sur un
-  écran large.
+- **Le bandeau « Ma présence » ne se laisse plus écraser.** Sur un téléphone (390 px), le texte du
+  bandeau (le nom et « Vous apparaissez dans l'annuaire ») se laissait écraser par l'interrupteur
+  « Apparaître dans l'annuaire » et se lisait mal : le texte garde une largeur de départ (150 px),
+  c'est l'interrupteur, puis les boutons, qui passent à la ligne. Dans l'en-tête de la 1.14.0
+  (dès 860 px), un administrateur a trois commandes au lieu de deux : « Mode admin » prend le coin
+  de la première rangée, à droite du nom, pour que l'interrupteur garde sa largeur, sur une ligne,
+  et que le bandeau reste à la hauteur du titre. Un test vérifie de 280 à 1 440 px que rien ne se
+  recouvre ni ne se coupe.
 
 ### Pour les développeurs
 
@@ -121,8 +124,8 @@ fiche d'une autre personne modifiée par un administrateur.
 
 ### Tests
 
-**453 tests** (dont 142 dans un vrai navigateur, optionnels sans Playwright) contre 406 (dont 124)
-avant ce lot.
+**546 tests** (dont 182 dans un vrai navigateur, optionnels sans Playwright) contre 499 (dont 164)
+à la sortie de la 1.14.0.
 
 - *Mode admin* : éteint à l'ouverture, un administrateur ne voit « Modifier » que sur sa fiche ; allumé,
   sur toutes les cartes ; le bouton s'actionne au clavier, annonce son état (`aria-pressed`) et garde
@@ -149,6 +152,108 @@ avant ce lot.
   administrateur sans fiche, colonne `email` absente de `BDD`).
 - Les tests de la 1.12.0 qui décrivaient l'ancienne fenêtre (textes, étapes, sélecteurs) sont
   réécrits pour la nouvelle ; aucun n'a été supprimé sans remplaçant.
+
+## 1.14.0 — Habillage du PUI : logos des établissements, financeurs et bandeau des fondateurs
+
+Le PUI est le consortium de tous ses établissements fondateurs : il n'a pas d'identité
+graphique propre, ce sont leurs logos qui l'habillent. Les logos sont stockés dans le
+document Grist (pièces jointes) : ni le dépôt ni le widget n'en contiennent. **Tout est
+facultatif** : sans les colonnes ni la table décrites plus bas, le widget montre les noms à la
+place des logos (la pastille de toujours sur les cartes, les fondateurs validés en texte dans
+le bandeau du bas, pas de financeurs en tête de page) et ne demande aucun jeton à Grist.
+
+- **Sur les cartes : le logo de l'établissement, seul** (le nom ne s'affiche, dans une
+  pastille, que si Grist n'a pas de logo pour lui). Un clic dessus filtre sur
+  l'établissement, comme la pastille ; on l'atteint au clavier ; le nom est son texte
+  alternatif et son infobulle. Plus haut qu'une pastille, le logo couvre les deux rangées du
+  nom et de la fonction, comme l'avatar : le nom reste centré sur l'avatar et rien ne passe
+  sous le logo.
+- **Un seul bandeau en haut** (limiter la place prise, demande d'Antoine) : le titre et le
+  compteur à gauche, les **financeurs** discrets au centre (la phrase « Projet financé par
+  l'État dans le cadre de France 2030 » et leurs logos, **affichés en niveaux de gris** quelle
+  que soit la version déposée dans Grist, comme sur la maquette ; le rond du bandeau du bas
+  garde ses couleurs), la zone « Ma présence » et « Modifier mon profil » à droite, devenue
+  compacte. Selon la largeur du cadre Grist : sous 860 px tout s'empile ; de 860 à 1 179 px,
+  le titre à gauche et à droite les financeurs au-dessus du profil ; à partir de 1 180 px,
+  les trois côte à côte, la phrase de financement ne s'ajoutant qu'à partir de 1 320 px (elle
+  reste lue par les lecteurs d'écran). Les seuils laissent de la marge avec une police plus
+  large que prévue (celle de la CI).
+- **Tout en bas : le bandeau des fondateurs.** Les logos des établissements fondateurs qui
+  ont validé leur apparition, dans l'ordre de la colonne `ordre_bandeau` (celui du bandeau
+  fourni par le PUI), le rond « France 2030 » qui le ferme (le financeur de ce nom) et la
+  phrase de financement, dont le nom du PUI renvoie à la page du projet. Une infobulle donne
+  le nom complet de chaque établissement. Sous 560 px de largeur utile, les logos se
+  répartissent sur quatre colonnes au lieu de huit.
+- **Un poids visuel voisin.** Un emblème carré, une bannière large et une signature haute
+  ne se règlent pas à la même hauteur : le widget vise une **surface** par logo, répartie
+  selon les proportions du fichier puis bornée en largeur et en hauteur (`logoSize()`). Les
+  logos apparaissent en fondu une fois chargés, sans cadre cassé ni texte qui clignote.
+- **Quand un logo manque, le nom le remplace**, sans bandeau rouge : fichier absent,
+  supprimé ou illisible (cet établissement seulement), jeton refusé par Grist ou version de
+  Grist sans cette méthode (tous les logos, un seul avertissement `[LOGOS]` par série
+  d'échecs). Une table `Financeurs` absente ne produit aucun message : l'en-tête n'a
+  simplement pas de financeurs.
+- **À faire dans Grist** (`GRIST_SETUP.md`, étape 5) : dans `Etablissements`, les colonnes
+  `logo` (Pièces jointes) et `ordre_bandeau` (Numérique) ; si l'on veut des financeurs, une
+  table `Financeurs` (`nom`, `logo`, `ordre`) ; puis un fichier par cellule, de préférence un
+  SVG ou un PNG sur fond transparent, rogné au plus près. Modifier ces tables ne prévient pas
+  le widget : recharger la page. **La table `Financeurs` est la seule table qu'il faut créer, à
+  la main ; le widget ne l'écrit jamais.** Les financeurs ne sont pas des établissements : les
+  ranger dans `Etablissements` les ferait apparaître dans le filtre « Établissement » et dans
+  les règles de visibilité.
+- **Comment le widget lit les fichiers.** Il lit les identifiants des pièces jointes
+  (`['L', 12]`), demande à Grist un **jeton d'accès en lecture seule**
+  (`docApi.getAccessToken({ readOnly: true })`, la méthode que donne la documentation de
+  Grist) et pose dans des balises `<img>` des adresses de la forme
+  `<adresse de l'API>/attachments/<identifiant>/download?auth=<jeton>`. Le jeton est demandé
+  une seule fois pour toutes les images, renouvelé 30 secondes avant son expiration, redemandé
+  une fois quand une image échoue (page restée ouverte), et jamais plus d'une fois toutes les
+  30 secondes après un refus. Aucune requête `fetch` n'est ajoutée au code.
+- **Sécurité** (`docs/securite.md`, nouvelle section « Les logos et le jeton d'accès aux
+  pièces jointes »). Le jeton n'est **pas limité aux pièces jointes** : tant qu'il est valable
+  (quelques minutes), qui le détient peut lire le document avec les droits de la personne
+  connectée, jamais l'écrire. Il se trouve dans l'adresse de chaque logo (onglet Réseau des
+  outils du navigateur ; le navigateur écrit lui-même cette adresse dans sa console quand un
+  logo ne se charge pas : **ne pas partager de capture de la console ni de l'onglet Réseau**).
+  Le widget le garde en mémoire seulement, ne le journalise jamais ni ne l'envoie ailleurs, et
+  n'envoie pas l'adresse de la page avec la demande d'image (`referrerPolicy="no-referrer"`).
+- **Pas encore essayé dans un vrai Grist.** Les tests simulent la réponse de Grist ; la
+  section 14 de `TESTING.md` est le contrôle à jouer sur une copie du document (jeton, adresses
+  des images, droits d'un compte Lecteur, expiration du jeton, mise en page).
+- **Pour les développeurs** : `branding.js` (ce qu'on montre : fondateurs, financeurs, rond,
+  logo de chaque établissement, taille des logos ; sans DOM), `attachments.js` (le jeton et
+  l'adresse de chaque fichier ; sans DOM) et `branding-ui.js` (les images et les deux
+  bandeaux) sont nouveaux ; `loadDirectory()` renvoie aussi les lignes brutes d'`Etablissements`
+  et de `Financeurs` (table facultative, absente sans message) ; `render.js` dessine le logo
+  d'une carte, y compris dans la relecture avant/après ; `constants.js` gagne `BRANDING`,
+  `BAND_LOGO`, `FUNDER_LOGO`, `CARD_LOGO` et `PUI_URL`. `tests/support/fake-attachments.mjs`
+  sert des pièces jointes au faux Grist des tests navigateur et le faux Grist sait répondre à
+  `getAccessToken`.
+- **Démonstration et captures.** `docs/demo/logos-fictifs.mjs` dessine des logos **inventés**
+  (de proportions variées) pour les établissements et financeurs imaginaires : aucun logo
+  réel n'entre dans le dépôt public. `?sanslogos` simule un Grist qui refuse le jeton. Toutes
+  les captures de `docs/images/` sont régénérées, avec deux nouvelles (`bandeau-fondateurs.png`,
+  `sans-logos.png`).
+- **Tests** : 499 tests (164 dans un vrai navigateur, optionnels sans Playwright), dont les
+  nouveaux fichiers `tests/branding.test.mjs`, `tests/attachments.test.mjs`,
+  `tests/branding-e2e.test.mjs` et `tests/branding-layout.test.mjs` (mise en page de 320 à
+  1 920 px, logos de formes variées, en-tête aux trois largeurs, bandeau qui se replie). Un
+  nouveau test vérifie que le widget n'écrit ni le jeton ni l'adresse d'un logo dans la
+  console, et `tests/docs.test.mjs` vérifie désormais que le schéma des imports de la
+  documentation développeur est exactement celui du code et que la page de sécurité cite
+  `getAccessToken`, la nouvelle méthode de l'API de Grist qu'emploie le widget.
+- **Contrôle négatif.** Quinze modifications volontaires du code des logos (fondateur sans
+  validation, ordre 0 accepté, rond cherché par son nom exact, jeton non renouvelé avant
+  son expiration, jeton demandé en écriture, aucun délai d'attente, adresse de la page
+  envoyée avec l'image, logos des cartes chargés tout de suite, nouvelle tentative sans fin,
+  jeton non encodé, bornes de taille inversées, jeton redemandé à chaque image, échec qui
+  ne retarde pas la demande suivante, logo du dernier fichier au lieu du premier, financeurs
+  sans ordre) ont été essayées une à une, le code étant remis en état après chacune :
+  chacune fait échouer au moins un test. La « nouvelle tentative sans fin » n'en faisait
+  échouer aucun ; un test a été ajouté pour elle. Les tests de mise en page ont aussi été
+  rejoués avec DejaVu Sans seule, la police de remplacement de la CI, plus large que celle du
+  développement, ce qui a conduit à des seuils d'en-tête avec de la marge et à une zone
+  « Ma présence » qui ne change pas de hauteur quand la police est large.
 
 ## 1.13.0 — Les domaines dans le menu Compétences : un seul menu, une double recherche
 

@@ -4,7 +4,7 @@ Cette page explique comment le widget est construit et comment le modifier sans 
 
 Pages liées : [README](../README.md) (présentation et installation), [guide utilisateur](utilisateurs.md), [sécurité](securite.md), [maintenance](maintenance.md).
 
-> **Cette page décrit la version 1.14.0** : le widget lit la table `BDD` (1.8.0), range les compétences par domaine (un filtre « Domaines » en 1.9.0, intégré depuis au menu Compétences, 1.13.0), s'adapte à la largeur de son cadre (1.9.1), n'affiche que les personnes qui ont accepté d'apparaître (1.10.0), laisse la personne connectée choisir d'apparaître ou non, « Ma présence » (1.11.0), puis modifier sa fiche après une relecture de la carte avant et après (1.12.0). Un administrateur y ajoute un « mode admin » (1.14.0) qui lui permet de modifier la fiche de toute personne affichée, adresse e-mail et établissement compris, dans une fenêtre qui suit la maquette validée. Ces modifications s'appliquent directement : il n'y a ni validation par un administrateur ni historique tenu par le widget. Ce qui n'est pas encore là est résumé dans [Chantiers en cours](#chantiers-en-cours).
+> **Cette page décrit la version 1.15.0** : le widget lit la table `BDD` (1.8.0), range les compétences par domaine (un filtre « Domaines » en 1.9.0, intégré depuis au menu Compétences, 1.13.0), s'adapte à la largeur de son cadre (1.9.1), n'affiche que les personnes qui ont accepté d'apparaître (1.10.0), laisse la personne connectée choisir d'apparaître ou non, « Ma présence » (1.11.0), puis modifier sa fiche après une relecture de la carte avant et après (1.12.0), puis affiche les logos des établissements, des financeurs et des fondateurs, lus comme des pièces jointes du document, dans un en-tête et un bandeau du bas remaniés (1.14.0). Depuis la 1.15.0, un administrateur allume un « mode admin » qui lui permet de modifier la fiche de toute personne affichée, adresse e-mail et établissement compris, dans une fenêtre qui suit la maquette validée. Ces modifications s'appliquent directement : il n'y a ni validation par un administrateur ni historique tenu par le widget. Ce qui n'est pas encore là est résumé dans [Chantiers en cours](#chantiers-en-cours).
 
 ## Sommaire
 
@@ -15,6 +15,7 @@ Pages liées : [README](../README.md) (présentation et installation), [guide ut
 - [Règles d'affichage](#règles-daffichage)
 - [Identité et « Ma présence »](#identité-et--ma-présence-)
 - [Modifier une fiche](#modifier-une-fiche)
+- [Habillage : logos et pièces jointes](#habillage--logos-et-pièces-jointes)
 - [Filtres, compteurs et recherche](#filtres-compteurs-et-recherche)
 - [Rendu des cartes et des menus](#rendu-des-cartes-et-des-menus)
 - [Fiabilité : que se passe-t-il en cas de panne ?](#fiabilité--que-se-passe-t-il-en-cas-de-panne-)
@@ -35,7 +36,8 @@ flowchart LR
         direction TB
         doc[("Document Grist<br/>tables de l'annuaire")]
         page["Page du document<br/>iframe du widget"]
-        doc <-->|"API de widget<br/>onRecords, fetchTable, listTables,<br/>applyUserActions"| page
+        doc <-->|"API de widget<br/>onRecords, fetchTable, listTables,<br/>getAccessToken, applyUserActions"| page
+        doc -->|"logos : pièces jointes<br/>(balises img, jeton en lecture seule)"| page
     end
     subgraph github["GitHub"]
         direction TB
@@ -58,16 +60,16 @@ flowchart LR
 | `grist-plugin-api.js` | API de widget de Grist. `index.html` la charge depuis `docs.getgrist.com`, sans version figée | `index.html` |
 | GitHub Actions | Exécute `node --test` à chaque pull request et à chaque push sur `main` | `.github/workflows/tests.yml` |
 
-Ce que le widget fait, dans la version 1.14.0 :
+Ce que le widget fait, dans la version 1.15.0 :
 
-- il **lit** les tables du document Grist : neuf lectures `fetchTable` par chargement de l'annuaire et, pour savoir qui est connecté, la liste des tables (`listTables`) puis la table-sonde. Quand une personne prépare la relecture d'une modification, il relit aussi `BDD` (puis une dernière fois juste avant d'écrire) et lit les tables de métadonnées `_grist_Tables` et `_grist_Tables_column` (`schema.js`) ;
+- il **lit** les tables du document Grist : dix lectures `fetchTable` par chargement de l'annuaire (neuf tables, plus la table facultative `Financeurs` des logos du haut de page) et, pour savoir qui est connecté, la liste des tables (`listTables`) puis la table-sonde. Quand une personne prépare la relecture d'une modification, il relit aussi `BDD` (puis une dernière fois juste avant d'écrire) et lit les tables de métadonnées `_grist_Tables` et `_grist_Tables_column` (`schema.js`). Pour afficher les logos, il demande à Grist un **jeton d'accès en lecture seule** (`getAccessToken`, dans `attachments.js`) : ce sont les images, demandées par le navigateur, qui le portent (voir [Habillage](#habillage--logos-et-pièces-jointes)) ;
 - il **écrit** dans trois cas seulement, toujours à l'initiative d'un chargement ou d'un clic, jamais en tâche de fond :
   1. à chaque chargement, il ajoute puis supprime une ligne de la table-sonde `Annuaire_Sonde` (`identity.js`), sauf pour un compte Lecteur ou quand la table n'existe pas ;
   2. quand la personne connectée actionne l'interrupteur « Ma présence », il écrit la case `Accepte_apparaitre` de sa ou de ses lignes de `BDD` (`presence.js`), en une seule action atomique ;
   3. quand une personne valide la relecture de la modification de sa fiche (un administrateur en mode admin : de la fiche d'une autre personne affichée), il écrit les colonnes modifiées de cette seule ligne de `BDD` (`profile-save.js`), en une seule action atomique, sans validation ni historique tenu par le widget.
 
   Il ne crée ni ne modifie jamais la structure du document (tables, colonnes) ;
-- il ne stocke rien dans le navigateur et n'émet lui-même aucune requête réseau ;
+- il ne stocke rien dans le navigateur et n'émet lui-même aucune requête réseau (aucun `fetch` : les logos sont téléchargés par le navigateur, par des balises `<img>`) ;
 - il demande l'accès `full` (`grist.ready({ requiredAccess: 'full' })` dans `main.js`, `accessLevel: full` dans `manifest.yml`), un choix assumé : il lit plusieurs tables autres que celle de sa section et écrit dans le document. Les conséquences et les garde-fous sont détaillés dans [sécurité](securite.md#niveau-daccès-demandé-à-grist).
 
 ## Organisation du code
@@ -83,6 +85,11 @@ flowchart TD
         identity["identity.js<br/>qui est connecté ?"]
         presence["presence.js<br/>choix d'apparaître"]
         account["account-ui.js<br/>bandeau Ma présence"]
+    end
+    subgraph habillage["L'habillage (logos)"]
+        branding["branding.js<br/>quoi montrer"]
+        attachments["attachments.js<br/>jeton et adresses"]
+        brandingui["branding-ui.js<br/>images, bandeaux"]
     end
     subgraph fiche["Modifier une fiche"]
         profile["profile.js<br/>droits, formulaire, changements"]
@@ -104,15 +111,26 @@ flowchart TD
     main --> profile
     main --> save
     main --> profileui
+    main --> branding
+    main --> attachments
+    main --> brandingui
+    main --> constants
     render --> data
     render --> constants
+    render --> brandingui
     render --> filters
+    render --> dom
     filters --> data
     filters --> constants
     identity --> data
     identity --> constants
     presence --> constants
     data --> constants
+    branding --> data
+    branding --> constants
+    branding --> attachments
+    brandingui --> constants
+    brandingui --> branding
     profile --> data
     profile --> constants
     save --> data
@@ -138,32 +156,37 @@ Une flèche signifie « importe » ; tous les `import` des fichiers à la racine
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | Squelette de la page, `<template id="cardTemplate">` d'une carte, `<dialog id="profileDialog">` de la fenêtre de modification, chargement de l'API Grist puis de `main.js` |
+| `index.html` | Squelette de la page : l'en-tête (titre et compteur, financeurs, zone « Ma présence »), les cartes, le bandeau des fondateurs du pied de page, `<template id="cardTemplate">` d'une carte, `<dialog id="profileDialog">` de la fenêtre de modification, chargement de l'API Grist puis de `main.js` |
 | `style.css` | Feuille de style unique (variables de couleur en tête de fichier) |
-| `constants.js` | Noms de la table principale (`MAIN_TABLE`, soit `BDD`), de la case de consentement (`CONSENT_COLUMN`, soit `Accepte_apparaitre`) et de la table-sonde (`PROBE_TABLE`, soit `Annuaire_Sonde`), puis taxonomie : `CATEGORIES` donne, pour chaque catégorie, son libellé, sa couleur, sa table de référence, ses colonnes de libellé et, sauf pour l'établissement et le rôle (des Références simples), sa colonne de liste dans la table principale. `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES`, `REFERENCE_SOURCES` et `LIST_CATEGORIES` en sont dérivés. `PROFILE_FIELDS` liste ce qu'on peut modifier sur une fiche (colonne, libellé, nature : texte, e-mail, téléphone, référence ou liste), dont l'e-mail et l'établissement réservés à un administrateur (`admin: true`) ; `fieldsFor()` en tire les champs du formulaire. `ETABLISSEMENT_NAMES` désigne, parmi les libellés lus de Grist, les noms complets des établissements |
-| `grist-data.js` | Lecture des tables (`loadDirectory()`), décodage des formats Grist, enrichissement des contacts, règles d'éligibilité et de consentement (`hasAccepted()`, `buildContacts()`), l'index des personnes par adresse e-mail ou par identifiant de ligne (`createPeopleIndex()`, dont `findByEmail()` et `findById()`), `describeVisibility()` et `displayName()` (le nom d'un contact tel que les cartes l'affichent) |
+| `constants.js` | Noms de la table principale (`MAIN_TABLE`, soit `BDD`), de la case de consentement (`CONSENT_COLUMN`, soit `Accepte_apparaitre`) et de la table-sonde (`PROBE_TABLE`, soit `Annuaire_Sonde`), puis taxonomie : `CATEGORIES` donne, pour chaque catégorie, son libellé, sa couleur, sa table de référence, ses colonnes de libellé et, sauf pour l'établissement et le rôle (des Références simples), sa colonne de liste dans la table principale. `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES`, `REFERENCE_SOURCES` et `LIST_CATEGORIES` en sont dérivés. `PROFILE_FIELDS` liste ce qu'on peut modifier sur une fiche (colonne, libellé, nature : texte, e-mail, téléphone, référence ou liste), dont l'e-mail et l'établissement réservés à un administrateur (`admin: true`) ; `fieldsFor()` en tire les champs du formulaire. `ETABLISSEMENT_NAMES` désigne, parmi les libellés lus de Grist, les noms complets des établissements. `BRANDING` nomme les colonnes et la table des logos (`logo`, `ordre_bandeau`, `Financeurs`) et le financeur du rond (`France 2030`) ; `BAND_LOGO`, `FUNDER_LOGO` et `CARD_LOGO` donnent la surface et les bornes des logos ; `PUI_URL` est la page du projet |
+| `grist-data.js` | Lecture des tables (`loadDirectory()`), décodage des formats Grist, enrichissement des contacts, règles d'éligibilité et de consentement (`hasAccepted()`, `buildContacts()`), l'index des personnes par adresse e-mail ou par identifiant de ligne (`createPeopleIndex()`, dont `findByEmail()` et `findById()`), `describeVisibility()` et `displayName()` (le nom d'un contact tel que les cartes l'affichent). `loadDirectory()` renvoie aussi les lignes brutes d'`Etablissements` et de `Financeurs`, que lit `branding.js` |
 | `filters.js` | Forme de l'état des filtres (`createEmptyFilterState()`), `filterContacts()`, `computeFilterCounts()`, `pruneStaleFilters()`, et le menu rangé par groupe (les compétences par domaine) : `menuGroups()`, `groupState()`, `toggleGroup()`, `selectionCount()` |
-| `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`, dont le menu Compétences rangé par domaine) et cartes (`renderCards()`, avec, sous la fonction, le bouton « Modifier » des fiches que la personne peut modifier : « ✎ Modifier » sur la sienne, « ✎ Modifier la fiche » sur celles des autres en mode admin) ; cartes de relecture sans interaction (`renderPreviewCard()`), où ce qui change est repéré ; `initials()` sert aussi au bandeau « Ma présence » |
+| `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`, dont le menu Compétences rangé par domaine) et cartes (`renderCards()`, avec, sous la fonction, le bouton « Modifier » des fiches que la personne peut modifier : « ✎ Modifier » sur la sienne, « ✎ Modifier la fiche » sur celles des autres en mode admin) ; cartes de relecture sans interaction (`renderPreviewCard()`), où ce qui change est repéré ; `initials()` sert aussi au bandeau « Ma présence ». Le logo de l'établissement remplace la pastille quand Grist en a un (`fillEtablissement()`) |
 | `identity.js` | `readIdentity()` : qui est connecté ? Ajoute une ligne dans la table-sonde `Annuaire_Sonde` (dont Grist calcule l'adresse par une formule `user.Email`), la relit par son identifiant puis la supprime. Renvoie l'adresse et la case administrateur, ou « personne » au moindre doute ; ne bloque jamais l'annuaire |
 | `presence.js` | « Ma présence » : `describePresence()` dit à la personne si elle apparaît et pourquoi, `setPresence()` écrit son accord (`Accepte_apparaitre`) sur sa ou ses lignes en une seule action atomique. `describeUnknownAccount()` dit à une personne connectée dont l'adresse ne figure pas dans `BDD` qu'il n'y a pas de fiche à modifier (un administrateur y trouve son mode admin) ; `describeHiddenFiche()` dit, à la relecture d'une modification, pourquoi la fiche modifiée ne figurerait pas dans l'annuaire ; `classifyWriteError()` range un refus de Grist (règle d'accès, colonne à formule, autre) et sert aussi à `profile-save.js` |
-| `account-ui.js` | Le bandeau « Ma présence » au-dessus des filtres, avec le bouton « Modifier mon profil » et, pour un administrateur, le bouton « Mode admin » (`setActions()`) : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier |
+| `account-ui.js` | Le bandeau « Ma présence » dans l'en-tête, à droite du titre et des financeurs, avec le bouton « Modifier mon profil » et, pour un administrateur, le bouton « Mode admin » (`setActions()`) : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier |
 | `profile.js` | Modifier une fiche, sans DOM ni Grist : `rightsFor()` (qui peut modifier quelle fiche : la sienne, ou toutes pour un administrateur qui a allumé le mode admin ; fermé par défaut), `profileFormModel()` et `draftOf()` (ce que le formulaire propose), `diffProfile()` (ce que la personne a changé, sous forme de delta, et pourquoi une saisie serait refusée, dont une adresse e-mail déjà prise), `rebaseChanges()` (ramener ces changements sur la fiche telle qu'elle est maintenant dans Grist) et `describeChanges()` (la liste « Ce qui change ») |
 | `profile-save.js` | Relire puis écrire une fiche : `prepareReview()` relit la fiche dans Grist et prépare les cartes avant et après, `saveProfile()` écrit en une seule action atomique (`UpdateRecord`), et seulement si les champs touchés n'ont pas changé depuis la relecture (`signatureOf()`) ; l'e-mail et l'établissement ne s'écrivent que pour une relecture préparée par un administrateur. `buildRowUpdate()` calcule les valeurs à écrire sur la fiche telle qu'elle est au moment d'écrire, `readRow()` la relit, `unsavedLabels()` dit ce que Grist n'a pas gardé |
 | `preview.js` | `previewOf()` : la carte « avant » et la carte « après » (la ligne avec les valeurs qui seront écrites, enrichie comme l'annuaire) ; `diffContacts()` : ce qui les distingue, y compris l'établissement et l'adresse e-mail |
 | `schema.js` | `readColumnTypes()` : le type des colonnes de `BDD` d'après les métadonnées de Grist, pour écrire le téléphone dans la forme de sa colonne |
 | `profile-ui.js` | La fenêtre de modification (`createProfileDialog()`) : formulaire, relecture avant/après (légende, cartes côte à côte, détail des changements), puis fermeture et message de confirmation, ou la fenêtre « Fiche enregistrée » quand il reste une réserve à lire. DOM seulement |
 | `changes-ui.js` | `renderChangeList()` : la liste « Ce qui change » de la relecture et de la confirmation. DOM seulement |
+| `branding.js` | L'habillage, sans DOM ni Grist : `buildBranding()` (les fondateurs du bandeau du bas, les financeurs, le rond, le logo de chaque établissement), `logoForContact()` (le logo d'une carte) et `logoSize()` (la taille d'un logo d'après ses proportions) |
+| `attachments.js` | Les pièces jointes de Grist : `attachmentIds()` lit une cellule « Pièces jointes », `createAttachments()` détient le jeton d'accès en lecture seule (`getAccessToken`) et donne l'adresse de chaque fichier ; il parle à Grist par le `docApi` qu'on lui passe, sans toucher au DOM |
+| `branding-ui.js` | Le DOM de l'habillage : `createLogoImage()` (une image qui se charge à l'écran, ou le nom en texte), `sizeLogo()`, `createBrandingUI()` (les financeurs de l'en-tête, le bandeau des fondateurs et son rond) |
 | `dom.js` | `el()` : crée un élément avec sa classe et son texte (jamais du HTML : ce qui vient de Grist reste du texte) |
 | `dialogs.css` | Feuille de style de la fenêtre de modification (formulaire, relecture, confirmation) et du message de confirmation |
 | `main.js` | Point d'entrée : détient l'état de l'application (dont le mode admin), relie `window.grist` et les événements du DOM aux autres modules, et affiche le message de confirmation d'un enregistrement (`showToast()`) |
 
 Règles de répartition, à respecter pour que les tests restent possibles sans navigateur :
 
-1. `constants.js`, `grist-data.js`, `filters.js`, `identity.js`, `presence.js`, `profile.js`, `profile-save.js`, `preview.js` et `schema.js` n'utilisent jamais le DOM.
-2. Seules `loadDirectory()` et `readColumnTypes()` (lectures), `readIdentity()`, `setPresence()` et les fonctions de `profile-save.js` (`prepareReview()` lit, `saveProfile()` écrit) parlent à Grist, par le `docApi` qu'on leur passe : les tests leur fournissent un faux `docApi` (`tests/support/fake-grist.js`). `profile.js` et `preview.js` ne l'utilisent jamais.
+1. `constants.js`, `grist-data.js`, `filters.js`, `identity.js`, `presence.js`, `profile.js`, `profile-save.js`, `preview.js`, `schema.js`, `branding.js` et `attachments.js` n'utilisent jamais le DOM.
+2. Seules `loadDirectory()` et `readColumnTypes()` (lectures), `createAttachments()` (il demande un jeton), `readIdentity()`, `setPresence()` et les fonctions de `profile-save.js` (`prepareReview()` lit, `saveProfile()` écrit) parlent à Grist, par le `docApi` qu'on leur passe : les tests leur fournissent un faux `docApi` (`tests/support/fake-grist.js`). `profile.js` et `preview.js` ne l'utilisent jamais.
 3. `render.js` ne contient aucune règle métier : il reçoit des contacts déjà filtrés et des fonctions de rappel (`onToggle`, et `onToggleGroup` pour la case d'un domaine). Ce qu'il sait d'un menu rangé par groupe (les groupes, l'état d'une case de domaine, le chiffre du bouton) vient des fonctions pures de `filters.js`, d'où la flèche `render.js` → `filters.js` du schéma.
+
 4. `filters.js` n'a pas d'effet de bord : `pruneStaleFilters()` renvoie un nouvel état au lieu de modifier son argument.
-5. Seul `main.js` détient l'état de l'application (`state`). La fenêtre de modification ne garde que l'état de sa propre session (étape, brouillon), jeté à sa fermeture ; `profile-ui.js`, `changes-ui.js` et `dom.js` ne contiennent aucune règle métier : `main.js` leur donne ce que les autres modules ont calculé.
+5. `branding-ui.js` et `render.js` ne contiennent aucune règle sur ce qu'on montre : `branding.js` l'a décidé. Les images ne sont jamais construites avec du HTML (`textContent` et propriétés du DOM seulement).
+6. Seul `main.js` détient l'état de l'application (`state`). La fenêtre de modification ne garde que l'état de sa propre session (étape, brouillon), jeté à sa fermeture ; `profile-ui.js`, `changes-ui.js` et `dom.js` ne contiennent aucune règle métier : `main.js` leur donne ce que les autres modules ont calculé.
 
 ## Chargement des données
 
@@ -177,9 +200,9 @@ sequenceDiagram
     G->>M: onRecords (au chargement, puis à chaque édition de la table principale)
     Note over M: debounce de 250 ms, numéro de requête
     M->>D: loadDirectory(docApi, { previousMaps })
-    D->>G: fetchTable × 9, en parallèle
+    D->>G: fetchTable × 10, en parallèle
     G-->>D: tables en colonnes
-    D-->>M: contacts, referenceMaps, etabFlags, people, issues
+    D-->>M: contacts, referenceMaps, etabFlags, people, lignes des logos, issues
     M->>M: applyDirectory : purge des sélections périmées, menus de filtre
     M->>F: filterContacts, computeFilterCounts
     M->>R: renderCards, updateFilterCounts
@@ -191,19 +214,19 @@ sequenceDiagram
 2. `onRecords` ne sert que de **déclencheur** : son contenu est ignoré. Il ne porte pas forcément toutes les colonnes de `BDD` (selon la vue branchée) et résout les Références en texte, alors que `fetchTable()` renvoie la table complète, les Références en identifiants de ligne. Grist ne rappelle `onRecords` que pour les changements de la table liée à la section du widget : modifier une table de référence ne rafraîchit pas le widget (voir [Limites connues](maintenance.md#limites-connues)).
 3. Le rappel est temporisé (anti-rebond : `debounce()`, 250 ms) : une rafale d'éditions ne déclenche qu'une lecture. Chaque lecture reçoit un numéro (`createRequestSequencer()`) et seule la plus récente applique son résultat.
 4. `loadDirectory()` enchaîne :
-   - `readAllTables()` lit les neuf tables en parallèle avec `Promise.allSettled` : une table illisible ne fait pas échouer les autres ;
+   - `readAllTables()` lit les dix tables en parallèle avec `Promise.allSettled` : une table illisible ne fait pas échouer les autres, et `Financeurs`, facultative (`OPTIONAL_TABLES`), est lue sans qu'aucun message ne signale son absence ;
    - `requireReadable()` puis `requireColumns()` lèvent une `DirectoryLoadError` si une donnée indispensable manque : table `BDD` ou `Etablissements` illisible, colonne obligatoire absente, y compris `Accepte_apparaitre` (voir [Fiabilité](#fiabilité--que-se-passe-t-il-en-cas-de-panne-)) ;
    - `readReferenceMaps()` construit, pour chaque **catégorie** (`REFERENCE_SOURCES`), la correspondance id → libellé : le libellé corrigé s'il est rempli, le libellé brut sinon. Une table illisible garde les libellés précédents de ses catégories (`previousMaps`). Un regroupement comme « Domaines » est complété ensuite par `completeGroupMap()` ;
    - `etablissementFlagsFromRows()` indexe les indicateurs de chaque établissement (fondateur, partenaire, validé) par identifiant de ligne, et par libellé en repli ;
    - `isInScope()` écarte les lignes sans périmètre ; `buildContacts()` ne garde ensuite que les personnes qui ont accepté d'apparaître (`hasAccepted()`), les enrichit avec `enrich()`, puis ne garde que celles qui ont un nom ou un prénom et un établissement éligible (voir [Règles d'affichage](#règles-daffichage)) ;
    - `createPeopleIndex()` indexe **toutes** les lignes de `BDD`, affichées ou non, par adresse e-mail : c'est ce qui permet à « Ma présence » de retrouver la fiche de la personne connectée et de lui dire pourquoi elle n'apparaît pas (voir [Identité et « Ma présence »](#identité-et--ma-présence-)) ;
    - `describeEmptyDirectory()` explique pourquoi l'annuaire est vide quand c'est anormal, y compris quand personne n'a accepté d'apparaître.
-5. `applyDirectory()` (dans `main.js`) restreint le menu Établissement aux établissements validés (`filterVisibleEstablishments()`), retire des filtres actifs les valeurs qui n'existent plus (`pruneStaleFilters()`), reconstruit les menus **seulement si les libellés ont changé** (`referenceMapsEqual()`, car reconstruire ferme les menus ouverts), puis rafraîchit les cartes (`refreshCards()`) et le bandeau « Ma présence » (`refreshAccount()`).
+5. `applyDirectory()` (dans `main.js`) restreint le menu Établissement aux établissements validés (`filterVisibleEstablishments()`), retire des filtres actifs les valeurs qui n'existent plus (`pruneStaleFilters()`), reconstruit les menus **seulement si les libellés ont changé** (`referenceMapsEqual()`, car reconstruire ferme les menus ouverts), met à jour l'habillage (`applyBranding()`, [voir plus bas](#habillage--logos-et-pièces-jointes)), puis rafraîchit les cartes (`refreshCards()`) et le bandeau « Ma présence » (`refreshAccount()`).
 6. `showStatus()` affiche ou masque le bandeau d'état avec les messages de `issues`.
 
 Cette suite est enveloppée dans `reloadDirectory()` (`main.js`), qui renvoie `'applied'`, `'stale'` (une lecture plus récente a pris le relais) ou `'failed'` (le bandeau d'état le dit). `onRecords` l'appelle après le délai d'anti-rebond ; l'interrupteur « Ma présence » et l'enregistrement d'une fiche (`saveReviewed()`) l'appellent directement après leur écriture, pour que l'écran montre ce que Grist a enregistré.
 
-`loadDirectory()` renvoie `{ contacts, referenceMaps, etabFlags, people, issues }` : les contacts éligibles et enrichis, les libellés de chaque catégorie (`referenceMaps`, rangés par **clé de catégorie** et non par table, parce que « Compétences » et « Domaines » lisent la même table `Competences`), les indicateurs des établissements, l'index des personnes par adresse e-mail (`people`) et les messages français destinés au bandeau d'état.
+`loadDirectory()` renvoie `{ contacts, referenceMaps, etabFlags, people, etablissementRows, financeurRows, issues }` : les contacts éligibles et enrichis, les libellés de chaque catégorie (`referenceMaps`, rangés par **clé de catégorie** et non par table, parce que « Compétences » et « Domaines » lisent la même table `Competences`), les indicateurs des établissements, l'index des personnes par adresse e-mail (`people`), les lignes brutes d'`Etablissements` et de `Financeurs` (`financeurRows` vaut `null` quand cette table manque), dont `branding.js` tire les logos, et les messages français destinés au bandeau d'état.
 
 Un contact enrichi garde toutes ses colonnes d'origine et reçoit :
 
@@ -346,7 +369,7 @@ Tout ce qui précède est du JavaScript qui tourne dans le navigateur de la pers
 
 ## Modifier une fiche
 
-Depuis la version 1.12.0, une personne connectée modifie sa propre fiche ; depuis la 1.14.0, un administrateur modifie celle de toute personne affichée dans l'annuaire, à condition d'avoir allumé le **mode admin**. Les modifications s'appliquent **directement** : il n'y a ni validation par un administrateur, ni historique tenu par le widget, ni table créée par lui. Avant d'enregistrer, une fenêtre de relecture montre la carte « Avant » et la carte « Après », avec ce qui change repéré ; l'aspect de la fenêtre, de la relecture, des repères et du message de confirmation est celui de la maquette v5 validée le 12 octobre 2026. Les réglages à faire dans Grist (colonnes de données, règles d'accès) sont dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) ; le protocole d'essai manuel est la [section 13 de `TESTING.md`](../TESTING.md#13-modifier-sa-fiche-1120-reprise-en-1140) (et la [section 14](../TESTING.md#14-mode-admin-e-mail-et-établissement-1140) pour le mode admin).
+Depuis la version 1.12.0, une personne connectée modifie sa propre fiche ; depuis la 1.15.0, un administrateur modifie celle de toute personne affichée dans l'annuaire, à condition d'avoir allumé le **mode admin**. Les modifications s'appliquent **directement** : il n'y a ni validation par un administrateur, ni historique tenu par le widget, ni table créée par lui. Avant d'enregistrer, une fenêtre de relecture montre la carte « Avant » et la carte « Après », avec ce qui change repéré ; l'aspect de la fenêtre, de la relecture, des repères et du message de confirmation est celui de la maquette v5 validée le 12 octobre 2026. Les réglages à faire dans Grist (colonnes de données, règles d'accès) sont dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) ; le protocole d'essai manuel est la [section 13 de `TESTING.md`](../TESTING.md#13-modifier-sa-fiche-1120-reprise-en-1150) (et la [section 15](../TESTING.md#15-mode-admin-e-mail-et-établissement-1150) pour le mode admin).
 
 ### Qui peut modifier quoi
 
@@ -464,6 +487,44 @@ Le widget n'attend la validation de personne, ne tient aucun historique des modi
 
 `profile.js`, `profile-save.js`, `preview.js` et `schema.js` se testent sans navigateur avec le faux document de `tests/support/fake-grist.js` (qui sait refuser une ligne précise, `denyRows`, et cache les tables `_grist_*` de `listTables`, comme Grist) : `tests/profile.test.mjs`, `tests/profile-save.test.mjs`, `tests/preview.test.mjs` et `tests/schema.test.mjs`. Le parcours complet, dans Chromium, est `tests/e2e-profile.test.mjs` : le mode admin, l'e-mail et l'établissement d'un administrateur, la relecture et ses repères, le message de confirmation (son délai se mesure avec l'horloge du navigateur, `page.clock`), les échecs, et la tenue de la fenêtre dans des cadres de 280, 320 et 360 px de large.
 
+## Habillage : logos et pièces jointes
+
+Depuis la version 1.14.0, l'annuaire affiche des logos : celui de chaque établissement sur ses cartes, ceux des financeurs au centre de l'en-tête et ceux des fondateurs dans un bandeau tout en bas. Ils sont lus dans le document Grist, où ce sont des **pièces jointes**. Les réglages à faire dans Grist sont à l'étape 5 de [`GRIST_SETUP.md`](../GRIST_SETUP.md), le protocole d'essai manuel est la [section 14 de `TESTING.md`](../TESTING.md#14-logos-et-habillage-1140) et ce que permet le jeton d'accès est décrit dans [sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes). Tout est facultatif : sans colonne ni table de logos, le widget affiche les noms et s'en passe.
+
+### Ce qui est lu, et ce qui est montré (`branding.js`)
+
+`loadDirectory()` renvoie les lignes brutes d'`Etablissements` (colonnes `logo`, Pièces jointes, et `ordre_bandeau`, Numérique) et de la table facultative `Financeurs` (`nom`, `logo`, `ordre`), ou `null` pour elle quand elle manque ; les noms sont dans `BRANDING` (`constants.js`). `main.js` (`applyBranding()`) en tire `buildBranding()`, sans rien casser en cas d'erreur : la console dit `[LOGOS] Impossible d'afficher les logos` et les cartes restent affichées. Les règles :
+
+- **Bandeau du bas** : les établissements qui sont `fondateur` **et** `ok_pour_apparaitre`, triés par `ordre_bandeau` ; sans numéro valable (vide, 0, texte), un établissement passe après les autres, dans l'ordre de la table. Son libellé est l'acronyme, à défaut le nom complet, qui sert aussi d'infobulle.
+- **Financeurs** : les lignes de `Financeurs` qui ont un nom ou un logo, triées par `ordre` de la même façon. Le financeur dont le nom (casse et accents ignorés) est `BRANDING.roundelFunder`, « France 2030 », est aussi le **rond** qui ferme le bandeau du bas.
+- **Logo d'une carte** : `logoForContact()` retrouve l'établissement du contact par l'identifiant de ligne de `BDD.Etablissement`, ou par son libellé quand Grist a déjà résolu la Référence en texte. Un établissement sans logo garde la pastille texte.
+- **Un seul fichier par cellule** : le premier. `attachmentIds()` lit une cellule `['L', 12, 13]` (ou un identifiant seul) et ignore tout ce qui n'est pas un entier positif, le marqueur `L` compris.
+- `buildBranding()` calcule aussi une `signature` : `branding-ui.js` ne reconstruit les financeurs et le bandeau que si elle change, car refaire les images à chaque lecture de Grist les ferait clignoter.
+
+### Le jeton d'accès (`attachments.js`)
+
+Grist ne laisse pas une balise `<img>` lire une pièce jointe sans autorisation. `createAttachments(docApi)` demande donc un jeton à `docApi.getAccessToken({ readOnly: true })`, la méthode que donne la documentation de Grist pour afficher une pièce jointe, et en tire l'adresse de chaque fichier : `<baseUrl>/attachments/<identifiant>/download?auth=<jeton>`. Il offre trois fonctions, sans toucher au DOM :
+
+- `url(id)` : l'adresse du fichier avec le jeton détenu, ou `null` sans jeton valable ;
+- `ready()` : `true` quand un jeton valable est détenu (il est demandé au besoin), `false` si Grist n'en donne pas ;
+- `refresh(adresseEnErreur)` : une image a échoué ; `true` si un autre jeton peut être essayé.
+
+La gestion du jeton est volontairement prudente, parce que Grist ne met pas ses jetons en cache : **une seule demande à la fois** (cent images en erreur ne font qu'une demande) ; un jeton est gardé jusqu'à son expiration (`ttlMsecs`, 5 minutes à défaut) et **redemandé 30 secondes avant**, ce qui garde des adresses identiques, donc le cache du navigateur ; une demande qui ne reçoit aucune réponse en 8 secondes est un échec ; après un échec, **pas de nouvelle demande avant 30 secondes** et un seul avertissement `[LOGOS]` par série d'échecs ; un jeton obtenu depuis moins de 10 secondes n'est pas redemandé sur la seule foi d'une image en erreur. `readTokenInfo()` refuse une réponse sans jeton ou dont l'adresse de base n'est pas une adresse web sans paramètre. Le widget ne journalise jamais le jeton ni l'adresse d'un logo (`tests/branding-e2e.test.mjs`).
+
+### Les images (`branding-ui.js`)
+
+- `createLogoImage()` fabrique une `<img>` invisible tant qu'elle n'est pas chargée (pas de cadre cassé ni de texte alternatif qui clignote ; elle apparaît en fondu, sans animation si la personne demande moins de mouvement). Elle porte le nom en texte alternatif, `decoding="async"`, `referrerPolicy="no-referrer"` (l'adresse de la page n'est pas envoyée au serveur de Grist) et `loading="lazy"` sur les cartes, `eager` dans l'en-tête et le bandeau.
+- **Quand une image échoue**, elle est retentée **une fois** avec un jeton renouvelé (`refresh()`) : il a pu expirer pendant que la page restait ouverte. Au second échec, ou sans jeton, le rappel de repli (`onFail`) remplace le logo par le nom, en texte, une seule fois. L'annuaire reste utilisable avec des noms partout.
+- **Taille optique** : `logoSize()` vise une **surface** (`BAND_LOGO`, `FUNDER_LOGO`, `CARD_LOGO` dans `constants.js`) répartie selon les proportions du fichier, puis bornée en largeur et en hauteur : un emblème carré, une bannière large et une signature haute ont ainsi un poids visuel voisin, comme sur un bandeau dessiné à la main. `sizeLogo()` écrit le résultat dans les variables CSS `--w` et `--h` ; sans proportions connues (un SVG sans `width` ni `height`), la feuille de style borne l'image.
+- **Sur une carte**, le logo est dans le bouton `etablissement-tag` : on l'atteint au clavier, un clic filtre sur l'établissement, son nom est l'infobulle et le texte alternatif. La classe `with-logo` de la carte lui donne la place de deux rangées, parce qu'un logo est plus haut qu'une pastille.
+- **Mise en page de l'en-tête** (`style.css`, largeurs du cadre Grist et non de l'écran) : sous 860 px, tout s'empile (titre, financeurs, zone « Ma présence ») ; de 860 à 1179 px, deux colonnes, le titre à gauche et à droite les financeurs au-dessus de la zone « Ma présence », devenue compacte (une grille de deux rangées : l'avatar et le message, puis l'interrupteur et le bouton, dont l'étiquette passe sur deux lignes plutôt que de rejeter le bouton sur une troisième rangée) ; à partir de 1180 px, trois colonnes, le titre, les financeurs au centre, la zone « Ma présence » à droite, la légende des financeurs n'étant affichée qu'à partir de 1320 px (elle reste dans la page, pour les lecteurs d'écran). Les seuils laissent de la marge avec DejaVu Sans, la police de la CI, plus large que Inter. Les logos des financeurs sont désaturés par `filter: grayscale(1)` (discrets, comme sur la maquette) ; le rond du bandeau du bas, qui est le même fichier, garde ses couleurs. Le bandeau du bas passe de huit à quatre colonnes sous 560 px de largeur utile. Tests : `tests/branding-layout.test.mjs`.
+
+### Tests de l'habillage
+
+`tests/branding.test.mjs` (règles de `buildBranding()`, `logoForContact()` et `logoSize()`, jusqu'au branchement sur `loadDirectory()`) et `tests/attachments.test.mjs` (jeton : une seule demande, renouvellement, échecs, délai, réponses inattendues, aucune adresse dans la console) tournent sans navigateur avec le faux Grist, dont `getAccessToken` répond ce qu'on lui demande. Les scénarios navigateur sont `tests/branding-e2e.test.mjs` (ce que voit la personne : logos, noms de repli, financeurs, bandeau, relecture) et `tests/branding-layout.test.mjs` (mise en page de 320 à 1920 px, logos de formes variées). Dans les tests navigateur, `tests/support/fake-attachments.mjs` répond à la place de Grist avec des images dessinées à la demande, dont des cas limites : un logo très haut, une bannière très large, un SVG sans dimensions, un fichier supprimé et un fichier qui n'est pas une image.
+
+**Limite assumée.** Aucun de ces tests ne parle à un vrai Grist : ils vérifient que le widget fait ce que la documentation de Grist décrit, pas que l'instance de l'État le permet. C'est ce que contrôle la section 14 de `TESTING.md`.
+
 ## Filtres, compteurs et recherche
 
 `filterContacts(contacts, activeFilters, searchTerm, scope, excludeKey)` combine trois prédicats : `matchesSearch()` (nom ou prénom), `matchesScope()` (interrupteurs) et `matchesSelections()` (menus).
@@ -479,14 +540,14 @@ Le widget n'attend la validation de personne, ne tient aucun historique des modi
 
 ## Rendu des cartes et des menus
 
-- `renderCards()` vide la grille puis ajoute une carte par contact (`buildCard()`), clonée depuis `<template id="cardTemplate">`. Les lignes facultatives (fonction, e-mail, téléphone, badge d'établissement) sont remplies par `reveal()`, qui leur ajoute la classe `visible` : le CSS masque l'e-mail, le téléphone et le badge tant qu'ils ne l'ont pas ; une fonction vide reste dans la page sans occuper de hauteur.
+- `renderCards()` vide la grille puis ajoute une carte par contact (`buildCard()`), clonée depuis `<template id="cardTemplate">`. Les lignes facultatives (fonction, e-mail, téléphone, badge d'établissement : son logo, ou sa pastille texte) sont remplies par `reveal()`, qui leur ajoute la classe `visible` : le CSS masque l'e-mail, le téléphone et le badge tant qu'ils ne l'ont pas ; une fonction vide reste dans la page sans occuper de hauteur.
 - **Aucune donnée Grist n'est insérée comme HTML** : tout passe par `textContent`. `innerHTML` n'est utilisé que pour vider un conteneur. Un prénom contenant `<img onerror=…>` s'affiche en texte (scénario de `tests/e2e.test.mjs`).
 - Le lien `mailto:` n'est créé que pour une adresse simple (`mailtoHref()`, expression régulière `SAFE_EMAIL`) : une adresse saisie avec `?cc=…`, plusieurs destinataires ou des espaces reste du texte.
 - Les tags d'une catégorie filtrable sont des `<button>` ; ceux de « Rôle PUI » sont des `<span>` non cliquables (`buildTag()`).
 - `createFilterUI()` construit tous les menus (`buildFilter()` → `buildFilterMenu()` → `buildOption()`). Chaque option porte sa valeur dans `data-value` : le texte affiché n'est pas la source. Un bouton de filtre peut porter une infobulle (`hint` dans `CATEGORIES`, utilisée par « Compétences »), et son champ de recherche un texte d'invite (`placeholder`), assez court pour ne pas être coupé dans un menu de 270px : un test en fixe la longueur.
 - **Le menu rangé par groupe** (`buildGroupedMenu()` → `buildGroup()`, quand `menuGroups()` n'est pas `null`) montre une ligne par domaine : une vraie case à cocher (« partielle » par `indeterminate`, `paintGroup()`), le nombre de cartes, et un bouton flèche qui déplie les compétences (`aria-expanded`, `aria-controls`, `aria-label` « Détail de … »). Les domaines sont repliés au départ ; le repli passe par la classe `open`, jamais par l'attribut `hidden`, que le CSS impose en `display: none !important`. Le champ de recherche du menu trouve un domaine comme une compétence (`searchGroups()`) : un domaine dont le nom correspond garde toutes ses compétences, un autre seulement celles qui correspondent ; tant qu'on cherche, tout est déplié (classe `searching`). Rien ne bouge pendant qu'on coche : c'est `settleGroupedMenu()`, à l'ouverture du menu, qui remet en tête les domaines et les compétences cochés et déplie les domaines cochés en partie.
 - `updateFilterUI()` met à jour **un seul menu** (cases, ordre, compteur du bouton) après un clic sur une case, un tag de carte ou un badge d'établissement ; `updateFilterCounts()` rafraîchit les compteurs de tous les menus. Aucun des deux ne reconstruit les menus : cela fermerait un menu ouvert et effacerait la saisie en cours dans sa recherche interne. Les menus ne sont reconstruits (`rebuildFilterUI()`) que par « Réinitialiser », précisément pour vider ces champs, et quand un rechargement apporte des libellés différents.
-- Mise en page : le widget s'adapte à la largeur de son cadre Grist, sans largeur minimale (`.widget-shell` garde `max-width: 1480px`). Les seuils de `style.css` sont ceux du cadre, pas de l'écran : sous 1400px les filtres passent sous la recherche, sous 840px les cartes se mettent sur deux colonnes, sous 600px sur une seule avec une barre d'outils empilée et un texte plus grand. Un écran tactile (`pointer: coarse`) reçoit en plus des cibles d'au moins 28px et des champs à 16px, et le survol n'y reste pas collé (`hover: none`). À partir de 1400px, la mise en page est celle de départ. `keepMenuInView()` (`render.js`) décale un menu de filtre qui sortirait du cadre à droite. Tests : `tests/responsive.test.mjs` ; protocole manuel : [`TESTING.md`](../TESTING.md), section 12 ; exigence : [`specs.md`](../specs.md).
+- Mise en page : le widget s'adapte à la largeur de son cadre Grist, sans largeur minimale (`.widget-shell` garde `max-width: 1480px`). Les seuils de `style.css` sont ceux du cadre, pas de l'écran (l'en-tête a les siens : [Habillage](#habillage--logos-et-pièces-jointes)) : sous 1400px les filtres passent sous la recherche, sous 840px les cartes se mettent sur deux colonnes, sous 600px sur une seule avec une barre d'outils empilée et un texte plus grand. Un écran tactile (`pointer: coarse`) reçoit en plus des cibles d'au moins 28px et des champs à 16px, et le survol n'y reste pas collé (`hover: none`). À partir de 1400px, la mise en page est celle de départ. `keepMenuInView()` (`render.js`) décale un menu de filtre qui sortirait du cadre à droite. Tests : `tests/responsive.test.mjs` ; protocole manuel : [`TESTING.md`](../TESTING.md), section 12 ; exigence : [`specs.md`](../specs.md).
 
 ## Fiabilité : que se passe-t-il en cas de panne ?
 
@@ -566,14 +627,18 @@ npx playwright install chromium         # ou CHROMIUM_PATH=/chemin/vers/chromium
 | `tests/profile-save.test.mjs` | `buildRowUpdate()` (listes calculées sur la fiche actuelle, téléphone numérique ou texte), `signatureOf()`, `prepareReview()` (cartes avant et après, rien d'écrit), `saveProfile()` (une seule action atomique, conflit concurrent, refus de Grist, aucune adresse dans la console) et `unsavedLabels()` |
 | `tests/preview.test.mjs` | `diffContacts()` et `previewOf()` : ce qui change entre la carte avant et la carte après |
 | `tests/schema.test.mjs` | `readColumnTypes()` : type des colonnes, repli quand les métadonnées sont illisibles |
+| `tests/attachments.test.mjs` | `attachmentIds()` et `createAttachments()` avec le faux Grist : jeton en lecture seule demandé une seule fois, renouvelé avant son expiration, échecs et délai d'attente, réponses inattendues, aucune adresse ni jeton dans la console |
+| `tests/branding.test.mjs` | `buildBranding()` : bandeau des fondateurs (validés, dans l'ordre), financeurs, rond « France 2030 », logo de chaque établissement ; `logoForContact()`, `logoSize()` et le branchement sur `loadDirectory()` (table `Financeurs` facultative) |
 | `tests/e2e.test.mjs` | Le vrai `index.html` dans Chromium avec le faux Grist : cartes, badge d'établissement, filtres, menu Compétences par domaine (case de domaine, détail, recherche à deux niveaux), compteurs, interrupteurs, pannes, consentement, bandeau « Ma présence » et son interrupteur |
 | `tests/e2e-profile.test.mjs` | Le même `index.html` : qui voit un bouton « Modifier », le formulaire, la relecture avant/après, l'écriture, les refus, les conflits, l'accessibilité de la fenêtre, y compris dans un cadre étroit |
+| `tests/branding-e2e.test.mjs` | Le même `index.html` avec des logos servis par `tests/support/fake-attachments.mjs` : logo seul sur les cartes, nom de repli, financeurs, bandeau des fondateurs, relecture, jeton refusé ou absent, fichier supprimé ou illisible, aucune trace du jeton dans la console |
+| `tests/branding-layout.test.mjs` | Le même `index.html` de 320 à 1920px avec des logos de formes variées : en-tête (titre, financeurs, profil), logos dans leur case, bandeau qui se replie, rien qui dépasse |
 | `tests/responsive.test.mjs` | Le même `index.html` de 280 à 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs`) : pas de défilement horizontal, texte contenu dans les cartes, colonnes, barre d'outils, menus de filtres dans le cadre (dont le menu Compétences déplié, et une compétence au nom très long), cibles tactiles, tailles de texte |
 | `tests/docs.test.mjs` | La documentation ne se périme pas : liens, noms de fonctions cités, jeu de données fictif et personnes de démonstration, serveur de démonstration, affirmations de sécurité (aucun appel réseau, aucun stockage, méthodes de l'API Grist employées) |
 
 - **Version de Node.** Le dépôt n'a pas de `package.json` : Node ne reconnaît les modules ES écrits en `.js` que grâce à la détection automatique de la syntaxe, activée par défaut depuis Node 20.19 et 22.7. En dessous (Node 18, 21, 22.6…), les tests échouent avec « Named export … not found » : c'est l'environnement qui est en cause, pas le code. Le serveur de démonstration, en `.mjs`, démarre dès Node 18.
-- Les tests unitaires n'ont aucune dépendance. `tests/e2e.test.mjs`, `tests/e2e-profile.test.mjs` et `tests/responsive.test.mjs` ont besoin de Playwright et de Chromium (l'outillage commun des deux premiers est dans `tests/support/browser.mjs`) ; sans eux leurs scénarios sont ignorés et `node --test` reste vert. La CI définit `REQUIRE_E2E=1` : un navigateur absent y est un échec, pas un « tout vert » sur des tests ignorés.
-- Le test navigateur est isolé du réseau : seuls le serveur local et l'API Grist simulée répondent, tout le reste est bloqué.
+- Les tests unitaires n'ont aucune dépendance. `tests/e2e.test.mjs`, `tests/e2e-profile.test.mjs`, `tests/responsive.test.mjs`, `tests/branding-e2e.test.mjs` et `tests/branding-layout.test.mjs` ont besoin de Playwright et de Chromium (l'outillage commun est dans `tests/support/browser.mjs`) ; sans eux leurs scénarios sont ignorés et `node --test` reste vert. La CI définit `REQUIRE_E2E=1` : un navigateur absent y est un échec, pas un « tout vert » sur des tests ignorés.
+- Le test navigateur est isolé du réseau : seuls le serveur local, l'API Grist simulée et ses pièces jointes (les logos) répondent, tout le reste est bloqué.
 - Limite assumée : l'API Grist est simulée, avec des données aux encodages observés en production. Ces tests garantissent que le vrai `main.js` et le vrai `render.js` réagissent correctement à ces encodages et à ces pannes ; ils ne garantissent pas que Grist les envoie toujours. Le faux document ne reproduit ni les règles d'accès de Grist ni le calcul réel des formules : il ne rejoue que le résultat attendu de la formule de la sonde (`Email` = adresse de la personne, `Admin` d'après `ACL`). D'où le protocole manuel de [`TESTING.md`](../TESTING.md), à jouer dans un vrai document avant un déploiement qui touche `main.js`, `render.js`, `index.html` ou `style.css`.
 - Chaque correction s'accompagne d'un test de non-régression, dans le fichier du module concerné. Une fonction ajoutée à `grist-data.js` ou `filters.js` a son test ; un changement d'affichage adapte ou ajoute un scénario de `tests/e2e.test.mjs` (ou de `tests/e2e-profile.test.mjs` pour la fenêtre de modification), et un changement de mise en page (`style.css`) un scénario de `tests/responsive.test.mjs`.
 
@@ -583,8 +648,9 @@ Le dossier `docs/demo/` permet d'essayer le vrai widget **sans document Grist** 
 
 | Fichier | Rôle |
 |---|---|
-| `docs/demo/donnees-fictives.mjs` | Jeu de données inventé (personnes, établissements, tables de référence, domaines de compétences, table-sonde vide et table `ACL`) à la structure de [`grist_structure.txt`](../grist_structure.txt) et au format que renvoie `fetchTable()`. `tablesFictives()` le construit, `CARTES_ATTENDUES` donne le nombre de cartes qu'il doit produire et `PERSONNES_DEMO` les adresses fictives que la démonstration peut connecter |
-| `docs/demo/serveur-demo.mjs` | Sert le dépôt avec le faux document Grist des tests (`tests/support/fake-grist.js`) à la place de l'API de widget. `index.html` n'est pas dupliqué : il est lu à chaque requête, et seule la balise qui charge `grist-plugin-api.js` est remplacée |
+| `docs/demo/donnees-fictives.mjs` | Jeu de données inventé (personnes, établissements avec leur logo et leur place dans le bandeau, financeurs, tables de référence, domaines de compétences, table-sonde vide et table `ACL`) à la structure de [`grist_structure.txt`](../grist_structure.txt) et au format que renvoie `fetchTable()`. `tablesFictives()` le construit, `CARTES_ATTENDUES` donne le nombre de cartes qu'il doit produire et `PERSONNES_DEMO` les adresses fictives que la démonstration peut connecter |
+| `docs/demo/logos-fictifs.mjs` | Les logos de la démonstration : des dessins SVG inventés pour les établissements et les financeurs imaginaires, de proportions variées. Chaque dessin a un numéro de pièce jointe (`IDS_LOGOS`) et `pieceJointe(id)` donne son SVG |
+| `docs/demo/serveur-demo.mjs` | Sert le dépôt avec le faux document Grist des tests (`tests/support/fake-grist.js`) à la place de l'API de widget, et ces logos comme pièces jointes (avec un contrôle du jeton). `index.html` n'est pas dupliqué : il est lu à chaque requête, et seule la balise qui charge `grist-plugin-api.js` est remplacée |
 | `docs/demo/capturer.mjs` | Régénère les images de `docs/images/` avec Playwright ; chaque capture est précédée d'une vérification (nombre de cartes, bandeau, fenêtre de modification) |
 
 ```bash
@@ -600,6 +666,8 @@ node docs/demo/serveur-demo.mjs                # puis http://127.0.0.1:8080  (PO
 # …&refus=BDD                                  simule une règle d'accès qui refuse d'écrire dans BDD
 #                                              (choix de présence comme modification de fiche)
 # …&readonly=true                              ouvre le widget comme un compte Lecteur : ni bandeau ni bouton « Modifier »
+# http://127.0.0.1:8080/?sanslogos             simule un Grist qui refuse le jeton d'accès aux pièces jointes :
+#                                              les noms remplacent tous les logos
 
 npm install --no-save playwright && npx playwright install chromium
 node docs/demo/capturer.mjs                    # réécrit docs/images/*.png
@@ -607,7 +675,7 @@ node docs/demo/capturer.mjs                    # réécrit docs/images/*.png
 
 Règles :
 
-- **Rien de réel dans le dépôt.** Les personnes et établissements sont inventés, les adresses se terminent par `.example` (domaine réservé à la documentation, RFC 2606) et les numéros appartiennent au plan réservé à la fiction (`05 36 49 xx xx`, `06 39 98 xx xx`, décision ARCEP n° 2018-0881). `tests/docs.test.mjs` le vérifie.
+- **Rien de réel dans le dépôt.** Les personnes, les établissements et leurs logos (des dessins inventés) sont inventés, les adresses se terminent par `.example` (domaine réservé à la documentation, RFC 2606) et les numéros appartiennent au plan réservé à la fiction (`05 36 49 xx xx`, `06 39 98 xx xx`, décision ARCEP n° 2018-0881). `tests/docs.test.mjs` le vérifie.
 - Après toute modification de l'interface, relancer `docs/demo/capturer.mjs`, regarder les images et les committer avec le changement.
 - Quand la structure Grist change, adapter `docs/demo/donnees-fictives.mjs` : `tests/docs.test.mjs` échoue tant que le jeu fictif n'est pas lu sans erreur par le vrai `loadDirectory()`.
 - Dans le jeu fictif, tout le monde a accepté d'apparaître (`Accepte_apparaitre`) sauf une personne qui a refusé : seuls les établissements et le périmètre décident des autres. `PERSONNES_DEMO` désigne une personne qui apparaît, une qui a refusé, une qui a accepté mais reste masquée (son établissement n'est pas validé) et un administrateur : ce sont elles que photographient les captures « Ma présence » (les trois captures de la modification d'une fiche, le bouton, le formulaire et la relecture, montrent la même modification de la personne qui apparaît), et `tests/docs.test.mjs` vérifie que le bandeau dit pour chacune ce que le guide annonce.
@@ -663,7 +731,7 @@ Règles :
 
 ## Chantiers en cours
 
-Au 12 octobre 2026, `main` est en version 1.14.0. Cette documentation la décrit et sera mise à jour à chaque fusion.
+Au 12 octobre 2026, `main` est en version 1.15.0 (la 1.14.0 est l'habillage, la 1.13.0 le menu Compétences par domaine). Cette documentation la décrit et sera mise à jour à chaque fusion.
 
 **Déjà fusionné**
 
@@ -673,12 +741,13 @@ Au 12 octobre 2026, `main` est en version 1.14.0. Cette documentation la décrit
 4. **Consentement individuel** (1.10.0) : seules les personnes dont `BDD.Accepte_apparaitre` est coché apparaissent, en plus de la validation de leur établissement. La colonne est obligatoire et un annuaire vide est expliqué par le bandeau d'état : voir [Règles d'affichage](#règles-daffichage).
 5. **« Ma présence »** (1.11.0) : le widget identifie la personne connectée grâce à une table-sonde et lui laisse choisir d'apparaître ou non, comme le décrit [Identité et « Ma présence »](#identité-et--ma-présence-). C'est la première fois que le widget écrit dans le document : [sécurité](securite.md) en tire les conséquences, et [`GRIST_SETUP.md`](../GRIST_SETUP.md) liste les réglages à faire dans Grist.
 6. **Modifier sa fiche directement, avec relecture avant et après** (1.12.0) : une personne connectée modifie sa propre fiche de `BDD`, un administrateur celle de toute personne affichée. Avant d'enregistrer, une fenêtre de relecture montre la carte « Avant » et la carte « Après », les changements étant repérés sur la carte « Après », avec un bouton pour valider. Les modifications s'appliquent directement : le widget ne tient ni validation par un administrateur ni historique, et ne crée aucune table. Voir [Modifier une fiche](#modifier-une-fiche).
-7. **Mode admin, e-mail et établissement, fenêtre fidèle à la maquette** (1.14.0) : un administrateur allume le « mode admin » du bandeau pour modifier la fiche de n'importe quelle personne affichée, adresse e-mail et établissement compris ; la fenêtre de modification, la relecture, les repères sur les cartes et le message de confirmation suivent la maquette v5 validée le 12 octobre 2026. Voir [Modifier une fiche](#modifier-une-fiche) et [Qui peut modifier quoi](#qui-peut-modifier-quoi).
+7. **Habillage : logos et pièces jointes** (1.14.0) : le logo de chaque établissement sur ses cartes, les financeurs au centre d'un en-tête qui réunit titre, financeurs et profil, et le bandeau des fondateurs en bas de page, dans l'ordre fixé dans Grist. Les logos sont des pièces jointes du document, lues avec un jeton d'accès en lecture seule ; la table facultative `Financeurs` se crée à la main et le widget n'y écrit jamais. Voir [Habillage](#habillage--logos-et-pièces-jointes).
+8. **Mode admin, e-mail et établissement, fenêtre fidèle à la maquette** (1.15.0) : un administrateur allume le « mode admin » du bandeau pour modifier la fiche de n'importe quelle personne affichée, adresse e-mail et établissement compris ; la fenêtre de modification, la relecture, les repères sur les cartes et le message de confirmation suivent la maquette v5 validée le 12 octobre 2026. Voir [Modifier une fiche](#modifier-une-fiche) et [Qui peut modifier quoi](#qui-peut-modifier-quoi).
 
-**Pas encore dans la 1.14.0**
+**Pas encore dans la 1.15.0**
 
 Ce qui suit n'est pas dans le code, et aucune date n'est promise.
 
-8. **La modification de la fiche d'un établissement par son responsable** : pas encore. Aucun code du widget ne lit la colonne `Responsable_de_l_Etablissement` d'`ACL`. Un administrateur ne modifie pas non plus, depuis le widget, une fiche que l'annuaire masque (pas de carte, donc pas de bouton).
-9. **Un avatar** : pas encore. Les cartes n'affichent que les initiales de la personne ; aucun code ne lit de colonne Avatar.
-10. **Créer sa fiche** et **choisir l'adresse e-mail affichée** : pas encore. Une personne connectée dont l'adresse ne figure pas dans `BDD` voit un bandeau qui le dit, sans bouton pour créer sa fiche ; aucun code ne lit de colonne `email_affiche`.
+9. **La modification de la fiche d'un établissement par son responsable** : pas encore. Aucun code du widget ne lit la colonne `Responsable_de_l_Etablissement` d'`ACL`. Un administrateur ne modifie pas non plus, depuis le widget, une fiche que l'annuaire masque (pas de carte, donc pas de bouton).
+10. **Un avatar** : pas encore. Les cartes n'affichent que les initiales de la personne ; aucun code ne lit de colonne Avatar.
+11. **Créer sa fiche** et **choisir l'adresse e-mail affichée** : pas encore. Une personne connectée dont l'adresse ne figure pas dans `BDD` voit un bandeau qui le dit, sans bouton pour créer sa fiche ; aucun code ne lit de colonne `email_affiche`.

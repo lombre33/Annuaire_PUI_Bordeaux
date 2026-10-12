@@ -213,20 +213,24 @@ test('le bouton « Modifier » est rangé sous la fonction, dans la colonne du n
   }
 });
 
-test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le texte passe à la ligne au lieu de se laisser écraser par l\'interrupteur', { skip }, async () => {
+test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le texte passe à la ligne au lieu de se laisser écraser par l\'interrupteur, et le bouton « Mode admin » ne le serre pas', { skip }, async () => {
   const parts = ['.account-avatar', '.account-identity', '.presence-switch', '.account-edit', '.account-admin'];
-  for (const width of [280, 320, 390, 560, 768, 1280]) {
+  for (const width of [280, 320, 390, 560, 768, 860, 1000, 1180, 1280, 1440]) {
     await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await waitForCards(page, 4);
       await adminToggle(page).waitFor();
-      const { bar, boxes, clipped } = await page.evaluate(selectors => {
+      const { bar, title, boxes, clipped, track, label } = await page.evaluate(selectors => {
         const rect = element => { const { x, y, width, height } = element.getBoundingClientRect(); return { x, y, width, height }; };
         const identity = document.querySelector('.account-identity');
+        const labelElement = document.querySelector('.presence-label');
         return {
           bar: rect(document.getElementById('accountBar')),
+          title: rect(document.querySelector('.page-title')),
           boxes: Object.fromEntries(selectors.map(selector => [selector, rect(document.querySelector(selector))])),
-          clipped: identity.scrollWidth > identity.clientWidth + 1
+          clipped: identity.scrollWidth > identity.clientWidth + 1,
+          track: rect(document.querySelector('.presence-track')),
+          label: { lines: labelElement.getBoundingClientRect().height / parseFloat(getComputedStyle(labelElement).lineHeight) }
         };
       }, parts);
       for (const selector of parts) {
@@ -240,6 +244,14 @@ test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le t
       }
       assert.equal(clipped, false, `à ${width} px : le nom et le message de la personne ne sont pas coupés`);
       assert.ok(boxes['.account-identity'].width >= 120, `à ${width} px : le texte garde de la largeur (${Math.round(boxes['.account-identity'].width)} px)`);
+      assert.ok(Math.abs(track.width - 38) <= 0.5, `à ${width} px : la piste de l'interrupteur garde sa largeur (${Math.round(track.width)} px)`);
+      if (width >= 860) {
+        // Dans l'en-tête compact, « Mode admin » est dans le coin de la première rangée : l'interrupteur
+        // garde la largeur de son étiquette, sur une ligne, et le bandeau ne dépasse pas le titre.
+        assert.ok(boxes['.account-admin'].y + boxes['.account-admin'].height <= boxes['.presence-switch'].y + 0.5, `à ${width} px : « Mode admin » est au-dessus de l'interrupteur`);
+        assert.ok(label.lines < 1.5, `à ${width} px : l'étiquette de l'interrupteur tient sur une ligne (${label.lines.toFixed(1)})`);
+        assert.ok(bar.height <= title.height + 12, `à ${width} px : le bandeau fait ${Math.round(bar.height)} px, le titre ${Math.round(title.height)} px`);
+      }
     });
   }
 });

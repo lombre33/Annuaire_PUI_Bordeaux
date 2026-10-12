@@ -10,6 +10,36 @@ export const CONSENT_COLUMN = 'Accepte_apparaitre';
 // au document et se crée à la main : GRIST_SETUP.md donne ses colonnes.
 export const PROBE_TABLE = 'Annuaire_Sonde';
 
+// Habillage : logos des établissements et des financeurs, bandeau des fondateurs.
+// Tout est facultatif (GRIST_SETUP.md) : sans ces colonnes ni cette table, le
+// widget affiche les noms à la place des logos et rien à la place des financeurs.
+//   Etablissements   `logo` (Pièces jointes) et `ordre_bandeau` (Numérique)
+//   Financeurs       `nom`, `logo` (Pièces jointes) et `ordre` (Numérique)
+// La table Financeurs se crée à la main : le widget n'écrit jamais dedans.
+export const BRANDING = {
+  logoColumn: 'logo',
+  bandOrderColumn: 'ordre_bandeau',
+  fundersTable: 'Financeurs',
+  funderNameColumn: 'nom',
+  funderLogoColumn: 'logo',
+  funderOrderColumn: 'ordre',
+  // Le financeur dont le logo ferme le bandeau du bas.
+  roundelFunder: 'France 2030'
+};
+
+// Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
+// logos, 1 014 pour la largeur du bandeau fourni par le PUI) et des financeurs (pixels) :
+// surface visée et bornes en largeur et en hauteur, voir logoSize() dans branding.js. Ces
+// valeurs reproduisent, à une dizaine de pour cent près, les tailles du bandeau fourni.
+export const BAND_LOGO = { area: 4150, maxWidth: 118, maxHeight: 58 };
+export const FUNDER_LOGO = { area: 1100, maxWidth: 110, maxHeight: 36 };
+// Sur une carte, le logo tient dans 92 x 32 px à ses proportions, sans autre règle de
+// surface (la surface visée est celle de la boîte : elle ne borne jamais).
+export const CARD_LOGO = { area: 92 * 32, maxWidth: 92, maxHeight: 32 };
+
+// Page du projet, vers laquelle renvoie la phrase du bandeau du bas.
+export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos-leviers/pui-reveler-le-potentiel-du-territoire';
+
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.
 //   label, color  affichage

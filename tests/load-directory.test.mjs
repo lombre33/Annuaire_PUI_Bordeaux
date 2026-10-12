@@ -54,11 +54,11 @@ test('loadDirectory returns the displayable contacts, each with its Etablissemen
   assert.equal(docApi.calls.BDD, 1);
 });
 
-test('loadDirectory reads the tables of the new structure and none of the old ones', async () => {
+test('loadDirectory reads the tables of the new structure, the optional funders table, and none of the old ones', async () => {
   const docApi = fakeDocApi(sampleTables());
   await loadDirectory(docApi, { log: recordingLog() });
   assert.deepEqual(Object.keys(docApi.calls).sort(), [
-    'Actions', 'BDD', 'Communautes', 'Competences', 'Etablissements', 'GT', 'INSTANCES', 'Role_Dans_le_PUI', 'Taches'
+    'Actions', 'BDD', 'Communautes', 'Competences', 'Etablissements', 'Financeurs', 'GT', 'INSTANCES', 'Role_Dans_le_PUI', 'Taches'
   ]);
 });
 

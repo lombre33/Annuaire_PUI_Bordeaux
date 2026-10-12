@@ -18,6 +18,12 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onAdminMode = 
   const adminButton = part('.account-admin');
   const status = part('.account-status');
 
+  // Dans l'en-tête compact, « Mode admin » prend le coin de la première rangée quand
+  // l'interrupteur occupe la deuxième : la feuille de style en a besoin pour placer le nom.
+  const placeAdminButton = () => {
+    root.classList.toggle('admin-corner', !adminButton.hidden && !switchButton.hidden);
+  };
+
   switchButton.addEventListener('click', () => {
     if (!switchButton.disabled) onToggle();
   });
@@ -34,6 +40,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onAdminMode = 
       detail.dataset.tone = view.tone;
       switchButton.setAttribute('aria-checked', String(view.accepted));
       switchButton.hidden = view.switchable === false;
+      placeAdminButton();
       root.hidden = false;
     },
 
@@ -47,6 +54,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onAdminMode = 
     setActions({ edit = false, admin = false, adminMode = false } = {}) {
       editButton.hidden = !edit;
       adminButton.hidden = !admin;
+      placeAdminButton();
       adminButton.setAttribute('aria-pressed', String(admin && adminMode));
       adminButton.title = adminMode
         ? 'Quitter le mode admin'

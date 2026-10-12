@@ -10,11 +10,12 @@ la faire et comment vérifier qu'elle a marché.
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?) | personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change |
 | 3 | Case `admin` cochée dans `ACL` pour les administrateurs | personne n'est administrateur |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation |
+| 5 | Les logos : colonnes `logo` et `ordre_bandeau` dans `Etablissements`, table `Financeurs` (facultatif) | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas, pas de financeurs en tête de page ; rien d'autre ne change |
 
 Le widget ne crée ni ne modifie jamais la structure du document (table, colonne,
 règle d'accès) : tout ce qui est ci-dessous se fait à la main, une fois. Il n'écrit que
 des lignes : celle de la personne dans `BDD` (son choix de présence, sa fiche) et la
-ligne passagère d'`Annuaire_Sonde`.
+ligne passagère d'`Annuaire_Sonde`. Les logos (étape 5) ne sont que lus.
 
 ## 1. Les colonnes que le widget écrit : des colonnes de données
 
@@ -102,8 +103,9 @@ class Annuaire_Sonde:
 Vérifier : ouvrez le widget avec un compte qui peut modifier le document et dont
 l'adresse figure dans la colonne `email` de `BDD`, console du navigateur ouverte. Vous
 devez voir `[IDENTITE] personne identifiée (administrateur : oui|non)` (jamais
-l'adresse elle-même), le bandeau « Ma présence » au-dessus des filtres, un bouton
-« Modifier » sur la carte de la personne, et la table `Annuaire_Sonde` vide.
+l'adresse elle-même), la zone « Ma présence » à droite de l'en-tête (sous le titre sur
+un écran étroit), un bouton « Modifier » sur la carte de la personne, et la table
+`Annuaire_Sonde` vide.
 
 Si le bandeau manque, la console dit pourquoi :
 
@@ -172,6 +174,98 @@ fenêtre, mais Grist refusera la modification.
 Un refus des règles d'accès n'abîme rien : le widget affiche « Grist a refusé la
 modification : vos droits ne permettent pas de changer cette fiche… », la relecture
 reste ouverte, rien n'a été écrit.
+
+## 5. Les logos (facultatif)
+
+Le widget est aux couleurs du consortium plutôt qu'à celles d'un établissement : le logo
+de chaque établissement figure sur ses cartes, les financeurs sont rappelés en haut de
+la page et les logos des fondateurs forment un bandeau en bas. Ces logos sont des
+**pièces jointes du document Grist** : le dépôt du widget n'en contient aucun (il est
+public, et un logo réel n'y a pas sa place sans l'accord de son titulaire). Sans ces
+colonnes, sans cette table ou sans fichier, rien ne casse : le **nom** de l'établissement
+remplace son logo (la pastille de toujours sur ses cartes, son acronyme en texte dans le
+bandeau du bas), et il n'y a pas de financeurs en tête de page. Le bandeau du bas, lui,
+est affiché dès qu'un établissement fondateur a validé sa présence, même sans aucun logo.
+
+**Dans `Etablissements`**, deux colonnes à ajouter (noms exacts) :
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `logo` | Pièces jointes | Le logo de l'établissement : sur ses cartes et, pour un fondateur, dans le bandeau du bas. Seul le premier fichier de la cellule est utilisé |
+| `ordre_bandeau` | Numérique | La place du fondateur dans le bandeau du bas : 1 est tout à gauche, puis 2, 3… Sans numéro, le fondateur passe après ceux qui en ont un, dans l'ordre de la table |
+
+Le bandeau du bas montre les établissements **fondateurs** qui ont **validé** leur
+apparition (`ok_pour_apparaitre` coché) : un fondateur qui ne l'a pas fait n'y figure
+pas. Un partenaire ou une structure « autres » n'y figure jamais, mais son logo apparaît
+sur les cartes de ses membres. Les logos se rangent sur une ou deux rangées selon la
+largeur du cadre (huit colonnes, quatre sur un cadre étroit), et s'ajustent d'eux-mêmes :
+le bandeau reste lisible avec seize logos.
+
+**Une table `Financeurs`**, créée à la main (une ligne par financeur ; nom de la table et
+des colonnes exacts) :
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `nom` | Texte | Le nom du financeur : affiché à la place du logo quand le fichier manque, et lu par les lecteurs d'écran |
+| `logo` | Pièces jointes | Le logo du financeur |
+| `ordre` | Numérique | L'ordre des logos en haut de la page, de gauche à droite : 1, 2, 3… |
+
+Le financeur dont le `nom` est exactement `France 2030` (casse et accents ignorés) ferme
+aussi le bandeau du bas, sous la forme d'un rond : c'est celui du bandeau que le PUI a
+fourni. Un financeur d'un autre nom ne figure qu'en haut de page.
+
+Déposez les logos **en couleurs** : en haut de page, les financeurs doivent rester discrets,
+le widget les y affiche donc en niveaux de gris (comme sur la maquette), alors que le rond du
+bandeau du bas, qui est le même fichier, garde ses couleurs.
+
+*Pourquoi une table, alors que le widget n'en crée jamais ?* Les financeurs ne sont pas
+des établissements : les ranger dans `Etablissements` les ferait apparaître dans le filtre
+« Établissement » et dans les règles de visibilité. Une petite table, créée une fois à la
+main, que le widget **lit sans jamais y écrire** et dont l'absence ne gêne rien, est le
+plus simple. Le widget ne crée pas cette table : si elle manque, il n'affiche simplement
+pas de financeurs.
+
+**Préparer les fichiers**
+
+- **PNG ou SVG**, de préférence **SVG** (net à toute taille), sur **fond transparent**,
+  **rognés au plus près du dessin**. Le widget ajuste lui-même la taille de chaque logo
+  pour qu'une rangée de logos de formes différentes (un emblème carré, une bannière
+  large, une signature haute) ait un poids visuel voisin : une marge blanche autour d'un
+  logo le ferait paraître plus petit que les autres, et un fond blanc opaque dessinerait
+  un rectangle blanc sur le fond de la page.
+- Un SVG doit déclarer sa taille (`width` et `height`, ou au moins un `viewBox`).
+- Une cellule peut contenir plusieurs fichiers, mais seul le premier est affiché : pour
+  changer un logo, **remplacez** le fichier au lieu d'en ajouter un.
+- Aucun logo n'est un secret : toute personne qui peut lire le document peut télécharger
+  ses pièces jointes.
+
+**Ajouter ou changer un logo.** Dans Grist, cliquez la cellule `logo` de l'établissement
+ou du financeur, puis le « + » (ou glissez le fichier). Modifier ces tables ne rafraîchit
+pas le widget tout seul : rechargez la page.
+
+**Comment le widget les lit.** Il demande à Grist un jeton d'accès **en lecture seule**
+(`getAccessToken`) et affiche chaque logo par une balise `<img>` à l'adresse que Grist
+indique : c'est la méthode que la documentation de Grist donne pour afficher une pièce
+jointe. Le jeton figure donc dans l'adresse de l'image ; il ne permet que de **lire** le
+document (pas d'y écrire), pour quelques minutes, puis le widget en demande un autre. Voir
+[`docs/securite.md`](docs/securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes).
+Cet affichage **n'a pas pu être essayé dans un vrai document Grist** (les tests simulent
+la réponse de Grist) : vérifiez-le sur votre document avant de compter dessus
+([`TESTING.md`](TESTING.md), section 14).
+
+Vérifier : ouvrez le widget, console ouverte. Les logos des établissements apparaissent
+sur les cartes, ceux des financeurs au centre de l'en-tête, ceux des fondateurs en bas
+de page. Si ce n'est pas le cas, la console dit pourquoi :
+
+| Ce que vous voyez | Cause | Remède |
+|---|---|---|
+| `[LOGOS] Jeton d'accès aux pièces jointes indisponible : les logos sont remplacés par le texte.` et des noms à la place de tous les logos | Grist ne donne pas de jeton (version de Grist sans `getAccessToken`, ou règle d'accès qui interdit la lecture des pièces jointes) | Vérifier l'accès du widget (`full`) et la version de Grist ; essayer avec un compte qui peut modifier le document |
+| Le nom d'**un seul** établissement à la place de son logo, ou un message « Failed to load resource » du navigateur | Le fichier est absent de la cellule `logo`, a été supprimé, ou n'est pas une image lisible (PNG, SVG, JPEG…) | Remplacer le fichier dans Grist |
+| `[LOGOS] Impossible d'afficher les logos : …` | Une erreur inattendue en construisant l'habillage ; les cartes restent affichées | Transmettre la ligne au mainteneur du code |
+| Pas de financeurs en tête de page | La table `Financeurs` n'existe pas (ou son nom diffère), ou elle est vide | Reprendre les noms exacts ci-dessus |
+| Pas de bandeau en bas de page | Aucun établissement n'est à la fois `fondateur` et `ok_pour_apparaitre` | Cocher les deux cases pour les fondateurs |
+| Le rond du bandeau manque | Le financeur ne s'appelle pas exactement `France 2030` | Corriger le `nom` |
+| Un logo paraît trop petit, ou entouré de blanc | Marge ou fond blanc dans le fichier | Rogner l'image, fond transparent |
 
 ## À savoir
 
