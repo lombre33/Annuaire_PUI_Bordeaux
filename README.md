@@ -138,7 +138,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── changes-ui.js         Liste des changements (formulaire, relecture, confirmation)
 ├── etablissement.js      Fiche d'un établissement : droits, brouillon, changements (sans DOM)
 ├── etablissement-save.js Relire puis écrire la fiche d'un établissement et ses responsables, en une seule action Grist
-├── etablissement-ui.js   Fenêtre « Fiche de l'établissement »
+├── etablissement-ui.js   Fenêtre « Fiche de l’établissement »
 ├── image-prep.js         Prépare l'image choisie (logo, photo de profil) : contrôle, redessin, PNG ou JPEG
 ├── upload.js             Envoie un fichier (logo, photo) à Grist : la seule requête réseau du widget
 ├── branding.js           Habillage : fondateurs, financeurs, logo de chaque établissement (sans DOM)
