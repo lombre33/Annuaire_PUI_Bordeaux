@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.16.2 — Pastilles et lien e-mail plus foncés, lisibles (WCAG 1.4.3)
+
+Troisième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un
+gain par version), pour la part du constat **U19** qui touche aux couleurs des étiquettes. **C'est le
+seul gain du lot qui change l'aspect de la page** : les pastilles, les titres de groupe et le lien
+e-mail sont plus sombres. Tout le reste (mise en page, textes, tailles, filtres, données) est
+inchangé. Deux fichiers portent le changement, `constants.js` et `style.css` : revenir aux couleurs
+d'avant, c'est `git revert` de la fusion de cette version.
+
+- **Pourquoi.** Le texte blanc d'une pastille mesure 8,5 px ; la norme (WCAG 1.4.3, niveau AA) exige
+  4,5:1 entre le texte et son fond, quelle que soit sa taille. Cinq des dix couleurs de catégorie
+  faisaient de 2,16:1 à 3,56:1 : l'audit comptait 134 pastilles sur 202 et 60 titres de groupe sur 80
+  sous le seuil, plus le lien e-mail à 3,30:1.
+- **Ce qui change.** Les cinq couleurs sont foncées **à teinte et saturation constantes** (on ne baisse
+  que la luminosité : chaque catégorie garde sa couleur), jusqu'à 4,6:1 au moins avec le blanc :
+
+  | Catégorie | Avant | Après |
+  |---|---|---|
+  | Actions | `#f28a54` (2,46:1) | `#c84e0f` (4,61:1) |
+  | Tâches | `#ff9800` (2,16:1) | `#a96500` (4,62:1) |
+  | Communautés | `#d85b9d` (3,56:1) | `#cf3788` (4,61:1) |
+  | GT | `#1ba99a` (2,92:1) | `#158378` (4,62:1) |
+  | Instances | `#4f8ee8` (3,30:1) | `#2271e2` (4,64:1) |
+  | Lien e-mail (`--blue`) | `#4f8ee8` (3,30:1) | `#2271e2` (4,64:1) |
+
+  Les cinq autres catégories (Compétences, Domaines, Actions des tâches, Établissement, Rôle PUI)
+  étaient déjà conformes et ne bougent pas.
+- **Où cela se voit.** Partout où le widget lit `CATEGORIES[…].color` : pastilles et titres de groupe des
+  cartes, point de couleur des boutons de filtre, filet de couleur en haut de leur menu, et, dans la
+  fenêtre de modification de fiche, titres de section et pastilles cochées. Le lien e-mail des cartes
+  prend le nouveau bleu. Les variables `--orange`, `--teal` et `--pink` de `style.css` ne changent
+  pas : elles servent à des décors qui ne portent pas de texte (filet de couleur en haut des cartes,
+  avatar, piste de l'interrupteur de présence, ✦ de l'état vide, icône de confirmation).
+- **Reste ouvert dans U19, pour d'autres lots** : le sous-titre de la page sur son dégradé (4,03:1),
+  les invites des champs (4,34:1), le nombre à droite d'une option de menu sous le survol (4,22:1) et
+  l'interrupteur de présence éteint (4,49:1, traité avec les autres constats de l'interrupteur).
+- **Pour les développeurs** : `constants.js` dit que la couleur d'une catégorie doit garder 4,5:1 avec
+  le blanc et comment en choisir une autre (la foncer à teinte constante) ; la recette « Ajouter une
+  catégorie » de `docs/developpeurs.md` et la section « Accessibilité » en parlent, et `TESTING.md`
+  a un contrôle à l'œil pour un vrai Grist.
+- **Tests** : 643 tests (221 dans un vrai navigateur, optionnels sans Playwright), 3 de plus qu'à la
+  1.16.1. Dans `tests/accessibility.test.mjs` : chaque couleur de `CATEGORIES` garde 4,5:1 avec le blanc,
+  et la couleur de `.email` lue dans `style.css` aussi (sans navigateur : une catégorie ajoutée plus tard
+  est contrôlée aussi) ; dans le navigateur, chaque pastille, chaque titre de groupe et le lien e-mail
+  d'une carte qui porte une pastille de chaque catégorie sont mesurés sur la page rendue (couleur de texte
+  et fond calculés), ce qui garde aussi le branchement de `render.js`. Douze variantes fautives ont été
+  essayées une à une, le code étant remis en état après chacune (chacune des cinq couleurs et du bleu de
+  retour à l'ancienne valeur, lien e-mail sur la variable orange ou en gris clair, titres de groupe et fond
+  des pastilles en couleur fixe, texte des pastilles en gris clair, nouvelle catégorie trop claire) : toutes
+  font échouer au moins un test.
+- **Documentation** : captures où une pastille, un titre de groupe, un point de filtre ou le lien e-mail
+  se voit (dix-huit sur vingt-trois) ; les cinq autres (« Ma présence », bandeau d'erreur, bandeau des
+  fondateurs) sont celles de la 1.16.1.
+
 ## 1.16.1 — Cartes triées par nom, recherche « prénom nom »
 
 Deuxième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un
