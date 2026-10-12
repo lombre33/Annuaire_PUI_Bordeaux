@@ -1,4 +1,4 @@
-// Rendu DOM — pas de logique métier ici, uniquement de la construction d'éléments.
+// Construction du DOM (menus de filtres, cartes), sans logique métier.
 
 import { TAG_GROUPS, FILTERS } from './constants.js';
 import { compareLabels, formatPhone, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
@@ -10,8 +10,8 @@ export function createFilterUI(container, referenceMaps, activeFilters, onToggle
   FILTERS.forEach(filter => {
     const wrapper = document.createElement('div');
     wrapper.className = 'filter';
-    // Sert à retrouver ce menu depuis updateFilterUI() après un clic, sans
-    // reconstruire tous les menus (ce qui fermerait ceux déjà ouverts).
+    // Permet à updateFilterUI() de retrouver ce menu sans reconstruire les autres
+    // (ce qui fermerait ceux qui sont ouverts).
     wrapper.dataset.filterKey = filter.key;
 
     const selected = activeFilters[filter.key];
@@ -40,8 +40,7 @@ export function createFilterUI(container, referenceMaps, activeFilters, onToggle
     search.placeholder = `Rechercher dans ${filter.label}…`;
     search.autocomplete = 'off';
     search.addEventListener('input', () => {
-      // normalize() (casse ET accents), comme la recherche principale et le
-      // matching des filtres : "competence" doit trouver "Compétence".
+      // Même normalisation que la recherche principale : « competence » trouve « Compétence ».
       const term = normalize(search.value);
       menu.querySelectorAll('.filter-option').forEach(option => {
         const label = normalize(option.querySelector('.option-label').textContent);
@@ -86,18 +85,12 @@ export function createFilterUI(container, referenceMaps, activeFilters, onToggle
   });
 }
 
-// Après un clic qui coche/décoche un filtre (case du menu, badge
-// établissement ou bulle de tag sur une carte — les trois passent par le
-// même onToggle), remet à jour UNIQUEMENT le menu concerné : options cochées
-// remontées en tête (chaque groupe re-trié alphabétiquement — ne pas se fier
-// à l'ordre DOM existant, une valeur qui passe de cochée à décochée doit
-// reprendre sa place alphabétique, pas rester "gelée" là où elle était) et
-// badge de comptage sur le bouton. Ne reconstruit pas le DOM du menu : un
-// autre menu ouvert, ou une recherche tapée dedans, ne doit pas être perturbé
-// par le clic (cf. correctif 1.4.0 sur la reconstruction destructive).
+// Après un clic sur une case, un badge d'établissement ou un tag de carte :
+// met à jour le seul menu concerné (cases, ordre, badge) sans le reconstruire,
+// pour ne pas fermer un autre menu ni effacer une recherche en cours.
 export function updateFilterUI(container, filterKey, activeFilters) {
   const wrapper = container.querySelector(`[data-filter-key="${filterKey}"]`);
-  if (!wrapper) return; // ex: tag "Rôle PUI", qui n'a pas de menu (non filtrable)
+  if (!wrapper) return; // « Rôle PUI » n'a pas de menu
 
   const selected = activeFilters[filterKey];
   const menu = wrapper.querySelector('.filter-menu');
@@ -111,15 +104,13 @@ export function updateFilterUI(container, filterKey, activeFilters) {
     const value = option.querySelector('.option-label').textContent;
     const isSelected = selected.has(value);
     option.classList.toggle('checked', isSelected);
-    // La case elle-même doit aussi être resynchronisée : un clic venu d'une
-    // bulle de carte ne passe jamais par cette case, qui resterait sinon
-    // décochée alors que le filtre est actif.
+    // Un clic venu d'une carte ne passe pas par la case : la resynchroniser.
     option.querySelector('input[type="checkbox"]').checked = isSelected;
   });
   const checked = options.filter(option => option.classList.contains('checked')).sort(byLabel);
   const unchecked = options.filter(option => !option.classList.contains('checked')).sort(byLabel);
-  // menu.appendChild() sur un nœud déjà enfant le déplace en dernière
-  // position sans le recréer : les écouteurs (change sur la case) survivent.
+  // Chaque groupe est retrié alphabétiquement : une valeur décochée reprend sa
+  // place. appendChild() déplace un nœud existant sans le recréer, les écouteurs survivent.
   [...checked, ...unchecked].forEach(option => menu.appendChild(option));
 
   const badge = wrapper.querySelector('.filter-count');
@@ -127,14 +118,8 @@ export function updateFilterUI(container, filterKey, activeFilters) {
   badge.hidden = selected.size === 0;
 }
 
-// Rafraîchit le nombre affiché à droite de CHAQUE option de TOUS les menus
-// (pas seulement celui qu'on vient de cocher : changer un filtre modifie le
-// compte des options de tous les autres, cf. computeFilterCounts() dans
-// filters.js) — appelé à chaque refreshCards(), quel que soit ce qui l'a
-// déclenché (recherche, scope, filtre, reset). Ne touche ni au DOM (ordre,
-// ouverture) ni aux cases à cocher : aucune interférence avec un menu ouvert
-// ou une recherche interne en cours de frappe (même principe que
-// updateFilterUI() ci-dessus).
+// Rafraîchit le nombre de chaque option de tous les menus (changer un filtre
+// modifie les comptes des autres), sans toucher à l'ordre ni aux menus ouverts.
 export function updateFilterCounts(container, counts) {
   if (!container) return;
   container.querySelectorAll('.filter').forEach(wrapper => {
@@ -193,11 +178,8 @@ export function renderCards(grid, template, contacts, onToggle) {
       section.appendChild(title);
       const values = document.createElement('div');
       values.className = 'tag-group-values';
-      // Un groupe de tags sans filtre correspondant (ex: "role" — Rôle PUI
-      // n'est volontairement pas un filtre, cf. specs.md) doit rendre un tag
-      // non interactif : un <button> avec un clic qui ne fait rien (parce que
-      // filterContacts() n'itère que sur FILTERS) induirait l'utilisateur en
-      // erreur en ayant l'air cliquable sans jamais rien filtrer.
+      // Un groupe sans filtre (« Rôle PUI », specs.md) est un <span> non cliquable :
+      // un bouton qui ne filtre rien induirait en erreur.
       const filterable = FILTERS.some(f => f.key === group.key);
       labels.forEach(value => {
         const tag = document.createElement(filterable ? 'button' : 'span');

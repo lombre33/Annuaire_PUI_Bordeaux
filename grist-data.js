@@ -1,6 +1,5 @@
-// Fonctions de conversion/enrichissement des données Grist. Aucune ne touche
-// le DOM : elles sont testables telles quelles (voir tests/data.test.mjs). Seule
-// loadDirectory() lit Grist, via le `docApi` qu'on lui passe.
+// Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
+// loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
 import { FILTERS, ROLE_REFERENCE } from './constants.js';
 
@@ -8,11 +7,8 @@ export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
 }
 
-// Compare/recherche insensible à la casse ET aux accents (contrairement à
-// .toLocaleLowerCase('fr-FR') seul) — utilisé pour matcher un tag libre
-// (ex: colonnes competences_1..15, texte tapé à la main) contre une valeur de
-// filtre issue d'une table de référence, qui peut différer par la casse ou les
-// accents sans que ce soit une vraie différence pour l'utilisateur.
+// Comparaison insensible à la casse et aux accents : une compétence saisie à la
+// main (« oncologie ») doit retrouver l'option « Oncologie » du menu.
 export function normalize(value) {
   return text(value)
     .normalize('NFD')
@@ -20,29 +16,22 @@ export function normalize(value) {
     .toLocaleLowerCase('fr-FR');
 }
 
-// Tri alphabétique français (ex: "chu" doit se classer avant "UBM", ce que
-// .sort() par défaut ne fait pas — il compare par code UTF-16, majuscules
-// d'abord).
+// Tri alphabétique français (« chu » avant « UBM ») ; .sort() seul trie par code
+// UTF-16, majuscules d'abord.
 export function compareLabels(a, b) {
   return text(a).localeCompare(text(b), 'fr-FR');
 }
 
-// Remonte les valeurs cochées en tête de liste (chaque groupe restant trié
-// alphabétiquement) — utilisé pour la construction initiale d'un menu de
-// filtre. `sortedValues` doit déjà être trié (ex: via compareLabels) : un
-// filtre stable sur un tableau trié préserve l'ordre à l'intérieur de
-// chaque groupe, pas besoin de retrier.
+// Remonte les valeurs cochées en tête. `sortedValues` doit déjà être trié :
+// chaque groupe garde cet ordre.
 export function sortWithCheckedFirst(sortedValues, selected) {
   const checked = sortedValues.filter(value => selected.has(value));
   const unchecked = sortedValues.filter(value => !selected.has(value));
   return [...checked, ...unchecked];
 }
 
-// La colonne numero_de_telephone est typée Numeric côté Grist : un numéro
-// français saisi avec son 0 initial (ex: 0556789012) perd ce 0 en passant par
-// un type numérique (556789012). On le rétablit pour l'affichage. Formats
-// inattendus (longueur différente, texte libre) : renvoyés tels quels plutôt
-// que déformés.
+// numero_de_telephone est Numeric dans Grist, qui perd le 0 initial (556789012).
+// On le rétablit ; un format inattendu est renvoyé tel quel plutôt que déformé.
 export function formatPhone(value) {
   if (value === null || value === undefined || value === '' || value === 0) return '';
   const raw = text(value);
@@ -52,9 +41,8 @@ export function formatPhone(value) {
   return raw;
 }
 
-// Grist encode les colonnes Liste/RéférenceListe sous la forme ['L', item1, item2, ...].
-// Une liste réellement vide est donc ['L'] (longueur 1, pas 0) : il faut retirer ce
-// marqueur avant de savoir si la liste contient de vraies valeurs.
+// Grist encode une liste ['L', item1, item2, ...] : une liste vide vaut ['L']
+// (longueur 1). Il faut retirer le marqueur pour savoir si elle contient quelque chose.
 export function safeValues(value) {
   if (Array.isArray(value)) {
     return value.filter(item => item !== 'L' && item !== null && item !== undefined && item !== 0 && item !== '');
@@ -62,7 +50,7 @@ export function safeValues(value) {
   return value === null || value === undefined || value === '' || value === 0 ? [] : [value];
 }
 
-// ===== CONVERSION GRIST: Column-oriented → Row-oriented =====
+// Table Grist en colonnes ({ id: [...], Nom: [...] }) → tableau de lignes.
 export function tableToRows(table) {
   if (!table || typeof table !== 'object') return [];
   if (Array.isArray(table)) return table;
@@ -84,15 +72,10 @@ export function pickLabel(row, fields) {
   return fields.map(field => text(row[field])).find(Boolean) || '';
 }
 
-// Une colonne Référence UNIQUE (pas ReferenceList) peut arriver sous 3 formes
-// différentes depuis l'API Grist, selon que la table liée a une "visible
-// column" configurée ou non :
-//   - déjà résolue en texte d'affichage (ex: "UBM") si une visible column
-//     est configurée sur la table liée — cas réel constaté sur Etablissements ;
-//   - encodée ['R', tableId, rowId] ;
-//   - un id numérique déjà nu.
-// refId() n'extrait un id que dans les 2 derniers cas (une chaîne n'est PAS
-// un id, c'est du texte déjà résolu — refLabel() la traite séparément).
+// Une Référence simple arrive sous 3 formes selon la « visible column » de la
+// table liée : texte déjà résolu (« UBM », cas constaté sur Etablissements),
+// ['R', table, id], ou id nu. refId() ne renvoie un id que pour les deux
+// dernières : une chaîne est du texte déjà résolu (voir refLabel()).
 export function refId(value) {
   if (Array.isArray(value)) {
     return value[0] === 'R' && value.length >= 3 ? value[2] : null;
@@ -101,19 +84,16 @@ export function refId(value) {
   return value || null;
 }
 
-// Résout une colonne Référence unique vers son libellé affichable, quelle
-// que soit la forme sous laquelle Grist l'a envoyée (voir refId() ci-dessus).
+// Libellé d'une Référence simple, quelle que soit sa forme.
 export function refLabel(value, referenceMap) {
   if (typeof value === 'string') return text(value);
   const id = refId(value);
   return (id && referenceMap?.[String(id)]) || '';
 }
 
-// ===== TABLE DE RÉFÉRENCE (id -> libellé) =====
-// labelFields accepte un nom de colonne unique, ou un tableau de colonnes
-// essayées dans l'ordre (la première non vide gagne) — utile quand la colonne
-// "principale" (ex: acronyme) n'est pas systématiquement renseignée. Les
-// lignes sans libellé sont ignorées : elles ne peuvent pas être affichées.
+// id → libellé d'une table de référence. `labelFields` : une colonne, ou
+// plusieurs essayées dans l'ordre (acronyme, sinon nom complet). Les lignes sans
+// libellé sont ignorées.
 export function labelMapFromRows(rows, labelFields) {
   const fields = [].concat(labelFields);
   const map = {};
@@ -125,11 +105,8 @@ export function labelMapFromRows(rows, labelFields) {
   return map;
 }
 
-// window.grist.onRecords peut se redéclencher avant qu'un appel précédent
-// n'ait fini de résoudre ses lectures (plusieurs éditions rapprochées dans
-// Grist) ; sans garde, l'appel le plus lent peut résoudre en dernier et écraser
-// un affichage plus récent avec des données périmées. Chaque appel prend un
-// numéro ; seul le numéro le plus récent est autorisé à appliquer son résultat.
+// Chaque lecture prend un numéro ; seule la plus récente peut appliquer son
+// résultat, pour qu'une lecture lente n'écrase pas un affichage plus récent.
 export function createRequestSequencer() {
   let latest = 0;
   return {
@@ -138,10 +115,8 @@ export function createRequestSequencer() {
   };
 }
 
-// Compare deux jeux de tables de référence (id -> libellé) par contenu, pas
-// par référence — sert à ne reconstruire l'UI des filtres (destructive : elle
-// ferme tout menu ouvert et vide les champs de recherche internes) que quand
-// les libellés ont réellement changé, pas à chaque édition d'un contact.
+// Compare deux jeux de tables id → libellé par contenu : reconstruire les menus
+// de filtres ferme ceux qui sont ouverts, donc seulement si un libellé a changé.
 export function referenceMapsEqual(a, b) {
   const tablesA = Object.keys(a);
   const tablesB = Object.keys(b);
@@ -156,26 +131,16 @@ export function referenceMapsEqual(a, b) {
   });
 }
 
-// Un élément d'une ReferenceList peut lui aussi arriver déjà résolu en texte
-// d'affichage (ex: "CME") plutôt qu'en id numérique brut — même ambiguïté que
-// pour une Référence unique (voir refId()/refLabel() plus haut), selon que la
-// table liée a une "visible column" configurée. RÉGRESSION CONSTATÉE EN PROD
-// (14/09, voir CHANGELOG 1.5.1) : la version précédente supposait toujours un
-// id numérique nu et cherchait `referenceMap[String("CME")]`, qui échoue
-// puisque la table est indexée par id numérique — l'item était alors
-// silencieusement jeté au lieu d'être affiché. Tags Instances/Actions/GT/
-// Communautés/Tâches disparus de toutes les cartes tant que ce cas ne gérait
-// pas le texte déjà résolu.
+// Un élément de ReferenceList arrive en id numérique ou déjà résolu en texte
+// (« CME »), comme une Référence simple. Ne traiter que l'id fait disparaître
+// les tags des cartes (CHANGELOG 1.5.1).
 export function resolveListItem(item, referenceMap) {
   if (typeof item === 'string') return text(item);
   return referenceMap?.[String(item)] || '';
 }
 
-// Colonnes ReferenceList (Grist encode ['L', id1, id2, ...]) résolues via une
-// table de référence : [colonne sur Annuaire, table de référence, clé de sortie].
-// Piloté par données plutôt que 5 blocs copiés-collés — un futur ajout est une
-// ligne ici, pas un bloc dupliqué avec 3 tokens à changer à la main (source de
-// bug si un token est oublié/mal collé).
+// Colonnes ReferenceList d'Annuaire résolues par une table de référence :
+// [colonne, table de référence, clé de sortie]. Une catégorie de plus = une ligne.
 const LIST_REFERENCE_FIELDS = [
   ['Instances', 'Instances', 'instances_labels'],
   ['Actions', 'Actions', 'actions_labels'],
@@ -184,20 +149,14 @@ const LIST_REFERENCE_FIELDS = [
   ['Taches', 'Taches', 'taches_labels']
 ];
 
-// ===== ENRICHIR UN CONTACT =====
-// etabFlags (voir etablissementFlagsFromRows() ci-dessus) est optionnel — les
-// appels existants (tests, ancien code) qui ne le passent pas obtiennent
-// simplement des indicateurs à false, ce qui exclut le contact via
-// isEtablissementEligible() plutôt que de planter.
+// Ajoute à un contact les libellés de ses catégories et les indicateurs de son
+// établissement. `etabFlags` est optionnel : sans lui, aucun indicateur n'est
+// vrai et le contact n'est pas éligible.
 export function enrich(contact, referenceMaps, etabFlags) {
   const enriched = { ...contact };
 
   LIST_REFERENCE_FIELDS.forEach(([contactField, table, outputKey]) => {
-    // resolveListItem() gère texte déjà résolu ET id numérique brut (voir sa
-    // doc ci-dessus). Un id numérique qui ne résout à aucun libellé (ligne de
-    // la table de référence sans libellé renseigné, cf. [REFS] ... sans
-    // <champ> dans la console) reste ignoré plutôt que d'afficher l'id brut :
-    // "47" comme tag sur une carte n'apporte rien à l'utilisateur.
+    // Un id sans libellé est ignoré plutôt qu'affiché brut (« 47 » n'aide personne).
     enriched[outputKey] = safeValues(contact[contactField])
       .map(id => resolveListItem(id, referenceMaps[table]))
       .filter(Boolean);
@@ -210,16 +169,12 @@ export function enrich(contact, referenceMaps, etabFlags) {
   }
   enriched.competences_labels = competences;
 
-  // Etablissement2 (Text, formule = rec.nom_de_domaine.acronyme côté Grist)
-  // est la source unique de vérité pour l'établissement d'un contact — pas la
-  // colonne nom_de_domaine elle-même (Reference), dont l'encodage sur une
-  // colonne FORMULE s'est avéré peu fiable en prod (cf. CHANGELOG). Toujours
-  // une chaîne simple, jamais l'ambiguïté texte/id/['R',...] des Références.
+  // Etablissement2 (Text, formule Grist) est la seule source de l'établissement
+  // d'un contact : une chaîne simple, sans l'ambiguïté des Références. Ne pas lui
+  // substituer une colonne Référence, dont l'encodage varie.
   enriched.etablissement_label = text(contact.Etablissement2) || '';
-  // Miroir en tableau (convention _labels commune à tous les groupes) pour que
-  // filters.js n'ait pas besoin d'un cas particulier pour l'établissement — le
-  // badge dédié sur la carte (render.js) continue lui d'utiliser la forme
-  // singulière ci-dessus.
+  // Même forme tableau que les autres catégories, pour que filters.js n'ait pas
+  // de cas particulier ; le badge de la carte utilise la forme singulière.
   enriched.etablissement_labels = enriched.etablissement_label ? [enriched.etablissement_label] : [];
 
   const flags = etablissementFlags(contact, etabFlags);
@@ -228,41 +183,28 @@ export function enrich(contact, referenceMaps, etabFlags) {
   enriched.etablissement_ok_pour_apparaitre = flags?.ok_pour_apparaitre === true;
 
   const roleLabel = refLabel(contact.Role_dans_le_PUI, referenceMaps['Role_Dans_le_PUI']);
-  // Tableau, pas chaîne : TAG_GROUPS (constants.js) et le rendu générique des
-  // tags de carte (render.js) attendent `${key}_labels` pour tous les groupes,
-  // "role" inclus — une valeur singulière role_label ici ne serait lue nulle
-  // part et le tag "Rôle PUI" resterait invisible sur toutes les cartes.
+  // Tableau comme les autres groupes de tags : le rendu des cartes ne lit que
+  // `${clé}_labels`, une valeur singulière ne serait lue nulle part.
   enriched.role_labels = roleLabel ? [roleLabel] : [];
 
   return enriched;
 }
 
-// Un contact n'est affiché que s'il a au moins une vraie valeur dans perimetre_all
-// (cahier des charges, specs.md). Réutilise safeValues() pour rester cohérent avec
-// le reste du code sur l'encodage des listes Grist.
-//
-// Correction régression: l'ancien contrôle testait `Array.isArray(p) && p.length > 0`,
-// ce qui était toujours vrai (le marqueur 'L' compte dans la longueur), même pour un
-// perimetre_all vide. Voir tests/data.test.mjs pour le test de non-régression.
+// Un contact n'est affiché que s'il a au moins une valeur dans perimetre_all
+// (specs.md). Ne pas tester la longueur brute : une liste vide vaut ['L'].
 export function isInScope(record) {
   return safeValues(record.perimetre_all).length > 0;
 }
 
-// ===== INDICATEURS DE VISIBILITÉ D'UN ÉTABLISSEMENT =====
-// La table Etablissements porte 4 colonnes booléennes pilotant l'affichage des
-// contacts qui y sont rattachés (cf. specs.md) : fondateur, partenaire, autres
-// (jamais affiché) et ok_pour_apparaitre (validation par l'établissement,
-// verrou global indépendant du statut).
+// ===== INDICATEURS D'UN ÉTABLISSEMENT =====
+// Colonnes booléennes de la table Etablissements (specs.md) : fondateur,
+// partenaire, autres (jamais affiché) et ok_pour_apparaitre (validation, verrou
+// global). Indexées par id (menu du filtre) et par libellé acronyme-sinon-nom-
+// complet, celui que porte Etablissement2 d'un contact.
 //
-// Indexées par libellé résolu (acronyme, repli nom_complet) — c'est ce
-// libellé (via Etablissement2, cf. etablissementFlags() ci-dessous) qui sert
-// à identifier l'établissement d'un contact. byId reste utilisé par
-// filterVisibleEstablishments() (menu du filtre, indexé par referenceMaps).
-//
-// Deux lignes de même libellé ne doivent pas se départager par leur ordre :
-// si leurs statuts divergent, on garde le plus strict (un indicateur n'est
-// vrai que s'il l'est sur toutes les lignes, donc les contacts restent masqués
-// dans le doute) et le libellé est listé dans `conflicts` pour être signalé.
+// Deux lignes de même libellé et de statuts différents ne se départagent pas par
+// leur ordre : on garde le plus strict (vrai seulement s'il l'est partout, donc
+// contacts masqués dans le doute) et le libellé est listé dans `conflicts`.
 const ETABLISSEMENT_LABEL_FIELDS = ['acronyme', 'nom_complet'];
 
 const FLAG_NAMES = ['fondateur', 'partenaire', 'ok_pour_apparaitre'];
@@ -291,32 +233,23 @@ export function etablissementFlagsFromRows(rows) {
   return { byId, byLabel, conflicts: [...conflicts] };
 }
 
-// Résout les indicateurs de l'établissement d'un contact à partir
-// d'Etablissement2 (Text — cf. enrich() ci-dessus pour le choix de cette
-// colonne plutôt que nom_de_domaine). null si vide ou si le libellé ne
-// correspond à aucune ligne de la table Etablissements.
+// Indicateurs de l'établissement d'un contact, d'après Etablissement2 ; null si
+// elle est vide ou ne correspond à aucune ligne d'Etablissements.
 export function etablissementFlags(contact, etabFlags) {
   const label = text(contact?.Etablissement2);
   return (label && etabFlags?.byLabel?.[label]) || null;
 }
 
-// Un contact n'est éligible à l'affichage que si son établissement a validé
-// (ok_pour_apparaitre) ET a le statut fondateur ou partenaire — jamais "autres"
-// (cf. demande). Un contact dont l'établissement n'est pas identifiable dans la
-// table Etablissements (repli Etablissement2, référence orpheline) n'a aucun
-// indicateur à faire valoir : exclu par défaut plutôt qu'affiché sans validation.
+// Éligible = établissement validé (ok_pour_apparaitre) ET fondateur ou
+// partenaire, jamais « autres ». Un établissement inconnu n'a aucun indicateur :
+// exclu plutôt qu'affiché sans validation.
 export function isEtablissementEligible(contact) {
   return contact.etablissement_ok_pour_apparaitre === true &&
     (contact.etablissement_fondateur === true || contact.etablissement_partenaire === true);
 }
 
-// Restreint un id->libellé d'Etablissements (issu de referenceMaps, voir
-// labelMapFromRows() ci-dessus) aux seules lignes ok_pour_apparaitre — sert
-// uniquement à construire les OPTIONS du menu du filtre Établissement
-// (render.js), pas à résoudre le libellé d'un contact : referenceMaps complet
-// (non filtré) doit rester utilisé pour ça (enrich()/refLabel()), un
-// établissement non validé pouvant quand même être le libellé affiché d'un
-// contact déjà exclu par isEtablissementEligible() en amont.
+// Options du menu Établissement : seulement les lignes ok_pour_apparaitre. Les
+// libellés affichés sur les cartes viennent de referenceMaps, non restreint.
 export function filterVisibleEstablishments(labelMap, etabFlags) {
   const result = {};
   Object.entries(labelMap || {}).forEach(([id, label]) => {
