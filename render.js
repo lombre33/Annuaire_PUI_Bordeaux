@@ -100,6 +100,19 @@ function buildFilterMenu(filter, referenceMaps, selected, counts, onToggle) {
   return menu;
 }
 
+// Marge laissée entre un menu ouvert et le bord du cadre du widget.
+const MENU_EDGE_GAP = 8;
+
+// Le cadre du widget peut être très étroit (panneau Grist, téléphone) : un menu
+// ouvert près du bord droit déborderait. On le décale vers la gauche, une fois
+// ouvert, juste assez pour qu'il tienne ; dans un cadre large il ne bouge pas.
+// Le CSS borne sa largeur à celle du cadre : il ne sort donc jamais à gauche.
+function keepMenuInView(menu) {
+  menu.style.left = '';
+  const overflow = menu.getBoundingClientRect().right - (document.documentElement.clientWidth - MENU_EDGE_GAP);
+  if (overflow > 0) menu.style.left = `${-overflow}px`;
+}
+
 function buildFilter(filter, referenceMaps, selected, counts, onToggle) {
   const wrapper = document.createElement('div');
   wrapper.className = 'filter';
@@ -116,6 +129,7 @@ function buildFilter(filter, referenceMaps, selected, counts, onToggle) {
       if (other !== wrapper) other.classList.remove('open');
     });
     wrapper.classList.toggle('open');
+    if (wrapper.classList.contains('open')) keepMenuInView(menu);
   });
   // Un clic dans le menu ne doit pas atteindre le document, qui referme les menus.
   menu.addEventListener('click', event => event.stopPropagation());

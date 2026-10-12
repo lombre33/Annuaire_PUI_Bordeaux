@@ -7,6 +7,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 ## Sommaire
 
 - [L'annuaire en bref](#lannuaire-en-bref)
+- [Lexique du PUI](#lexique-du-pui)
 - [Découvrir l'écran](#découvrir-lécran)
 - [Lire une carte](#lire-une-carte)
 - [Rechercher une personne](#rechercher-une-personne)
@@ -24,8 +25,26 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 - Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (instances, actions, groupes de travail ou GT, communautés, tâches, compétences, rôle).
 - On retrouve quelqu'un par son **nom** ou, grâce aux **filtres**, par ce qu'il fait.
-- L'annuaire s'ouvre dans Grist, sur un **écran d'ordinateur** : il n'est pas prévu pour un téléphone.
+- L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un grand écran, une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
 - Il est en **lecture seule** : on n'y modifie rien. Pour corriger ou compléter une information, adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist.
+
+## Lexique du PUI
+
+<!-- Les lignes « À compléter » attendent une phrase de définition, à écrire directement ici. -->
+
+| Mot | Sens |
+|---|---|
+| **PUI** | Pôle universitaire d'innovation de Bordeaux |
+| **GT** | Groupe de travail |
+| **Établissement fondateur** | L'un des 16 établissements qui ont fondé le PUI |
+| **Établissement partenaire** | Un partenaire du PUI |
+| **Structure « autres »** | Une structure extérieure au PUI, qui a collaboré à certaines tâches. Son statut est « autres » : ses contacts n'apparaissent pas dans l'annuaire |
+| **Instances** | *À compléter* |
+| **Actions** | *À compléter* |
+| **Communautés** | *À compléter* |
+| **Tâches** | *À compléter* |
+| **Rôle PUI** | *À compléter* |
+| **Périmètre** | *À compléter.* Pour qu'une personne apparaisse, au moins un périmètre doit être renseigné (colonne `perimetre`) |
 
 ## Découvrir l'écran
 
@@ -102,7 +121,7 @@ Seul le **Rôle PUI** n'est pas cliquable : il s'affiche mais n'a pas de filtre.
 
 ## Fondateurs et Partenaires
 
-Deux interrupteurs choisissent les établissements dont les contacts sont affichés, selon leur statut.
+Deux interrupteurs choisissent les établissements dont les contacts sont affichés, selon leur statut : fondateur du PUI ou partenaire (voir le [lexique](#lexique-du-pui)).
 
 ![Interrupteur Partenaires activé et Fondateurs désactivé : seuls les contacts d'établissements partenaires s'affichent](images/partenaires.png)
 
@@ -134,7 +153,7 @@ Quand rien ne correspond, l'annuaire affiche « Aucun contact trouvé » : modif
 - elle a au moins une valeur de **périmètre** (colonne `perimetre`) ;
 - elle est rattachée à un établissement (colonne `Etablissement`, qui renvoie à une ligne de la table `Etablissements`) ;
 - cet établissement a **validé** son apparition (`ok_pour_apparaitre` coché) ;
-- cet établissement est **fondateur ou partenaire** (un établissement « autres », qui n'est ni l'un ni l'autre, n'apparaît jamais).
+- cet établissement est **fondateur ou partenaire** (une structure « autres », extérieure au PUI, n'apparaît jamais).
 
 Quelques cas, avec des personnes fictives du jeu de démonstration :
 
@@ -186,7 +205,7 @@ Ils ne s'affichent que s'ils sont renseignés dans Grist.
 
 **Puis-je utiliser l'annuaire sur mon téléphone ?**
 
-Il est conçu pour un écran d'ordinateur (largeur minimale de 980 pixels) : sur un petit écran, la mise en page n'est pas adaptée.
+Oui : l'annuaire s'adapte à la largeur de la zone que Grist lui donne. Sur un petit écran ou dans un panneau étroit, les cartes passent sur une colonne, la recherche et les filtres s'empilent, le texte est plus grand et les boutons sont plus faciles à toucher. Cet affichage a été vérifié dans un navigateur de bureau avec un écran tactile simulé, pas encore sur un téléphone : signalez à l'administrateur des données ce qui s'afficherait mal.
 
 **Mes coordonnées sont-elles visibles par tout le monde ?**
 

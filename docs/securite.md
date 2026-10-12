@@ -1,6 +1,6 @@
 # Sécurité et confidentialité
 
-Cette page répond aux questions qu'on se pose avant de mettre l'annuaire entre les mains d'un public : qu'est-ce que le widget peut lire et faire, où vont les données, quels sont les risques restants et comment les réduire. Elle décrit la **version 1.9.0** ; le chantier d'édition de fiche, qui ajoutera des écritures, obligera à la compléter (voir [Évolutions en cours](#évolutions-en-cours)).
+Cette page répond aux questions qu'on se pose avant de mettre l'annuaire entre les mains d'un public : qu'est-ce que le widget peut lire et faire, où vont les données, quels sont les risques restants et comment les réduire. Elle décrit la **version 1.9.1** ; le chantier d'édition de fiche, qui ajoutera des écritures, obligera à la compléter (voir [Évolutions en cours](#évolutions-en-cours)).
 
 Pages liées : [README](../README.md), [documentation développeur](developpeurs.md), [maintenance](maintenance.md), [guide utilisateur](utilisateurs.md).
 
@@ -19,7 +19,7 @@ Pages liées : [README](../README.md), [documentation développeur](developpeurs
 
 ## Résumé
 
-| Question | Réponse pour la version 1.9.0 |
+| Question | Réponse pour la version 1.9.1 |
 |---|---|
 | Le widget écrit-il dans le document Grist ? | **Non.** Il n'utilise que la lecture (`fetchTable`) et deux appels d'initialisation (`ready`, `onRecords`) |
 | Où vont les données qu'il lit ? | **Nulle part ailleurs que dans la page affichée** : le code n'émet aucune requête réseau, ne stocke rien dans le navigateur (ni cookie, ni stockage local) et ne communique avec aucun service de statistiques |
@@ -31,7 +31,7 @@ Pages liées : [README](../README.md), [documentation développeur](developpeurs
 
 ## Ce que le widget lit, écrit et envoie
 
-Vérifié dans le code de la version 1.9.0 :
+Vérifié dans le code de la version 1.9.1 :
 
 - **Lecture.** `loadDirectory()` appelle `docApi.fetchTable()` une fois par table de [`grist_structure.txt`](../grist_structure.txt) à chaque chargement. C'est le seul accès aux données.
 - **Écriture.** Aucun appel d'écriture dans le document (`applyUserActions` ou équivalent) : le widget est en lecture seule.
@@ -82,14 +82,14 @@ Les règles d'affichage ([guide utilisateur](utilisateurs.md#pourquoi-une-person
 
 Pour qu'une donnée ne soit pas lisible, il faut une **règle d'accès Grist** (ACL) sur le document. La documentation de Grist consultée ne précise pas comment ces règles s'appliquent à un widget en accès complet : **testez ce comportement dans votre instance avant de vous y fier**, par exemple en ouvrant le widget avec un compte aux droits restreints.
 
-**Un verrou dans l'interface ne protège pas.** Cela vaut aussi pour les écritures à venir : un contrôle fait seulement dans le code du widget (« le bouton n'est visible que pour les administrateurs », « la modification attend une validation ») n'arrête que la personne de bonne foi. Quiconque a accès au document peut contourner la page, en écrivant directement dans Grist ou en modifiant la page dans son navigateur. Seules les règles d'accès appliquées par le serveur Grist constituent une vraie barrière, sous réserve de la vérification demandée plus haut.
+**Un verrou dans l'interface ne protège pas.** Cela vaut aussi pour les écritures à venir : un contrôle fait seulement dans le code du widget (par exemple « le bouton n'est visible que pour certaines personnes ») n'arrête que la personne de bonne foi. Quiconque a accès au document peut contourner la page, en écrivant directement dans Grist ou en modifiant la page dans son navigateur. Seules les règles d'accès appliquées par le serveur Grist constituent une vraie barrière, sous réserve de la vérification demandée plus haut.
 
 ## Données dans le dépôt
 
 Le dépôt GitHub est **public**. Il ne doit contenir aucune donnée réelle de l'annuaire ni du document Grist.
 
 - **Schéma réduit.** [`grist_structure.txt`](../grist_structure.txt) ne liste que les tables et colonnes utiles au widget. Le document Grist source contient d'autres tables sans rapport avec l'annuaire, dont certaines sensibles : ne jamais copier son schéma complet dans le dépôt. Pour du débogage, le garder en local.
-- **Jeux de test et de démonstration inventés.** Règle : `tests/fixtures.mjs` et `docs/demo/donnees-fictives.mjs` ne contiennent que des personnes inventées (les adresses de `tests/fixtures.mjs` reprennent toutefois des domaines d'institutions réelles : voir [Recommandations](#recommandations), point 6). Le jeu de démonstration l'est entièrement, établissements compris : ses adresses se terminent par `.example` (domaine réservé à la documentation par la RFC 2606) et ses numéros appartiennent au plan réservé à la fiction (`05 36 49 xx xx`, `06 39 98 xx xx`, décision ARCEP n° 2018-0881). `tests/docs.test.mjs` vérifie ces deux points.
+- **Jeux de test et de démonstration inventés.** Règle : `tests/fixtures.mjs` et `docs/demo/donnees-fictives.mjs` ne contiennent que des personnes inventées (les adresses de `tests/fixtures.mjs` reprennent toutefois des domaines d'institutions réelles : voir [Recommandations](#recommandations), point 6). Le jeu de démonstration l'est entièrement, établissements compris : ses adresses se terminent par `.example` (domaine réservé à la documentation par la RFC 2606) et ses numéros appartiennent au plan réservé à la fiction (`05 36 49 xx xx`, `06 39 98 xx xx`, décision ARCEP n° 2018-0881). `tests/docs.test.mjs` vérifie ces deux points. Le jeu de `tests/fixtures-responsive.mjs` (tests de mise en page) suit la même règle, vérifiée par `tests/responsive.test.mjs`.
 - **Captures d'écran.** Les images de `docs/images/` sont produites par `docs/demo/capturer.mjs` à partir de ce jeu fictif. Ne jamais y mettre la capture du vrai annuaire.
 - **Si des données réelles sont enregistrées par erreur dans le dépôt (commit)**, les retirer dans un nouveau commit ne suffit pas : l'historique Git les conserve. Prévenir sans attendre le propriétaire du dépôt (purge de l'historique et, si besoin, information du responsable du traitement).
 
@@ -97,7 +97,7 @@ Le dépôt GitHub est **public**. Il ne doit contenir aucune donnée réelle de 
 
 L'annuaire affiche des données à caractère personnel, d'ordre professionnel : nom, prénom, fonction, établissement, adresse e-mail, téléphone et participations aux instances, actions et groupes de travail (GT). Cette page n'est pas une analyse juridique ; voici les points techniques utiles au responsable du traitement.
 
-- **Verrou de publication.** Dans la version 1.9.0, l'apparition d'un contact dépend de son **établissement** : celui-ci doit l'avoir autorisée (`ok_pour_apparaitre`) et être fondateur ou partenaire. Un consentement individuel de la personne est en préparation (voir [Évolutions en cours](#évolutions-en-cours)).
+- **Verrou de publication.** Dans la version 1.9.1, l'apparition d'un contact dépend de son **établissement** : celui-ci doit l'avoir autorisée (`ok_pour_apparaitre`) et être fondateur ou partenaire. Un consentement individuel de la personne est en préparation (voir [Évolutions en cours](#évolutions-en-cours)).
 - **Minimisation.** Le widget n'affiche que les champs prévus par le [cahier des charges](../specs.md). Il lit cependant toutes les colonnes des neuf tables, y compris celles qu'il n'affiche pas, et les garde en mémoire dans le navigateur le temps de la session : seules les règles d'accès Grist peuvent restreindre ce qui est lu.
 - **Pas de copie.** Le widget ne conserve rien dans le navigateur et n'envoie rien à un autre service ; les données demeurent dans Grist, unique lieu où exercer les droits de rectification et d'effacement.
 - **À confirmer par le responsable du traitement** : information des personnes, modalités d'exercice de leurs droits, durée de conservation, liste des personnes ayant accès au document Grist.
@@ -120,7 +120,7 @@ Utilisez le signalement privé de vulnérabilités de GitHub (onglet Security du
 
 ## Évolutions en cours
 
-Cette page décrit la version 1.9.0. Deux chantiers la compléteront :
+Cette page décrit la version 1.9.1. Deux chantiers la compléteront :
 
 - **Le consentement individuel** : seules les personnes dont `Accepte_apparaitre` est cochée apparaîtraient, en plus de la validation de leur établissement. C'est un verrou de publication de plus, sans nouvel accès : les paragraphes [Données personnelles](#données-personnelles) et [Affichage et droits d'accès](#affichage-et-droits-daccès) seront à jour à sa fusion.
-- **L'édition de fiche avec validation par un administrateur** donnera au widget des **écritures** dans le document Grist, ce que permet l'accès complet, choisi pour cela. Il ajoutera des opérations sensibles et un rôle d'administrateur à vérifier, et il fera des règles d'accès Grist le vrai point de contrôle (le widget ne pouvant pas, seul, empêcher une écriture). Chaque ligne du tableau [Risques et protections](#risques-et-protections) sera revue à la fusion de ce chantier, avec la procédure de configuration côté Grist.
+- **L'édition de fiche par la personne connectée** donnera au widget des **écritures** dans le document Grist, ce que permet l'accès complet, choisi pour cela. Les modifications s'appliqueront directement, sans validation par un administrateur : aucune étape ne filtrera une écriture avant qu'elle atteigne les données. Ce chantier ajoutera des opérations sensibles à vérifier, et il fera des règles d'accès Grist le vrai point de contrôle (le widget ne pouvant pas, seul, empêcher une écriture). Chaque ligne du tableau [Risques et protections](#risques-et-protections) sera revue à la fusion de ce chantier, avec la procédure de configuration côté Grist.
