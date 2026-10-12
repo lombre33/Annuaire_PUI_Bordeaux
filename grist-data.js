@@ -1,6 +1,8 @@
-// Fonctions pures de conversion/enrichissement des données Grist.
-// Aucune de ces fonctions ne touche le DOM : elles sont testables telles quelles
-// (voir tests/data.test.mjs).
+// Fonctions de conversion/enrichissement des données Grist. Aucune ne touche
+// le DOM : elles sont testables telles quelles (voir tests/data.test.mjs). Seule
+// loadDirectory() lit Grist, via le `docApi` qu'on lui passe.
+
+import { FILTERS, ROLE_REFERENCE } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -107,37 +109,24 @@ export function refLabel(value, referenceMap) {
   return (id && referenceMap?.[String(id)]) || '';
 }
 
-// ===== CHARGER UNE TABLE DE RÉFÉRENCE (id -> libellé) =====
+// ===== TABLE DE RÉFÉRENCE (id -> libellé) =====
 // labelFields accepte un nom de colonne unique, ou un tableau de colonnes
 // essayées dans l'ordre (la première non vide gagne) — utile quand la colonne
-// "principale" (ex: acronyme) n'est pas systématiquement renseignée.
-export async function fetchTable(tableName, labelFields) {
-  const fields = Array.isArray(labelFields) ? labelFields : [labelFields];
-  try {
-    const table = await window.grist.docApi.fetchTable(tableName);
-    const rows = tableToRows(table);
-    const map = {};
-    let rowsWithoutLabel = 0;
-    rows.forEach(row => {
-      const label = pickLabel(row, fields);
-      if (row.id === null || row.id === undefined) return;
-      if (label) {
-        map[String(row.id)] = label;
-      } else {
-        rowsWithoutLabel += 1;
-      }
-    });
-    console.info(`[REFS] ${tableName}: ${Object.keys(map).length} entrées`
-      + (rowsWithoutLabel ? ` (${rowsWithoutLabel} ligne(s) sans ${fields.join('/')})` : ''));
-    return map;
-  } catch (error) {
-    console.warn(`[REFS] Impossible de charger ${tableName}`, error);
-    return {};
-  }
+// "principale" (ex: acronyme) n'est pas systématiquement renseignée. Les
+// lignes sans libellé sont ignorées : elles ne peuvent pas être affichées.
+export function labelMapFromRows(rows, labelFields) {
+  const fields = [].concat(labelFields);
+  const map = {};
+  rows.forEach(row => {
+    if (row.id === null || row.id === undefined) return;
+    const label = pickLabel(row, fields);
+    if (label) map[String(row.id)] = label;
+  });
+  return map;
 }
 
 // window.grist.onRecords peut se redéclencher avant qu'un appel précédent
-// n'ait fini de résoudre ses fetchTable() (plusieurs éditions rapprochées dans
+// n'ait fini de résoudre ses lectures (plusieurs éditions rapprochées dans
 // Grist) ; sans garde, l'appel le plus lent peut résoudre en dernier et écraser
 // un affichage plus récent avec des données périmées. Chaque appel prend un
 // numéro ; seul le numéro le plus récent est autorisé à appliquer son résultat.
@@ -196,7 +185,7 @@ const LIST_REFERENCE_FIELDS = [
 ];
 
 // ===== ENRICHIR UN CONTACT =====
-// etabFlags (voir fetchEtablissementsFlags() ci-dessus) est optionnel — les
+// etabFlags (voir etablissementFlagsFromRows() ci-dessus) est optionnel — les
 // appels existants (tests, ancien code) qui ne le passent pas obtiennent
 // simplement des indicateurs à false, ce qui exclut le contact via
 // isEtablissementEligible() plutôt que de planter.
@@ -263,37 +252,43 @@ export function isInScope(record) {
 // La table Etablissements porte 4 colonnes booléennes pilotant l'affichage des
 // contacts qui y sont rattachés (cf. specs.md) : fondateur, partenaire, autres
 // (jamais affiché) et ok_pour_apparaitre (validation par l'établissement,
-// verrou global indépendant du statut). Chargées à part de fetchTable()
-// ci-dessus, qui ne renvoie qu'un id->libellé et n'a pas vocation à porter ces
-// indicateurs.
+// verrou global indépendant du statut).
 //
 // Indexées par libellé résolu (acronyme, repli nom_complet) — c'est ce
 // libellé (via Etablissement2, cf. etablissementFlags() ci-dessous) qui sert
 // à identifier l'établissement d'un contact. byId reste utilisé par
 // filterVisibleEstablishments() (menu du filtre, indexé par referenceMaps).
-export async function fetchEtablissementsFlags() {
-  const empty = { byId: {}, byLabel: {} };
-  try {
-    const table = await window.grist.docApi.fetchTable('Etablissements');
-    const rows = tableToRows(table);
-    const byId = {};
-    const byLabel = {};
-    rows.forEach(row => {
-      if (row.id === null || row.id === undefined) return;
-      const flags = {
-        fondateur: row.fondateur === true,
-        partenaire: row.partenaire === true,
-        ok_pour_apparaitre: row.ok_pour_apparaitre === true
-      };
-      byId[String(row.id)] = flags;
-      const label = pickLabel(row, ['acronyme', 'nom_complet']);
-      if (label) byLabel[label] = flags;
-    });
-    return { byId, byLabel };
-  } catch (error) {
-    console.warn('[REFS] Impossible de charger les indicateurs Etablissements', error);
-    return empty;
-  }
+//
+// Deux lignes de même libellé ne doivent pas se départager par leur ordre :
+// si leurs statuts divergent, on garde le plus strict (un indicateur n'est
+// vrai que s'il l'est sur toutes les lignes, donc les contacts restent masqués
+// dans le doute) et le libellé est listé dans `conflicts` pour être signalé.
+const ETABLISSEMENT_LABEL_FIELDS = ['acronyme', 'nom_complet'];
+
+const FLAG_NAMES = ['fondateur', 'partenaire', 'ok_pour_apparaitre'];
+
+function strictestFlags(a, b) {
+  return Object.fromEntries(FLAG_NAMES.map(name => [name, a[name] && b[name]]));
+}
+
+export function etablissementFlagsFromRows(rows) {
+  const byId = {};
+  const byLabel = {};
+  const conflicts = new Set();
+  rows.forEach(row => {
+    if (row.id === null || row.id === undefined) return;
+    const flags = Object.fromEntries(FLAG_NAMES.map(name => [name, row[name] === true]));
+    byId[String(row.id)] = flags;
+    const label = pickLabel(row, ETABLISSEMENT_LABEL_FIELDS);
+    if (!label) return;
+    if (!Object.hasOwn(byLabel, label)) {
+      byLabel[label] = flags;
+      return;
+    }
+    if (FLAG_NAMES.some(name => byLabel[label][name] !== flags[name])) conflicts.add(label);
+    byLabel[label] = strictestFlags(byLabel[label], flags);
+  });
+  return { byId, byLabel, conflicts: [...conflicts] };
 }
 
 // Résout les indicateurs de l'établissement d'un contact à partir
@@ -316,7 +311,7 @@ export function isEtablissementEligible(contact) {
 }
 
 // Restreint un id->libellé d'Etablissements (issu de referenceMaps, voir
-// fetchTable() ci-dessus) aux seules lignes ok_pour_apparaitre — sert
+// labelMapFromRows() ci-dessus) aux seules lignes ok_pour_apparaitre — sert
 // uniquement à construire les OPTIONS du menu du filtre Établissement
 // (render.js), pas à résoudre le libellé d'un contact : referenceMaps complet
 // (non filtré) doit rester utilisé pour ça (enrich()/refLabel()), un
@@ -328,4 +323,132 @@ export function filterVisibleEstablishments(labelMap, etabFlags) {
     if (etabFlags?.byId?.[id]?.ok_pour_apparaitre === true) result[id] = label;
   });
   return result;
+}
+
+// ===== LIEN MAILTO =====
+// Une adresse saisie à la main peut contenir des paramètres (`?cc=...`) ou
+// plusieurs destinataires : on ne fabrique le lien que pour une adresse simple,
+// sinon le texte reste affiché sans lien.
+const SAFE_EMAIL = /^[^\s@,;?#&%<>"]+@[^\s@,;?#&%<>"]+$/;
+
+export function mailtoHref(email) {
+  const address = text(email);
+  return SAFE_EMAIL.test(address) ? `mailto:${address}` : '';
+}
+
+// ===== CHARGEMENT COMPLET DE L'ANNUAIRE =====
+
+// Tables de référence à lire, dérivées de la taxonomie (constants.js) plutôt
+// que recopiées à la main. Role_Dans_le_PUI n'a pas de filtre : déclarée à part.
+const REFERENCE_TABLES = [
+  ...FILTERS.map(filter => [filter.table, filter.field]),
+  [ROLE_REFERENCE.table, ROLE_REFERENCE.field]
+];
+
+// Sans l'une de ces colonnes aucun contact n'est éligible : mieux vaut une
+// erreur explicite qu'un annuaire vide.
+const REQUIRED_ANNUAIRE_COLUMNS = ['Etablissement2', 'perimetre_all'];
+
+// Lecture impossible d'une donnée indispensable. `message` est une phrase
+// française destinée au bandeau d'état.
+export class DirectoryLoadError extends Error {
+  constructor(message, cause) {
+    super(message, { cause });
+    this.name = 'DirectoryLoadError';
+  }
+}
+
+// `scopedRows` : lignes d'Annuaire déjà filtrées par isInScope().
+export function buildContacts(scopedRows, referenceMaps, etabFlags) {
+  return scopedRows
+    .map(row => enrich(row, referenceMaps, etabFlags))
+    .filter(contact => contact.Nom || contact.Prenom)
+    .filter(isEtablissementEligible);
+}
+
+// Quand la table contient des lignes mais qu'aucun contact n'est affichable,
+// dit pourquoi (colonne vide, établissements non validés...) au lieu de laisser
+// un « 0 contact » inexpliqué.
+function describeEmptyDirectory(rowCount, scopedRows, contacts) {
+  if (contacts.length > 0 || rowCount === 0) return null;
+  if (scopedRows.length === 0) {
+    return 'perimetre_all est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
+  }
+  if (scopedRows.every(row => !text(row.Etablissement2))) {
+    return 'Etablissement2 est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne formule dans Grist.';
+  }
+  return 'Aucun contact affichable alors que la table Annuaire contient des lignes : vérifiez les noms, Etablissement2 '
+    + '(établissement validé, fondateur ou partenaire) et perimetre_all.';
+}
+
+function readTables(docApi, names) {
+  // async : une erreur levée de façon synchrone par docApi devient un rejet.
+  return Promise.allSettled(names.map(async name => docApi.fetchTable(name)));
+}
+
+// Lit Annuaire et toutes les tables de référence (chacune une seule fois) et
+// renvoie { contacts, referenceMaps, etabFlags, issues }.
+//
+// Annuaire et Etablissements sont indispensables : leur lecture ratée lève une
+// DirectoryLoadError (l'appelant garde l'affichage précédent). Une autre table
+// illisible n'empêche pas l'affichage : on réutilise ses libellés précédents
+// (`previousMaps`) et on le signale dans `issues`, messages français destinés
+// au bandeau d'état.
+export async function loadDirectory(docApi, { previousMaps = {}, log = console } = {}) {
+  const referenceNames = REFERENCE_TABLES.map(([table]) => table);
+  const names = ['Annuaire', ...referenceNames];
+  const settled = await readTables(docApi, names);
+  const results = Object.fromEntries(names.map((name, index) => [name, settled[index]]));
+
+  ['Annuaire', 'Etablissements'].forEach(name => {
+    if (results[name].status === 'fulfilled') return;
+    log.warn(`[REFS] Impossible de charger ${name}`, results[name].reason);
+    throw new DirectoryLoadError(`table « ${name} » illisible`, results[name].reason);
+  });
+
+  const rows = tableToRows(results.Annuaire.value);
+  const missingColumns = rows.length ? REQUIRED_ANNUAIRE_COLUMNS.filter(column => !(column in rows[0])) : [];
+  if (missingColumns.length) {
+    throw new DirectoryLoadError(`colonne « ${missingColumns.join(' », « ')} » absente de la table Annuaire`);
+  }
+
+  const unreadable = [];
+  const referenceMaps = {};
+  REFERENCE_TABLES.forEach(([table, fields]) => {
+    if (results[table].status === 'rejected') {
+      log.warn(`[REFS] Impossible de charger ${table}`, results[table].reason);
+      unreadable.push(table);
+      referenceMaps[table] = previousMaps[table] ?? {};
+      return;
+    }
+    const tableRows = tableToRows(results[table].value);
+    referenceMaps[table] = labelMapFromRows(tableRows, fields);
+    const withoutLabel = tableRows.length - Object.keys(referenceMaps[table]).length;
+    log.info(`[REFS] ${table}: ${Object.keys(referenceMaps[table]).length} entrées`
+      + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${[].concat(fields).join('/')})` : ''));
+  });
+
+  const etabFlags = etablissementFlagsFromRows(tableToRows(results.Etablissements.value));
+  const scopedRows = rows.filter(isInScope);
+  const contacts = buildContacts(scopedRows, referenceMaps, etabFlags);
+  log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
+
+  const withoutEtablissement = scopedRows.filter(row => !text(row.Etablissement2)).map(row => row.id);
+  if (withoutEtablissement.length) {
+    log.warn(`[ETABLISSEMENT] ${withoutEtablissement.length}/${scopedRows.length} contact(s) sans Etablissement2 `
+      + 'renseigné (identifiants de ligne Grist) :', withoutEtablissement.slice(0, 20));
+  }
+
+  const issues = [];
+  if (unreadable.length) {
+    issues.push(`Tables illisibles (${unreadable.join(', ')}) : des libellés ou des tags peuvent manquer.`);
+  }
+  if (etabFlags.conflicts.length) {
+    issues.push(`Acronymes en double dans Etablissements (${etabFlags.conflicts.join(', ')}) avec des statuts `
+      + 'différents : leurs contacts sont masqués.');
+  }
+  const emptyReason = describeEmptyDirectory(rows.length, scopedRows, contacts);
+  if (emptyReason) issues.push(emptyReason);
+
+  return { contacts, referenceMaps, etabFlags, issues };
 }

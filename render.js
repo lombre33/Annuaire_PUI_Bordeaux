@@ -1,7 +1,7 @@
 // Rendu DOM — pas de logique métier ici, uniquement de la construction d'éléments.
 
 import { TAG_GROUPS, FILTERS } from './constants.js';
-import { compareLabels, formatPhone, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { compareLabels, formatPhone, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
 
 export function createFilterUI(container, referenceMaps, activeFilters, onToggle, counts) {
   if (!container) return;
@@ -40,9 +40,11 @@ export function createFilterUI(container, referenceMaps, activeFilters, onToggle
     search.placeholder = `Rechercher dans ${filter.label}…`;
     search.autocomplete = 'off';
     search.addEventListener('input', () => {
-      const term = search.value.trim().toLocaleLowerCase('fr-FR');
+      // normalize() (casse ET accents), comme la recherche principale et le
+      // matching des filtres : "competence" doit trouver "Compétence".
+      const term = normalize(search.value);
       menu.querySelectorAll('.filter-option').forEach(option => {
-        const label = option.querySelector('.option-label').textContent.toLocaleLowerCase('fr-FR');
+        const label = normalize(option.querySelector('.option-label').textContent);
         option.hidden = term !== '' && !label.includes(term);
       });
     });
@@ -168,7 +170,8 @@ export function renderCards(grid, template, contacts, onToggle) {
     const email = clone.querySelector('.email');
     if (contact.Email) {
       email.textContent = contact.Email;
-      email.href = `mailto:${contact.Email}`;
+      const href = mailtoHref(contact.Email);
+      if (href) email.href = href;
       email.classList.add('visible');
     }
     const tel = clone.querySelector('.tel');

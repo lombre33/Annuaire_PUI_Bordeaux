@@ -11,8 +11,9 @@ Pas de bundler : le navigateur charge directement des modules ES natifs.
 - `index.html` — structure de la page + template de carte.
 - `style.css` — feuille de style (un seul fichier, non minifié à la main).
 - `constants.js` — taxonomie des filtres/tags (`FILTERS`, `TAG_GROUPS`), source unique.
-- `grist-data.js` — fonctions pures : lecture des tables Grist, conversion
-  colonnes→lignes, enrichissement des contacts. Aucune dépendance au DOM.
+- `grist-data.js` — lecture des tables Grist (`loadDirectory()`, seule
+  fonction qui appelle `docApi`), conversion colonnes→lignes, enrichissement
+  des contacts. Aucune dépendance au DOM.
 - `filters.js` — état des filtres actifs + logique de filtrage (pure elle aussi).
 - `render.js` — construction du DOM (cartes, menus de filtres). Pas de logique métier.
 - `main.js` — point d'entrée : câble `window.grist` et les événements DOM aux
@@ -29,17 +30,28 @@ filtrage/enrichissement est testable indépendamment du DOM et de Grist.
 node --test
 ```
 
-Les tests couvrent les fonctions pures (`grist-data.js`, `filters.js`) : lecture
-des tables Grist, résolution des Références, enrichissement des contacts,
-filtrage, ainsi que plusieurs tests de non-régression (filtre `perimetre_all`,
-tag "Rôle PUI", fallback établissement — voir CHANGELOG). Node ≥ 18 suffit
-(testé avec Node 22), aucune dépendance à installer.
+Sans rien installer (Node ≥ 18, testé avec Node 22), `node --test` exécute les
+tests unitaires (`tests/data.test.mjs`) : lecture des tables Grist
+(`loadDirectory()` avec un faux `docApi`), résolution des Références,
+enrichissement des contacts, filtrage, et plusieurs tests de non-régression
+(filtre `perimetre_all`, tag « Rôle PUI », fallback établissement, pannes de
+lecture — voir CHANGELOG).
 
-Il n'y a pas de test end-to-end automatisé contre une vraie instance Grist —
-`main.js` et `render.js` touchent `window.grist`/le DOM réels et ne sont donc
-pas exercés par `node --test` (pas de dépendance type jsdom ajoutée, cf.
-architecture ci-dessus). Voir [`TESTING.md`](TESTING.md) pour le protocole de
-test manuel complet à exécuter dans Grist avant chaque déploiement.
+`tests/e2e.test.mjs` charge le vrai `index.html` (`main.js`, `render.js`) dans
+Chromium avec une API Grist simulée et vérifie ce que voit l'utilisateur
+(nombre de contacts, badge `Etablissement2`, filtres, bandeau d'état). Il est
+ignoré tant que Playwright n'est pas installé — ce n'est pas une dépendance du
+widget :
+
+```
+npm install --no-save playwright
+npx playwright install chromium
+node --test
+```
+
+Ces tests ne remplacent pas un essai dans un vrai document Grist : voir
+[`TESTING.md`](TESTING.md) pour le protocole manuel à exécuter avant chaque
+déploiement.
 
 ## Développement local
 
@@ -65,6 +77,22 @@ Le widget est servi statiquement via GitHub Pages depuis ce dépôt
 production immédiatement pour tous les documents Grist qui l'utilisent — pas
 de rollback automatique. Taguer les versions stables (`git tag vX.Y.Z`) pour
 pouvoir revenir en arrière facilement si besoin.
+
+## Limites connues
+
+- **Modifier une table de référence ne rafraîchit pas le widget.** Grist ne
+  prévient le widget que des changements de la table `Annuaire`. Après avoir
+  modifié `Etablissements` (par exemple `ok_pour_apparaitre`) ou une autre
+  table de référence, recharger le widget pour voir le changement.
+- **Établissement sans acronyme** : le widget identifie l'établissement d'un
+  contact par `Etablissement2`, qui doit être égal à l'acronyme de la ligne
+  d'`Etablissements` (ou à son nom complet quand l'acronyme est vide). Si la
+  formule d'`Etablissement2` renvoie autre chose, le contact ne correspond à
+  aucune ligne et reste masqué.
+- **Script de l'API Grist** : `index.html` charge `grist-plugin-api.js` depuis
+  `docs.getgrist.com`, sans version figée. Le charger depuis l'instance
+  utilisée (`grist.numerique.gouv.fr`) serait plus cohérent, mais ne se vérifie
+  que dans un vrai document Grist : non modifié.
 
 ## Accès à la donnée Grist
 
