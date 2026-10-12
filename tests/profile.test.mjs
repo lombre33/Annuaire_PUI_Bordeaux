@@ -32,6 +32,14 @@ test('profileFormModel offers every editable column with the current value of th
   assert.deepEqual(field(model, 'Competences').value, [1, 2]);
 });
 
+test('profileFormModel tells the category of each reference and list field, and none for a text field', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  assert.equal(field(model, 'Competences').category, 'competences');
+  assert.equal(field(model, 'Role_dans_le_PUI').category, 'role');
+  assert.ok(!('category' in field(model, 'Fonction')));
+});
+
 test('profileFormModel shows 0 for a person without role, never a missing value', async () => {
   const { referenceMaps, row } = await setup();
   assert.equal(field(profileFormModel(row(2), referenceMaps), 'Role_dans_le_PUI').value, 0);
@@ -40,11 +48,38 @@ test('profileFormModel shows 0 for a person without role, never a missing value'
 test('profileFormModel lists the options of each reference sorted by label, and never offers email, Etablissement, perimetre or consent', async () => {
   const { referenceMaps, row } = await setup();
   const model = profileFormModel(row(1), referenceMaps);
-  assert.deepEqual(field(model, 'Competences').options.map(option => option.label), ['Divers', 'Hématologie', 'Oncologie', 'Pharmacovigilance']);
+  assert.deepEqual(field(model, 'Instances').options.map(option => option.label), ['CME', 'COVIRIS']);
   assert.deepEqual(field(model, 'Role_dans_le_PUI').options, [{ id: 1, label: 'Référent qualité' }]);
   for (const forbidden of ['email', 'Etablissement', 'perimetre', 'Accepte_apparaitre', 'Avatar']) {
     assert.equal(field(model, forbidden), undefined, forbidden);
   }
+});
+
+test('profileFormModel groups the competences by domain, the fallback domain last, and leaves other lists ungrouped', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  assert.deepEqual(field(model, 'Competences').options.map(option => [option.group, option.label]), [
+    ['Cancérologie', 'Hématologie'],
+    ['Cancérologie', 'Oncologie'],
+    ['Pharmacie', 'Pharmacovigilance'],
+    ['Autres', 'Divers']
+  ]);
+  assert.ok(field(model, 'Instances').options.every(option => !('group' in option)));
+});
+
+test('profileFormModel offers the competences ungrouped when the document has no domain column', async () => {
+  const tables = sampleTables();
+  delete tables.Competences.Macro_competences;
+  const { referenceMaps, row } = await setup(tables);
+  const options = field(profileFormModel(row(1), referenceMaps), 'Competences').options;
+  assert.deepEqual(options.map(option => option.label), ['Divers', 'Hématologie', 'Oncologie', 'Pharmacovigilance']);
+  assert.ok(options.every(option => !('group' in option)));
+});
+
+test('a group never leaks into what a request carries: champs keep only id and label', async () => {
+  const { referenceMaps, row } = await setup();
+  const result = diffProfile(row(1), { Competences: [1, 2, 3] }, referenceMaps);
+  assert.deepEqual(result.champs.Competences, { ajout: [{ id: 3, label: 'Pharmacovigilance' }], retrait: [] });
 });
 
 test('profileFormModel shows only the values it can name: a row without label stays out of the form', async () => {

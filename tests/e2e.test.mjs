@@ -11,130 +11,14 @@
 // npx playwright install chromium). Sans lui ces tests sont ignorés et
 // `node --test` reste vert. CHROMIUM_PATH désigne un Chromium déjà installé.
 
-import { test, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   sampleTables, withoutOptionalColumns, withIdentity, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL, ADMIN_EMAIL
 } from './fixtures.mjs';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
-const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
-
-// Remplace grist-plugin-api.js : le faux document que partagent les tests Node
-// (tests/support/fake-grist.js, `export` retiré), branché sur des variables que le
-// test pose avant le chargement et peut modifier ensuite (relues à chaque appel) :
-// __tables, __failTables, __user (la personne connectée), __denyWrites (tables dont
-// l'écriture est refusée), __delay. __triggerRecords rejoue un onRecords (édition
-// Grist) ; __fake.calls liste les actions envoyées à Grist.
-const FAKE_GRIST = fs.readFileSync(path.join(ROOT, 'tests/support/fake-grist.js'), 'utf8').replace(/^export /gm, '');
-const GRIST_MOCK = `${FAKE_GRIST}
-window.__fake = createFakeGrist({
-  tables: () => window.__tables,
-  failTables: () => window.__failTables,
-  user: () => window.__user,
-  denyWrites: () => window.__denyWrites,
-  delay: () => window.__delay
-});
-window.grist = {
-  ready(options) { window.__gristReady = options; },
-  onRecords(callback) { window.__triggerRecords = callback; setTimeout(callback, 0); },
-  docApi: window.__fake.docApi
-};`;
-
-async function startBrowser() {
-  try {
-    const { chromium } = await import('playwright');
-    return await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
-  } catch {
-    return null;
-  }
-}
-
-function startStaticServer() {
-  const server = http.createServer((request, response) => {
-    const file = path.join(ROOT, decodeURIComponent(new URL(request.url, 'http://x').pathname));
-    if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
-    response.end(fs.readFileSync(file));
-  });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const browser = await startBrowser();
-const server = browser ? await startStaticServer() : null;
-const baseUrl = server ? `http://127.0.0.1:${server.address().port}` : '';
-const skip = browser ? false : 'Playwright/Chromium indisponible (voir TESTING.md)';
-
-// En CI (REQUIRE_E2E=1), un navigateur absent est un échec, pas un « tout vert »
-// sur des tests ignorés.
-if (!browser && process.env.REQUIRE_E2E) {
-  test('le navigateur de test est disponible', () => assert.fail('Playwright/Chromium introuvable alors que REQUIRE_E2E est défini'));
-}
-
-after(async () => {
-  await browser?.close();
-  server?.close();
-});
-
-// `user` : l'adresse de la personne connectée (null : compte anonyme) ; `readOnly` :
-// le cadre d'un compte Lecteur (?readonly=true).
-async function openWidget({ tables = sampleTables(), failTables = [], user = null, denyWrites = [], delay = 0, readOnly = false } = {}) {
-  const context = await browser.newContext();
-  // Hermétique : seul le serveur local et l'API Grist simulée répondent.
-  await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
-  await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));
-  const page = await context.newPage();
-  const logs = { errors: [], warnings: [], infos: [] };
-  page.on('pageerror', error => logs.errors.push(error.message));
-  page.on('console', message => {
-    // text() réduit un objet à « JSHandle@object » : on relit les arguments.
-    const readable = async () => (await Promise.all(message.args().map(arg => arg.jsonValue())))
-      .map(value => (typeof value === 'string' ? value : JSON.stringify(value))).join(' ');
-    if (message.type() === 'error') logs.errors.push(readable());
-    if (message.type() === 'warning') logs.warnings.push(readable());
-    if (message.type() === 'info') logs.infos.push(readable());
-  });
-  await page.addInitScript(values => {
-    window.__tables = values.tables;
-    window.__failTables = values.failTables;
-    window.__user = values.user;
-    window.__denyWrites = values.denyWrites;
-    window.__delay = values.delay;
-  }, { tables, failTables, user: user && { email: user }, denyWrites, delay });
-  await page.goto(`${baseUrl}/index.html${readOnly ? '?readonly=true' : ''}`);
-  return { page, context, logs };
-}
-
-// Rejoue un onRecords (comme une édition dans Grist) et attend la fin du debounce.
-async function reload(page) {
-  await page.evaluate(() => window.__triggerRecords());
-}
-
-const cardCount = page => page.locator('.contact-card').count();
-const waitForCards = (page, count) =>
-  page.waitForFunction(expected => document.querySelectorAll('.contact-card').length === expected, count);
-const waitForBanner = (page, visible = true) =>
-  page.waitForFunction(expected => !document.getElementById('statusBanner').hidden === expected, visible);
-const cardNames = page => page.locator('.contact-card .name').allTextContents();
-const resultCount = page => page.locator('#resultCount').textContent();
-const bannerText = page => page.locator('#statusBanner').textContent();
-
-async function withWidget(options, run) {
-  const widget = await openWidget(options);
-  try {
-    await run(widget);
-  } finally {
-    await widget.context.close();
-  }
-}
+import {
+  skip, openWidget, withWidget, reload, cardCount, waitForCards, waitForBanner, cardNames, resultCount, bannerText
+} from './support/browser.mjs';
 
 // ===== Affichage nominal =====
 

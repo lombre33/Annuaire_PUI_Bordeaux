@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Annuaire PUI Bordeaux</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dialogs.css">
 </head>
 <body>
   <main class="widget-shell">
@@ -27,7 +28,10 @@
         <span class="presence-track" aria-hidden="true"><span class="presence-thumb"></span></span>
         <span class="presence-label">Apparaître dans l'annuaire</span>
       </button>
-      <div class="account-actions"></div>
+      <div class="account-actions">
+        <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil<span class="account-dot" hidden><span class="sr-only"> (une demande est en attente)</span></span></button>
+        <button type="button" class="account-admin" aria-haspopup="dialog" hidden></button>
+      </div>
       <p class="account-status" role="status" data-tone="info"></p>
     </section>
 
@@ -52,6 +56,47 @@
       <p>Modifiez votre recherche ou réinitialisez les filtres.</p>
     </section>
   </main>
+
+  <dialog id="profileDialog" class="dlg" aria-labelledby="profileTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="profileTitle">Modifier mon profil</h2>
+          <p class="dlg-sub">Vos modifications sont envoyées à un administrateur. Votre fiche ne change qu'après sa validation.</p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer">✕</button>
+      </header>
+      <div class="dlg-body"></div>
+      <footer class="dlg-foot"></footer>
+    </div>
+  </dialog>
+
+  <dialog id="adminDialog" class="dlg dlg-admin" aria-labelledby="adminTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="adminTitle">Demandes de modification</h2>
+          <p class="dlg-sub">Validez ou refusez les modifications de fiche proposées par les personnes de l'annuaire.</p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer">✕</button>
+      </header>
+      <div class="admin-bar">
+        <div class="tabs" role="tablist" aria-label="Demandes">
+          <button type="button" class="tab" role="tab" id="adminTabPending" data-tab="pending" aria-controls="adminPanel" aria-selected="true">À valider</button>
+          <button type="button" class="tab" role="tab" id="adminTabDone" data-tab="done" aria-controls="adminPanel" aria-selected="false" tabindex="-1">Traitées</button>
+        </div>
+        <div class="admin-filters">
+          <input type="search" data-admin-search placeholder="Rechercher une personne…" aria-label="Rechercher une personne" autocomplete="off">
+          <select data-admin-etab aria-label="Filtrer par établissement"></select>
+          <button type="button" class="btn" data-admin-refresh>Actualiser</button>
+          <button type="button" class="btn btn-ok" data-admin-bulk hidden></button>
+          <button type="button" class="btn" data-admin-bulk-cancel hidden>Annuler</button>
+        </div>
+      </div>
+      <p class="admin-status" role="status" data-admin-status hidden></p>
+      <div class="admin-main" id="adminPanel" role="tabpanel" tabindex="-1" aria-labelledby="adminTabPending"></div>
+    </div>
+  </dialog>
 
   <template id="cardTemplate">
     <article class="contact-card">

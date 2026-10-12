@@ -126,6 +126,32 @@ export function withRequests(tables = withIdentity()) {
   return copy;
 }
 
+// Ajoute une demande à la table Annuaire_Demandes d'un document de withRequests() et
+// renvoie son identifiant. `author` est l'adresse que Grist aurait inscrite (user.Email),
+// `champs` le contenu de la colonne Changements (forme de parseChanges), `date` en secondes.
+// Une demande traitée porte son état, l'adresse de qui l'a traitée, la date et le motif.
+export function addRequest(tables, {
+  person, author, champs, status = 'en_attente', message = '', date, by = '', decidedAt = null, reason = '', changements
+}) {
+  const table = tables.Annuaire_Demandes;
+  const id = table.id.length ? Math.max(...table.id) + 1 : 1;
+  const row = {
+    id,
+    Date: date ?? 1760000000 + id * 60,
+    Email: author,
+    Personne: person,
+    Statut: status,
+    Changements: changements ?? JSON.stringify({ v: 1, champs }),
+    Resume: '',
+    Message: message,
+    Traitee_par: by,
+    Traitee_le: decidedAt,
+    Motif_refus: reason
+  };
+  Object.entries(row).forEach(([column, value]) => table[column].push(value));
+  return id;
+}
+
 // Les métadonnées que Grist expose par fetchTable('_grist_Tables') et
 // fetchTable('_grist_Tables_column') : le type des colonnes de BDD qui comptent pour
 // écrire (le téléphone est Numeric, comme dans le document d'origine).

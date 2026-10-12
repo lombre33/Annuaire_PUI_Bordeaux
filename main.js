@@ -1,14 +1,25 @@
 // Point d'entrée : relie l'API Grist et les événements du DOM aux modules
 // grist-data.js (lecture, enrichissement), filters.js (filtrage), render.js
 // (construction du DOM), identity.js et presence.js (la personne connectée et
-// son choix d'apparaître) et account-ui.js (son bandeau).
+// son choix d'apparaître), account-ui.js (son bandeau), et pour les demandes de
+// modification de fiche profile.js / requests.js (la logique) avec profile-ui.js
+// et admin-ui.js (les deux fenêtres).
 
-import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
+import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, normalize } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
 import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { describePresence, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
+import { REQUESTS_TABLE } from './constants.js';
+import { profileFormModel, draftOf, draftFromChanges, diffProfile } from './profile.js';
+import {
+  RequestError, hasRequestsTable, loadRequests, classifyRequests, ownRequestState, parseChanges, describeChanges,
+  describeRequest, submitRequest, validateRequest, validateRequests, refuseRequest
+} from './requests.js';
+import { readColumnTypes } from './schema.js';
+import { createProfileDialog } from './profile-ui.js';
+import { createAdminDialog } from './admin-ui.js';
 
 const state = {
   allContacts: [],
@@ -25,7 +36,12 @@ const state = {
   // La personne connectée (identity.js ; null tant qu'elle n'est pas lue) et
   // l'index des lignes de BDD par e-mail (grist-data.js), pour retrouver sa fiche.
   identity: null,
-  people: null
+  people: null,
+  // Les demandes de modification (requests.js) : `available` dit si la table existe ;
+  // `active` les demandes à traiter, `history` les autres.
+  requests: { available: false, all: [], active: [], history: [] },
+  // Type des colonnes de BDD (schema.js), pour écrire un téléphone dans la forme de sa colonne.
+  columnTypes: {}
 };
 
 const elements = {
@@ -42,7 +58,19 @@ const elements = {
 
 // Bandeau « Ma présence » (voir « Ma présence » plus bas) : masqué tant que la
 // personne connectée n'est pas identifiée et retrouvée dans BDD.
-const accountBar = createAccountBar(document.getElementById('accountBar'), { onToggle: togglePresence });
+const accountBar = createAccountBar(document.getElementById('accountBar'), {
+  onToggle: togglePresence,
+  onEdit: openProfile,
+  onAdmin: openAdmin
+});
+
+const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
+const adminDialog = createAdminDialog(document.getElementById('adminDialog'), {
+  onRefresh: () => loadAdminData({ strict: true }),
+  onValidate: id => decide(async () => validateRequest(window.grist.docApi, id, await adminOptions())),
+  onRefuse: (id, reason) => decide(async () => refuseRequest(window.grist.docApi, id, reason, await adminOptions())),
+  onValidateAll: validateMany
+});
 
 function toggleFilter(filterKey, value) {
   if (!state.activeFilters[filterKey]) state.activeFilters[filterKey] = new Set();
@@ -148,6 +176,8 @@ function applyDirectory({ contacts, referenceMaps, etabFlags, people }) {
 
   state.allContacts = contacts;
   state.people = people;
+  personCache.clear();
+  descriptions.clear();
   if (referenceMapsChanged) rebuildFilterUI();
   refreshCards();
   refreshAccount();
@@ -196,20 +226,33 @@ function warnOnce(key, message) {
 
 function refreshAccount() {
   const persons = myPersons();
+  const admin = isAdmin() ? { count: state.requests.active.length } : null;
+  // Une seule fiche pour cette adresse : sinon on ne sait pas laquelle modifier.
+  const edit = persons.length === 1 && state.requests.available
+    ? { pending: Boolean(ownRequestState(state.requests.all, state.identity.email).pending) }
+    : null;
+
   if (persons.length === 0) {
-    accountBar.hide();
     if (state.identity?.status === 'ready' && state.people) {
       warnOnce('no-row', state.people.hasEmailColumn
         ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bandeau « Ma présence ».'
         : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
     }
+    if (!admin) {
+      accountBar.hide();
+      return;
+    }
+    // Une administratrice sans fiche dans BDD : rien à dire sur sa présence, mais les demandes à valider.
+    accountBar.show({ name: 'Administration', presence: false, tone: 'info', message: 'Vous pouvez valider les demandes de modification des fiches.' });
+    accountBar.setActions({ admin });
     return;
   }
   if (persons.length > 1) {
     warnOnce('duplicates', `[IDENTITE] ${persons.length} lignes de BDD portent la même adresse (identifiants de ligne : `
-      + `${persons.map(person => person.row.id).join(', ')}) : le choix de présence s'applique à toutes.`);
+      + `${persons.map(person => person.row.id).join(', ')}) : le choix de présence s'applique à toutes, la modification de fiche n'est pas proposée.`);
   }
   accountBar.show({ name: persons[0].name || 'Ma fiche', initials: initials(persons[0].row), ...describePresence(persons) });
+  accountBar.setActions({ edit, admin });
 }
 
 let togglePending = false;
@@ -238,7 +281,188 @@ async function togglePresence() {
 // L'identité ne retarde jamais l'annuaire : lue à part, elle ajoute le bandeau
 // quand elle arrive. Sans elle (pas de table-sonde, compte Lecteur…), personne
 // n'est identifié et aucune modification n'est proposée.
-readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(identity => {
+readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(async identity => {
   state.identity = identity;
+  if (identity.status === 'ready') await detectRequests();
   refreshAccount();
 });
+
+// ===== Demandes de modification de fiche =====
+
+// Aucune modification n'est proposée sans la table des demandes (GRIST_SETUP.md, étape 4).
+async function detectRequests() {
+  state.requests.available = await hasRequestsTable(window.grist.docApi);
+  if (!state.requests.available) {
+    warnOnce('no-requests-table', `[DEMANDES] La table « ${REQUESTS_TABLE} » est introuvable : aucune modification de fiche n'est proposée (voir GRIST_SETUP.md).`);
+    return;
+  }
+  await refreshRequests();
+}
+
+const isAdmin = () => state.identity?.status === 'ready' && state.identity.admin === true && state.requests.available;
+
+// Ce que l'écran des administrateurs calcule une fois par relecture : la personne d'une
+// demande et la description d'une demande (mémorisées, vidées quand les données changent).
+const personCache = new Map();
+const descriptions = new Map();
+
+function personInfo(id) {
+  if (!personCache.has(id)) {
+    const entry = state.people?.findById(id) ?? null;
+    personCache.set(id, entry && {
+      name: entry.name || 'Sans nom',
+      initials: initials(entry.row),
+      etablissement: entry.etablissement,
+      search: normalize(entry.name)
+    });
+  }
+  return personCache.get(id);
+}
+
+function describeFor(request) {
+  if (!descriptions.has(request.id)) {
+    descriptions.set(request.id, describeRequest(request, {
+      findPerson: id => state.people?.findById(id) ?? null,
+      referenceMaps: state.referenceMaps,
+      columnTypes: state.columnTypes
+    }));
+  }
+  return descriptions.get(request.id);
+}
+
+// Les lectures se font l'une après l'autre : la dernière demandée est la dernière appliquée.
+// Renvoie vrai si les demandes ont pu être lues ; sinon l'état précédent reste affiché.
+let requestsQueue = Promise.resolve();
+function refreshRequests() {
+  const run = async () => {
+    if (!state.requests.available) return false;
+    try {
+      const all = await loadRequests(window.grist.docApi);
+      const { active, history } = classifyRequests(all);
+      state.requests = { available: true, all, active, history };
+      descriptions.clear();
+      return true;
+    } catch (error) {
+      console.error('[DEMANDES] Lecture impossible :', error);
+      return false;
+    } finally {
+      refreshAccount();
+    }
+  };
+  requestsQueue = requestsQueue.then(run);
+  return requestsQueue;
+}
+
+// Une erreur attendue (RequestError) porte une phrase française ; toute autre est
+// consignée dans la console et remplacée par une phrase générale.
+function userFacing(error) {
+  if (error instanceof RequestError) return error;
+  console.error('[DEMANDES] Erreur inattendue :', error);
+  return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
+}
+
+// ----- Modifier sa fiche -----
+
+async function openProfile() {
+  const persons = myPersons();
+  if (persons.length !== 1 || !state.requests.available) return;
+  accountBar.setStatus('');
+  // L'état des demandes est relu à l'ouverture : la personne voit si une demande attend déjà.
+  if (!(await refreshRequests())) {
+    accountBar.setStatus('Vos demandes n\'ont pas pu être lues. Réessayez dans un instant.', 'error');
+    return;
+  }
+  const [person] = myPersons();
+  if (!person || myPersons().length !== 1) return;
+  const { row } = person;
+  const model = profileFormModel(row, state.referenceMaps);
+  const own = ownRequestState(state.requests.all, state.identity.email);
+
+  // Une demande en attente se reprend là où elle en était : l'envoyer de nouveau la remplace.
+  let draft = draftOf(model);
+  if (own.pending) {
+    const parsed = parseChanges(own.pending.changes, state.referenceMaps);
+    if (parsed.champs) draft = draftFromChanges(model, parsed.champs);
+  }
+  profileDialog.open({
+    person: { name: person.name || 'Ma fiche', email: String(row.email ?? '').trim(), initials: initials(row) },
+    etablissement: person.etablissement,
+    model,
+    draft,
+    message: own.pending ? own.pending.message : '',
+    pending: own.pending ? { date: own.pending.date } : null,
+    last: !own.pending && own.last ? { status: own.last.status, date: own.last.decidedAt || own.last.date, reason: own.last.reason } : null,
+    evaluate(values) {
+      const result = diffProfile(row, values, state.referenceMaps);
+      return { ...result, lines: describeChanges(result.champs) };
+    },
+    async submit({ champs, summary, message }) {
+      try {
+        await submitRequest(window.grist.docApi, row, { champs, summary }, message);
+      } catch (error) {
+        throw userFacing(error);
+      }
+      await refreshRequests();
+    }
+  });
+}
+
+// ----- Valider ou refuser -----
+
+const adminContext = () => ({
+  adminEmail: state.identity.email,
+  active: state.requests.active,
+  history: state.requests.history,
+  person: personInfo,
+  describe: describeFor
+});
+
+async function loadAdminData({ strict = false } = {}) {
+  state.columnTypes = await readColumnTypes(window.grist.docApi);
+  descriptions.clear();
+  if (!(await refreshRequests())) {
+    const message = 'Les demandes n\'ont pas pu être lues. Réessayez avec « Actualiser ».';
+    if (strict) throw new Error(message);
+    adminDialog.showFailure(message);
+    return;
+  }
+  adminDialog.update(adminContext());
+}
+
+async function openAdmin() {
+  if (!isAdmin()) return;
+  adminDialog.open();
+  await loadAdminData();
+}
+
+// Les types de colonnes sont relus avant d'écrire : le téléphone s'écrit dans la forme de sa colonne.
+async function adminOptions() {
+  state.columnTypes = await readColumnTypes(window.grist.docApi);
+  descriptions.clear();
+  return { adminEmail: state.identity.email, referenceMaps: state.referenceMaps, columnTypes: state.columnTypes };
+}
+
+// Après une décision, réussie ou non, l'annuaire et les demandes sont relus : l'écran montre ce
+// que Grist contient vraiment, pas ce qu'on espérait.
+async function settle() {
+  await Promise.all([reloadDirectory(), refreshRequests()]);
+  adminDialog.update(adminContext());
+}
+
+async function decide(run) {
+  if (!isAdmin()) throw new RequestError('Cette action est réservée aux administrateurs.');
+  try {
+    await run();
+  } catch (error) {
+    await settle();
+    throw userFacing(error);
+  }
+  await settle();
+}
+
+async function validateMany(ids) {
+  if (!isAdmin()) throw new RequestError('Cette action est réservée aux administrateurs.');
+  const outcomes = await validateRequests(window.grist.docApi, ids, await adminOptions());
+  await settle();
+  return outcomes;
+}

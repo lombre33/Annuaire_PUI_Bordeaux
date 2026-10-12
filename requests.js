@@ -17,7 +17,7 @@ import { classifyWriteError } from './presence.js';
 const PAYLOAD_VERSION = 1;
 const MAX_PAYLOAD_LENGTH = 20000;
 const MAX_LIST_ITEMS = 300;
-const MAX_MESSAGE_LENGTH = 500;
+export const MAX_MESSAGE_LENGTH = 500;
 
 // Erreur dont le message est une phrase française destinée à la personne ; l'erreur
 // d'origine reste dans `cause`.

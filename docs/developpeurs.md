@@ -93,9 +93,14 @@ Une flèche signifie « importe ».
 | `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`) et cartes (`renderCards()`) |
 | `identity.js` | `readIdentity()` : qui est connecté ? Ajoute une ligne dans la table-sonde `Annuaire_Sonde` (dont Grist calcule l'adresse par une formule `user.Email`), la relit par son identifiant puis la supprime. Renvoie l'adresse et la case administrateur, ou « personne » au moindre doute ; ne bloque jamais l'annuaire |
 | `presence.js` | « Ma présence » : `describePresence()` dit à la personne si elle apparaît et pourquoi, `setPresence()` écrit son accord (`Accepte_apparaitre`) sur sa ou ses lignes en une seule action atomique |
-| `account-ui.js` | Le bandeau « Ma présence » au-dessus des filtres : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier |
+| `account-ui.js` | Le bandeau « Ma présence » au-dessus des filtres : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier ; porte aussi les boutons « Modifier mon profil » et « demandes à valider » |
 | `profile.js` | Modifier sa fiche, côté personne : `profileFormModel()` donne les champs du formulaire, `diffProfile()` calcule ce qui change (un delta : pour une liste, les valeurs à ajouter et à retirer) et refuse une saisie illisible. Aucun accès au DOM ni à Grist |
 | `requests.js` | Les demandes de modification : `submitRequest()` en dépose une dans `Annuaire_Demandes`, `parseChanges()` la relit champ par champ (c'est une donnée non fiable), `describeRequest()` montre à l'administrateur ce qui change, `validateRequest()` écrit la fiche et le statut en une seule action atomique, `refuseRequest()` la refuse |
+| `dom.js` | Trois petits outils des fenêtres : `el()` (un élément, son texte toujours posé en texte brut), `plural()` et `formatDate()` |
+| `changes-ui.js` | `renderChangeList()` : la liste des changements d'une demande (ancienne valeur barrée puis nouvelle, valeurs ajoutées et retirées d'une liste), la même pour la personne et pour l'administrateur |
+| `profile-ui.js` | La fenêtre « Modifier mon profil » : champs, pastilles à cocher, récapitulatif en direct, envoi, écran de confirmation. Dessine ce que lui donne `main.js`, n'écrit rien dans Grist |
+| `admin-view.js` | Ce que la vue administrateur montre : `filterRequests()`, `etablissementsOf()`, `pageOf()` et `bulkTargets()` (les demandes qu'un seul geste peut valider). Aucun accès au DOM ni à Grist |
+| `admin-ui.js` | La fenêtre des administrateurs : onglets « À valider » et « Traitées », une carte par demande, valider, refuser avec un motif, tout valider. Dessine ce que lui donne `main.js`, qui seul parle à Grist |
 | `schema.js` | `readColumnTypes()` : le type que Grist déclare pour chaque colonne de la table principale, pour écrire le téléphone sous la forme de sa colonne (nombre ou texte) |
 | `main.js` | Point d'entrée : détient l'état de l'application, relie `window.grist` et les événements du DOM aux autres modules |
 

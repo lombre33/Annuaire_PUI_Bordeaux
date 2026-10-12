@@ -7,7 +7,7 @@
 // une valeur que le formulaire ne montre pas (une ligne de référence sans libellé)
 // n'est jamais perdue, et ce qu'un autre a changé entre-temps non plus.
 
-import { PROFILE_FIELDS } from './constants.js';
+import { CATEGORIES, PROFILE_FIELDS } from './constants.js';
 import { compareLabels, formatPhone, refId, safeValues, text } from './grist-data.js';
 
 export const MAX_TEXT_LENGTH = 200;
@@ -43,11 +43,24 @@ export function frenchPhoneDigits(input) {
   return null;
 }
 
-// Les valeurs qu'une table de référence propose : [{ id, label }] triées.
+// La catégorie qui regroupe celle-ci (les domaines regroupent les compétences), ou null.
+const groupingOf = category => Object.entries(CATEGORIES).find(([, other]) => other.groups === category) || null;
+
+// Les valeurs qu'une table de référence propose : [{ id, label }] triées. Quand un
+// regroupement est connu (les domaines des compétences), chaque valeur porte aussi son
+// `group` et les valeurs sont rangées groupe par groupe, le groupe de repli (« Autres »)
+// en dernier : le formulaire peut les présenter par domaine sans rien recalculer.
 export function optionsOf(category, referenceMaps) {
+  const grouping = groupingOf(category);
+  const groups = grouping ? referenceMaps[grouping[0]] || {} : {};
+  const grouped = Object.keys(groups).length > 0;
+  const fallback = grouping?.[1].fallback;
+  const rank = group => (group === fallback ? 1 : 0);
   return Object.entries(referenceMaps[category] || {})
-    .map(([id, label]) => ({ id: Number(id), label }))
-    .sort((a, b) => compareLabels(a.label, b.label));
+    .map(([id, label]) => ({ id: Number(id), label, ...(grouped && { group: groups[id] || fallback }) }))
+    .sort((a, b) => (grouped
+      ? rank(a.group) - rank(b.group) || compareLabels(a.group, b.group) || compareLabels(a.label, b.label)
+      : compareLabels(a.label, b.label)));
 }
 
 // Identifiants d'une cellule ReferenceList qui figurent parmi `options` (ceux que
@@ -58,12 +71,12 @@ function knownIds(cell, options) {
 }
 
 // Le formulaire de modification d'une fiche : un champ par PROFILE_FIELDS, avec la
-// valeur actuelle de la fiche (`value`) et, pour une référence ou une liste, les
-// valeurs proposées (`options`).
+// valeur actuelle de la fiche (`value`) et, pour une référence ou une liste, sa
+// `category` et les valeurs proposées (`options`).
 export function profileFormModel(row, referenceMaps) {
   // Une colonne facultative absente de BDD n'est pas proposée (rien à modifier).
   return PROFILE_FIELDS.filter(field => field.key in row).map(field => {
-    const base = { key: field.key, label: field.label, kind: field.kind };
+    const base = { key: field.key, label: field.label, kind: field.kind, ...(field.category && { category: field.category }) };
     if (field.kind === 'text') return { ...base, value: text(row[field.key]) };
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
     const options = optionsOf(field.category, referenceMaps);
