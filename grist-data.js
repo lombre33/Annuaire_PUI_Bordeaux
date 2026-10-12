@@ -22,10 +22,36 @@ export function normalize(value) {
     .toLocaleLowerCase('fr-FR');
 }
 
+// Comparaison de la recherche principale, un peu plus tolérante que normalize() (qui sert
+// aux menus et aux sélections) : « œ » et « æ » s'écrivent comme on les tape (« coeur »),
+// l'apostrophe disparaît (« d'arcy », « d’arcy » et « darcy » se valent), les tirets, les
+// points et les soulignés valent des espaces (« marie-christine » = « marie christine »,
+// « J.-P. » = « j p ») et les espaces se réduisent à un seul. Les lettres que la
+// décomposition accentuée ne touche pas (ß, ø, ł, đ) prennent leur écriture ordinaire.
+const LETTER_FOLDS = { œ: 'oe', æ: 'ae', ß: 'ss', ø: 'o', ł: 'l', đ: 'd' };
+export function normalizeForSearch(value) {
+  return normalize(value)
+    .replace(/[œæßøłđ]/g, letter => LETTER_FOLDS[letter])
+    .replace(/['’‘ʼ′＇`´]/g, '')
+    .replace(/[\p{Pd}_.]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Tri alphabétique français (« chu » avant « UBM »), les nombres dans l'ordre (« 1.2 »
 // avant « 1.10 ») ; .sort() seul trie par code UTF-16, majuscules d'abord.
 export function compareLabels(a, b) {
   return text(a).localeCompare(text(b), 'fr-FR', { numeric: true });
+}
+
+// Ordre des cartes : nom de famille, puis prénom, alphabétique français (« Éluard » avec les E,
+// « de Gaulle » avec les D). Une personne sans nom de famille se range d'après son prénom.
+// Un seul collateur partagé : en construire un par comparaison coûterait cher sur un
+// grand annuaire.
+const NAME_COLLATOR = new Intl.Collator('fr-FR');
+export function compareContacts(a, b) {
+  return NAME_COLLATOR.compare(text(a.nom) || text(a.prenom), text(b.nom) || text(b.prenom))
+    || NAME_COLLATOR.compare(text(a.prenom), text(b.prenom));
 }
 
 // Remonte les valeurs cochées en tête. `sortedValues` doit déjà être trié :
@@ -360,7 +386,8 @@ export function buildContacts(scopedRows, referenceMaps, etabFlags) {
     .filter(hasAccepted)
     .map(row => enrich(row, referenceMaps, etabFlags))
     .filter(contact => contact.nom || contact.prenom)
-    .filter(isEtablissementEligible);
+    .filter(isEtablissementEligible)
+    .sort(compareContacts);
 }
 
 // Pourquoi une ligne de BDD apparaît dans l'annuaire, ou non : reprend, critère

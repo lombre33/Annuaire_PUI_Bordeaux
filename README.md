@@ -21,7 +21,7 @@
 
 L'annuaire affiche les accompagnateurs de l'innovation du PUI sous forme de **cartes** : on retrouve chaque personne par son nom ou par ce qu'elle fait.
 
-- 🔎 **Recherche** par nom ou prénom, sans souci d'accents ni de majuscules.
+- 🔎 **Recherche** par prénom et nom, dans l'ordre que l'on veut (« élise marchetti » comme « marchetti élise »), sans souci d'accents, de majuscules ni de tirets. Les cartes sont triées par nom.
 - 🎛️ **Filtres** : chaque menu liste les valeurs d'une catégorie, avec le nombre de cartes qui portent chacune. Les valeurs d'un même menu s'additionnent (« ou »), les menus se cumulent entre eux (« et »).
 - 🏛️ **Fondateurs et Partenaires** : deux interrupteurs permettent de choisir les établissements affichés, fondateurs du PUI ou partenaires. Seuls les établissements qui ont validé leur apparition sont montrés.
 - 🙋 **Chacun décide s'il apparaît** : une personne n'est affichée que si elle a accepté d'apparaître. Connectée à Grist, elle voit un bandeau « Ma présence » et active ou retire son accord d'un clic.

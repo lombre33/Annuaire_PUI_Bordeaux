@@ -1,5 +1,73 @@
 # Changelog
 
+## 1.16.1 — Cartes triées par nom, recherche « prénom nom »
+
+Deuxième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un
+gain par version). Deux constats majeurs de l'audit, U31 (recherche fragile) et U32 (aucun tri),
+levés ensemble : ils tiennent au même geste, retrouver une personne. **Rien d'autre ne change** : les
+filtres, les menus, les compteurs, la mise en page et les bandeaux sont ceux de la 1.16.0.
+
+- **Les cartes sont triées par nom de famille, puis par prénom**, dans l'ordre alphabétique
+  français : « Éluard » est avec les E, « de Gaulle » avec les D (la particule compte comme une
+  lettre). Une personne sans nom de famille se range d'après son prénom ; deux homonymes parfaits
+  gardent l'ordre des lignes de `BDD`. Avant, les cartes suivaient l'ordre des lignes de la table
+  Grist, c'est-à-dire l'ordre de saisie : pour retrouver quelqu'un sans le chercher, il fallait
+  parcourir toutes les cartes. Le tri se fait une seule fois à chaque lecture de Grist
+  (`buildContacts()`), pas à chaque frappe ni à chaque filtre ; une modification de nom dans Grist
+  replace la carte à sa lettre, sans recharger la page.
+- **La recherche trouve « prénom nom ».** Elle testait le nom et le prénom séparément : aucune requête
+  ne pouvait couvrir les deux, et « Élise Marchetti » ne donnait rien (l'audit a relevé « karim benali »,
+  « benali karim », « Jean Le Cœur » et « Zoé É » : 0 résultat). Chaque mot tapé doit maintenant se
+  trouver dans « prénom nom », dans n'importe quel ordre : « élise marchetti », « marchetti élise » et
+  « eli mar » trouvent Élise Marchetti, et un mot seul cherche toujours dans le prénom comme dans le nom.
+  Tous les mots doivent être trouvés : « Élise Garnier » ne trouve personne s'il n'y a pas d'Élise Garnier.
+- **Les écritures d'un même nom se valent**, pour la recherche principale seulement. L'audit avait relevé
+  que « marie christine » ne trouvait pas « Marie-Christine », que « d'arcy » écrit avec l'apostrophe
+  typographique ne trouvait pas « D'Arcy » (l'apostrophe droite, si) et que « coeur » ne trouvait pas
+  « Cœur ». Désormais les tirets, les points et les soulignés valent des espaces, l'apostrophe (droite ou
+  typographique) disparaît, « œ », « æ », « ß », « ø », « ł » et « đ » s'écrivent comme on les tape, et les
+  espaces se réduisent à une seule (`normalizeForSearch()`). Les menus, les sélections et les compteurs
+  gardent `normalize()` tel quel : ils n'ont pas à confondre plus de libellés qu'avant.
+- **La liste ne se redessine plus à chaque lettre.** Elle attend 200 ms sans nouvelle frappe
+  (`SEARCH_DELAY_MS`) : un mot de six lettres ne reconstruit plus les cartes qu'une fois au lieu de six
+  (chaque reconstruction coûte ≈ 0,15 s à 400 contacts d'après l'audit). Un champ vidé (Échap, croix du
+  champ) s'applique tout de suite, et « Réinitialiser » annule la frappe en attente. C'est un répit, pas
+  la réponse à la lenteur à grande échelle (constat U33), qui relève de l'audit de performance prévu après
+  le mode admin : une reconstruction complète des cartes à chaque application reste le coût.
+- **Pour les développeurs** : la section « Filtres, compteurs et recherche » de `docs/developpeurs.md`
+  décrit la recherche mot par mot, la clé de recherche gardée par contact (`searchKey()` : une frappe
+  parcourt tout l'annuaire), l'ordre des cartes (`compareContacts()`, un seul `Intl.Collator` partagé) et
+  l'attente de la frappe. `docs/demo/capturer.mjs` ne suppose plus que la carte de la personne
+  connectée est sur la première rangée : les cartes étant triées, celle de Camille Rousseau est sur la
+  dernière ; la capture de son bouton montre sa rangée, celle de la confirmation défile jusqu'à sa carte,
+  celle de la carte légendée la choisit par son nom, et `node docs/demo/capturer.mjs apercu partenaires`
+  ne refait que les captures dont le nom commence ainsi.
+- **Tests** : 640 tests (220 dans un vrai navigateur, optionnels sans Playwright), 18 de plus qu'à la 1.16.0
+  (622, dont 213). Le tri : un
+  test d'unité de l'ordre (accents, particules, prénom en second critère, nom vide, valeurs vides) et un
+  test de `loadDirectory()` ; dans le navigateur, les cartes d'une table à l'envers apparaissent triées, et
+  une modification de nom dans Grist replace la carte. La recherche : huit tests de `filterContacts()` (mot
+  par mot, tous les mots, tirets, apostrophes, œ, séparateurs seuls, contacts sans prénom ou sans nom, nom
+  relu pour un contact reconstruit), un de `normalizeForSearch()` et un du compteur de menu, qui cherche
+  comme les cartes ; dans le navigateur, les requêtes de l'audit. L'attente : quatre lettres tapées dans la
+  même tâche ne provoquent qu'une mise à jour des cartes, un champ vidé s'applique sans attendre,
+  « Réinitialiser » annule l'attente et n'en laisse aucune mise à jour superflue. Les vingt variantes fautives
+  essayées une à une (tri retiré, prénom avant nom, ordre par code, `some` au lieu de `every`, apostrophe ou
+  tiret conservés, attente retirée, attente non annulée…) font toutes échouer au moins un test. Les tests
+  qui supposaient l'ordre des lignes de Grist (une carte « la première », « la troisième ») cherchent
+  maintenant la carte par son nom, et la liste des noms de référence (`DEFAULT_CARD_NAMES`) est dans l'ordre
+  alphabétique. Cinq tests du menu Tâches par action de la 1.16.0 (`tests/e2e-taches.test.mjs`) attendaient
+  aussi cet ordre : leurs listes de noms sont dans l'ordre alphabétique, la carte de la fiche relue est
+  retrouvée par son nom, et le menu est refermé avant de cliquer le badge de Bob, que le menu recouvrait
+  depuis que sa carte est la première de la rangée. Le banc d'essai (`tests/support/browser.mjs`) ne fait
+  plus échouer tout un fichier quand une page se ferme pendant la lecture d'une ligne de console : sur une
+  machine chargée, `tests/e2e.test.mjs` échouait ainsi malgré ses 68 scénarios verts. Un scénario fait
+  échouer cette lecture à la main (sans le correctif, il échoue à chaque essai).
+- **Documentation** : guide utilisateur (« Rechercher une personne », l'ordre des cartes), maintenance (limites
+  connues), spécifications, README, `TESTING.md` (section 2 du protocole manuel, à jouer dans un vrai Grist) et
+  les captures où l'ordre des cartes se voit (aperçu, filtres, partenaires, mode admin, carte légendée, bouton
+  « Modifier », confirmation, bandeau d'état, sans logos).
+
 ## 1.16.0 — Les tâches rangées par action : le menu Tâches se range comme les compétences
 
 À la demande d'Antoine (« pourrais-tu faire pareil pour les tâches ? »), le menu **Tâches**

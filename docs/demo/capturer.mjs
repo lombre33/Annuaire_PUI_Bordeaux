@@ -4,6 +4,7 @@
 //   npm install --no-save playwright      (une fois ; pas une dépendance du projet)
 //   npx playwright install chromium       (ou CHROMIUM_PATH=/chemin/vers/chromium)
 //   node docs/demo/capturer.mjs
+//   node docs/demo/capturer.mjs apercu partenaires      (seulement les captures dont le nom commence ainsi)
 //
 // À relancer, puis à committer, après toute modification de l'interface.
 // Chaque capture est précédée d'une vérification (nombre de cartes, logos chargés,
@@ -41,10 +42,13 @@ try {
 // des cadres vides ou à demi transparents (un logo apparaît en fondu). On attend que chaque logo
 // soit chargé et pleinement visible (ou remplacé par le nom de l'établissement quand Grist refuse
 // le fichier), sauf ceux des cartes hors de l'écran, que le navigateur ne charge pas avant d'en
-// approcher (loading="lazy").
+// approcher (loading="lazy") : au-dessus de l'écran comme au-dessous, si la page a défilé.
 const attendreLogos = page =>
   page.waitForFunction(() => [...document.querySelectorAll('img.logo-img')]
-    .filter(image => image.loading === 'eager' || image.getBoundingClientRect().top < window.innerHeight)
+    .filter(image => {
+      const boite = image.getBoundingClientRect();
+      return image.loading === 'eager' || (boite.bottom > 0 && boite.top < window.innerHeight);
+    })
     .every(image => image.classList.contains('loaded') && getComputedStyle(image).opacity === '1'), null, { timeout: 10_000 });
 const attendreCartes = async (page, nombre) => {
   await page.waitForFunction(attendu => document.querySelectorAll('.contact-card').length === attendu, nombre, { timeout: 10_000 });
@@ -61,6 +65,7 @@ const attendrePresence = (page, extrait) =>
       && bandeau.querySelector('.account-status').textContent === '';
   }, extrait, { timeout: 10_000 });
 const filtre = (page, cle) => page.locator(`.filter[data-filter-key="${cle}"]`);
+const carteDe = (page, nom) => page.locator('.contact-card', { has: page.locator('.name', { hasText: new RegExp(`^${nom}$`) }) });
 
 // Ouvre le menu, coche l'option, puis le referme comme le ferait un utilisateur
 // (un clic ailleurs) : un menu resté ouvert masquerait le bouton suivant.
@@ -136,7 +141,8 @@ async function exigerHabillage(page, { cartes, sansLogo = 0 }) {
 }
 
 // Le bandeau propose « Modifier mon profil » et la carte de la personne, la seule à avoir
-// un bouton, porte « Votre fiche » et « ✎ Modifier » ; elle figure sur la première rangée.
+// un bouton, porte « Votre fiche » et « ✎ Modifier ». Les cartes étant triées par nom, la sienne
+// n'est pas forcément sur la première rangée.
 const attendreBoutonsModifier = (page, nom) =>
   page.waitForFunction(attendu => {
     const bouton = document.querySelector('#accountBar .account-edit');
@@ -144,11 +150,9 @@ const attendreBoutonsModifier = (page, nom) =>
     const avecBouton = cartes.filter(carte => !carte.querySelector('.card-actions').hidden);
     if (!bouton || bouton.hidden || bouton.textContent !== 'Modifier mon profil' || avecBouton.length !== 1) return false;
     const [carte] = avecBouton;
-    const premierRang = Math.min(...cartes.map(autre => Math.round(autre.getBoundingClientRect().top)));
     return carte.querySelector('.name').textContent === attendu
       && !carte.querySelector('.own-flag').hidden && carte.querySelector('.own-flag').textContent === 'Votre fiche'
-      && carte.querySelector('.card-edit').textContent === '✎ Modifier'
-      && Math.round(carte.getBoundingClientRect().top) === premierRang;
+      && carte.querySelector('.card-edit').textContent === '✎ Modifier';
   }, nom, { timeout: 10_000 });
 
 // La fenêtre est ouverte sur l'étape qui porte ce titre (« Modifier mon profil », « Relire avant de valider »).
@@ -241,9 +245,9 @@ const REPERES = [
 
 // Les pastilles sont ajoutées à la page le temps de la capture seulement :
 // le widget lui-même n'est pas modifié.
-async function poserReperes(page) {
-  await page.evaluate(reperes => {
-    const carte = document.querySelector('.contact-card');
+async function poserReperes(page, nom) {
+  await page.evaluate(({ reperes, nom }) => {
+    const carte = [...document.querySelectorAll('.contact-card')].find(autre => autre.querySelector('.name').textContent === nom);
     reperes.forEach(({ numero, selecteur, texte, dernier, placement = 'droite' }) => {
       const cibles = carte.querySelectorAll(selecteur);
       const cible = dernier ? cibles[cibles.length - 1] : cibles[0];
@@ -264,7 +268,7 @@ async function poserReperes(page) {
         + 'font:700 11px/18px Inter,system-ui,sans-serif;text-align:center;';
       document.body.appendChild(repere);
     });
-  }, REPERES);
+  }, { reperes: REPERES, nom });
 }
 
 // Chaque scène : fichier produit, adresse à ouvrir (`requete`), mise en situation
@@ -460,20 +464,23 @@ const SCENES = [
     }
   },
   {
+    // La carte de Camille Rousseau, qui porte les neuf éléments légendés (les cartes sont triées par nom).
     fichier: 'carte-anatomie.png',
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
-      await poserReperes(page);
+      await poserReperes(page, 'Camille Rousseau');
     },
     async zone(page) {
-      const boite = await page.locator('.contact-card').first().boundingBox();
+      const boite = await carteDe(page, 'Camille Rousseau').boundingBox();
       return { x: boite.x - 24, y: boite.y - 14, width: boite.width + 48, height: boite.height + 28 };
     }
   },
   {
-    // L'annuaire vu par Camille Rousseau : « Modifier mon profil » dans le bandeau, et sur sa
-    // carte (la première) « Votre fiche » et « ✎ Modifier ». Aucune autre carte n'a de bouton.
-    fichier: 'modifier-fiche-bouton.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquALaRangee(1),
+    // La rangée de la carte de Camille Rousseau, qui porte « Votre fiche » et « ✎ Modifier » ; l'autre
+    // carte de la rangée n'a pas de bouton. Les cartes sont triées par nom : la sienne est sur la dernière
+    // rangée. Le bouton « Modifier mon profil » du bandeau est celui de ma-presence.png.
+    fichier: 'modifier-fiche-bouton.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, pagePleine: true,
+    zone: autourDe('.contact-card:has(.own-flag:not([hidden]))', MARGE_RANGEE),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       await attendrePresence(page, 'Vous apparaissez dans l\'annuaire.');
@@ -544,6 +551,13 @@ const SCENES = [
       exiger(await page.locator('#toast').textContent() === 'Vos modifications sont enregistrées.', 'le message de confirmation n\'est pas celui attendu');
       await page.waitForFunction(attendu => [...document.querySelectorAll('.contact-card .fonction')].some(ligne => ligne.textContent === attendu),
         BROUILLON.fonction, { timeout: 10_000 });
+      // Les cartes sont triées par nom : celle de Camille Rousseau est sur la dernière rangée. La page
+      // descend jusqu'à elle, comme le ferait la personne pour vérifier sa fiche ; le message, lui, est
+      // fixé en bas de l'écran.
+      await carteDe(page, 'Camille Rousseau').evaluate(carte => carte.scrollIntoView({ block: 'center' }));
+      await attendreLogos(page);
+      exiger(await carteDe(page, 'Camille Rousseau').locator('.fonction').textContent() === BROUILLON.fonction, 'la carte de la personne n\'a pas sa nouvelle fonction');
+      exiger(await carteDe(page, 'Camille Rousseau').isVisible() && !(await page.locator('#toast').isHidden()), 'la carte et le message ne sont pas à l\'écran ensemble');
     }
   },
   {
@@ -583,7 +597,11 @@ try {
   // Hermétique : seules les requêtes vers le serveur local passent.
   await contexte.route(adresse => adresse.hostname !== '127.0.0.1', route => route.abort());
 
-  for (const scene of SCENES) {
+  const demandees = process.argv.slice(2);
+  const scenes = demandees.length ? SCENES.filter(scene => demandees.some(nom => scene.fichier.startsWith(nom))) : SCENES;
+  if (scenes.length === 0) throw new Error(`Aucune capture ne s'appelle « ${demandees.join(' », « ')} »`);
+
+  for (const scene of scenes) {
     const page = await contexte.newPage();
     if (scene.hauteur) await page.setViewportSize({ width: LARGEUR, height: scene.hauteur });
     await page.goto(`${url}/${scene.requete ?? ''}`);
