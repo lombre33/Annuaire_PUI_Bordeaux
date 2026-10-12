@@ -4,7 +4,7 @@ Cette page explique comment le widget est construit et comment le modifier sans 
 
 Pages liées : [README](../README.md) (présentation et installation), [guide utilisateur](utilisateurs.md), [sécurité](securite.md), [maintenance](maintenance.md).
 
-> **Cette page décrit la version 1.17.0** : le widget lit la table `BDD` (1.8.0), range les compétences par domaine (un filtre « Domaines » en 1.9.0, intégré depuis au menu Compétences, 1.13.0), s'adapte à la largeur de son cadre (1.9.1), n'affiche que les personnes qui ont accepté d'apparaître (1.10.0), laisse la personne connectée choisir d'apparaître ou non, « Ma présence » (1.11.0), puis modifier sa fiche après une relecture de la carte avant et après (1.12.0), puis affiche les logos des établissements, des financeurs et des fondateurs, lus comme des pièces jointes du document, dans un en-tête et un bandeau du bas remaniés (1.14.0). Depuis la 1.15.0, un administrateur allume un « mode admin » qui lui permet de modifier la fiche de toute personne affichée, adresse e-mail et établissement compris, dans une fenêtre qui suit la maquette validée. Depuis la 1.16.0, le menu Tâches range les tâches par action d'après leur numéro. Depuis la 1.17.0, un **responsable d'établissement** modifie la fiche de son établissement (logo, nom complet, visibilité, liste des responsables) dans une autre fenêtre de la maquette, et le widget **envoie lui-même** le fichier du logo à Grist. Ces modifications s'appliquent directement : il n'y a ni validation par un administrateur ni historique tenu par le widget. Ce qui n'est pas encore là est résumé dans [Chantiers en cours](#chantiers-en-cours).
+> **Cette page décrit la version 1.17.2** : le widget lit la table `BDD` (1.8.0), range les compétences par domaine (un filtre « Domaines » en 1.9.0, intégré depuis au menu Compétences, 1.13.0), s'adapte à la largeur de son cadre (1.9.1), n'affiche que les personnes qui ont accepté d'apparaître (1.10.0), laisse la personne connectée choisir d'apparaître ou non, « Ma présence » (1.11.0), puis modifier sa fiche après une relecture de la carte avant et après (1.12.0), puis affiche les logos des établissements, des financeurs et des fondateurs, lus comme des pièces jointes du document, dans un en-tête et un bandeau du bas remaniés (1.14.0). Depuis la 1.15.0, un administrateur allume un « mode admin » qui lui permet de modifier la fiche de toute personne affichée, adresse e-mail et établissement compris, dans une fenêtre qui suit la maquette validée. Depuis la 1.16.0, le menu Tâches range les tâches par action d'après leur numéro. Depuis la 1.17.0, un **responsable d'établissement** modifie la fiche de son établissement (logo, nom complet, visibilité, liste des responsables) dans une autre fenêtre de la maquette, et le widget **envoie lui-même** le fichier du logo à Grist. Ces modifications s'appliquent directement : il n'y a ni validation par un administrateur ni historique tenu par le widget. Depuis la 1.17.1, tout le texte des cartes fait 12 px au moins et les pastilles 24 px de haut ; depuis la 1.17.2, dans un cadre étroit, le texte du bandeau « Ma présence » garde 200 px au moins et l'interrupteur passe dessous. Ce qui n'est pas encore là est résumé dans [Chantiers en cours](#chantiers-en-cours).
 
 ## Sommaire
 
@@ -63,7 +63,7 @@ flowchart LR
 | `grist-plugin-api.js` | API de widget de Grist. `index.html` la charge depuis `docs.getgrist.com`, sans version figée | `index.html` |
 | GitHub Actions | Exécute `node --test` à chaque pull request et à chaque push sur `main` | `.github/workflows/tests.yml` |
 
-Ce que le widget fait, dans la version 1.17.0 :
+Ce que le widget fait, dans la version 1.17.2 :
 
 - il **lit** les tables du document Grist : dix lectures `fetchTable` par chargement de l'annuaire (neuf tables, plus la table facultative `Financeurs` des logos du haut de page) et, pour savoir qui est connecté, la liste des tables (`listTables`) puis la table-sonde. Quand une personne prépare la relecture d'une modification, il relit aussi `BDD` (puis une dernière fois juste avant d'écrire) et lit les tables de métadonnées `_grist_Tables` et `_grist_Tables_column` (`schema.js`). Quand un responsable ouvre la fiche de son établissement, il relit `Etablissements` et `ACL` (`etablissement-save.js`). Pour afficher les logos, il demande à Grist un **jeton d'accès en lecture seule** (`getAccessToken`, dans `attachments.js`) : ce sont les images, demandées par le navigateur, qui le portent (voir [Habillage](#habillage--logos-et-pièces-jointes)) ;
 - il **écrit** dans quatre cas seulement, toujours à l'initiative d'un chargement ou d'un clic, jamais en tâche de fond :
@@ -948,7 +948,7 @@ Règles :
 
 ## Chantiers en cours
 
-Au 12 octobre 2026, `main` est en version 1.17.0 (la 1.16.0 range les tâches par action, la 1.16.1 trie les cartes par nom et la 1.16.2 fonce les pastilles ; la 1.15.0 est le mode admin, la 1.14.1 le premier des six « gains rapides » de l'audit UI/UX, un par version ; la 1.14.0 est l'habillage, la 1.13.0 le menu Compétences par domaine). Cette documentation la décrit et sera mise à jour à chaque fusion.
+Au 12 octobre 2026, `main` est en version 1.17.2 (la 1.17.2 range le bandeau « Ma présence » dans un cadre étroit, la 1.17.1 donne au texte des cartes 12 px au moins, la 1.17.0 est la fiche d'un établissement ; la 1.16.0 range les tâches par action, la 1.16.1 trie les cartes par nom, la 1.16.2 fonce les pastilles et la 1.16.3 rend l'interrupteur de présence accessible ; la 1.15.0 est le mode admin, la 1.14.1 le premier des six « gains rapides » de l'audit UI/UX, un par version, dont la 1.17.2 est le dernier ; la 1.14.0 est l'habillage, la 1.13.0 le menu Compétences par domaine). Cette documentation la décrit et sera mise à jour à chaque fusion.
 
 **Déjà fusionné**
 
@@ -963,7 +963,7 @@ Au 12 octobre 2026, `main` est en version 1.17.0 (la 1.16.0 range les tâches pa
 9. **Tâches rangées par action** (1.16.0) : le menu Tâches se range comme le menu Compétences, par action au lieu de domaine (une case par action, détail dépliable, recherche à deux niveaux). Aucune colonne n'est ajoutée dans Grist : l'action d'une tâche est le numéro avant le point de son libellé (« 1.3 … » → « Action 1 : … »). Le filtre Actions ne change pas. Voir [Filtres, compteurs et recherche](#filtres-compteurs-et-recherche).
 10. **La fiche d'un établissement** (1.17.0) : un responsable d'établissement (désigné dans la table `ACL`) modifie, depuis le widget et sans validation, le logo, le nom complet, la visibilité dans l'annuaire et la liste des responsables de son établissement, par « ✎ Modifier » sous le logo de ses cartes ou par « Mon établissement » dans le bandeau. Le fichier du logo est envoyé à l'API du document avec un jeton d'accès en écriture, demandé pour l'envoi seul : c'est la seule requête réseau du code, décrite dans [sécurité](securite.md#lenvoi-dun-logo-et-le-jeton-en-écriture). Le widget ne crée aucune table. Voir [La fiche d'un établissement](#la-fiche-dun-établissement).
 
-**Pas encore dans la 1.17.0**
+**Pas encore dans la 1.17.2**
 
 Ce qui suit n'est pas dans le code, et aucune date n'est promise.
 

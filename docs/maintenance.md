@@ -48,7 +48,7 @@ Une personne n'est affichée que si **toutes** les conditions suivantes sont vra
 
 Côté écran, les interrupteurs **Fondateurs** et **Partenaires** affinent ensuite l'affichage ([guide utilisateur](utilisateurs.md#fondateurs-et-partenaires)). Le schéma complet des règles est dans la [documentation développeur](developpeurs.md#règles-daffichage).
 
-Cinq précisions sur la version 1.17.0 :
+Cinq précisions sur la version 1.17.2 :
 
 - L'établissement vient de la référence `Etablissement`, résolue par identifiant de ligne. L'ancienne colonne calculée `Etablissement2` n'est plus utilisée depuis la 1.8.0, et deux lignes d'`Etablissements` de même acronyme ne se confondent plus.
 - **Les deux accords sont indépendants.** Valider un établissement (`ok_pour_apparaitre`) ne fait pas apparaître une personne qui n'a pas accepté, et une personne qui a accepté n'apparaît pas tant que son établissement n'est pas validé. Seul « coché » vaut accord.
