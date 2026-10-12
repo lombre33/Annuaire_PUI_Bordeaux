@@ -453,6 +453,10 @@ textarea {
   gap: 18px;
   align-items: start;
 }
+/* Une fiche qu'on crée n'a qu'une carte, à la largeur d'une carte de l'annuaire. */
+.rv-cols.rv-cols-one {
+  grid-template-columns: minmax(0, 520px);
+}
 .rv-col {
   min-width: 0;
 }

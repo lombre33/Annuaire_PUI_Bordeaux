@@ -177,11 +177,16 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 // décident de ce qui s'affiche) ni Accepte_apparaitre (l'interrupteur « Ma présence »
 // l'écrit). Un administrateur qui modifie la fiche d'UNE AUTRE personne change aussi
 // l'e-mail et l'établissement (`admin: true`) ; le périmètre reste l'affaire de Grist.
+// Une personne qui crée sa fiche choisit en plus son établissement (`atCreation: true`) :
+// elle n'en a pas encore, et sans lui la fiche ne pourrait jamais s'afficher.
 //   key       colonne de BDD
 //   kind      'text', 'email' (une adresse), 'phone' (numéro français), 'reference'
 //             (une valeur d'une table de référence) ou 'list' (plusieurs)
 //   category  catégorie de CATEGORIES dont viennent les valeurs proposées
 //   admin     réservé à un administrateur sur la fiche d'une autre personne
+//   atCreation  proposé aussi à la personne qui crée sa fiche
+//   optional  une adresse facultative (`email_affiche`) : on peut la vider, et plusieurs fiches
+//             peuvent la porter, contrairement à `email`
 //   labelsFrom  la table de libellés à proposer, quand ce n'est pas celle de la catégorie
 //   required  une référence qu'on ne peut pas vider
 const LIST_FIELD_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches'];
@@ -190,8 +195,10 @@ export const PROFILE_FIELDS = [
   { key: 'prenom', label: 'Prénom', kind: 'text' },
   { key: 'nom', label: 'Nom', kind: 'text' },
   { key: 'email', label: 'E-mail', kind: 'email', admin: true },
-  { key: 'Etablissement', label: CATEGORIES.etablissement.label, kind: 'reference', category: 'etablissement', labelsFrom: ETABLISSEMENT_NAMES, admin: true, required: true },
+  { key: 'Etablissement', label: CATEGORIES.etablissement.label, kind: 'reference', category: 'etablissement', labelsFrom: ETABLISSEMENT_NAMES, admin: true, atCreation: true, required: true },
   { key: 'Fonction', label: 'Fonction', kind: 'text' },
+  // L'adresse que la carte montre à la place de `email` quand elle n'est pas vide (colonne facultative).
+  { key: 'email_affiche', label: 'E-mail affiché', kind: 'email', optional: true },
   { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
   { key: 'Role_dans_le_PUI', label: 'Rôle dans le PUI', kind: 'reference', category: 'role' },
   ...LIST_FIELD_KEYS.map(category => ({ key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category }))
@@ -199,5 +206,7 @@ export const PROFILE_FIELDS = [
 
 // Les champs que le formulaire propose : ceux de tout le monde, plus ceux de l'administrateur
 // quand c'en est un qui modifie la fiche d'une autre personne (`admin` vaut exactement true :
-// fermé par défaut).
-export const fieldsFor = admin => PROFILE_FIELDS.filter(field => admin === true || !field.admin);
+// fermé par défaut), ou seulement l'établissement quand la personne crée sa propre fiche
+// (`creating` vaut exactement true ; son e-mail est celui de son compte, il ne se saisit pas).
+export const fieldsFor = (admin, creating = false) =>
+  PROFILE_FIELDS.filter(field => admin === true || !field.admin || (creating === true && field.atCreation === true));

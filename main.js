@@ -14,8 +14,8 @@ import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateF
 import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
-import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges } from './profile.js';
-import { ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
+import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges, blankFiche } from './profile.js';
+import { ProfileSaveError, createProfile, prepareCreation, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
 import { createProfileDialog } from './profile-ui.js';
 import { diffEtablissement, etablissementOf, etablissementRightsFor, peopleOfEtablissement, responsablesOf } from './etablissement.js';
 import { EtablissementSaveError, readEtablissement, saveEtablissement, savePlanOf } from './etablissement-save.js';
@@ -77,6 +77,7 @@ const elements = {
 const accountBar = createAccountBar(document.getElementById('accountBar'), {
   onToggle: togglePresence,
   onEdit: openOwnProfile,
+  onCreate: openCreation,
   onEtab: openMyEtablissement,
   onAdminMode: toggleAdminMode
 });
@@ -323,7 +324,8 @@ function refreshAccount() {
       ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bouton « Modifier mon profil ».'
       : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
     accountBar.show(describeUnknownAccount({ email: state.identity.email, admin, emailColumn: state.people.hasEmailColumn }));
-    accountBar.setActions({ etab: myEtablissements().length > 0, admin, adminMode: state.adminMode });
+    // Sans colonne « email », la fiche créée ne pourrait pas être reliée à la personne : rien à proposer.
+    accountBar.setActions({ create: state.people.hasEmailColumn, etab: myEtablissements().length > 0, admin, adminMode: state.adminMode });
     return;
   }
   if (persons.length > 1) {
@@ -439,8 +441,9 @@ function etablissementWarning(id) {
 
 // Ce que le brouillon change (de quoi activer le bouton) et pourquoi il serait refusé.
 // `admin` : un administrateur modifie la fiche d'une autre personne (e-mail et établissement compris).
-function evaluateDraft(row, draft, admin) {
-  const { champs, errors, fieldErrors } = diffProfile(row, draft, state.referenceMaps, { admin, emailTaken: emailTakenElsewhere(row.id) });
+// `creating` : la personne remplit sa propre fiche, qui n'existe pas encore (établissement compris).
+function evaluateDraft(row, draft, admin, creating = false) {
+  const { champs, errors, fieldErrors } = diffProfile(row, draft, state.referenceMaps, { admin, creating, emailTaken: emailTakenElsewhere(row.id) });
   return { errors, fieldErrors, lines: describeChanges(champs) };
 }
 
@@ -530,6 +533,62 @@ function openProfile(rowId, returnFocus) {
 function openOwnProfile() {
   const persons = myPersons();
   if (persons.length === 1) openProfile(persons[0].row.id, () => accountBar.focusEdit());
+}
+
+// ===== Créer sa fiche =====
+
+// Prépare la relecture de la fiche à créer (profile-save.js) : rien n'est écrit. `blank` : la fiche vide
+// que le formulaire a montrée.
+async function reviewCreation(blank, draft) {
+  try {
+    return await prepareCreation(window.grist.docApi, blank, draft, {
+      email: state.identity.email, referenceMaps: state.referenceMaps, etabFlags: state.etabFlags
+    });
+  } catch (error) {
+    throw userFacing(error);
+  }
+}
+
+// Ajoute la fiche à BDD, puis relit l'annuaire : le bandeau montre alors l'interrupteur et « Modifier mon
+// profil », et on vérifie que Grist a gardé ce qu'on lui a demandé.
+async function saveCreation(review) {
+  let result;
+  try {
+    result = await createProfile(window.grist.docApi, review);
+  } catch (error) {
+    throw userFacing(error);
+  }
+  const outcome = await reloadDirectory();
+  const saved = outcome === 'applied' && result.rowId !== null ? state.people?.findById(result.rowId)?.row : null;
+  const leftovers = saved ? unsavedLabels(review, saved, state.referenceMaps) : [];
+  return { status: 'saved', lines: review.lines, leftovers, reloaded: outcome !== 'failed' };
+}
+
+// Le bouton « Créer ma fiche » du bandeau : la personne connectée n'a aucune ligne dans BDD. Elle remplit la
+// même fenêtre que pour modifier sa fiche, et choisit en plus son établissement ; son e-mail est celui de son
+// compte. La fiche est une ligne ajoutée à BDD, jamais une table. Fermé par défaut : seulement sans fiche.
+function openCreation() {
+  if (state.identity?.status !== 'ready' || !state.people?.hasEmailColumn || myPersons().length > 0) return;
+  const email = state.identity.email;
+  const blank = blankFiche(state.people.columns, normalizeEmail(email));
+  const model = profileFormModel(blank, state.referenceMaps, { creating: true });
+  profileDialog.open({
+    mode: 'create',
+    viewerAdmin: isAdmin(),
+    person: { name: 'Nouvelle fiche', email, initials: '+' },
+    etablissement: '',
+    model,
+    draft: draftOf(model),
+    evaluate: draft => evaluateDraft(blank, draft, false, true),
+    review: draft => reviewCreation(blank, draft),
+    hiddenNotice: review => describeHiddenFiche(review.visibility, { own: true }),
+    fieldWarning: (key, value) => (key === 'Etablissement' ? etablissementWarning(value) : ''),
+    save: review => saveCreation(review),
+    renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks, cardLogos()),
+    notify: showToast,
+    // La fiche créée, c'est « Modifier mon profil » qui reprend le focus ; sinon le bouton qui a ouvert la fenêtre.
+    onClose: () => { if (!accountBar.focusEdit()) accountBar.focusCreate(); }
+  });
 }
 
 // ===== Modifier un établissement =====

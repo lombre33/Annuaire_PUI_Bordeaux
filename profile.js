@@ -16,6 +16,9 @@ export const MAX_TEXT_LENGTH = 200;
 // résumé du pied de fenêtre le reconnaissent à cette phrase.
 export const NAME_REQUIRED = 'Indiquez au moins un prénom ou un nom.';
 
+// Ce que dit le formulaire de création quand la personne n'a pas choisi son établissement.
+export const ETABLISSEMENT_REQUIRED = 'Choisissez votre établissement.';
+
 // Un texte qui commence par l'un de ces caractères serait lu comme une formule par
 // un tableur qui ouvre un export de l'annuaire.
 const SPREADSHEET_FORMULA_START = /^[=+\-@]/;
@@ -86,6 +89,16 @@ function emailFault(after, before, emailTaken) {
   return '';
 }
 
+// Pourquoi l'adresse que la carte affiche (facultative : `email_affiche`) est refusée, ou ''. Elle peut
+// être vidée (la carte montre alors l'adresse du compte) et plusieurs fiches peuvent la porter (une
+// boîte de service) : seule sa forme compte, contrairement à l'adresse du compte.
+function shownEmailFault(after) {
+  if (after === '') return '';
+  const fault = textFault(after);
+  if (fault) return `${sentence(fault)}.`;
+  return EMAIL_SHAPE.test(after) ? '' : 'Indiquez une adresse e-mail valide.';
+}
+
 // « 05 56 78 90 12 », « 05.56.78.90.12 », « +33 5 56 78 90 12 » ou « 0033 5 56 78 90 12 »
 // → « 0556789012 ».
 // null pour tout ce qui n'est pas un numéro français à 10 chiffres.
@@ -98,6 +111,21 @@ export function frenchPhoneDigits(input) {
   if (raw.startsWith('+') && /^330[1-9]\d{8}$/.test(digits)) return `0${digits.slice(3)}`; // +33 (0)5 56…
   if (/^0033[1-9]\d{8}$/.test(digits)) return `0${digits.slice(4)}`;
   return null;
+}
+
+// ===== Une fiche qui n'existe pas encore =====
+
+const BLANK_CELL = { text: '', email: '', phone: '', reference: 0 };
+
+// La fiche vide d'une personne qui n'en a pas : une cellule vide, de la forme qu'elle a dans Grist,
+// pour chaque colonne de BDD (`columns`) que le formulaire sait remplir, et l'adresse de son compte
+// (`email`). Le formulaire et la comparaison la traitent comme n'importe quelle fiche.
+export function blankFiche(columns, email = '') {
+  const row = { id: 0 };
+  PROFILE_FIELDS.filter(field => columns.includes(field.key)).forEach(field => {
+    row[field.key] = field.kind === 'list' ? ['L'] : BLANK_CELL[field.kind];
+  });
+  return { ...row, email };
 }
 
 // ===== Le formulaire =====
@@ -139,13 +167,15 @@ function knownIds(cell, options) {
 // Le formulaire de modification d'une fiche : un champ par PROFILE_FIELDS, avec la
 // valeur actuelle de la fiche (`value`) et, pour une référence ou une liste, sa
 // `category` et les valeurs proposées (`options`). `admin` : un administrateur modifie la
-// fiche d'une autre personne, et change aussi son e-mail et son établissement.
-export function profileFormModel(row, referenceMaps, { admin = false } = {}) {
+// fiche d'une autre personne, et change aussi son e-mail et son établissement. `creating` : la
+// personne crée sa fiche (blankFiche) et choisit son établissement.
+export function profileFormModel(row, referenceMaps, { admin = false, creating = false } = {}) {
   // Une colonne facultative absente de BDD n'est pas proposée (rien à modifier).
-  return fieldsFor(admin).filter(field => field.key in row).map(field => {
+  return fieldsFor(admin, creating).filter(field => field.key in row).map(field => {
     const base = {
       key: field.key, label: field.label, kind: field.kind,
-      ...(field.category && { category: field.category }), ...(field.required && { required: true })
+      ...(field.category && { category: field.category }), ...(field.required && { required: true }),
+      ...(field.optional && { optional: true })
     };
     if (field.kind === 'text' || field.kind === 'email') return { ...base, value: text(row[field.key]) };
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
@@ -181,8 +211,10 @@ function sameSet(a, b) {
 //   admin        un administrateur modifie la fiche d'une autre personne : l'e-mail et
 //                l'établissement du brouillon comptent. Sinon ils sont ignorés, quoi que
 //                le brouillon contienne.
+//   creating     la personne remplit sa fiche (`row` : blankFiche) : l'établissement compte,
+//                et, dès qu'elle a rempli quelque chose, il faut un nom et un établissement
 //   emailTaken   adresse → vrai (ou le nom de la personne) si une AUTRE fiche la porte déjà
-export function diffProfile(row, draft, referenceMaps, { admin = false, emailTaken = () => false } = {}) {
+export function diffProfile(row, draft, referenceMaps, { admin = false, creating = false, emailTaken = () => false } = {}) {
   const champs = {};
   const errors = [];
   const fieldErrors = {};
@@ -191,7 +223,8 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, emailTak
     fieldErrors[field.key] = message;
   };
 
-  fieldsFor(admin).forEach(field => {
+  const fields = fieldsFor(admin, creating);
+  fields.forEach(field => {
     if (!(field.key in draft) || !(field.key in row)) return;
     const input = draft[field.key];
 
@@ -199,7 +232,7 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, emailTak
       const before = text(row[field.key]);
       if (String(input ?? '') === before) return; // laissée telle quelle : pas un changement
       const after = cleanText(input).toLowerCase();
-      const fault = emailFault(after, before, emailTaken);
+      const fault = field.optional ? shownEmailFault(after) : emailFault(after, before, emailTaken);
       if (fault) fail(field, fault);
       else if (after !== before) champs[field.key] = { avant: before, apres: after };
       return;
@@ -270,11 +303,15 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, emailTak
     };
   });
 
+  // Une fiche qu'on crée ne se juge qu'une fois commencée : le formulaire vide ne réclame rien.
+  const started = creating && Object.keys(champs).length > 0;
   const name = field => (champs[field] ? champs[field].apres : text(row[field]));
-  if (('nom' in champs || 'prenom' in champs) && !name('nom') && !name('prenom')) {
+  if ((started || 'nom' in champs || 'prenom' in champs) && !name('nom') && !name('prenom')) {
     errors.push(NAME_REQUIRED);
-    ['prenom', 'nom'].filter(key => key in champs).forEach(key => { fieldErrors[key] = NAME_REQUIRED; });
+    ['prenom', 'nom'].filter(key => started || key in champs).forEach(key => { fieldErrors[key] = NAME_REQUIRED; });
   }
+  const etablissement = fields.find(field => field.key === 'Etablissement');
+  if (started && etablissement && 'Etablissement' in row && !champs.Etablissement) fail(etablissement, ETABLISSEMENT_REQUIRED);
   return { champs, errors, fieldErrors };
 }
 
@@ -287,11 +324,12 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, emailTak
 //   - `moved` nomme les champs dont la valeur a changé dans Grist depuis que le
 //     formulaire a été ouvert : la personne doit le savoir avant de valider.
 // `admin` : comme pour diffProfile, l'e-mail et l'établissement ne comptent que pour un
-// administrateur qui modifie la fiche d'une autre personne ; sinon ils sont écartés.
-export function rebaseChanges(champs, row, referenceMaps, { admin = false } = {}) {
+// administrateur qui modifie la fiche d'une autre personne ; sinon ils sont écartés. `creating` :
+// l'établissement compte aussi pour la personne qui vient de créer sa fiche.
+export function rebaseChanges(champs, row, referenceMaps, { admin = false, creating = false } = {}) {
   const rebased = {};
   const moved = [];
-  fieldsFor(admin).filter(field => champs[field.key]).forEach(field => {
+  fieldsFor(admin, creating).filter(field => champs[field.key]).forEach(field => {
     const change = champs[field.key];
 
     if (field.kind === 'text' || field.kind === 'email') {

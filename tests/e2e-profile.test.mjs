@@ -8,8 +8,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sampleTables, withIdentity, withSchema, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL } from './fixtures.mjs';
-import { assertFooterWraps, skip, reload, waitForCards, withWidget } from './support/browser.mjs';
+import { sampleTables, withIdentity, withSchema, withShownEmail, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
+import { assertFooterWraps, cardCount, skip, reload, waitForCards, withWidget } from './support/browser.mjs';
 
 // ===== Outils =====
 
@@ -154,6 +154,7 @@ test('une personne ne voit « Modifier » que sur sa propre fiche, marquée « V
     assert.equal(await gridCard(page, 'Gina').locator('.card-actions').isHidden(), true);
     assert.equal(await gridCard(page, 'Hugo').locator('.card-actions').isHidden(), true);
     assert.equal(await page.locator('#accountBar .account-edit').textContent(), 'Modifier mon profil');
+    assert.equal(await page.locator('#accountBar .account-create').isHidden(), true, 'elle a une fiche : rien à créer');
     assert.equal(await isOpen(page), false, 'la fenêtre reste fermée tant qu\'on ne la demande pas');
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
@@ -310,11 +311,14 @@ test('le bandeau « Ma présence » de 320 à 840 px : le texte garde 200 px au 
       tables.BDD.Etablissement[4] = 0;
       tables.BDD.perimetre[4] = ['L'];
     } },
-    { label: 'compte sans fiche, adresse sans coupure possible', user: unbreakableAddress, ready: '.account-name', buttons: 0, patch: () => {} },
-    // Administrateur sans fiche : ni interrupteur ni « Modifier mon profil », le seul bouton est « Mode admin ».
-    { label: 'administrateur sans fiche', user: ADMIN_EMAIL, ready: '.account-admin', buttons: 1, patch: () => {} },
-    // Responsable du CHU, sans fiche ni droit d'administrateur (une ligne de plus dans ACL) : le seul bouton est « Mon établissement ».
-    { label: 'responsable sans fiche', user: 'responsable@example.test', ready: '.account-etab', buttons: 1, patch: tables => {
+    // Un compte sans fiche a « Créer ma fiche », son seul bouton.
+    { label: 'compte sans fiche, adresse sans coupure possible', user: unbreakableAddress, ready: '.account-create', buttons: 1, patch: () => {} },
+    // Sans colonne « email » dans BDD, la fiche ne pourrait pas être reliée à la personne : aucun bouton, le bloc vide ne prend aucune place.
+    { label: 'BDD sans colonne email', user: unbreakableAddress, ready: '.account-name', buttons: 0, patch: tables => { delete tables.BDD.email; } },
+    // Administrateur sans fiche : ni interrupteur ni « Modifier mon profil », mais « Créer ma fiche » et « Mode admin ».
+    { label: 'administrateur sans fiche', user: ADMIN_EMAIL, ready: '.account-admin', buttons: 2, patch: () => {} },
+    // Responsable du CHU, sans fiche ni droit d'administrateur (une ligne de plus dans ACL) : « Créer ma fiche » et « Mon établissement ».
+    { label: 'responsable sans fiche', user: 'responsable@example.test', ready: '.account-etab', buttons: 2, patch: tables => {
       tables.ACL.id.push(4);
       tables.ACL.email.push('responsable@example.test');
       tables.ACL.Responsable_de_l_Etablissement.push(1);
@@ -1480,3 +1484,115 @@ for (const width of [280, 320, 360]) {
       assert.ok(validate.y + validate.height <= 640 + 0.5, 'le bouton « Valider » est visible');
     }));
 }
+
+// ===== Créer sa fiche =====
+
+test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit une seule carte, et une ligne est ajoutée à BDD', { skip }, () =>
+  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    const create = page.locator('#accountBar .account-create');
+    await create.waitFor();
+    assert.equal(await create.textContent(), 'Créer ma fiche');
+    assert.equal(await page.locator('#accountBar .account-edit').isHidden(), true, 'pas de fiche à modifier');
+    assert.equal(await page.locator('#accountBar .presence-switch').isHidden(), true);
+
+    await create.click();
+    await dialog(page).waitFor();
+    assert.equal(await heading(page).textContent(), 'Créer ma fiche');
+    assert.equal(await dialog(page).locator('.ident-mail').textContent(), NEW_EMAIL, 'l\'adresse du compte, qui ne se saisit pas');
+    assert.equal(await dialog(page).locator('#profile-email').count(), 0);
+    assert.equal(await summary(page), 'Aucun champ rempli');
+    assert.equal(await press(page, 'Relire ma fiche').isDisabled(), true);
+    assert.equal(await field(page, 'Etablissement').evaluate(select => select.selectedOptions[0].textContent), 'Choisir…');
+
+    // Le formulaire réclame un nom puis un établissement, une fois commencé seulement.
+    await field(page, 'Fonction').fill('Chargée de mission');
+    assert.equal(await summary(page), 'Indiquez au moins un prénom ou un nom');
+    await field(page, 'prenom').fill('Zoé');
+    await field(page, 'nom').fill('Nouvelle');
+    assert.equal(await summary(page), 'Choisissez votre établissement');
+    assert.equal(await page.locator('#profile-Etablissement-error').textContent(), 'Choisissez votre établissement.');
+    await field(page, 'Etablissement').selectOption({ label: 'CHU de Bordeaux' });
+    assert.equal(await summary(page), '4 champs remplis');
+    await press(page, 'Relire ma fiche').click();
+
+    await headingIs(page, 'Relire avant de créer');
+    assert.equal(await dialog(page).locator('.rv-col-before').count(), 0, 'pas de carte « avant » pour une fiche qui n\'existe pas');
+    assert.equal(await column(page, 'after').locator('.name').textContent(), 'Zoé Nouvelle');
+    assert.equal(await column(page, 'after').locator('.email').textContent(), NEW_EMAIL);
+    assert.match(await dialog(page).locator('.notice').first().textContent(), /Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître/);
+    assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
+    await press(page, 'Créer ma fiche').click();
+    await savedWith(page, 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».');
+
+    // Une seule ligne ajoutée à BDD, avec l'adresse du compte ; ni accord, ni périmètre, aucune autre table touchée.
+    assert.deepEqual(await bddCalls(page), [{
+      action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
+      values: { email: NEW_EMAIL, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission' }
+    }]);
+    assert.deepEqual(await page.evaluate(() => window.__fake.calls.filter(call => !['BDD', 'Annuaire_Sonde'].includes(call.table))), []);
+    assert.equal(await cardCount(page), 4, 'sans accord ni périmètre, le nombre de contacts affichés ne change pas');
+
+    // Le bandeau a changé : la fiche existe, le choix de présence aussi, plus de bouton « Créer ».
+    await page.locator('#accountBar .presence-switch').waitFor();
+    assert.equal(await create.isHidden(), true);
+    assert.equal(await page.locator('#accountBar .account-edit').isVisible(), true);
+    assert.equal(await page.locator('#accountBar .account-name').textContent(), 'Zoé Nouvelle');
+    await focusReturnsTo(page, '#accountBar .account-edit');
+
+    // Elle accepte d'apparaître : il manque encore le périmètre (l'affaire de Grist), qui le dit.
+    await page.locator('#accountBar .presence-switch').click();
+    await until(async () => (await page.locator('#accountBar .account-detail').textContent()).includes('n\'a pas de périmètre'), 'le bandeau ne dit pas pourquoi la fiche reste masquée');
+    await page.evaluate(() => { window.__tables.BDD.perimetre[12] = ['L', 1]; }); // un administrateur le renseigne dans Grist
+    await reload(page);
+    await waitForCards(page, 5);
+    assert.equal(await gridCard(page, 'Zoé Nouvelle').locator('.fonction').textContent(), 'Chargée de mission');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+    assert.ok(!JSON.stringify(await Promise.all([...logs.warnings, ...logs.infos])).includes('@'), 'aucune adresse dans la console');
+  }));
+
+// ===== E-mail affiché =====
+
+test('l\'e-mail affiché remplace l\'adresse du compte sur la carte et dans son lien, se modifie dans la fenêtre et se vide pour revenir à l\'adresse du compte', { skip }, () => {
+  const tables = withSchema(withShownEmail(memberTables()));
+  tables.BDD.email_affiche[9] = 'hugo@exemple.fr'; // Hugo : une adresse affichée, et aucune adresse de compte
+  return withWidget({ tables, user: ANA_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    const shown = name => gridCard(page, name).locator('.email');
+    assert.equal(await shown('Hugo Bernard').textContent(), 'hugo@exemple.fr');
+    assert.equal(await shown('Hugo Bernard').getAttribute('href'), 'mailto:hugo@exemple.fr');
+    assert.equal(await shown('Ana Martin').textContent(), ANA_EMAIL, 'sans adresse affichée, celle du compte');
+
+    await openOwn(page);
+    assert.equal(await field(page, 'email_affiche').inputValue(), '');
+    assert.match(await page.locator('#profile-email_affiche-hint').textContent(), /^Facultatif : l’adresse montrée sur la carte/);
+    await field(page, 'email_affiche').fill('pas une adresse');
+    assert.equal(await summary(page), 'Corrigez l’adresse e-mail');
+    assert.equal(await press(page, 'Relire mes modifications').isDisabled(), true);
+    await field(page, 'email_affiche').fill(' Contact@CHU-Bordeaux.fr ');
+    await review(page);
+    assert.equal(await column(page, 'before').locator('.email').textContent(), ANA_EMAIL);
+    assert.match(await column(page, 'after').locator('.email').textContent(), /^contact@chu-bordeaux\.fr/);
+    await press(page, 'Valider').click();
+    await savedWith(page, 'Vos modifications sont enregistrées.');
+
+    // Une seule colonne écrite : l'adresse du compte, qui désigne la personne, n'a pas bougé.
+    assert.deepEqual(await bddCalls(page), [{ action: 'UpdateRecord', table: 'BDD', rowId: 1, ok: true, values: { email_affiche: 'contact@chu-bordeaux.fr' } }]);
+    assert.equal(await bddCell(page, 'email'), ANA_EMAIL);
+    await until(async () => (await shown('Ana Martin').textContent()) === 'contact@chu-bordeaux.fr', 'la carte n\'a pas pris l\'adresse affichée');
+    assert.equal(await shown('Ana Martin').getAttribute('href'), 'mailto:contact@chu-bordeaux.fr');
+    assert.equal(await gridCard(page, 'Ana Martin').locator('.card-edit').isVisible(), true, 'elle reste reconnue par l\'adresse de son compte');
+
+    // Vidée, la carte revient à l'adresse du compte.
+    await focusReturnsTo(page, '#accountBar .account-edit');
+    await openOwn(page);
+    assert.equal(await field(page, 'email_affiche').inputValue(), 'contact@chu-bordeaux.fr');
+    await field(page, 'email_affiche').fill('');
+    await review(page);
+    await press(page, 'Valider').click();
+    await savedWith(page, 'Vos modifications sont enregistrées.');
+    await until(async () => (await shown('Ana Martin').textContent()) === ANA_EMAIL, 'la carte n\'est pas revenue à l\'adresse du compte');
+    assert.equal(await bddCell(page, 'email_affiche'), '');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  });
+});

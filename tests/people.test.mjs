@@ -4,7 +4,7 @@ import {
   loadDirectory, buildContacts, isInScope, tableToRows, describeVisibility, createPeopleIndex, normalizeEmail
 } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
-import { sampleTables, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
+import { sampleTables, withShownEmail, ANA_EMAIL, BOB_EMAIL, BOB_SHOWN_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 
 // ===== people : retrouver sa ligne de BDD par adresse e-mail, et savoir pourquoi on (n')apparaît (pas) =====
 
@@ -126,4 +126,14 @@ test('findById gives the row as stored, so what a form shows and what it writes 
   const tables = sampleTables();
   const { people } = await directory(tables);
   assert.deepEqual(people.findById(2).row, tableToRows(tables.BDD)[1]);
+});
+
+test('findByEmail looks at email only, never at the address a person chose to show; columns lists those of BDD, an empty one included', async () => {
+  const { people } = await directory(withShownEmail());
+  assert.equal(people.findByEmail(BOB_EMAIL).length, 1);
+  assert.deepEqual(people.findByEmail(BOB_SHOWN_EMAIL), [], 'l\'adresse affichée ne désigne personne');
+  assert.ok(['email', 'email_affiche', 'Accepte_apparaitre'].every(column => people.columns.includes(column)));
+  const empty = sampleTables();
+  Object.keys(empty.BDD).forEach(column => { empty.BDD[column] = []; });
+  assert.deepEqual((await directory(empty)).people.columns, Object.keys(empty.BDD));
 });

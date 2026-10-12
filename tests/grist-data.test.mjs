@@ -4,7 +4,7 @@ import {
   safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, normalizeForSearch,
   compareLabels, compareContacts,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
-  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName, taskActionNumber, actionNumber
+  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName, taskActionNumber, actionNumber, shownEmail
 } from '../grist-data.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
@@ -314,4 +314,13 @@ test('displayName writes "Prénom Nom" as the card does, trims, and falls back t
   assert.equal(displayName({ prenom: null, nom: 'Martin' }), 'Martin');
   assert.equal(displayName({ prenom: '', nom: '' }), 'Sans nom');
   assert.equal(displayName({}), 'Sans nom');
+});
+
+test('shownEmail gives the address a person chose to show (email_affiche) in place of the account address, and falls back to it', () => {
+  assert.equal(shownEmail({ email: 'ana@chu.fr', email_affiche: 'contact@chu.fr' }), 'contact@chu.fr');
+  assert.equal(shownEmail({ email: 'ana@chu.fr', email_affiche: '' }), 'ana@chu.fr');
+  assert.equal(shownEmail({ email: 'ana@chu.fr', email_affiche: '   ' }), 'ana@chu.fr', 'des espaces ne sont pas une adresse');
+  assert.equal(shownEmail({ email: 'ana@chu.fr', email_affiche: null }), 'ana@chu.fr');
+  assert.equal(shownEmail({ email: 'ana@chu.fr' }), 'ana@chu.fr', 'sans la colonne facultative');
+  assert.equal(shownEmail({}), '');
 });

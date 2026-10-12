@@ -1,4 +1,4 @@
-# Version 1.17.2 — Bandeau « Ma présence » lisible de 320 à 860 px (voir CHANGELOG.md)
+# Version 1.18.0 — « Créer ma fiche » et e-mail affiché (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -26,4 +26,8 @@ Depuis la 1.17.1, tout le texte des cartes fait 12 px au moins et les pastilles 
 sont plus hautes d'un tiers environ, un écart voulu avec la maquette v5 (audit UI/UX).
 Depuis la 1.17.2, dans un cadre de moins de 860 px, le texte du bandeau « Ma présence » garde 200 px au moins :
 l'interrupteur passe dessous au lieu de le serrer, et le bloc des boutons vide ne prend plus de place (audit UI/UX).
-800 tests (dont 283 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.18.0, une personne que Grist reconnaît mais qui n'a pas de ligne dans `BDD` peut créer sa fiche
+(bouton « Créer ma fiche » : une ligne ajoutée à `BDD`, jamais une table ; elle choisit son établissement, son e-mail
+est celui de son compte) et choisir une adresse e-mail à afficher sur sa carte à la place de celle de son compte
+(colonne facultative `email_affiche`, vidée elle revient à l'adresse du compte).
+808 tests (dont 285 dans un vrai navigateur, optionnels sans Playwright).
