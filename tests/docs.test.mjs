@@ -1,6 +1,7 @@
 // Garde-fous de la documentation : elle ne doit pas se périmer en silence.
 //   1. Les liens et images de README.md et docs/*.md mènent à un fichier et à un
-//      titre qui existent ; aucune image de docs/images n'est orpheline.
+//      titre qui existent ; aucune image de docs/images n'est orpheline ; chaque
+//      image a un texte alternatif.
 //   2. Les fichiers et les fonctions cités entre accents graves existent encore.
 //   3. Le jeu de données fictif de docs/demo est lu sans incident par le vrai
 //      loadDirectory(), donne le nombre de cartes annoncé et reste fictif.
@@ -93,6 +94,20 @@ test('chaque image de docs/images est utilisée par la documentation', () => {
     linkTargets(read(file)).filter(target => !isExternal(target)).map(target => resolveTarget(file, target))));
   const orphans = fs.readdirSync(path.join(ROOT, 'docs', 'images')).filter(name => !used.has(`docs/images/${name}`));
   assert.deepEqual(orphans, [], 'Images de docs/images citées nulle part : à utiliser, ou à supprimer (et à retirer de docs/demo/capturer.mjs).');
+});
+
+test('chaque image de la documentation a un texte alternatif', () => {
+  const problems = [];
+  DOC_FILES.forEach(file => {
+    const text = withoutCode(read(file));
+    [...text.matchAll(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g)].forEach(([, alt, source]) => {
+      if (!alt.trim()) problems.push(`${file} : l'image ${source} n'a pas de texte alternatif`);
+    });
+    [...text.matchAll(/<img\b[^>]*>/gi)].forEach(([tag]) => {
+      if (!(tag.match(/\balt="([^"]*)"/i)?.[1] ?? '').trim()) problems.push(`${file} : ${tag.slice(0, 70)}… n'a pas de texte alternatif`);
+    });
+  });
+  assert.deepEqual(problems, [], 'Décrivez chaque image en une phrase (attribut alt, ou texte entre crochets).');
 });
 
 // ===== 2. Fichiers et fonctions cités =====

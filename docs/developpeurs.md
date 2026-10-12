@@ -2,9 +2,9 @@
 
 Cette page explique comment le widget est construit et comment le modifier sans le casser : infrastructure, chargement des données, règles d'affichage, tests, déploiement. Elle suppose de savoir lire du JavaScript ; aucune connaissance de Grist n'est requise, les notions utiles sont rappelées au fil du texte.
 
-Les autres documents : [README](../README.md) (présentation et installation), [guide utilisateur](utilisateurs.md), [sécurité](securite.md), [maintenance](maintenance.md).
+Pages liées : [README](../README.md) (présentation et installation), [guide utilisateur](utilisateurs.md), [sécurité](securite.md), [maintenance](maintenance.md).
 
-> **Cette page décrit la version 1.9.0** : le widget lit la table `BDD` (1.8.0) et propose le filtre « Domaines » (1.9.0). D'autres évolutions vont encore en modifier une partie (accord individuel d'apparaître, identité de la personne connectée, édition de fiche). Elles sont résumées dans [Chantiers en cours](#chantiers-en-cours) et la page sera mise à jour à chaque fusion.
+> **Cette page décrit la version 1.9.0** : le widget lit la table `BDD` (1.8.0) et propose le filtre « Domaines » (1.9.0). D'autres évolutions vont encore en modifier une partie (consentement individuel, identité de la personne connectée, édition de fiche). Elles sont résumées dans [Chantiers en cours](#chantiers-en-cours) et la page sera mise à jour à chaque fusion.
 
 ## Sommaire
 
@@ -41,7 +41,7 @@ flowchart LR
         pages["GitHub Pages<br/>fichiers statiques"]
         ci["GitHub Actions<br/>node --test"]
         repo -->|"push sur main"| pages
-        repo -->|"pull request, push"| ci
+        repo -->|"pull request, push sur main"| ci
     end
     api["docs.getgrist.com<br/>grist-plugin-api.js"]
     pages -->|"index.html, main.js, style.css…"| page
@@ -60,7 +60,7 @@ Ce que le widget fait, dans la version 1.9.0 :
 
 - il **lit** les tables du document Grist (neuf lectures `fetchTable` par chargement) ;
 - il n'**écrit** rien dans Grist, ne stocke rien dans le navigateur et n'émet lui-même aucune requête réseau ;
-- il demande l'accès `full` (`grist.ready({ requiredAccess: 'full' })` dans `main.js`, `accessLevel: full` dans `manifest.yml`), un choix assumé : il lit plusieurs tables autres que celle de sa section et les nouvelles fonctionnalités écriront dans le document. Les conséquences et les garde-fous sont détaillés dans [sécurité](securite.md#niveau-daccès-demandé-à-grist).
+- il demande l'accès `full` (`grist.ready({ requiredAccess: 'full' })` dans `main.js`, `accessLevel: full` dans `manifest.yml`), un choix assumé : il lit plusieurs tables autres que celle de sa section et les fonctionnalités prévues écriront dans le document. Les conséquences et les garde-fous sont détaillés dans [sécurité](securite.md#niveau-daccès-demandé-à-grist).
 
 ## Organisation du code
 
@@ -87,9 +87,9 @@ Une flèche signifie « importe ».
 |---|---|
 | `index.html` | Squelette de la page, `<template id="cardTemplate">` d'une carte, chargement de l'API Grist puis de `main.js` |
 | `style.css` | Feuille de style unique (variables de couleur en tête de fichier) |
-| `constants.js` | Nom de la table principale (`MAIN_TABLE`, soit `BDD`) et taxonomie : `CATEGORIES` donne, pour chaque catégorie, son libellé, sa couleur, sa table de référence, ses colonnes de libellé et sa colonne dans la table principale. `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES`, `REFERENCE_SOURCES` et `LIST_CATEGORIES` en sont dérivés |
+| `constants.js` | Nom de la table principale (`MAIN_TABLE`, soit `BDD`) et taxonomie : `CATEGORIES` donne, pour chaque catégorie, son libellé, sa couleur, sa table de référence, ses colonnes de libellé et, sauf pour l'établissement et le rôle (des Références simples), sa colonne de liste dans la table principale. `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES`, `REFERENCE_SOURCES` et `LIST_CATEGORIES` en sont dérivés |
 | `grist-data.js` | Lecture des tables (`loadDirectory()`), décodage des formats Grist, enrichissement des contacts, règles d'éligibilité |
-| `filters.js` | État des filtres actifs, `filterContacts()`, `computeFilterCounts()`, `pruneStaleFilters()` |
+| `filters.js` | Forme de l'état des filtres (`createEmptyFilterState()`), `filterContacts()`, `computeFilterCounts()`, `pruneStaleFilters()` |
 | `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`) et cartes (`renderCards()`) |
 | `main.js` | Point d'entrée : détient l'état de l'application, relie `window.grist` et les événements du DOM aux autres modules |
 
@@ -116,7 +116,7 @@ sequenceDiagram
     D->>G: fetchTable × 9, en parallèle
     G-->>D: tables en colonnes
     D-->>M: contacts, referenceMaps, etabFlags, issues
-    M->>M: applyDirectory : menus de filtre, purge des sélections périmées
+    M->>M: applyDirectory : purge des sélections périmées, menus de filtre
     M->>F: filterContacts, computeFilterCounts
     M->>R: renderCards, updateFilterCounts
     M->>M: showStatus(issues)
@@ -124,13 +124,13 @@ sequenceDiagram
 
 1. `main.js` déclare l'accès avec `grist.ready({ requiredAccess: 'full' })` puis s'abonne à `grist.onRecords`.
 2. `onRecords` ne sert que de **déclencheur** : son contenu est ignoré. Il ne porte pas forcément toutes les colonnes de `BDD` (selon la vue branchée) et résout les Références en texte, alors que `fetchTable()` renvoie la table complète, les Références en identifiants de ligne. Grist ne rappelle `onRecords` que pour les changements de la table liée à la section du widget : modifier une table de référence ne rafraîchit pas le widget (voir [Limites connues](maintenance.md#limites-connues)).
-3. Le rappel est « debouncé » (`debounce()`, 250 ms) : une rafale d'éditions ne déclenche qu'une lecture. Chaque lecture reçoit un numéro (`createRequestSequencer()`) et seule la plus récente applique son résultat.
+3. Le rappel est temporisé (anti-rebond : `debounce()`, 250 ms) : une rafale d'éditions ne déclenche qu'une lecture. Chaque lecture reçoit un numéro (`createRequestSequencer()`) et seule la plus récente applique son résultat.
 4. `loadDirectory()` enchaîne :
    - `readAllTables()` lit les neuf tables en parallèle avec `Promise.allSettled` : une table illisible ne fait pas échouer les autres ;
    - `requireReadable()` puis `requireColumns()` lèvent une `DirectoryLoadError` si une donnée indispensable manque : table `BDD` ou `Etablissements` illisible, colonne obligatoire absente (voir [Fiabilité](#fiabilité--que-se-passe-t-il-en-cas-de-panne-)) ;
    - `readReferenceMaps()` construit, pour chaque **catégorie** (`REFERENCE_SOURCES`), la correspondance id → libellé : le libellé corrigé s'il est rempli, le libellé brut sinon. Une table illisible garde les libellés précédents de ses catégories (`previousMaps`). Un regroupement comme « Domaines » est complété ensuite par `completeGroupMap()` ;
    - `etablissementFlagsFromRows()` indexe les indicateurs de chaque établissement (fondateur, partenaire, validé) par identifiant de ligne, et par libellé en repli ;
-   - `buildContacts()` ne garde que les contacts éligibles (voir [Règles d'affichage](#règles-daffichage)) et les enrichit avec `enrich()` ;
+   - `isInScope()` écarte les lignes sans périmètre ; `buildContacts()` enrichit les autres avec `enrich()`, puis ne garde que celles qui ont un nom ou un prénom et un établissement éligible (voir [Règles d'affichage](#règles-daffichage)) ;
    - `describeEmptyDirectory()` explique pourquoi l'annuaire est vide quand c'est anormal.
 5. `applyDirectory()` (dans `main.js`) restreint le menu Établissement aux établissements validés (`filterVisibleEstablishments()`), retire des filtres actifs les valeurs qui n'existent plus (`pruneStaleFilters()`), reconstruit les menus **seulement si les libellés ont changé** (`referenceMapsEqual()`, car reconstruire ferme les menus ouverts), puis rafraîchit les cartes.
 6. `showStatus()` affiche ou masque le bandeau d'état avec les messages de `issues`.
@@ -139,15 +139,15 @@ sequenceDiagram
 
 Un contact enrichi garde toutes ses colonnes d'origine et reçoit :
 
-- `labels` : un objet `{ clé de catégorie → liste de libellés }`, lu par `labelsOf(contact, clé)`. Établissement et rôle, qui n'ont qu'une valeur, prennent la même forme de liste pour que `filters.js` et `render.js` n'aient aucun cas particulier ;
+- `labels` : un objet `{ clé de catégorie → liste de libellés }`, lu par `labelsOf(contact, clé)`. Établissement et rôle, qui n'ont qu'une valeur, prennent la même forme de liste pour que les filtres et les tags n'aient aucun cas particulier (la pastille de la carte lit `etablissement_label`) ;
 - `etablissement_label` : le texte du badge de la carte ;
 - `etablissement_fondateur`, `etablissement_partenaire`, `etablissement_ok_pour_apparaitre` : les indicateurs de son établissement.
 
 ## Données Grist : structure et encodages
 
-Les noms de tables et de colonnes lus par le widget sont listés dans [`grist_structure.txt`](../grist_structure.txt), un schéma volontairement **réduit** aux seules tables et colonnes utilisées. Ne jamais y copier le schéma complet du document Grist (voir [sécurité](securite.md#données-dans-le-dépôt)). Le widget lit la table principale `BDD` (une ligne par personne, nommée par `MAIN_TABLE`) et les tables de référence de `CATEGORIES` dans `constants.js` : `Actions`, `Taches`, `Communautes`, `GT`, `Competences`, `INSTANCES` (en majuscules), `Etablissements` et `Role_Dans_le_PUI`. La table `Competences` alimente deux catégories, « Compétences » et « Domaines », et n'est lue qu'une fois par chargement. Les colonnes obligatoires sont `nom`, `prenom`, `Etablissement` et `perimetre` ; `email`, `Fonction`, `numero_de_telephone` et `Role_dans_le_PUI` sont facultatives : absentes, la carte ne les affiche simplement pas.
+Les noms de tables et de colonnes lus par le widget sont listés dans [`grist_structure.txt`](../grist_structure.txt), un schéma volontairement **réduit** aux tables et colonnes utiles au widget. Ne jamais y copier le schéma complet du document Grist (voir [sécurité](securite.md#données-dans-le-dépôt)). Le widget lit la table principale `BDD` (une ligne par personne, nommée par `MAIN_TABLE`) et les tables de référence de `CATEGORIES` dans `constants.js` : `Actions`, `Taches`, `Communautes`, `GT`, `Competences`, `INSTANCES` (en majuscules), `Etablissements` et `Role_Dans_le_PUI`. La table `Competences` alimente deux catégories, « Compétences » et « Domaines », et n'est lue qu'une fois par chargement. Les colonnes obligatoires sont `nom`, `prenom`, `Etablissement` et `perimetre` ; `email`, `Fonction`, `numero_de_telephone` et `Role_dans_le_PUI` sont facultatives : absentes, la carte ne les affiche simplement pas.
 
-Grist ne renvoie pas toujours les valeurs sous la forme qu'on attendrait. Les encodages ci-dessous ont tous provoqué un bug en production (voir le [CHANGELOG](../CHANGELOG.md)) :
+Grist ne renvoie pas toujours les valeurs sous la forme qu'on attendrait. Les encodages ci-dessous ont presque tous provoqué un bug en production (voir le [CHANGELOG](../CHANGELOG.md)) :
 
 | Ce que Grist envoie | Exemple | Fonction qui le décode |
 |---|---|---|
@@ -165,11 +165,11 @@ Règles à respecter :
 - `perimetre` ne sert qu'à savoir si elle contient au moins une valeur ([`specs.md`](../specs.md)) ; le widget ne lit pas sa table de référence. L'ancienne table `Annuaire` et ses colonnes `perimetre_*` ne sont plus lues.
 - Chaque table de référence porte un libellé brut (celui de l'import) et un libellé corrigé : le corrigé est affiché quand il est rempli, le brut sinon (`field` de chaque entrée de `CATEGORIES`).
 - Les compétences sont une liste de références (`BDD.Competences`) vers la table `Competences`. Le domaine d'une compétence est sa colonne `Macro_competences` : celui d'un contact se déduit de ses compétences (la colonne `Comptetences_macr` de `BDD` n'est pas lue).
-- `Accepte_apparaitre` (l'accord individuel d'apparaître) existe dans `BDD` mais le widget ne la lit pas encore : voir [Chantiers en cours](#chantiers-en-cours).
+- `Accepte_apparaitre` (le consentement individuel de la personne) existe dans `BDD` mais le widget ne la lit pas encore : voir [Chantiers en cours](#chantiers-en-cours).
 
 ## Règles d'affichage
 
-La référence fonctionnelle est [`specs.md`](../specs.md). Une ligne de la table principale (`BDD`) devient une carte si elle franchit toutes les étapes suivantes :
+Le cahier des charges est [`specs.md`](../specs.md) ; en cas d'écart avec le code, le code et le [CHANGELOG](../CHANGELOG.md) font foi. Une ligne de la table principale (`BDD`) devient une carte si elle franchit toutes les étapes suivantes :
 
 ```mermaid
 flowchart TD
@@ -200,62 +200,61 @@ flowchart TD
 
 À savoir :
 
-- Les cinq premières étapes sont appliquées une fois par chargement, dans `loadDirectory()`. Les deux dernières le sont à chaque action de l'utilisateur, dans `main.js` : `refreshCards()` appelle `filterContacts()` sur la liste des contacts éligibles.
+- Parmi les sept étapes du schéma, les cinq premières sont appliquées une fois par chargement, dans `loadDirectory()`. Les deux dernières le sont à chaque action de l'utilisateur, dans `main.js` : `refreshCards()` appelle `filterContacts()` sur la liste des contacts éligibles.
 - Un établissement « autres » n'est jamais affiché : aucune branche du code ne le rend éligible.
 - Un établissement inconnu (`Etablissement` vide, ou sans ligne correspondante dans `Etablissements`) n'a aucun indicateur : le contact est exclu plutôt qu'affiché sans validation.
-- La Référence `Etablissement` désigne une ligne par son identifiant : deux lignes de même acronyme ne se mélangent pas. Seul le repli par libellé, quand Grist envoie la Référence déjà résolue en texte, ne peut pas les départager : `etablissementFlagsFromRows()` retient alors le statut le plus strict (vrai seulement s'il l'est partout) et signale le libellé dans `conflicts` ; dans le doute, les contacts sont masqués.
+- La Référence `Etablissement` désigne une ligne par son identifiant : deux lignes de même acronyme ne se mélangent pas. Seul le repli par libellé, quand Grist envoie la Référence déjà résolue en texte, ne peut pas les départager : `etablissementFlagsFromRows()` retient alors le statut le plus strict (vrai seulement s'il l'est partout) et signale le libellé dans `conflicts` : les contacts de ce libellé sont masqués si ce statut ne les rend plus éligibles.
 - Par défaut, l'interrupteur Fondateurs est actif et Partenaires ne l'est pas (`state.scope` dans `main.js`, changement de la version 1.7.0). « Réinitialiser » ne les modifie pas. Si les deux sont désactivés, aucune carte ne s'affiche.
-- [`specs.md`](../specs.md) écrit encore « cochés par défaut » pour les deux interrupteurs, ce qui était vrai avant la version 1.7.0. Le comportement de référence est celui du code et du [CHANGELOG](../CHANGELOG.md).
 
 ## Filtres, compteurs et recherche
 
 `filterContacts(contacts, activeFilters, searchTerm, scope, excludeKey)` combine trois prédicats : `matchesSearch()` (nom ou prénom), `matchesScope()` (interrupteurs) et `matchesSelections()` (menus).
 
 - **OU dans une catégorie, ET entre catégories** : cocher deux instances montre les contacts qui ont l'une ou l'autre ; ajouter un établissement ne garde que ceux qui ont en plus cet établissement.
-- **Comparaisons normalisées** : `normalize()` retire les accents et la casse (`NFD`, `toLocaleLowerCase('fr-FR')`). « ecole » trouve « École », et deux écritures d'un même libellé (« Cancérologie », « cancerologie ») ne forment qu'une valeur. Elle sert à la recherche principale, à la recherche interne des menus, aux sélections, aux compteurs et à la suppression des doublons (`uniqueLabels()`) : un contact qui a deux libellés équivalents dans une catégorie n'y compte qu'une fois.
+- **Comparaisons normalisées** : `normalize()` retire les accents et la casse (`NFD`, `toLocaleLowerCase('fr-FR')`). « ecole » trouve « École », et deux écritures d'un même libellé (« Cancérologie », « cancerologie ») ne forment qu'une valeur. Cette fonction sert à la recherche principale, à la recherche interne des menus, aux sélections, aux compteurs et à la suppression des doublons (`uniqueLabels()`) : un contact qui a deux libellés équivalents dans une catégorie n'y compte qu'une fois.
 - **Domaines : un regroupement de la table `Competences`.** « Domaines » (clé `macro`) lit une autre colonne de la table que « Compétences », `Macro_competences`, et se déclare dans `CATEGORIES` par `groups: 'competences'` : le domaine d'un contact se déduit de ses `BDD.Competences` (`resolveGroupItem()`). Une compétence sans domaine renseigné prend le libellé `fallback` (« Autres »), pour qu'aucun contact ne devienne introuvable ; la console liste ses identifiants de ligne. Deux écritures d'un même domaine n'en font qu'un (`groupLabelMap()`). Si la colonne `Macro_competences` n'existe pas, le filtre reste vide au lieu de tout classer sous « Autres ». Pour `filters.js`, « Domaines » est une catégorie comme une autre : le OU, le ET et les compteurs lui sont appliqués sans code particulier. Les cartes n'affichent pas de domaine (`TAG_KEYS` ne le liste pas).
-- **Compteurs par option** : `computeFilterCounts()` calcule, pour chaque catégorie, le nombre de cartes que donnerait le fait de cocher l'option. Pour cela, chaque catégorie est comptée avec **tous les autres filtres** mais sans le sien (`excludeKey`) : sinon cocher « Santé numérique » ferait tomber à zéro les autres options de la même catégorie, alors qu'elles s'ajoutent (OU).
+- **Compteurs par option** : `computeFilterCounts()` calcule, pour chaque catégorie, le nombre de cartes qui portent chaque valeur. Chaque catégorie est comptée avec **tous les autres filtres** (recherche, interrupteurs, autres menus) mais sans le sien (`excludeKey`) : sinon cocher « Santé numérique » ferait tomber à zéro les autres options de la même catégorie, alors qu'elles s'ajoutent (OU). Le nombre affiché est donc celui de l'option seule : cocher une valeur de plus ajoute ses cartes à celles déjà affichées.
 - **Ordre des menus** : tri alphabétique français (`compareLabels()`, `localeCompare` en `fr-FR`), valeurs cochées d'abord (`sortWithCheckedFirst()`).
 - **Rôle PUI** s'affiche sur les cartes mais n'a ni menu ni filtre ([`specs.md`](../specs.md)) : ses tags ne sont pas cliquables.
 
 ## Rendu des cartes et des menus
 
-- `renderCards()` vide la grille puis ajoute une carte par contact (`buildCard()`), clonée depuis `<template id="cardTemplate">`. Les lignes facultatives (fonction, e-mail, téléphone, badge d'établissement) sont affichées par `reveal()` : le CSS les masque tant qu'elles n'ont pas la classe `visible`.
+- `renderCards()` vide la grille puis ajoute une carte par contact (`buildCard()`), clonée depuis `<template id="cardTemplate">`. Les lignes facultatives (fonction, e-mail, téléphone, badge d'établissement) sont remplies par `reveal()`, qui leur ajoute la classe `visible` : le CSS masque l'e-mail, le téléphone et le badge tant qu'ils ne l'ont pas ; une fonction vide reste dans la page sans occuper de hauteur.
 - **Aucune donnée Grist n'est insérée comme HTML** : tout passe par `textContent`. `innerHTML` n'est utilisé que pour vider un conteneur. Un prénom contenant `<img onerror=…>` s'affiche en texte (scénario de `tests/e2e.test.mjs`).
-- Le lien `mailto:` n'est créé que pour une adresse simple (`mailtoHref()`, expression `SAFE_EMAIL`) : une adresse saisie avec `?cc=…`, plusieurs destinataires ou des espaces reste du texte.
+- Le lien `mailto:` n'est créé que pour une adresse simple (`mailtoHref()`, expression régulière `SAFE_EMAIL`) : une adresse saisie avec `?cc=…`, plusieurs destinataires ou des espaces reste du texte.
 - Les tags d'une catégorie filtrable sont des `<button>` ; ceux de « Rôle PUI » sont des `<span>` non cliquables (`buildTag()`).
 - `createFilterUI()` construit tous les menus (`buildFilter()` → `buildFilterMenu()` → `buildOption()`). Chaque option porte sa valeur dans `data-value` : le texte affiché n'est pas la source. Un bouton de filtre peut porter une infobulle (`hint` dans `CATEGORIES`, utilisée par « Domaines »).
-- `updateFilterUI()` met à jour **un seul menu** (cases, ordre, badge) après un clic sur une case, un tag de carte ou un badge d'établissement ; `updateFilterCounts()` rafraîchit les compteurs de tous les menus. Aucun des deux ne reconstruit les menus : cela fermerait un menu ouvert et effacerait la saisie en cours dans sa recherche interne. Les menus ne sont reconstruits (`rebuildFilterUI()`) que par « Réinitialiser », précisément pour vider ces champs, et quand un rechargement apporte des libellés différents.
+- `updateFilterUI()` met à jour **un seul menu** (cases, ordre, compteur du bouton) après un clic sur une case, un tag de carte ou un badge d'établissement ; `updateFilterCounts()` rafraîchit les compteurs de tous les menus. Aucun des deux ne reconstruit les menus : cela fermerait un menu ouvert et effacerait la saisie en cours dans sa recherche interne. Les menus ne sont reconstruits (`rebuildFilterUI()`) que par « Réinitialiser », précisément pour vider ces champs, et quand un rechargement apporte des libellés différents.
 - Mise en page : une grille de trois colonnes (`.cards-grid`), `max-width: 1480px` pour `.widget-shell` et `min-width: 980px` sur `body`. Le widget est conçu pour un écran de PC, sans version mobile ([`specs.md`](../specs.md)).
 
 ## Fiabilité : que se passe-t-il en cas de panne ?
 
-Principe : un annuaire incomplet ne doit jamais passer pour un annuaire vide. Tout ce qui rend l'affichage incomplet produit un message dans le bandeau d'état (`#statusBanner`, `role="alert"`).
+Principe : une panne de lecture ou une donnée indispensable manquante ne doit jamais passer pour un annuaire vide. Les situations ci-dessous produisent un message dans le bandeau d'état (`#statusBanner`, `role="alert"`). Deux cas restent muets : un contact dont l'établissement désigne une ligne qui n'existe pas (masqué, sans message sauf si la colonne est vide) et une colonne facultative supprimée de `BDD` (l'information n'est plus affichée) ; voir [Limites connues](maintenance.md#limites-connues).
 
 | Situation | Ce que voit l'utilisateur | Où c'est géré |
 |---|---|---|
-| La table `BDD` ou `Etablissements` est illisible | Bandeau « Impossible de charger l'annuaire depuis Grist (table « … » illisible) ». Les cartes déjà affichées restent ; le compteur indique « Chargement impossible » s'il n'y en avait aucune | `requireReadable()`, `DirectoryLoadError`, `showLoadError()` |
-| Une colonne indispensable manque : `nom`, `prenom`, `Etablissement` ou `perimetre` dans `BDD` ; `fondateur`, `partenaire` ou `ok_pour_apparaitre` dans `Etablissements` | Même bandeau, avec le nom de la colonne et de la table (« colonne « … » absente de la table BDD ») | `requireColumns()` |
-| Une table de référence est illisible (Actions, GT, Instances…) | Les cartes restent, avec les libellés du chargement précédent ; bandeau « Tables illisibles (…) : des libellés ou des tags peuvent manquer. » | `readReferenceMaps()`, `directoryIssues()` |
+| La table `BDD` ou `Etablissements` est illisible | Bandeau « Impossible de charger l'annuaire depuis Grist (table “…” illisible) ». Les cartes déjà affichées restent ; le compteur indique « Chargement impossible » s'il n'y avait encore aucun contact chargé | `requireReadable()`, `DirectoryLoadError`, `showLoadError()` |
+| Une colonne indispensable manque : `nom`, `prenom`, `Etablissement` ou `perimetre` dans `BDD` ; `fondateur`, `partenaire` ou `ok_pour_apparaitre` dans `Etablissements` | Même bandeau, avec le nom de la colonne et de la table (« colonne “…” absente de la table BDD ») | `requireColumns()` |
+| Une table de référence est illisible (Actions, GT, Instances…) | Les cartes restent, avec les libellés du chargement précédent s'il y en a un (au premier chargement, le filtre et les tags concernés restent vides) ; bandeau « Tables illisibles (…) : des libellés ou des tags peuvent manquer. » | `readReferenceMaps()`, `directoryIssues()` |
 | Aucune colonne de libellé n'existe dans une table de référence (par exemple ni `Actions_corrigees` ni `Actions`, ou `Macro_competences` pour « Domaines ») | Bandeau « Colonne de libellé introuvable : … Les tags et le filtre correspondants restent vides. » Si seule la colonne corrigée manque, le libellé brut est utilisé et seule la console avertit | `readReferenceMap()`, `directoryIssues()` |
 | Deux établissements de même acronyme et de statuts différents, avec une Référence envoyée en texte | Leurs contacts sont masqués ; bandeau « Acronymes en double dans Etablissements (…) » | `etablissementFlagsFromRows()` |
-| La table contient des lignes mais aucun contact n'est affichable | Bandeau qui dit pourquoi (colonne vide, établissement non validé…) au lieu d'un « 0 contact » muet | `describeEmptyDirectory()` |
+| La table contient des lignes mais aucun contact n'est affichable | Bandeau qui dit où chercher (colonne `perimetre` ou `Etablissement` vide partout, ou rappel des conditions d'affichage) au lieu d'un « 0 contact » muet | `describeEmptyDirectory()` |
 | Rafale d'éditions dans Grist | Une seule lecture, 250 ms après la dernière ; une lecture lente n'écrase pas un affichage plus récent | `debounce()`, `createRequestSequencer()` |
 | Un libellé coché est renommé ou supprimé dans Grist | La sélection périmée disparaît d'elle-même, sans grille bloquée à zéro | `pruneStaleFilters()` |
 | Adresse e-mail non standard | Texte affiché sans lien | `mailtoHref()` |
 
-La console du navigateur garde le détail, avec trois préfixes :
+La console du navigateur garde le détail, avec trois préfixes (plus l'erreur brute d'un chargement raté, sans préfixe) :
 
 - `[GRIST]` : nombre d'enregistrements reçus et de contacts affichables ;
 - `[REFS]` : entrées chargées par catégorie, lectures échouées, colonnes de libellé introuvables et compétences que `Macro_competences` ne classe pas ;
-- `[ETABLISSEMENT]` : contacts sans `Etablissement` renseigné. **Seuls les identifiants de ligne sont journalisés** (jamais un nom ni une adresse) : la console peut être partagée pendant une démonstration.
+- `[ETABLISSEMENT]` : contacts qui ont un périmètre mais pas d'`Etablissement` renseigné (vingt identifiants au plus). **Seuls les identifiants de ligne sont journalisés** (jamais un nom ni une adresse) : la console peut être partagée pendant une démonstration.
 
 Le tableau des symptômes et des actions à mener côté Grist est dans [maintenance](maintenance.md#diagnostiquer-un-problème).
 
 ## Tests
 
 ```bash
-node --test                              # tous les tests (Node 18 ou plus ; la CI utilise Node 22)
+node --test                              # tous les tests (Node 22.7 ou plus, ou 20.19 ou plus ; la CI utilise Node 22)
 node --test tests/filters.test.mjs       # un seul fichier
 
 npm install --no-save playwright        # active les tests navigateur (pas une dépendance du projet)
@@ -274,8 +273,9 @@ npx playwright install chromium         # ou CHROMIUM_PATH=/chemin/vers/chromium
 | `tests/e2e.test.mjs` | Le vrai `index.html` dans Chromium avec une API Grist simulée : cartes, badge d'établissement, filtres, compteurs, interrupteurs, pannes |
 | `tests/docs.test.mjs` | La documentation ne se périme pas : liens, noms de fonctions cités, jeu de données fictif |
 
+- **Version de Node.** Le dépôt n'a pas de `package.json` : Node ne reconnaît les modules ES écrits en `.js` que grâce à la détection automatique de la syntaxe, activée par défaut depuis Node 20.19 et 22.7. En dessous (Node 18, 21, 22.6…), les tests échouent avec « Named export … not found » : c'est l'environnement qui est en cause, pas le code. Le serveur de démonstration, en `.mjs`, démarre dès Node 18.
 - Les tests unitaires n'ont aucune dépendance. `tests/e2e.test.mjs` a besoin de Playwright et de Chromium ; sans eux ses scénarios sont ignorés et `node --test` reste vert. La CI définit `REQUIRE_E2E=1` : un navigateur absent y est un échec, pas un « tout vert » sur des tests ignorés.
-- Le test navigateur est hermétique : seuls le serveur local et l'API Grist simulée répondent, tout le reste est bloqué.
+- Le test navigateur est isolé du réseau : seuls le serveur local et l'API Grist simulée répondent, tout le reste est bloqué.
 - Limite assumée : l'API Grist est simulée, avec des données aux encodages observés en production. Ces tests garantissent que le vrai `main.js` et le vrai `render.js` réagissent correctement à ces encodages et à ces pannes ; ils ne garantissent pas que Grist les envoie toujours. D'où le protocole manuel de [`TESTING.md`](../TESTING.md), à jouer dans un vrai document avant un déploiement qui touche `main.js`, `render.js`, `index.html` ou `style.css`.
 - Chaque correction s'accompagne d'un test de non-régression, dans le fichier du module concerné. Une fonction ajoutée à `grist-data.js` ou `filters.js` a son test ; un changement d'affichage adapte ou ajoute un scénario de `tests/e2e.test.mjs`.
 
@@ -317,7 +317,7 @@ Règles :
 
 1. Ajouter l'élément dans `<template id="cardTemplate">` (`index.html`) et sa mise en forme dans `style.css`.
 2. Le remplir dans `buildCard()` (`render.js`), avec `reveal()` s'il est facultatif et `textContent` pour tout texte venu de Grist.
-3. Ajouter un scénario à `tests/e2e.test.mjs`, régénérer les captures (dont `docs/images/carte-anatomie.png`, dont la légende est dans [le guide utilisateur](utilisateurs.md#lire-une-carte)).
+3. Ajouter un scénario à `tests/e2e.test.mjs`, régénérer les captures (en particulier `docs/images/carte-anatomie.png`, dont la légende se trouve dans [le guide utilisateur](utilisateurs.md#lire-une-carte)).
 
 **Changer une règle d'éligibilité**
 
@@ -326,7 +326,7 @@ Règles :
 
 **Renommer une table ou une colonne Grist**
 
-1. La table principale (`MAIN_TABLE`), les tables de référence, leurs colonnes de libellé et les colonnes de liste de `BDD` sont dans `constants.js`. Les autres noms sont écrits en dur : dans `grist-data.js`, les colonnes obligatoires de `BDD` (`REQUIRED_COLUMNS`) et d'`Etablissements` (`REQUIRED_ETABLISSEMENT_COLUMNS`), `Etablissement`, `perimetre`, `Role_dans_le_PUI` et les indicateurs d'établissement ; et, pour les colonnes d'identité, dans `grist-data.js`, `filters.js` et `render.js` (`nom`, `prenom`, `email`, `Fonction`, `numero_de_telephone`).
+1. La table principale (`MAIN_TABLE`), les tables de référence, leurs colonnes de libellé et les colonnes de liste de `BDD` sont dans `constants.js`. Les autres noms sont écrits en dur : dans `grist-data.js`, le nom de la table `Etablissements`, les colonnes obligatoires de `BDD` (`REQUIRED_COLUMNS`) et d'`Etablissements` (`REQUIRED_ETABLISSEMENT_COLUMNS`), `Etablissement`, `perimetre`, `Role_dans_le_PUI` et les indicateurs d'établissement ; et, pour les colonnes d'identité, dans `grist-data.js`, `filters.js` et `render.js` (`nom`, `prenom`, `email`, `Fonction`, `numero_de_telephone`).
 2. Mettre à jour `grist_structure.txt`, `tests/fixtures.mjs` et `docs/demo/donnees-fictives.mjs`.
 3. Lancer `node --test`, puis jouer [`TESTING.md`](../TESTING.md) dans une copie du document.
 
@@ -334,8 +334,8 @@ Règles :
 
 - **Pas de dépendance à l'exécution.** Toute nouvelle dépendance se discute d'abord.
 - **JavaScript** : modules ES, point-virgule, apostrophes simples, indentation de deux espaces ; des fonctions courtes et nommées plutôt que de longs blocs.
-- **Commentaires** : ils disent *pourquoi* le code est ainsi. L'histoire des bugs vit dans le [CHANGELOG](../CHANGELOG.md) et les messages de commit, pas dans le code.
-- **Langue** : identifiants en anglais, commentaires et textes affichés en français.
+- **Commentaires** : ils disent *pourquoi* le code est ainsi. L'histoire détaillée des bugs vit dans le [CHANGELOG](../CHANGELOG.md) et les messages de commit ; un commentaire peut y renvoyer, sans la raconter.
+- **Langue** : identifiants en anglais (sauf les noms de colonnes Grist et les fichiers de `docs/demo/`, en français), commentaires et textes affichés en français.
 - **Une correction = un test de non-régression**, écrit avec la correction.
 - **Jamais** de vraies données dans le dépôt (captures, jeux de test, schéma complet du document Grist) ni de colonne `nom_de_domaine` dans le code.
 - Tout changement visible ajoute une entrée au [CHANGELOG](../CHANGELOG.md) et met à jour [`VERSION.md`](../VERSION.md).
@@ -343,9 +343,9 @@ Règles :
 ## Versions, déploiement et CI
 
 - Une modification passe de préférence par une branche et une pull request vers `main`. La CI (`.github/workflows/tests.yml`) exécute `node --test` sous Node 22 avec `playwright@1.64.0` et `REQUIRE_E2E=1`, avec le seul droit `contents: read`. Elle s'exécute aussi à chaque push sur `main`, mais elle ne bloque pas la publication : avant un push direct, lancer `node --test` en local.
-- **Un push sur `main` met le widget à jour en production** pour tous les documents Grist qui l'utilisent, via GitHub Pages (`https://lombre33.github.io/Annuaire_PUI_Bordeaux/`), sans rollback automatique. Taguer les versions stables (`git tag vX.Y.Z`) permet de savoir où revenir ; la procédure de retour en arrière est dans [maintenance](maintenance.md#revenir-en-arrière).
-- Le numéro de version est dans le titre de [`VERSION.md`](../VERSION.md) et dans les en-têtes du [CHANGELOG](../CHANGELOG.md), plus récente en premier.
-- En local, les modules ES ne se chargent pas via `file://`. Servir le dossier (`python3 -m http.server 8080` ou `node docs/demo/serveur-demo.mjs`). Pour un essai complet avec un vrai document, ajouter un widget personnalisé qui pointe vers `http://localhost:8080` (voir la préparation de [`TESTING.md`](../TESTING.md)).
+- **Un push sur `main` met le widget à jour en production** pour tous les documents Grist qui l'utilisent, via GitHub Pages (`https://lombre33.github.io/Annuaire_PUI_Bordeaux/`), sans retour arrière automatique. Taguer les versions stables (`git tag vX.Y.Z`) permet de savoir où revenir ; la procédure de retour en arrière est dans [maintenance](maintenance.md#revenir-en-arrière).
+- Le numéro de version est dans le titre de [`VERSION.md`](../VERSION.md) et dans les en-têtes du [CHANGELOG](../CHANGELOG.md), la version la plus récente en premier.
+- En local, les modules ES ne se chargent pas via `file://`. Servir le dossier avec `python3 -m http.server 8080` ; pour un essai complet avec un vrai document, ajouter un widget personnalisé qui pointe vers `http://localhost:8080` (voir la préparation de [`TESTING.md`](../TESTING.md)). Le serveur de démonstration (`node docs/demo/serveur-demo.mjs`) remplace l'API Grist par un simulateur : il ne sert qu'à essayer le widget sans Grist.
 
 ## Chantiers en cours
 
@@ -358,5 +358,5 @@ Au 12 octobre 2026, `main` est en version 1.9.0. Cette documentation décrit `ma
 
 **À venir**
 
-3. **Accord individuel d'apparaître** (1.10.0) : seules les personnes dont `BDD.Accepte_apparaitre` est coché apparaîtraient, en plus de la validation de leur établissement. La colonne deviendrait obligatoire et un annuaire vide serait expliqué par le bandeau. Les [règles d'affichage](#règles-daffichage), le guide utilisateur et la page de maintenance changeront en conséquence.
+3. **Consentement individuel** (1.10.0) : seules les personnes dont `BDD.Accepte_apparaitre` est coché apparaîtraient, en plus de la validation de leur établissement. La colonne deviendrait obligatoire et un annuaire vide serait expliqué par le bandeau. Les [règles d'affichage](#règles-daffichage), le guide utilisateur et la page de maintenance changeront en conséquence.
 4. **Édition de fiche par la personne connectée** : identité de la personne connectée, interrupteur de présence, modale d'édition de sa fiche, demandes de modification validées par un administrateur. Le widget ne sera plus en lecture seule : ce changement modifie le modèle de sécurité décrit dans [sécurité](securite.md), et un guide de configuration côté Grist accompagnera ce chantier.
