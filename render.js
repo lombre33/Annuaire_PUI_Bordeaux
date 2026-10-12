@@ -1,7 +1,8 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
-import { TAG_GROUPS, FILTERS } from './constants.js';
+import { TAG_GROUPS, FILTERS, CARD_LOGO } from './constants.js';
 import { compareLabels, formatPhone, labelsOf, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { createLogoImage, sizeLogo } from './branding-ui.js';
 
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
@@ -201,10 +202,29 @@ function fullName(contact) {
   return `${contact.prenom || ''} ${contact.nom || ''}`.trim() || 'Sans nom';
 }
 
-function fillEtablissement(badge, label, onToggle) {
+// L'établissement d'une carte : son logo seul quand Grist en a un, sinon son nom dans
+// une pastille. `logo` : { attachment, name, attachments } (voir buildCard), ou null.
+// Si le logo ne se charge pas, le nom reprend sa place.
+function fillEtablissement(badge, label, onToggle, logo) {
   if (!label) return;
-  reveal(badge, label);
   badge.addEventListener('click', () => onToggle('etablissement', label));
+  if (!logo) {
+    reveal(badge, label);
+    return;
+  }
+  // `with-logo` donne au logo, plus haut que la pastille, la place des deux rangées du nom
+  // et de la fonction (style.css) : sa hauteur ne décentre pas le nom par rapport à l'avatar.
+  const body = badge.closest('.card-body');
+  const showName = () => {
+    badge.classList.remove('has-logo');
+    body?.classList.remove('with-logo');
+    badge.replaceChildren();
+    reveal(badge, label);
+  };
+  badge.classList.add('visible', 'has-logo');
+  body?.classList.add('with-logo');
+  badge.title = logo.name;
+  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { onLoad: image => sizeLogo(image, CARD_LOGO) }));
 }
 
 function fillEmail(link, email) {
@@ -251,12 +271,17 @@ function fillTags(container, contact, onToggle) {
   });
 }
 
-function buildCard(template, contact, onToggle) {
+// `options.logoFor(contact)` donne { logo, name } de l'établissement du contact
+// (branding.js, logoForContact) et `options.attachments` les adresses des fichiers
+// (attachments.js) : sans l'un des deux, la carte garde la pastille texte.
+function buildCard(template, contact, onToggle, options) {
   const card = template.content.cloneNode(true);
   card.querySelector('.avatar').textContent = initials(contact);
   card.querySelector('.name').textContent = fullName(contact);
   if (contact.Fonction) reveal(card.querySelector('.fonction'), contact.Fonction);
-  fillEtablissement(card.querySelector('.etablissement-tag'), contact.etablissement_label, onToggle);
+  const etablissement = options.attachments && options.logoFor?.(contact);
+  fillEtablissement(card.querySelector('.etablissement-tag'), contact.etablissement_label, onToggle,
+    etablissement?.logo ? { attachment: etablissement.logo, name: etablissement.name, attachments: options.attachments } : null);
   fillEmail(card.querySelector('.email'), contact.email);
   const phone = formatPhone(contact.numero_de_telephone);
   if (phone) reveal(card.querySelector('.tel'), `☎ ${phone}`);
@@ -264,7 +289,7 @@ function buildCard(template, contact, onToggle) {
   return card;
 }
 
-export function renderCards(grid, template, contacts, onToggle) {
+export function renderCards(grid, template, contacts, onToggle, options = {}) {
   grid.innerHTML = '';
-  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle)));
+  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle, options)));
 }

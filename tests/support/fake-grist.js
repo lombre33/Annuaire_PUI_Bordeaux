@@ -9,7 +9,8 @@
 //   - les formules déclenchées de la table-sonde (GRIST_SETUP.md) : Email prend
 //     l'adresse de la personne connectée, Admin se déduit de la table ACL ;
 //   - des pannes de lecture (failTables) et des écritures refusées (denyWrites),
-//     comme le ferait une règle d'accès.
+//     comme le ferait une règle d'accès ;
+//   - getAccessToken, le jeton qui donne accès aux pièces jointes (logos).
 //
 // Chaque option peut être une valeur ou une fonction qui la renvoie : le test
 // navigateur lit ainsi window.__tables, window.__user… à chaque appel, et un test
@@ -22,12 +23,19 @@
 //   triggers    formules déclenchées en plus de celles de la sonde :
 //               { table: { colonne: ({ user, tables }) => valeur } }
 //   delay       millisecondes d'attente avant chaque écriture (une écriture lente)
+//   accessToken la réponse de getAccessToken { token, baseUrl, ttlMsecs } ; null
+//               simule un refus de Grist (par défaut : un jeton valable dix minutes)
 //
-// `calls` garde chaque action tentée : { action, table, rowId, values, ok, error }.
+// `calls` garde chaque action tentée : { action, table, rowId, values, ok, error } ;
+// `tokenRequests` garde les demandes de jeton, avec leurs options.
+
+// Adresse des pièces jointes du faux document : les tests navigateur la servent.
+export const FAKE_ATTACHMENTS_URL = 'https://docs.getgrist.com/api/docs/fake-doc';
 
 export function createFakeGrist(options = {}) {
   const read = value => (typeof value === 'function' ? value() : value);
   const calls = [];
+  const tokenRequests = [];
   let actionNum = 0;
 
   const normalize = value => String(value ?? '').trim().toLowerCase();
@@ -103,6 +111,13 @@ export function createFakeGrist(options = {}) {
       return Object.keys(read(options.tables));
     },
 
+    async getAccessToken(request) {
+      tokenRequests.push(request);
+      const answer = read(options.accessToken);
+      if (answer === null) throw new Error('Access token refused');
+      return structuredClone(answer ?? { token: 'fake-token', baseUrl: FAKE_ATTACHMENTS_URL, ttlMsecs: 600000 });
+    },
+
     // Atomique : les actions s'appliquent à une copie, adoptée seulement si toutes
     // réussissent.
     async applyUserActions(actions) {
@@ -134,5 +149,5 @@ export function createFakeGrist(options = {}) {
     }
   };
 
-  return { docApi, calls };
+  return { docApi, calls, tokenRequests };
 }

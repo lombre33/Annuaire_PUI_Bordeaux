@@ -121,3 +121,23 @@ export const DEFAULT_CARD_NAMES = [
   'Gina Bergonié',
   'Hugo Bernard'
 ];
+
+// Le document complété pour l'habillage (GRIST_SETUP.md) : logos et ordre du bandeau
+// dans Etablissements, et la table facultative Financeurs. Les nombres sont des
+// identifiants de pièces jointes (['L', 11] : le fichier 11).
+//   fondateurs du bandeau : Institut Bergonié (ordre 1), puis CHU (ordre 2) ; INSERM
+//   n'y figure pas (n'a pas validé sa présence) ;
+//   logos des cartes : CHU 11, UBM 12, INSERM 14 ; Clinique et Bergonié n'en ont pas ;
+//   financeurs dans l'ordre : République française, ANR, Bpifrance (sans logo), France 2030.
+export function withBranding(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  copy.Etablissements.logo = [['L', 11], ['L', 12], ['L'], ['L', 14], null];
+  copy.Etablissements.ordre_bandeau = [2, 0, 0, 0, 1];
+  copy.Financeurs = {
+    id: [1, 2, 3, 4],
+    nom: ['République française', 'ANR', 'France 2030', 'Bpifrance'],
+    logo: [['L', 21], ['L', 22], ['L', 23], null],
+    ordre: [1, 2, 4, 3]
+  };
+  return copy;
+}

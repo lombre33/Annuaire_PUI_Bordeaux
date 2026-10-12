@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { CATEGORIES, CONSENT_COLUMN, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES } from './constants.js';
+import { BRANDING, CATEGORIES, CONSENT_COLUMN, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -435,9 +435,14 @@ function describeEmptyDirectory(rowCount, scopedRows, contacts) {
     + '(établissement validé, fondateur ou partenaire) et perimetre.';
 }
 
+// Tables lues en plus mais facultatives : absentes ou illisibles, elles ne gênent
+// pas l'affichage et ne produisent aucun message (la table des financeurs n'existe
+// pas dans les documents créés avant l'habillage).
+const OPTIONAL_TABLES = [BRANDING.fundersTable];
+
 // Lit toutes les tables en parallèle : { nom de table → résultat de Promise.allSettled }.
 async function readAllTables(docApi) {
-  const names = [MAIN_TABLE, ...REFERENCE_TABLES];
+  const names = [MAIN_TABLE, ...REFERENCE_TABLES, ...OPTIONAL_TABLES];
   // async : une erreur levée de façon synchrone par docApi devient un rejet.
   const settled = await Promise.allSettled(names.map(async name => docApi.fetchTable(name)));
   return Object.fromEntries(names.map((name, index) => [name, settled[index]]));
@@ -585,8 +590,11 @@ function directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyRe
 }
 
 // Lit BDD et toutes les tables de référence (chacune une seule fois) et
-// renvoie { contacts, referenceMaps, etabFlags, people, issues } ; `people` est
-// l'index des lignes de BDD par adresse e-mail (createPeopleIndex).
+// renvoie { contacts, referenceMaps, etabFlags, people, etablissementRows,
+// financeurRows, issues } ; `people` est l'index des lignes de BDD par adresse
+// e-mail (createPeopleIndex). `etablissementRows` et `financeurRows` sont les lignes
+// brutes d'Etablissements et de la table facultative Financeurs (null si elle est
+// absente), dont branding.js tire les logos.
 //
 // BDD et Etablissements sont indispensables : leur lecture ratée lève une
 // DirectoryLoadError (l'appelant garde l'affichage précédent). Une autre table
@@ -611,11 +619,14 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   logWithoutConsent(scopedRows, log);
 
   const emptyReason = describeEmptyDirectory(rows.length, scopedRows, contacts);
+  const funders = results[BRANDING.fundersTable];
   return {
     contacts,
     referenceMaps,
     etabFlags,
     people: createPeopleIndex(rows, referenceMaps, etabFlags),
+    etablissementRows,
+    financeurRows: funders.status === 'fulfilled' ? tableToRows(funders.value) : null,
     issues: directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason })
   };
 }
