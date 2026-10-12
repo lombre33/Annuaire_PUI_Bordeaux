@@ -59,8 +59,9 @@ revenir au comportement et aux couleurs d'avant, c'est `git revert` de la fusion
   « Accessibilité » de `docs/developpeurs.md` a une règle de plus sur l'interrupteur, `TESTING.md`
   (section 15) cinq contrôles à l'œil pour un vrai Grist, et le guide utilisateur dit ce qui change au
   clavier et avec un lecteur d'écran.
-- **Tests** : 650 tests (227 dans un vrai navigateur, optionnels sans Playwright), 7 de plus qu'à la
-  1.16.2. Dans `tests/e2e.test.mjs` : l'interrupteur garde le focus pendant et après l'écriture, grisé avec
+- **Tests** : 652 tests (227 dans un vrai navigateur, optionnels sans Playwright), 9 de plus qu'à la
+  1.16.2, dont 7 ajoutés ici (les deux autres viennent de la relecture de la documentation, PR #26).
+  Dans `tests/e2e.test.mjs` : l'interrupteur garde le focus pendant et après l'écriture, grisé avec
   le pointeur d'attente, et les touches de plus pressées pendant l'écriture n'écrivent rien ; la réussite est
   dite par la région d'état (phrase exacte, boîte réduite et rognée, délai relancé par une deuxième bascule,
   effacement au bout de six secondes sur une horloge simulée) ; une écriture réussie suivie d'une relecture

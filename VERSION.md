@@ -19,4 +19,4 @@ la recherche trouve « prénom nom » dans n'importe quel ordre, tirets, apostro
 sont assez foncés pour être lus (4,5:1 au moins avec le blanc, audit UI/UX). Depuis la 1.16.3,
 l'interrupteur de présence garde le focus pendant l'écriture, annonce sa réussite aux lecteurs d'écran,
 a une piste à 3:1 au moins de son fond et reste lisible en contraste élevé (audit UI/UX).
-650 tests (dont 227 dans un vrai navigateur, optionnels sans Playwright).
+652 tests (dont 227 dans un vrai navigateur, optionnels sans Playwright).
