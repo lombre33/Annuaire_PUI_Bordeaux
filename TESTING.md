@@ -38,16 +38,31 @@ Sans dépendance, un fichier de tests par module :
   table-sonde absente, formule muette, écriture refusée, lecture en panne, ligne de
   sonde toujours retirée, personnes simultanées, aucune adresse dans la console) et
   `isReadOnlyAddress`.
-- `tests/people.test.mjs` — l'index des lignes de `BDD` par adresse
-  (`findByEmail`, doublons, colonne `email` absente) et `describeVisibility` : le
+- `tests/people.test.mjs` — l'index des lignes de `BDD` par adresse et par
+  identifiant (`findByEmail`, `findById`, doublons, colonne `email` absente) et `describeVisibility` : le
   verdict « apparaît ou non, et pourquoi » concorde avec `buildContacts`, ligne par
   ligne.
 - `tests/presence.test.mjs` — `describePresence` (les messages dits à la
   personne), `setPresence` (une écriture atomique, seule la case de la personne,
   plusieurs lignes, refus de Grist) et `explainWriteError`.
+- `tests/profile.test.mjs` — `rightsFor` (qui peut modifier quelle fiche, fermé par
+  défaut), `profileFormModel` et `draftOf`, `diffProfile` (textes nettoyés et refusés,
+  téléphone français, références, listes en ajouts et retraits), `rebaseChanges`
+  (ramener les changements sur la fiche actuelle) et `describeChanges`.
+- `tests/profile-save.test.mjs` — `buildRowUpdate` (listes calculées sur la fiche
+  actuelle, téléphone numérique ou texte), `signatureOf`, `readRow`, `prepareReview`
+  (cartes avant et après, rien d'écrit), `saveProfile` (une seule action atomique,
+  changement concurrent, refus de Grist, aucune adresse ni valeur dans la console) et
+  `unsavedLabels`.
+- `tests/preview.test.mjs` — `diffContacts` et `previewOf` : ce qui change entre la
+  carte avant et la carte après.
+- `tests/schema.test.mjs` — `readColumnTypes` (type des colonnes de `BDD`, repli).
 - `tests/support/fake-grist.js` — le faux document Grist commun aux tests Node et
   au test navigateur : lectures, `applyUserActions` atomique (ajout, modification,
-  suppression), formules déclenchées de la sonde, pannes, écritures refusées.
+  suppression), formules déclenchées de la sonde, pannes, écritures refusées (par
+  table ou par ligne).
+- `tests/support/browser.mjs` — l'outillage des tests navigateur : serveur
+  statique, Chromium, faux Grist injecté dans la page.
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
@@ -63,6 +78,14 @@ bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interru
 double clic, écriture refusée, personne sans fiche).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
+
+`tests/e2e-profile.test.mjs` y ajoute 43 scénarios sur la modification d'une fiche : qui
+voit un bouton « Modifier » (personne ordinaire, administrateur, compte Lecteur,
+anonyme, adresse inconnue, doublon), le formulaire et ses refus, la relecture (carte
+avant et carte après, ce qui change repéré, rien d'écrit), l'écriture en une seule
+action, la fiche modifiée par un administrateur, le téléphone numérique ou texte, un
+refus de Grist, un changement concurrent, une fiche supprimée, le double clic, Échap,
+un prénom piégé, le focus, la tabulation dans la fenêtre et l'affichage de 280 à 360px.
 
 `tests/responsive.test.mjs` y ajoute 15 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
@@ -356,3 +379,62 @@ iOS, Chrome Android) que les tests ne couvrent pas :
 - [ ] Téléphone ou tablette : toucher le champ de recherche ne zoome pas la page
       (champs à 16px), les badges, tags et le lien e-mail se touchent sans
       viser, et un filtre touché ne reste pas coloré une fois relâché.
+
+## 13. Modifier sa fiche (1.12.0)
+
+Réglages d'abord : `GRIST_SETUP.md` (colonnes de données, règles d'accès). À jouer sur
+une **copie** du document, avec deux comptes (une personne ordinaire et un
+administrateur) dans deux navigateurs, console ouverte.
+
+- [ ] Personne ordinaire : un bouton « ✎ Modifier » sur sa seule carte, marquée
+      « Votre fiche », et « Modifier mon profil » dans le bandeau. Aucune autre carte
+      n'a de bouton.
+- [ ] Administrateur : un bouton sur toutes les cartes ; celui de sa propre fiche ouvre
+      « Modifier mon profil », les autres « Modifier la fiche de … ».
+- [ ] Compte Lecteur, compte absent de `BDD`, document sans `Annuaire_Sonde` : aucun
+      bouton.
+- [ ] Ouvrir sa fiche : les champs contiennent les valeurs de Grist (le téléphone avec
+      son 0 initial et ses espaces) ; l'e-mail et l'établissement sont affichés mais
+      pas modifiables. La console ne dit pas `[SCHEMA] Types de colonnes illisibles`
+      (sinon le widget suit la forme de la cellule : vérifier le téléphone plus bas).
+- [ ] Changer la fonction, retirer un tag, en ajouter un, changer le téléphone, puis
+      « Relire » : la carte « Avant » est la fiche actuelle, la carte « Après » montre
+      les nouvelles valeurs repérées (relief et pastille « modifié » ou « ajouté » sur
+      une ligne de texte, « + » devant un tag ajouté, tag retiré barré, ligne vidée
+      barrée avec la pastille « supprimé »). **Rien n'a changé dans Grist** à ce stade.
+- [ ] Une personne qui n'a pas accepté d'apparaître, ou dont l'établissement n'est pas
+      validé : la relecture de sa fiche porte un avis qui le dit, avec la raison
+      (« Votre fiche est masquée de l'annuaire… » / « Votre fiche reste masquée de
+      l'annuaire : … »). Une personne visible n'a aucun avis.
+- [ ] « Retour » : les saisies sont conservées. « Annuler » : rien n'est écrit.
+- [ ] « Valider » : « Fiche enregistrée ». Dans Grist, seuls les champs modifiés ont
+      changé ; `email`, `Etablissement`, `perimetre` et `Accepte_apparaitre` sont
+      intacts ; un seul « Annuler » de Grist défait toute la modification. L'annuaire
+      montre la fiche à jour sans rechargement.
+- [ ] Téléphone : colonne numérique, Grist stocke un nombre sans 0 initial et la carte
+      affiche « 05 56 78 90 12 » ; colonne de texte, il stocke « 05 56 78 90 12 ». Vider
+      le champ vide la cellule.
+- [ ] Changement concurrent : ouvrir la relecture, changer la **même** colonne dans
+      Grist, puis « Valider » : la fenêtre revient à la relecture avec l'avis « La fiche
+      a changé dans Grist pendant la relecture » et rien n'est écrit ; « Valider » à
+      nouveau écrit. En changeant une **autre** colonne, l'enregistrement réussit sans
+      l'écraser.
+- [ ] Règle d'accès qui refuse la modification de `BDD` à ce compte : « Grist a refusé
+      la modification… », la relecture reste ouverte, rien n'est écrit.
+- [ ] Un compte ordinaire ne peut pas modifier la fiche d'un autre ni `email`,
+      `Etablissement`, `perimetre` : depuis la console (contexte de l'iframe du
+      widget), `grist.docApi.applyUserActions([['UpdateRecord', 'BDD', <autre ligne>,
+      {Fonction: 'x'}]])` est refusé.
+- [ ] Rendre temporairement `Fonction` à formule : le message parle d'une colonne à
+      formule et renvoie à `GRIST_SETUP.md`. Remettre une colonne de données.
+- [ ] Une fiche dont une liste contient une valeur sans libellé : modifier une autre
+      liste conserve cette valeur.
+- [ ] Échap : avec des modifications, un premier appui avertit et un second ferme ;
+      sans modification, un seul appui ferme. Pendant l'enregistrement, Échap ne ferme
+      pas.
+- [ ] Clavier et lecteur d'écran (au moins une fois, NVDA ou VoiceOver) : le titre de
+      chaque étape est annoncé, « ajouté », « retiré » et « modifié » sont lus dans la
+      carte « Après » (les pastilles sont du texte, les tags ont un mot caché), le focus revient au bouton d'origine à la fermeture.
+- [ ] Téléphone ou tablette : la fenêtre tient dans l'écran, les cartes avant et après
+      sont l'une sous l'autre, « Valider » reste accessible.
+- [ ] La console ne montre aucune erreur ni aucune adresse e-mail.

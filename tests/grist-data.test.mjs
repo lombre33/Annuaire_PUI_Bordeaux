@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, compareLabels,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
-  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts
+  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName
 } from '../grist-data.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
@@ -213,4 +213,13 @@ test('buildContacts keeps only the people who accepted, whatever their establish
     { id: 3, prenom: 'Cleo', nom: 'C', Etablissement: 1, Accepte_apparaitre: null }
   ];
   assert.deepEqual(buildContacts(rows, {}, etabFlags).map(contact => contact.prenom), ['Ana']);
+});
+
+test('displayName writes "Prénom Nom" as the card does, trims, and falls back to "Sans nom"', () => {
+  assert.equal(displayName({ prenom: 'Ana', nom: 'Martin' }), 'Ana Martin');
+  assert.equal(displayName({ prenom: '  Ana ', nom: ' Martin  ' }), 'Ana Martin');
+  assert.equal(displayName({ prenom: 'Ana', nom: '' }), 'Ana');
+  assert.equal(displayName({ prenom: null, nom: 'Martin' }), 'Martin');
+  assert.equal(displayName({ prenom: '', nom: '' }), 'Sans nom');
+  assert.equal(displayName({}), 'Sans nom');
 });

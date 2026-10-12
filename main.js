@@ -1,14 +1,19 @@
 // Point d'entrée : relie l'API Grist et les événements du DOM aux modules
 // grist-data.js (lecture, enrichissement), filters.js (filtrage), render.js
 // (construction du DOM), identity.js et presence.js (la personne connectée et
-// son choix d'apparaître) et account-ui.js (son bandeau).
+// son choix d'apparaître), account-ui.js (son bandeau) et, pour la modification
+// d'une fiche, profile.js / profile-save.js / preview.js (la logique) avec
+// profile-ui.js (la fenêtre).
 
-import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
+import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
-import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts, initials } from './render.js';
+import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
-import { describePresence, setPresence, PresenceError } from './presence.js';
+import { describeHiddenFiche, describePresence, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
+import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges } from './profile.js';
+import { ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
+import { createProfileDialog } from './profile-ui.js';
 
 const state = {
   allContacts: [],
@@ -23,9 +28,16 @@ const state = {
   // ce ne sont pas des valeurs de menu. « Réinitialiser » n'y touche pas.
   scope: { fondateur: true, partenaire: false },
   // La personne connectée (identity.js ; null tant qu'elle n'est pas lue) et
-  // l'index des lignes de BDD par e-mail (grist-data.js), pour retrouver sa fiche.
+  // l'index des lignes de BDD par e-mail et par identifiant (grist-data.js), pour
+  // retrouver sa fiche.
   identity: null,
-  people: null
+  people: null,
+  // Ce que la personne connectée peut faire de chaque fiche (profile.js) : rien tant
+  // qu'elle n'est pas identifiée.
+  rightsOf: () => null,
+  // Indicateurs des établissements, pour montrer la fiche « après » telle que
+  // l'annuaire la présentera.
+  etabFlags: null
 };
 
 const elements = {
@@ -42,7 +54,9 @@ const elements = {
 
 // Bandeau « Ma présence » (voir « Ma présence » plus bas) : masqué tant que la
 // personne connectée n'est pas identifiée et retrouvée dans BDD.
-const accountBar = createAccountBar(document.getElementById('accountBar'), { onToggle: togglePresence });
+const accountBar = createAccountBar(document.getElementById('accountBar'), { onToggle: togglePresence, onEdit: openOwnProfile });
+
+const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
 
 function toggleFilter(filterKey, value) {
   if (!state.activeFilters[filterKey]) state.activeFilters[filterKey] = new Set();
@@ -67,11 +81,21 @@ function rebuildFilterUI() {
 
 function refreshCards() {
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
-  renderCards(elements.grid, elements.template, filtered, toggleFilter);
+  renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf);
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
   updateFilterCounts(elements.filtersContainer, currentCounts());
 }
+
+// Un seul écouteur pour tous les boutons « Modifier » : les cartes sont reconstruites à
+// chaque filtre. Les cartes étant redessinées après un enregistrement, le focus revient
+// au bouton de la même fiche et non à celui, disparu, qui a ouvert la fenêtre.
+elements.grid.addEventListener('click', event => {
+  const edit = event.target.closest('.card-edit');
+  if (!edit) return;
+  const rowId = Number(edit.dataset.rowId);
+  openProfile(rowId, () => elements.grid.querySelector(`.card-edit[data-row-id="${rowId}"]`)?.focus());
+});
 
 elements.searchInput.addEventListener('input', event => {
   state.searchTerm = event.target.value.trim();
@@ -148,6 +172,7 @@ function applyDirectory({ contacts, referenceMaps, etabFlags, people }) {
 
   state.allContacts = contacts;
   state.people = people;
+  state.etabFlags = etabFlags;
   if (referenceMapsChanged) rebuildFilterUI();
   refreshCards();
   refreshAccount();
@@ -207,9 +232,12 @@ function refreshAccount() {
   }
   if (persons.length > 1) {
     warnOnce('duplicates', `[IDENTITE] ${persons.length} lignes de BDD portent la même adresse (identifiants de ligne : `
-      + `${persons.map(person => person.row.id).join(', ')}) : le choix de présence s'applique à toutes.`);
+      + `${persons.map(person => person.row.id).join(', ')}) : le choix de présence s'applique à toutes, `
+      + 'le bouton « Modifier mon profil » n\'est pas proposé (chaque carte garde le sien).');
   }
   accountBar.show({ name: persons[0].name || 'Ma fiche', initials: initials(persons[0].row), ...describePresence(persons) });
+  // Plusieurs fiches pour la même adresse : on ne sait pas laquelle ouvrir depuis le bandeau.
+  accountBar.setActions({ edit: persons.length === 1 });
 }
 
 let togglePending = false;
@@ -240,5 +268,86 @@ async function togglePresence() {
 // n'est identifié et aucune modification n'est proposée.
 readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(identity => {
   state.identity = identity;
+  state.rightsOf = rightsFor(identity);
   refreshAccount();
+  refreshCards(); // les boutons « Modifier » apparaissent sur les cartes concernées
 });
+
+// ===== Modifier une fiche =====
+
+// Une erreur attendue (ProfileSaveError) porte une phrase française ; toute autre est
+// consignée dans la console et remplacée par une phrase générale.
+function userFacing(error) {
+  if (error instanceof ProfileSaveError) return error;
+  console.error('[PROFIL] Erreur inattendue :', error);
+  return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
+}
+
+// Ce que le brouillon change (de quoi activer le bouton) et pourquoi il serait refusé.
+function evaluateDraft(row, draft) {
+  const { champs, errors, fieldErrors } = diffProfile(row, draft, state.referenceMaps);
+  return { errors, fieldErrors, lines: describeChanges(champs) };
+}
+
+// Prépare la relecture (profile-save.js) : rien n'est écrit. `row` est la fiche telle que
+// le formulaire l'a montrée.
+async function reviewProfile(row, draft) {
+  try {
+    return await prepareReview(window.grist.docApi, row, draft, { referenceMaps: state.referenceMaps, etabFlags: state.etabFlags });
+  } catch (error) {
+    throw userFacing(error);
+  }
+}
+
+// Écrit ce que la personne a relu. Si la fiche a changé dans Grist depuis la relecture,
+// rien n'est écrit : la personne relit d'abord ce qui s'y trouve. Sinon l'annuaire est
+// relu, et on vérifie que Grist a gardé ce qu'on lui a demandé.
+async function saveReviewed(row, review, draft) {
+  let result;
+  try {
+    result = await saveProfile(window.grist.docApi, review);
+  } catch (error) {
+    throw userFacing(error);
+  }
+  if (result.status === 'changed') {
+    return {
+      status: 'changed',
+      review: await reviewProfile(row, draft),
+      notice: 'La fiche a changé dans Grist pendant la relecture. Relisez ce qui suit, puis validez à nouveau.'
+    };
+  }
+  const outcome = await reloadDirectory();
+  const saved = outcome === 'applied' ? state.people?.findById(review.rowId)?.row : null;
+  const leftovers = saved ? unsavedLabels(review, saved, state.referenceMaps) : [];
+  return { status: 'saved', lines: review.lines, leftovers, reloaded: outcome !== 'failed' };
+}
+
+// Ouvre la fenêtre de modification de la fiche `rowId`, si la personne connectée en a le
+// droit : la sienne, ou n'importe laquelle pour une administratrice. Fermé par défaut.
+// `returnFocus` redonne le focus à l'endroit d'où la fenêtre a été ouverte, à sa fermeture.
+function openProfile(rowId, returnFocus) {
+  const person = state.people?.findById(rowId);
+  const rights = person ? state.rightsOf(person.row) : null;
+  if (!rights) return;
+  const { row } = person;
+  const model = profileFormModel(row, state.referenceMaps);
+  profileDialog.open({
+    mode: rights,
+    person: { name: person.name || 'Sans nom', email: text(row.email), initials: initials(row) },
+    etablissement: person.etablissement,
+    model,
+    draft: draftOf(model),
+    evaluate: draft => evaluateDraft(row, draft),
+    review: draft => reviewProfile(row, draft),
+    hiddenNotice: visibility => describeHiddenFiche(visibility, { own: rights === 'own' }),
+    save: (review, draft) => saveReviewed(row, review, draft),
+    renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks),
+    onClose: returnFocus
+  });
+}
+
+// Le bouton « Modifier mon profil » du bandeau : la fiche de la personne connectée.
+function openOwnProfile() {
+  const persons = myPersons();
+  if (persons.length === 1) openProfile(persons[0].row.id, () => accountBar.focusEdit());
+}

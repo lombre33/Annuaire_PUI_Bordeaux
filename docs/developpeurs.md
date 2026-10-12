@@ -57,12 +57,13 @@ flowchart LR
 | `grist-plugin-api.js` | API de widget de Grist. `index.html` la charge depuis `docs.getgrist.com`, sans version figée | `index.html` |
 | GitHub Actions | Exécute `node --test` à chaque pull request et à chaque push sur `main` | `.github/workflows/tests.yml` |
 
-Ce que le widget fait, dans la version 1.11.0 :
+Ce que le widget fait, dans la version 1.12.0 :
 
 - il **lit** les tables du document Grist : neuf lectures `fetchTable` par chargement de l'annuaire et, pour savoir qui est connecté, la liste des tables (`listTables`) puis la table-sonde ;
-- il **écrit** dans deux cas seulement, toujours à l'initiative d'un chargement ou d'un clic, jamais en tâche de fond :
+- il **écrit** dans trois cas seulement, toujours à l'initiative d'un chargement ou d'un clic, jamais en tâche de fond :
   1. à chaque chargement, il ajoute puis supprime une ligne de la table-sonde `Annuaire_Sonde` (`identity.js`), sauf pour un compte Lecteur ou quand la table n'existe pas ;
-  2. quand la personne connectée actionne l'interrupteur « Ma présence », il écrit la case `Accepte_apparaitre` de sa ou de ses lignes de `BDD` (`presence.js`), en une seule action atomique.
+  2. quand la personne connectée actionne l'interrupteur « Ma présence », il écrit la case `Accepte_apparaitre` de sa ou de ses lignes de `BDD` (`presence.js`), en une seule action atomique ;
+  3. quand une personne valide la relecture de la modification de sa fiche (un administrateur : de n'importe quelle fiche), il écrit les colonnes modifiées de cette seule ligne de `BDD` (`profile-save.js`), en une seule action atomique, sans validation ni historique.
 
   Il ne crée ni ne modifie jamais une table ou une colonne ;
 - il ne stocke rien dans le navigateur et n'émet lui-même aucune requête réseau ;
@@ -105,16 +106,24 @@ Une flèche signifie « importe ».
 | `constants.js` | Noms de la table principale (`MAIN_TABLE`, soit `BDD`), de la case de consentement (`CONSENT_COLUMN`, soit `Accepte_apparaitre`) et de la table-sonde (`PROBE_TABLE`, soit `Annuaire_Sonde`), puis taxonomie : `CATEGORIES` donne, pour chaque catégorie, son libellé, sa couleur, sa table de référence, ses colonnes de libellé et, sauf pour l'établissement et le rôle (des Références simples), sa colonne de liste dans la table principale. `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES`, `REFERENCE_SOURCES` et `LIST_CATEGORIES` en sont dérivés |
 | `grist-data.js` | Lecture des tables (`loadDirectory()`), décodage des formats Grist, enrichissement des contacts, règles d'éligibilité et de consentement (`hasAccepted()`, `buildContacts()`), et l'index des personnes par adresse e-mail (`createPeopleIndex()`, `describeVisibility()`) |
 | `filters.js` | Forme de l'état des filtres (`createEmptyFilterState()`), `filterContacts()`, `computeFilterCounts()`, `pruneStaleFilters()` |
-| `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`) et cartes (`renderCards()`) ; `initials()` sert aussi au bandeau « Ma présence » |
+| `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`) et cartes (`renderCards()`, avec le bouton « Modifier » des fiches que la personne peut modifier) ; cartes de relecture sans interaction (`renderPreviewCard()`), où ce qui change est repéré ; `initials()` sert aussi au bandeau « Ma présence » |
 | `identity.js` | `readIdentity()` : qui est connecté ? Ajoute une ligne dans la table-sonde `Annuaire_Sonde` (dont Grist calcule l'adresse par une formule `user.Email`), la relit par son identifiant puis la supprime. Renvoie l'adresse et la case administrateur, ou « personne » au moindre doute ; ne bloque jamais l'annuaire |
 | `presence.js` | « Ma présence » : `describePresence()` dit à la personne si elle apparaît et pourquoi, `setPresence()` écrit son accord (`Accepte_apparaitre`) sur sa ou ses lignes en une seule action atomique |
 | `account-ui.js` | Le bandeau « Ma présence » au-dessus des filtres : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier |
+| `profile.js` | Modifier une fiche, sans DOM ni Grist : `rightsFor()` (qui peut modifier quelle fiche : la sienne, ou toutes pour un administrateur ; fermé par défaut), `profileFormModel()` et `draftOf()` (ce que le formulaire propose), `diffProfile()` (ce que la personne a changé, sous forme de delta, et pourquoi une saisie serait refusée), `rebaseChanges()` (ramener ces changements sur la fiche telle qu'elle est maintenant dans Grist) et `describeChanges()` (la liste « Ce qui change ») |
+| `profile-save.js` | Relire puis écrire une fiche : `prepareReview()` relit la fiche dans Grist et prépare les cartes avant et après, `saveProfile()` écrit en une seule action atomique (`UpdateRecord`), et seulement si les champs touchés n'ont pas changé depuis la relecture (`signatureOf()`). `buildRowUpdate()` calcule les valeurs à écrire sur la fiche telle qu'elle est au moment d'écrire, `readRow()` la relit, `unsavedLabels()` dit ce que Grist n'a pas gardé |
+| `preview.js` | `previewOf()` : la carte « avant » et la carte « après » (la ligne avec les valeurs qui seront écrites, enrichie comme l'annuaire) ; `diffContacts()` : ce qui les distingue |
+| `schema.js` | `readColumnTypes()` : le type des colonnes de `BDD` d'après les métadonnées de Grist, pour écrire le téléphone dans la forme de sa colonne |
+| `profile-ui.js` | La fenêtre de modification (`createProfileDialog()`) : formulaire, relecture avant/après, confirmation. DOM seulement |
+| `changes-ui.js` | `renderChangeList()` : la liste « Ce qui change » de la relecture et de la confirmation. DOM seulement |
+| `dom.js` | `el()` : crée un élément avec sa classe et son texte (jamais du HTML : ce qui vient de Grist reste du texte) |
+| `dialogs.css` | Feuille de style de la fenêtre de modification (formulaire, relecture, confirmation) |
 | `main.js` | Point d'entrée : détient l'état de l'application, relie `window.grist` et les événements du DOM aux autres modules |
 
 Règles de répartition, à respecter pour que les tests restent possibles sans navigateur :
 
-1. `constants.js`, `grist-data.js`, `filters.js`, `identity.js` et `presence.js` n'utilisent jamais le DOM.
-2. Seules `loadDirectory()` (lecture), `readIdentity()` et `setPresence()` (écritures) parlent à Grist, par le `docApi` qu'on leur passe : les tests leur fournissent un faux `docApi` (`tests/support/fake-grist.js`).
+1. `constants.js`, `grist-data.js`, `filters.js`, `identity.js`, `presence.js`, `profile.js`, `profile-save.js`, `preview.js` et `schema.js` n'utilisent jamais le DOM.
+2. Seules `loadDirectory()` et `readColumnTypes()` (lectures), `readIdentity()`, `setPresence()` et les fonctions de `profile-save.js` (`prepareReview()` lit, `saveProfile()` écrit) parlent à Grist, par le `docApi` qu'on leur passe : les tests leur fournissent un faux `docApi` (`tests/support/fake-grist.js`). `profile.js` et `preview.js` ne l'utilisent jamais.
 3. `render.js` ne contient aucune règle métier : il reçoit des contacts déjà filtrés et une fonction de rappel `onToggle`.
 4. `filters.js` n'a pas d'effet de bord : `pruneStaleFilters()` renvoie un nouvel état au lieu de modifier son argument.
 5. Seul `main.js` détient l'état (`state`).
@@ -296,7 +305,7 @@ Tout ce qui précède est du JavaScript qui tourne dans le navigateur de la pers
 
 ### Tests
 
-`identity.js`, `presence.js` et l'index des personnes se testent sans navigateur grâce au faux document Grist de `tests/support/fake-grist.js` : `tests/identity.test.mjs`, `tests/people.test.mjs` et `tests/presence.test.mjs`. Ce faux document reproduit ce dont le widget dépend : lectures, écritures atomiques qui renvoient `retValues` comme Grist, formules de déclenchement de la sonde, pannes de lecture, écritures refusées. Le test navigateur (`tests/e2e.test.mjs`) et le serveur de démonstration en injectent le texte tel quel dans la page, `export` retiré : ce fichier ne doit donc rien importer.
+`identity.js`, `presence.js` et l'index des personnes se testent sans navigateur grâce au faux document Grist de `tests/support/fake-grist.js` : `tests/identity.test.mjs`, `tests/people.test.mjs` et `tests/presence.test.mjs`. Ce faux document reproduit ce dont le widget dépend : lectures, écritures atomiques qui renvoient `retValues` comme Grist, formules de déclenchement de la sonde, pannes de lecture, écritures refusées. Les tests navigateur (`tests/support/browser.mjs`, utilisé par `tests/e2e.test.mjs` et `tests/e2e-profile.test.mjs`) et le serveur de démonstration en injectent le texte tel quel dans la page, `export` retiré : ce fichier ne doit donc rien importer.
 
 ## Filtres, compteurs et recherche
 
@@ -375,12 +384,17 @@ npx playwright install chromium         # ou CHROMIUM_PATH=/chemin/vers/chromium
 | `tests/identity.test.mjs` | `readIdentity()` et `isReadOnlyAddress()` avec le faux Grist : adresse lue sur la ligne de la sonde, droit d'administrateur d'après `ACL`, compte Lecteur, sonde absente, formule muette, écriture refusée, lecture en panne, ligne de sonde toujours retirée, personnes simultanées, aucune adresse dans la console |
 | `tests/people.test.mjs` | L'index des personnes par adresse (casse et espaces ignorés, doublons signalés) et `describeVisibility()`, dont l'accord avec `buildContacts()` sur chaque ligne |
 | `tests/presence.test.mjs` | `describePresence()` (les messages dits à la personne) et `setPresence()` : une seule action atomique, vrais booléens, toutes les lignes de la personne ou aucune, refus de Grist traduit en français |
+| `tests/profile.test.mjs` | `rightsFor()` (qui peut modifier quelle fiche, fermé par défaut), le modèle du formulaire, `diffProfile()` (textes nettoyés et refusés, téléphone français, références, listes en ajouts et retraits), `rebaseChanges()` et `describeChanges()` |
+| `tests/profile-save.test.mjs` | `buildRowUpdate()` (listes calculées sur la fiche actuelle, téléphone numérique ou texte), `signatureOf()`, `prepareReview()` (cartes avant et après, rien d'écrit), `saveProfile()` (une seule action atomique, conflit concurrent, refus de Grist, aucune adresse dans la console) et `unsavedLabels()` |
+| `tests/preview.test.mjs` | `diffContacts()` et `previewOf()` : ce qui change entre la carte avant et la carte après |
+| `tests/schema.test.mjs` | `readColumnTypes()` : type des colonnes, repli quand les métadonnées sont illisibles |
 | `tests/e2e.test.mjs` | Le vrai `index.html` dans Chromium avec le faux Grist : cartes, badge d'établissement, filtres, compteurs, interrupteurs, pannes, consentement, bandeau « Ma présence » et son interrupteur |
+| `tests/e2e-profile.test.mjs` | Le même `index.html` : qui voit un bouton « Modifier », le formulaire, la relecture avant/après, l'écriture, les refus, les conflits, l'accessibilité de la fenêtre, y compris dans un cadre étroit |
 | `tests/responsive.test.mjs` | Le même `index.html` de 280 à 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs`) : pas de défilement horizontal, texte contenu dans les cartes, colonnes, barre d'outils, menus de filtres dans le cadre, cibles tactiles, tailles de texte |
 | `tests/docs.test.mjs` | La documentation ne se périme pas : liens, noms de fonctions cités, jeu de données fictif et personnes de démonstration, serveur de démonstration, affirmations de sécurité (aucun appel réseau, aucun stockage, méthodes de l'API Grist employées) |
 
 - **Version de Node.** Le dépôt n'a pas de `package.json` : Node ne reconnaît les modules ES écrits en `.js` que grâce à la détection automatique de la syntaxe, activée par défaut depuis Node 20.19 et 22.7. En dessous (Node 18, 21, 22.6…), les tests échouent avec « Named export … not found » : c'est l'environnement qui est en cause, pas le code. Le serveur de démonstration, en `.mjs`, démarre dès Node 18.
-- Les tests unitaires n'ont aucune dépendance. `tests/e2e.test.mjs` et `tests/responsive.test.mjs` ont besoin de Playwright et de Chromium ; sans eux leurs scénarios sont ignorés et `node --test` reste vert. La CI définit `REQUIRE_E2E=1` : un navigateur absent y est un échec, pas un « tout vert » sur des tests ignorés.
+- Les tests unitaires n'ont aucune dépendance. `tests/e2e.test.mjs`, `tests/e2e-profile.test.mjs` et `tests/responsive.test.mjs` ont besoin de Playwright et de Chromium (l'outillage commun des deux premiers est dans `tests/support/browser.mjs`) ; sans eux leurs scénarios sont ignorés et `node --test` reste vert. La CI définit `REQUIRE_E2E=1` : un navigateur absent y est un échec, pas un « tout vert » sur des tests ignorés.
 - Le test navigateur est isolé du réseau : seuls le serveur local et l'API Grist simulée répondent, tout le reste est bloqué.
 - Limite assumée : l'API Grist est simulée, avec des données aux encodages observés en production. Ces tests garantissent que le vrai `main.js` et le vrai `render.js` réagissent correctement à ces encodages et à ces pannes ; ils ne garantissent pas que Grist les envoie toujours. Le faux document ne reproduit ni les règles d'accès de Grist ni le calcul réel des formules : il ne rejoue que le résultat attendu de la formule de la sonde (`Email` = adresse de la personne, `Admin` d'après `ACL`). D'où le protocole manuel de [`TESTING.md`](../TESTING.md), à jouer dans un vrai document avant un déploiement qui touche `main.js`, `render.js`, `index.html` ou `style.css`.
 - Chaque correction s'accompagne d'un test de non-régression, dans le fichier du module concerné. Une fonction ajoutée à `grist-data.js` ou `filters.js` a son test ; un changement d'affichage adapte ou ajoute un scénario de `tests/e2e.test.mjs`, et un changement de mise en page (`style.css`) un scénario de `tests/responsive.test.mjs`.

@@ -8,20 +8,28 @@
 
 import { CONSENT_COLUMN, MAIN_TABLE } from './constants.js';
 
-// Ce qui retient hors de l'annuaire une fiche acceptée, dans les mots de la
-// personne concernée.
-const ETABLISSEMENT_REASONS = {
-  missing: 'votre fiche n\'a pas d\'établissement',
-  unknown: 'votre établissement n\'est pas reconnu',
-  not_validated: 'votre établissement n\'a pas encore été validé',
-  not_eligible: 'votre établissement n\'est ni fondateur ni partenaire'
+// Ce qui retient hors de l'annuaire une fiche acceptée, dit à la personne concernée
+// (« votre fiche ») ou à un administrateur qui relit une autre fiche (« la fiche »).
+const VOICES = {
+  own: { fiche: 'votre fiche', etablissement: 'votre établissement' },
+  admin: { fiche: 'la fiche', etablissement: 'son établissement' }
 };
 
-function hiddenReasons(statuses) {
+function etablissementReasons({ fiche, etablissement }) {
+  return {
+    missing: `${fiche} n'a pas d'établissement`,
+    unknown: `${etablissement} n'est pas reconnu`,
+    not_validated: `${etablissement} n'a pas encore été validé`,
+    not_eligible: `${etablissement} n'est ni fondateur ni partenaire`
+  };
+}
+
+function hiddenReasons(statuses, voice = VOICES.own) {
+  const etablissements = etablissementReasons(voice);
   const reasons = statuses.flatMap(status => [
-    !status.named && 'votre fiche n\'a ni prénom ni nom',
-    !status.inScope && 'votre fiche n\'a pas de périmètre',
-    ETABLISSEMENT_REASONS[status.etablissement]
+    !status.named && `${voice.fiche} n'a ni prénom ni nom`,
+    !status.inScope && `${voice.fiche} n'a pas de périmètre`,
+    etablissements[status.etablissement]
   ]).filter(Boolean);
   return [...new Set(reasons)];
 }
@@ -60,6 +68,22 @@ export function describePresence(persons) {
   };
 }
 
+// Ce que la relecture d'une modification dit d'une fiche absente de l'annuaire : la
+// carte « Après » montre une carte que personne ne verra dans la grille tant que la
+// cause demeure. `status` vient de describeVisibility() ; `own` dit si la fiche est celle
+// de la personne qui relit. Renvoie '' quand la fiche figure dans l'annuaire.
+export function describeHiddenFiche(status, { own }) {
+  if (status.visible) return '';
+  if (!status.accepted) {
+    return own
+      ? 'Votre fiche est masquée de l\'annuaire : vous n\'avez pas accepté d\'apparaître (interrupteur « Apparaître dans l\'annuaire » en haut de page).'
+      : 'Cette fiche est masquée de l\'annuaire : la personne n\'a pas accepté d\'apparaître.';
+  }
+  const reasons = hiddenReasons([status], own ? VOICES.own : VOICES.admin);
+  const why = reasons.length ? ` : ${reasons.join(' ; ')}` : '';
+  return `${own ? 'Votre fiche reste masquée' : 'Cette fiche reste masquée'} de l'annuaire${why}.`;
+}
+
 // Erreur d'écriture dont le message est une phrase française destinée à la
 // personne ; l'erreur d'origine reste dans `cause` et dans la console.
 export class PresenceError extends Error {
@@ -70,14 +94,21 @@ export class PresenceError extends Error {
 }
 
 // Ce que Grist répond à une écriture refusée n'est pas stable d'une version à
-// l'autre : on reconnaît les deux causes qui comptent, la règle d'accès et la
-// colonne à formule, et on reste générique pour le reste.
-export function explainWriteError(error) {
+// l'autre : on reconnaît les deux causes qui comptent, la règle d'accès ('denied')
+// et la colonne à formule ('formula'), et on reste générique pour le reste ('other').
+export function classifyWriteError(error) {
   const detail = String(error?.message || error || '');
-  if (/access rule|blocked|denied|forbidden|permission|\bACL\b/i.test(detail)) {
+  if (/access rule|blocked|denied|forbidden|permission|\bACL\b/i.test(detail)) return 'denied';
+  if (/formula column/i.test(detail)) return 'formula';
+  return 'other';
+}
+
+export function explainWriteError(error) {
+  const kind = classifyWriteError(error);
+  if (kind === 'denied') {
     return 'Grist a refusé la modification : vos droits ne permettent pas de changer cette information. Contactez un administrateur.';
   }
-  if (/formula column/i.test(detail)) {
+  if (kind === 'formula') {
     return `La colonne ${CONSENT_COLUMN} est une colonne à formule : elle doit être une colonne de données (case à cocher). Voir GRIST_SETUP.md.`;
   }
   return 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.';

@@ -1,0 +1,408 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  profileFormModel, diffProfile, cleanText, frenchPhoneDigits, textFault, MAX_TEXT_LENGTH,
+  draftOf, rightsFor, rebaseChanges, describeChanges
+} from '../profile.js';
+import { loadDirectory, tableToRows } from '../grist-data.js';
+import { createFakeGrist } from './support/fake-grist.js';
+import { sampleTables, withoutOptionalColumns } from './fixtures.mjs';
+
+// ===== profile : qui peut modifier une fiche, ce qu'on peut y changer, et ce qui change =====
+
+const quiet = { info() {}, warn() {} };
+
+async function setup(tables = sampleTables()) {
+  const { referenceMaps } = await loadDirectory(createFakeGrist({ tables }).docApi, { log: quiet });
+  const rows = tableToRows(tables.BDD);
+  return { referenceMaps, row: id => rows.find(candidate => candidate.id === id) };
+}
+
+const field = (model, key) => model.find(entry => entry.key === key);
+
+test('profileFormModel offers every editable column with the current value of the row', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps); // Ana
+  assert.deepEqual(model.map(entry => entry.key),
+    ['prenom', 'nom', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+  assert.equal(field(model, 'Fonction').value, 'Pharmacienne');
+  assert.equal(field(model, 'numero_de_telephone').value, '05 56 78 90 12', 'le 0 perdu par le type Numeric est rétabli');
+  assert.equal(field(model, 'Role_dans_le_PUI').value, 1);
+  assert.deepEqual(field(model, 'Competences').value, [1, 2]);
+});
+
+test('profileFormModel tells the category of each reference and list field, and none for a text field', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  assert.equal(field(model, 'Competences').category, 'competences');
+  assert.equal(field(model, 'Role_dans_le_PUI').category, 'role');
+  assert.ok(!('category' in field(model, 'Fonction')));
+});
+
+test('profileFormModel shows 0 for a person without role, never a missing value', async () => {
+  const { referenceMaps, row } = await setup();
+  assert.equal(field(profileFormModel(row(2), referenceMaps), 'Role_dans_le_PUI').value, 0);
+});
+
+test('profileFormModel lists the options of each reference sorted by label, and never offers email, Etablissement, perimetre or consent', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  assert.deepEqual(field(model, 'Instances').options.map(option => option.label), ['CME', 'COVIRIS']);
+  assert.deepEqual(field(model, 'Role_dans_le_PUI').options, [{ id: 1, label: 'Référent qualité' }]);
+  for (const forbidden of ['email', 'Etablissement', 'perimetre', 'Accepte_apparaitre', 'Avatar']) {
+    assert.equal(field(model, forbidden), undefined, forbidden);
+  }
+});
+
+test('profileFormModel groups the competences by domain, the fallback domain last, and leaves other lists ungrouped', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  assert.deepEqual(field(model, 'Competences').options.map(option => [option.group, option.label]), [
+    ['Cancérologie', 'Hématologie'],
+    ['Cancérologie', 'Oncologie'],
+    ['Pharmacie', 'Pharmacovigilance'],
+    ['Autres', 'Divers']
+  ]);
+  assert.ok(field(model, 'Instances').options.every(option => !('group' in option)));
+});
+
+test('profileFormModel offers the competences ungrouped when the document has no domain column', async () => {
+  const tables = sampleTables();
+  delete tables.Competences.Macro_competences;
+  const { referenceMaps, row } = await setup(tables);
+  const options = field(profileFormModel(row(1), referenceMaps), 'Competences').options;
+  assert.deepEqual(options.map(option => option.label), ['Divers', 'Hématologie', 'Oncologie', 'Pharmacovigilance']);
+  assert.ok(options.every(option => !('group' in option)));
+});
+
+test('a group never leaks into the changes: champs keep only id and label', async () => {
+  const { referenceMaps, row } = await setup();
+  const result = diffProfile(row(1), { Competences: [1, 2, 3] }, referenceMaps);
+  assert.deepEqual(result.champs.Competences, { ajout: [{ id: 3, label: 'Pharmacovigilance' }], retrait: [] });
+});
+
+test('profileFormModel shows only the values it can name: a row without label stays out of the form', async () => {
+  const { referenceMaps, row } = await setup();
+  const hugo = profileFormModel(row(10), referenceMaps); // Instances ['L', 999]
+  assert.deepEqual(field(hugo, 'Instances').value, []);
+});
+
+test('profileFormModel leaves out the optional columns BDD does not have', async () => {
+  const tables = withoutOptionalColumns(sampleTables());
+  const { referenceMaps, row } = await setup(tables);
+  const keys = profileFormModel(row(1), referenceMaps).map(entry => entry.key);
+  assert.ok(!keys.includes('numero_de_telephone') && !keys.includes('Role_dans_le_PUI'));
+  assert.ok(keys.includes('Fonction'));
+});
+
+test('diffProfile finds no change when the draft is the current form', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  assert.deepEqual(diffProfile(row(1), draftOf(model), referenceMaps), { champs: {}, errors: [], fieldErrors: {} });
+});
+
+test('diffProfile records old and new value of a text field', async () => {
+  const { referenceMaps, row } = await setup();
+  const result = diffProfile(row(1), { Fonction: 'Cheffe de service' }, referenceMaps);
+  assert.deepEqual(result.champs, { Fonction: { avant: 'Pharmacienne', apres: 'Cheffe de service' } });
+  assert.deepEqual(result.errors, []);
+});
+
+test('diffProfile cleans typed text: spaces, line breaks and control characters', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), { Fonction: '  Cheffe \n de\tservice\u0000 ' }, referenceMaps);
+  assert.equal(champs.Fonction.apres, 'Cheffe de service');
+});
+
+test('diffProfile does not turn an untouched value into a change, even a messy one', async () => {
+  const tables = sampleTables();
+  tables.BDD.Fonction[0] = 'Pharmacienne  chef';
+  tables.BDD.numero_de_telephone[0] = 'poste 1234';
+  const { referenceMaps, row } = await setup(tables);
+  const result = diffProfile(row(1), { Fonction: 'Pharmacienne  chef', numero_de_telephone: 'poste 1234' }, referenceMaps);
+  assert.deepEqual(result, { champs: {}, errors: [], fieldErrors: {} });
+});
+
+test('diffProfile refuses text that a spreadsheet would read as a formula, and text that is too long', async () => {
+  const { referenceMaps, row } = await setup();
+  for (const bad of ['=SOMME(A1)', '+33 cmd', '-2+3', '@admin']) {
+    const result = diffProfile(row(1), { Fonction: bad }, referenceMaps);
+    assert.deepEqual(result.champs, {}, bad);
+    assert.match(result.errors[0], /Fonction : ne peut pas commencer par = \+ - ou @\./);
+  }
+  const long = diffProfile(row(1), { Fonction: 'x'.repeat(MAX_TEXT_LENGTH + 1) }, referenceMaps);
+  assert.match(long.errors[0], /200 caractères au plus/);
+  assert.deepEqual(diffProfile(row(1), { Fonction: 'x'.repeat(MAX_TEXT_LENGTH) }, referenceMaps).errors, []);
+});
+
+test('diffProfile accepts a French phone number in any usual writing and stores its canonical form', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), { numero_de_telephone: '+33 5 56 78 90 13' }, referenceMaps);
+  assert.deepEqual(champs, { numero_de_telephone: { avant: '0556789012', apres: '0556789013' } });
+  assert.deepEqual(diffProfile(row(1), { numero_de_telephone: '05.56.78.90.12' }, referenceMaps).champs, {},
+    'le même numéro écrit autrement n\'est pas un changement');
+});
+
+test('diffProfile refuses a phone number that is not a French 10-digit number, and lets one clear the field', async () => {
+  const { referenceMaps, row } = await setup();
+  for (const bad of ['12345', '+44 7700 900123', 'appelez-moi', '05 56 78 90']) {
+    const result = diffProfile(row(1), { numero_de_telephone: bad }, referenceMaps);
+    assert.deepEqual(result.champs, {}, bad);
+    assert.match(result.errors[0], /Téléphone : un numéro français à 10 chiffres est attendu/);
+  }
+  const cleared = diffProfile(row(1), { numero_de_telephone: '' }, referenceMaps);
+  assert.deepEqual(cleared.champs, { numero_de_telephone: { avant: '0556789012', apres: '' } });
+});
+
+test('diffProfile handles a reference: change, removal, and an id the table does not know', async () => {
+  const { referenceMaps, row } = await setup();
+  const removal = diffProfile(row(1), { Role_dans_le_PUI: 0 }, referenceMaps);
+  assert.deepEqual(removal.champs, { Role_dans_le_PUI: { avant: { id: 1, label: 'Référent qualité' }, apres: { id: 0, label: '' } } });
+  const unknown = diffProfile(row(1), { Role_dans_le_PUI: 99 }, referenceMaps);
+  assert.deepEqual(unknown.champs, {});
+  assert.match(unknown.errors[0], /Rôle PUI : valeur inconnue/);
+  assert.deepEqual(diffProfile(row(2), { Role_dans_le_PUI: 1 }, referenceMaps).champs.Role_dans_le_PUI.avant, { id: 0, label: '' });
+});
+
+test('diffProfile records a list as values to add and values to remove', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), { Competences: [2, 3] }, referenceMaps); // Ana : 1, 2
+  assert.deepEqual(champs.Competences, {
+    ajout: [{ id: 3, label: 'Pharmacovigilance' }],
+    retrait: [{ id: 1, label: 'Oncologie' }]
+  });
+});
+
+test('diffProfile treats a reordered list as unchanged, and an unknown id as an error', async () => {
+  const { referenceMaps, row } = await setup();
+  assert.deepEqual(diffProfile(row(1), { Competences: [2, 1] }, referenceMaps).champs, {});
+  const unknown = diffProfile(row(1), { Competences: [1, 2, 404] }, referenceMaps);
+  assert.deepEqual(unknown.champs, {});
+  assert.match(unknown.errors[0], /Compétences : valeur inconnue/);
+});
+
+test('diffProfile never removes a value the form could not show', async () => {
+  const { referenceMaps, row } = await setup();
+  // Hugo a l'instance 999, que la table Instances ne nomme pas : il en ajoute une autre.
+  const { champs } = diffProfile(row(10), { Instances: [1] }, referenceMaps);
+  assert.deepEqual(champs.Instances, { ajout: [{ id: 1, label: 'CME' }], retrait: [] });
+});
+
+test('diffProfile keeps at least a first or a last name', async () => {
+  const { referenceMaps, row } = await setup();
+  const both = diffProfile(row(1), { prenom: '', nom: '  ' }, referenceMaps);
+  assert.match(both.errors.at(-1), /au moins un prénom ou un nom/);
+  const one = diffProfile(row(1), { prenom: '' }, referenceMaps);
+  assert.deepEqual(one.errors, []);
+  assert.equal(one.champs.prenom.apres, '');
+});
+
+test('diffProfile ignores a field the draft does not mention and a column the row does not have', async () => {
+  const tables = withoutOptionalColumns(sampleTables());
+  const { referenceMaps, row } = await setup(tables);
+  assert.deepEqual(diffProfile(row(1), { numero_de_telephone: '0102030405' }, referenceMaps).champs, {});
+  assert.deepEqual(diffProfile(row(1), {}, referenceMaps).champs, {});
+});
+
+test('diffProfile reads a cleaned text equal to the stored one as no change', async () => {
+  const { referenceMaps, row } = await setup();
+  for (const typed of ['Pharmacienne ', '  Pharmacienne', 'Pharmacienne\n', 'Pharma\tcienne'.replace('\t', '')]) {
+    assert.deepEqual(diffProfile(row(1), { Fonction: typed }, referenceMaps).champs, {}, JSON.stringify(typed));
+  }
+});
+
+test('diffProfile counts a repeated id of the draft once', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), { Competences: [2, 3, 3] }, referenceMaps);
+  assert.deepEqual(champs.Competences.ajout, [{ id: 3, label: 'Pharmacovigilance' }]);
+});
+
+test('diffProfile refuses a draft of the wrong type instead of reading it as "none" or "empty"', async () => {
+  const { referenceMaps, row } = await setup();
+  for (const wrong of ['1', '', null, 1.5, -1, NaN, [1], {}]) {
+    const result = diffProfile(row(1), { Role_dans_le_PUI: wrong }, referenceMaps);
+    assert.deepEqual(result.champs, {}, `référence ${JSON.stringify(wrong)}`);
+    assert.match(result.errors.join(' '), /Rôle PUI : valeur illisible/, `référence ${JSON.stringify(wrong)}`);
+  }
+  for (const wrong of ['1', '', null, 1, {}, [1, '2'], [1, null], [1.5], [NaN]]) {
+    const result = diffProfile(row(1), { Competences: wrong }, referenceMaps);
+    assert.deepEqual(result.champs, {}, `liste ${JSON.stringify(wrong)}`);
+    assert.match(result.errors.join(' '), /Compétences : valeur illisible/, `liste ${JSON.stringify(wrong)}`);
+  }
+});
+
+test('diffProfile lets a row that has no name yet change something else, or get its first name', async () => {
+  const { referenceMaps, row } = await setup();
+  const nameless = { ...row(1), prenom: '', nom: '' };
+  assert.deepEqual(diffProfile(nameless, { Fonction: 'Cheffe' }, referenceMaps).errors, []);
+  const blank = diffProfile(nameless, { prenom: ' ' }, referenceMaps);
+  assert.deepEqual([blank.champs, blank.errors], [{}, []], 'un nom vide laissé vide n\'est pas un changement');
+  const named = diffProfile(nameless, { prenom: 'Ana' }, referenceMaps);
+  assert.deepEqual(named.errors, []);
+  assert.deepEqual(named.champs.prenom, { avant: '', apres: 'Ana' });
+});
+
+test('diffProfile reports each refusal against its own field', async () => {
+  const { referenceMaps, row } = await setup();
+  const result = diffProfile(row(1), {
+    Fonction: '=1+1', numero_de_telephone: '12', Role_dans_le_PUI: 99, Competences: [404], Instances: 'x'
+  }, referenceMaps);
+  assert.deepEqual(Object.keys(result.fieldErrors).sort(), ['Competences', 'Fonction', 'Instances', 'Role_dans_le_PUI', 'numero_de_telephone']);
+  assert.equal(result.fieldErrors.Fonction, 'ne peut pas commencer par = + - ou @.');
+  assert.match(result.fieldErrors.numero_de_telephone, /^un numéro français à 10 chiffres est attendu/);
+  assert.equal(result.errors.length, 5);
+  assert.ok(result.errors.every(message => /^[^:]+ : /.test(message)), 'chaque phrase nomme son champ');
+  const nameless = diffProfile({ ...row(1), nom: '' }, { prenom: '' }, referenceMaps);
+  assert.deepEqual(nameless.fieldErrors, { prenom: 'Indiquez au moins un prénom ou un nom.' });
+});
+
+test('draftOf copies the form values, lists included', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  const draft = draftOf(model);
+  assert.equal(draft.Fonction, 'Pharmacienne');
+  assert.deepEqual(draft.Competences, [1, 2]);
+  draft.Competences.push(3);
+  assert.deepEqual(field(model, 'Competences').value, [1, 2], 'le modèle n\'est pas modifié par le brouillon');
+});
+
+test('cleanText, textFault and frenchPhoneDigits on the awkward cases', () => {
+  assert.equal(cleanText(null), '');
+  assert.equal(cleanText('a\u0007b'), 'a b');
+  assert.equal(textFault('Ana'), '');
+  assert.equal(textFault('=1+1'), 'ne peut pas commencer par = + - ou @');
+  const accepted = ['0556789012', '05 56 78 90 12', '05.56.78.90.12', '05-56-78-90-12', '+33 5 56 78 90 12', '+33 (0)5 56 78 90 12', '0033 5 56 78 90 12'];
+  accepted.forEach(input => assert.equal(frenchPhoneDigits(input), '0556789012', input));
+  ['', '556789012', '33 5 56 78 90 12', '+44 7700 900123', '05 56 78 90 123', '0556789012x', null,
+    '0033 0 56 78 90 12', '0033 5 56 78 90', '+33 0 56 78 90 12', '+33 5 56 78 90'].forEach(input =>
+    assert.equal(frenchPhoneDigits(input), null, String(input)));
+});
+
+// ===== rightsFor : qui peut modifier quelle fiche =====
+
+const ready = (email, admin = false) => ({ status: 'ready', email, admin, reason: '' });
+const BDD_ROWS = tableToRows(sampleTables().BDD);
+const rowOf = id => BDD_ROWS.find(candidate => candidate.id === id);
+
+test('rightsFor lets a person edit their own fiche, whatever the case and spaces of the address', () => {
+  const rights = rightsFor(ready(' Ana.Martin@CHU-Bordeaux.FR '));
+  assert.equal(rights(rowOf(1)), 'own');
+  assert.equal(rights(rowOf(2)), null, 'la fiche d\'une autre personne');
+  assert.equal(rights(rowOf(10)), null, 'une fiche sans adresse n\'est la fiche de personne');
+});
+
+test('rightsFor lets an administrator edit every fiche, and tells her own from the others', () => {
+  const rights = rightsFor(ready('ana.martin@chu-bordeaux.fr', true));
+  assert.equal(rights(rowOf(1)), 'own');
+  assert.equal(rights(rowOf(2)), 'admin');
+  assert.equal(rights(rowOf(10)), 'admin', 'même une fiche sans adresse');
+  assert.equal(rightsFor(ready('admin@chu-bordeaux.fr', true))(rowOf(1)), 'admin', 'une administratrice sans fiche');
+});
+
+test('rightsFor is closed by default: no reliable identity, no right, administrator flag or not', () => {
+  const hostile = { email: 'ana.martin@chu-bordeaux.fr', admin: true };
+  for (const identity of [null, undefined, {}, { ...hostile, status: 'unavailable' }, { ...hostile, status: 'viewer' }, { ...hostile, status: 'pending' }]) {
+    assert.equal(rightsFor(identity)(rowOf(1)), null, JSON.stringify(identity));
+    assert.equal(rightsFor(identity)(rowOf(2)), null, JSON.stringify(identity));
+  }
+});
+
+test('rightsFor takes only a real true for an administrator, and never matches an empty address', () => {
+  for (const admin of [1, 'true', 'oui', {}, [], 'admin']) {
+    assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', admin))(rowOf(2)), null, JSON.stringify(admin));
+  }
+  const blank = rightsFor(ready('   '));
+  assert.equal(blank(rowOf(10)), null, 'une adresse vide ne désigne pas les fiches sans adresse');
+  assert.equal(blank(rowOf(1)), null);
+  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr'))(null), null);
+  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', true))(undefined), null);
+});
+
+// ===== rebaseChanges : ramener ce que la personne a changé sur la fiche d'aujourd'hui =====
+
+test('rebaseChanges leaves the changes alone when the fiche has not moved since the form was opened', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), {
+    Fonction: 'Cheffe', numero_de_telephone: '05 56 78 90 13', Role_dans_le_PUI: 0, Competences: [2, 3]
+  }, referenceMaps);
+  const rebased = rebaseChanges(champs, row(1), referenceMaps);
+  assert.deepEqual(rebased.champs, champs);
+  assert.deepEqual(rebased.moved, []);
+});
+
+test('rebaseChanges starts a text, a phone and a reference from their value of today, and names the fields that moved', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), {
+    Fonction: 'Cheffe', numero_de_telephone: '05 56 78 90 13', Role_dans_le_PUI: 0
+  }, referenceMaps);
+  // Pendant ce temps, quelqu'un d'autre a changé la fonction, le téléphone et le rôle.
+  const today = { ...row(1), Fonction: 'Directrice', numero_de_telephone: 556789099, Role_dans_le_PUI: 2 };
+  const maps = { ...referenceMaps, role: { 1: 'Référent qualité', 2: 'Coordinatrice' } };
+  const rebased = rebaseChanges(champs, today, maps);
+  assert.deepEqual(rebased.champs, {
+    Fonction: { avant: 'Directrice', apres: 'Cheffe' },
+    numero_de_telephone: { avant: '0556789099', apres: '0556789013' },
+    Role_dans_le_PUI: { avant: { id: 2, label: 'Coordinatrice' }, apres: { id: 0, label: '' } }
+  });
+  assert.deepEqual(rebased.moved, ['Fonction', 'Téléphone', 'Rôle PUI']);
+});
+
+test('rebaseChanges drops what somebody else has already done, and says nothing about it', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), { Fonction: 'Cheffe', numero_de_telephone: '05 56 78 90 13', Role_dans_le_PUI: 0 }, referenceMaps);
+  const today = { ...row(1), Fonction: 'Cheffe', numero_de_telephone: 556789013, Role_dans_le_PUI: 0 };
+  assert.deepEqual(rebaseChanges(champs, today, referenceMaps), { champs: {}, moved: [] });
+});
+
+test('rebaseChanges keeps the additions and removals of a list, minus those that are already done', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), { Competences: [2, 3] }, referenceMaps); // +3, −1
+  // Quelqu'un a déjà retiré la 1 et ajouté la 4 : la 4 est conservée, le retrait n'a plus lieu d'être.
+  const today = { ...row(1), Competences: ['L', 2, 4] };
+  assert.deepEqual(rebaseChanges(champs, today, referenceMaps).champs.Competences, {
+    ajout: [{ id: 3, label: 'Pharmacovigilance' }],
+    retrait: []
+  });
+  // Tout est déjà fait : la liste disparaît des changements.
+  const done = { ...row(1), Competences: ['L', 2, 3] };
+  assert.deepEqual(rebaseChanges(champs, done, referenceMaps), { champs: {}, moved: [] });
+});
+
+test('rebaseChanges never reports a list as moved: lists apply to any state', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), { Competences: [1, 2, 3] }, referenceMaps);
+  assert.deepEqual(rebaseChanges(champs, { ...row(1), Competences: ['L', 4] }, referenceMaps).moved, []);
+});
+
+test('rebaseChanges keeps the order of the form, ignores a field it does not know, and does not change its input', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), { Competences: [2], Fonction: 'Cheffe', prenom: 'Anna' }, referenceMaps);
+  const withStranger = { ...champs, email: { avant: 'a', apres: 'b' }, Etablissement: { avant: 1, apres: 2 } };
+  const copy = structuredClone(withStranger);
+  const rebased = rebaseChanges(withStranger, row(1), referenceMaps);
+  assert.deepEqual(Object.keys(rebased.champs), ['prenom', 'Fonction', 'Competences']);
+  assert.deepEqual(withStranger, copy);
+});
+
+// ===== describeChanges : les lignes montrées sous les deux cartes =====
+
+test('describeChanges gives one line per changed field in form order, whatever the order of the changes', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(1), {
+    Competences: [2, 3], Fonction: 'Cheffe', numero_de_telephone: '', Role_dans_le_PUI: 0, prenom: 'Anna'
+  }, referenceMaps);
+  const lines = describeChanges(champs);
+  assert.deepEqual(lines.map(line => line.key), ['prenom', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Competences']);
+  assert.deepEqual(lines[0], { key: 'prenom', label: 'Prénom', kind: 'text', before: 'Ana', after: 'Anna' });
+  assert.deepEqual(lines[2], { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone', before: '05 56 78 90 12', after: '' });
+  assert.deepEqual(lines[3], { key: 'Role_dans_le_PUI', label: 'Rôle PUI', kind: 'reference', before: 'Référent qualité', after: '' });
+  assert.deepEqual(lines[4], { key: 'Competences', label: 'Compétences', kind: 'list', added: ['Pharmacovigilance'], removed: ['Oncologie'] });
+  const shuffled = Object.fromEntries(Object.entries(champs).reverse());
+  assert.deepEqual(describeChanges(shuffled), lines);
+});
+
+test('describeChanges names a value by its identifier when its label is unknown, and gives nothing for nothing', () => {
+  const lines = describeChanges({ Instances: { ajout: [{ id: 9, label: '' }], retrait: [] } });
+  assert.deepEqual(lines[0].added, ['n° 9']);
+  assert.deepEqual(describeChanges({}), []);
+});

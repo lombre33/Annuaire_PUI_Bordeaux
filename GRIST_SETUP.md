@@ -6,26 +6,38 @@ la faire et comment vérifier qu'elle a marché.
 
 | Étape | Quoi | Sans elle |
 |---|---|---|
-| 1 | `BDD.Accepte_apparaitre` est une colonne de **données** (case à cocher) | l'interrupteur « Ma présence » échoue, avec un message qui renvoie ici |
-| 2 | Table `Annuaire_Sonde` (qui est connecté ?) | personne n'est identifié : pas de bandeau, rien d'autre ne change |
+| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** | l'interrupteur « Ma présence » ou l'enregistrement d'une fiche échoue, avec un message qui renvoie ici |
+| 2 | Table `Annuaire_Sonde` (qui est connecté ?) | personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change |
 | 3 | Case `admin` cochée dans `ACL` pour les administrateurs | personne n'est administrateur |
-| 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité |
+| 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation |
 
-Le widget ne crée ni ne modifie jamais une table ou une colonne de lui-même : tout
-ce qui est ci-dessous se fait à la main, une fois.
+Le widget ne crée ni ne modifie jamais la structure du document (table, colonne,
+règle d'accès) : tout ce qui est ci-dessous se fait à la main, une fois. Il n'écrit que
+des lignes : celle de la personne dans `BDD` (son choix de présence, sa fiche) et la
+ligne passagère d'`Annuaire_Sonde`.
 
-## 1. `Accepte_apparaitre` : une colonne de données
+## 1. Les colonnes que le widget écrit : des colonnes de données
 
-Le widget écrit cette colonne quand une personne utilise l'interrupteur « Ma
-présence ». Grist refuse d'écrire dans une colonne **à formule** : elle doit être une
-colonne de **données**, de type **Case à cocher** (Bascule).
+Le widget écrit dans `BDD` dans deux cas :
 
-1. Ouvrez les données brutes de `BDD`, colonne `Accepte_apparaitre`, panneau de
+- quand une personne utilise l'interrupteur « Ma présence » : la colonne
+  `Accepte_apparaitre` ;
+- quand elle enregistre la modification de sa fiche : `prenom`, `nom`, `Fonction`,
+  `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`,
+  `Competences`, `Communautes` et `Taches`. Jamais `email`, `Etablissement`,
+  `perimetre` ni `Accepte_apparaitre`.
+
+Grist refuse d'écrire dans une colonne **à formule** : chacune doit être une colonne
+de **données**. `Accepte_apparaitre` est de type **Case à cocher** (Bascule) ;
+`numero_de_telephone` peut être numérique ou texte, le widget écrit dans la forme de
+la colonne (il lit son type dans les métadonnées du document).
+
+1. Ouvrez les données brutes de `BDD`, puis, colonne par colonne, le panneau de
    droite « Colonne ».
-2. Type : **Case à cocher**. Comportement : **Colonne de données**. Si Grist propose
-   « Convertir en colonne de données », choisissez-le.
-3. Cochez la case des personnes qui ont déjà donné leur accord. Une case vide ou
-   décochée masque la personne.
+2. Comportement : **Colonne de données**. Si Grist propose « Convertir en colonne de
+   données », choisissez-le.
+3. Pour `Accepte_apparaitre`, type **Case à cocher** ; cochez la case des personnes
+   qui ont déjà donné leur accord. Une case vide ou décochée masque la personne.
 
 Une colonne créée vide par Grist se convertit d'elle-même à la première saisie. Un
 export de structure la montre alors comme une colonne à formule `return False` tant
@@ -33,7 +45,9 @@ que personne n'a rien saisi : c'est normal, et c'est pour cela que cette étape 
 
 Vérifier : cochez une case dans Grist, la carte de la personne apparaît dans le widget
 (au besoin, rechargez-le). Si l'interrupteur « Ma présence » affiche « La colonne
-Accepte_apparaitre est une colonne à formule », reprenez l'étape.
+Accepte_apparaitre est une colonne à formule », ou si l'enregistrement d'une fiche
+affiche « Une colonne de la fiche est une colonne à formule », reprenez l'étape pour
+la colonne concernée.
 
 ## 2. La table `Annuaire_Sonde` : qui est connecté ?
 
@@ -88,8 +102,8 @@ class Annuaire_Sonde:
 Vérifier : ouvrez le widget avec un compte qui peut modifier le document et dont
 l'adresse figure dans la colonne `email` de `BDD`, console du navigateur ouverte. Vous
 devez voir `[IDENTITE] personne identifiée (administrateur : oui|non)` (jamais
-l'adresse elle-même), le bandeau « Ma présence » au-dessus des filtres, et la table
-`Annuaire_Sonde` vide.
+l'adresse elle-même), le bandeau « Ma présence » au-dessus des filtres, un bouton
+« Modifier » sur la carte de la personne, et la table `Annuaire_Sonde` vide.
 
 Si le bandeau manque, la console dit pourquoi :
 
@@ -105,9 +119,10 @@ Si le bandeau manque, la console dit pourquoi :
 ## 3. Les administrateurs dans `ACL`
 
 La table `ACL` a trois colonnes : `email`, `Responsable_de_l_Etablissement` et
-`admin`. Seule `admin` sert pour l'instant. Cochez-la pour chaque administrateur. Si
-la colonne est une colonne à formule, convertissez-la d'abord en colonne de données :
-on ne coche pas les cases d'une colonne à formule.
+`admin`. Seule `admin` sert pour l'instant. Cochez-la pour chaque administrateur : il
+voit un bouton « Modifier » sur toutes les cartes et peut corriger la fiche de
+n'importe qui. Si la colonne est une colonne à formule, convertissez-la d'abord en
+colonne de données : on ne coche pas les cases d'une colonne à formule.
 
 L'adresse de `ACL` est comparée à celle de Grist sans tenir compte des majuscules ni
 des espaces.
@@ -117,23 +132,36 @@ des espaces.
 Le widget parle à Grist **avec les droits de la personne connectée**. Les règles
 d'accès décident donc de ce qu'il peut faire, et ce sont elles seules qui protègent
 vraiment les données : un verrou d'interface se contourne depuis la console du
-navigateur. Ce qui suit est ce dont le widget a besoin, pas une configuration
-complète. Je n'ai pas pu l'essayer dans un vrai Grist : à tester sur une copie du
-document.
+navigateur. Depuis la 1.12.0, une personne modifie sa fiche **directement**, sans
+validation ni historique tenu par le widget : ces règles sont la seule barrière entre
+une fiche et les autres utilisateurs du document.
 
-- **`Annuaire_Sonde`** : toute personne qui peut modifier le document doit pouvoir y
-  **créer, lire et supprimer** des lignes. Sinon elle n'est pas identifiée (le widget
-  échoue en sécurité, sans bandeau).
-- **`BDD.Accepte_apparaitre`** : pour que l'interrupteur ne serve qu'à soi, une règle
-  sur cette colonne autorise la **modification** quand l'adresse de la personne est
-  celle de la ligne, par exemple avec la condition
-  `user.Email and rec.email and user.Email.strip().lower() == rec.email.strip().lower()`,
-  et la refuse à tout autre que vous.
-- **`ACL`** : peut être masquée à tous sauf à vous. La formule de `Annuaire_Sonde`
-  la lit pour son propre compte, sans passer par les droits de la personne.
+Ce qui suit est ce dont le widget a besoin, pas une configuration complète. Ces règles
+n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du document.
+
+| Où | Qui peut | Pourquoi |
+|---|---|---|
+| `Annuaire_Sonde` : créer, lire, supprimer des lignes | toute personne qui peut modifier le document | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
+| `BDD` : modifier `prenom`, `nom`, `Fonction`, `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
+| `BDD` : modifier `email`, `Etablissement`, `perimetre` | les administrateurs | `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` et `perimetre` décident de qui apparaît |
+| `BDD` : ajouter ou supprimer une ligne | les administrateurs | le widget ne crée ni ne supprime jamais de fiche |
+| `ACL` | les administrateurs (masquée aux autres) | la formule d'`Annuaire_Sonde` la lit pour son propre compte, sans passer par les droits de la personne |
+
+Pour « la personne dont `email` est la sienne », une condition comme
+`user.Email and rec.email and user.Email.strip().lower() == rec.email.strip().lower()`.
+Pour « les administrateurs », le plus simple est un attribut d'utilisateur de Grist
+(« Ajouter des attributs d'utilisateur ») qui cherche `user.Email` dans la colonne
+`email` de `ACL` : la condition devient `user.Acl.admin`, si vous avez nommé l'attribut
+`Acl`. La recherche de Grist tient compte de la casse : écrivez les adresses d'`ACL` en
+minuscules.
+
+Si vous préférez que le rôle dans le PUI (`Role_dans_le_PUI`) soit attribué par les
+administrateurs, retirez-le de la deuxième ligne : le champ reste affiché dans la
+fenêtre, mais Grist refusera la modification.
 
 Un refus des règles d'accès n'abîme rien : le widget affiche « Grist a refusé la
-modification… » et l'interrupteur reste dans son état réel.
+modification : vos droits ne permettent pas de changer cette fiche… », la relecture
+reste ouverte, rien n'a été écrit.
 
 ## À savoir
 
@@ -142,7 +170,19 @@ modification… » et l'interrupteur reste dans son état réel.
   fermée entre les deux, une ligne orpheline peut rester : vous pouvez vider la table
   sans risque.
 - **« Annuler » de Grist** défait le dernier changement fait par le widget, y compris
-  un changement de présence.
+  un changement de présence ou l'enregistrement d'une fiche (une seule action Grist).
+- **Le widget ne garde aucun historique des modifications**, ni table de demandes :
+  elles s'appliquent tout de suite. Pour savoir qui a changé quoi, c'est le journal de
+  Grist lui-même (panneau « Historique » du document, durée de conservation selon
+  votre formule).
+- **Deux personnes qui modifient la même fiche en même temps** : si elles touchent
+  aux mêmes champs, la seconde est ramenée à la relecture avec ce que Grist contient
+  maintenant (rien n'est écrit sans qu'elle l'ait relu) ; sinon les deux modifications
+  se cumulent, y compris dans une liste.
+- **Une liste qui contient une valeur sans libellé** (une ligne de référence supprimée)
+  garde cette valeur à l'enregistrement ; si la cellule contient autre chose que des
+  identifiants de ligne, le widget refuse de la réécrire et le dit : à corriger dans
+  Grist.
 - **Une adresse sur plusieurs lignes de `BDD`** : le choix de présence s'applique à
   toutes ces lignes (la console le signale). Mieux vaut corriger les doublons.
 - **Une personne connectée avec une autre adresse que celle de `BDD`** n'est pas
