@@ -334,11 +334,18 @@ test('fetchEtablissementsFlags indexes the fondateur/partenaire/ok_pour_apparait
   assert.deepEqual(flags.byLabel['Clinique'], flags.byId['3']);
 });
 
-test('fetchEtablissementsFlags swallows a docApi error and returns empty maps rather than throwing', async (t) => {
+test('fetchEtablissementsFlags swallows a docApi error and returns empty maps flagged failed rather than throwing', async (t) => {
   t.after(() => { delete globalThis.window; });
   globalThis.window = { grist: { docApi: { fetchTable: async () => { throw new Error('network down'); } } } };
   const flags = await fetchEtablissementsFlags();
-  assert.deepEqual(flags, { byId: {}, byLabel: {} });
+  assert.deepEqual(flags, { byId: {}, byLabel: {}, failed: true });
+});
+
+test('fetchEtablissementsFlags does not flag a successful read as failed', async (t) => {
+  t.after(() => { delete globalThis.window; });
+  globalThis.window = { grist: { docApi: { fetchTable: async () => ({ id: [1], acronyme: ['CHU'], ok_pour_apparaitre: [true] }) } } };
+  const flags = await fetchEtablissementsFlags();
+  assert.equal(flags.failed, undefined);
 });
 
 test('etablissementFlags resolves via byLabel from Etablissement2 (Text, seule source de vérité)', () => {

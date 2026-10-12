@@ -40,6 +40,7 @@ const elements = {
   emptyState: document.getElementById('emptyState'),
   searchInput: document.getElementById('searchInput'),
   resetFilters: document.getElementById('resetFilters'),
+  loadError: document.getElementById('loadError'),
   scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
 
@@ -116,6 +117,20 @@ function logEtablissementDiagnostics(records) {
   }
 }
 
+// Un échec de lecture Grist ne doit pas se présenter comme un annuaire vide
+// ("0 contact" / "Aucun contact trouvé") : on l'affiche explicitement. Les
+// cartes déjà affichées (chargement précédent réussi) restent en place.
+function showLoadError(message) {
+  elements.loadError.textContent = message;
+  elements.loadError.hidden = false;
+  if (state.allContacts.length === 0) elements.resultCount.textContent = 'Chargement impossible';
+}
+
+function hideLoadError() {
+  elements.loadError.hidden = true;
+  elements.loadError.textContent = '';
+}
+
 function debounce(fn, wait) {
   let timer = null;
   return (...args) => {
@@ -151,6 +166,9 @@ window.grist.onRecords(debounce(async () => {
       fetchEtablissementsFlags()
     ]);
     if (!recordsSequencer.isLatest(requestId)) return; // une invocation plus récente a déjà démarré, on jette ce résultat périmé
+    // Sans les indicateurs Etablissements, isEtablissementEligible() exclurait
+    // TOUS les contacts : on n'écrase pas l'affichage courant avec une liste vide.
+    if (etabFlags.failed) throw new Error('lecture de la table Etablissements impossible');
 
     const rows = tableToRows(annuaireTable);
     console.log('[GRIST] Enregistrements reçus:', rows.length);
@@ -196,7 +214,10 @@ window.grist.onRecords(debounce(async () => {
         computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
     }
     refreshCards();
+    hideLoadError();
   } catch (error) {
+    if (!recordsSequencer.isLatest(requestId)) return;
     console.error('Erreur dans le traitement des contacts:', error);
+    showLoadError("Impossible de charger l'annuaire depuis Grist. Rechargez la page ; si le problème persiste, le détail est dans la console du navigateur.");
   }
 }, 250));

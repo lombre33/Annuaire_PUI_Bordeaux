@@ -271,8 +271,13 @@ export function isInScope(record) {
 // libellé (via Etablissement2, cf. etablissementFlags() ci-dessous) qui sert
 // à identifier l'établissement d'un contact. byId reste utilisé par
 // filterVisibleEstablishments() (menu du filtre, indexé par referenceMaps).
+//
+// En cas d'échec de lecture, renvoie des index vides marqués `failed: true` :
+// sans ces indicateurs AUCUN contact n'est éligible, et main.js doit pouvoir
+// distinguer cette panne d'un annuaire réellement vide (symptôme "0 contact"
+// sans explication).
 export async function fetchEtablissementsFlags() {
-  const empty = { byId: {}, byLabel: {} };
+  const empty = { byId: {}, byLabel: {}, failed: true };
   try {
     const table = await window.grist.docApi.fetchTable('Etablissements');
     const rows = tableToRows(table);
