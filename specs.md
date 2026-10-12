@@ -2,7 +2,7 @@ Cahier des charges
 
 
 
-UI/UX : Une UI/UX moderne, colorée et agréable à la navigation sur PC. Le widget s'adapte aussi à la largeur de son cadre Grist (demande d'Antoine du 12/10/2026, 1.9.1) : utilisable sans défilement horizontal de 320px de large (téléphone, panneau étroit) à un grand écran, la mise en page « PC » restant celle de référence à partir de 1400px.
+UI/UX : Une UI/UX moderne, colorée et agréable à la navigation sur PC. Le widget s'adapte aussi à la largeur de son cadre Grist (demande d'Antoine du 12/10/2026, 1.9.1) : utilisable sans défilement horizontal de 320px de large (téléphone, panneau étroit) à un grand écran, la mise en page « PC » restant celle de référence à partir de 1400px. Accessible au clavier et aux lecteurs d'écran (audit UI/UX du 12/10/2026, 1.14.1) : chaque contrôle a un nom et un anneau de focus violet le désigne quand on tabule.
 
 
 

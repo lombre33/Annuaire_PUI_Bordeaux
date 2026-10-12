@@ -36,6 +36,14 @@ input {
 [hidden] {
   display: none !important;
 }
+/* Anneau de focus commun à tous les contrôles : 2 px en violet, à 2 px du bord (5,4:1 sur le
+   fond clair, au-dessus des 3:1 exigés pour un indicateur de focus). `:where()` lui retire toute
+   spécificité : la règle propre à un contrôle (`.group-toggle:focus-visible`, …) l'emporte. Il ne
+   s'affiche qu'à la tabulation, sauf dans un champ de saisie où il s'affiche aussi à la souris. */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
 /* Texte réservé aux lecteurs d'écran */
 .sr-only {
   position: absolute;
@@ -298,6 +306,12 @@ h1 {
   outline: 0;
   background: transparent;
   font-size: 13px;
+}
+/* L'anneau entoure le champ entier (icône comprise) et en suit les coins arrondis : celui de
+   l'input, sans bordure, tomberait au milieu du cadre. */
+.search-box:focus-within {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
 }
 .search-icon {
   color: var(--violet);
@@ -647,7 +661,6 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 12px;
-  outline: 0;
   background: #f7f8fc;
 }
 .filter-search-input:focus {

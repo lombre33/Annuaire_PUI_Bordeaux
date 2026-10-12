@@ -130,7 +130,7 @@ Après chaque changement de données (ajout, modification, import), vérifier le
 4. **Aucun bandeau rouge** sous la barre d'outils.
 5. **Le menu Compétences** : s'il montre des domaines et que le dernier s'appelle « Autres », des compétences n'ont pas de domaine (voir [Opérations courantes](#opérations-courantes-dans-grist)).
 6. **« Ma présence »** : ouvert avec son propre compte (dont l'adresse figure dans `BDD.email`), le widget affiche le bandeau, la console dit `[IDENTITE] personne identifiée …` et la table `Annuaire_Sonde` est vide.
-7. **« ✎ Modifier »** : avec ce même compte, la carte de la personne porte « Votre fiche » et le bouton, et aucune autre carte n'en a ; avec un compte administrateur, aucune autre carte n'en a tant que le mode admin est éteint, et toutes les cartes affichées en ont un une fois le mode admin allumé ([`TESTING.md`](../TESTING.md), sections 13 et 15).
+7. **« ✎ Modifier »** : avec ce même compte, la carte de la personne porte « Votre fiche » et le bouton, et aucune autre carte n'en a ; avec un compte administrateur, aucune autre carte n'en a tant que le mode admin est éteint, et toutes les cartes affichées en ont un une fois le mode admin allumé ([`TESTING.md`](../TESTING.md), sections 13 et 16).
 8. **Les logos** : les logos des établissements sur les cartes, ceux des financeurs au centre de l'en-tête, ceux des fondateurs dans l'ordre voulu tout en bas, et aucune ligne `[LOGOS]` dans la console ([`TESTING.md`](../TESTING.md), section 14).
 
 ## Diagnostiquer un problème

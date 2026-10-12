@@ -8,7 +8,9 @@ adresse e-mail, choisir d'apparaître ou non (1.11.0), puis modifier sa fiche di
 après une relecture de la carte avant et après (1.12.0, réglages dans `GRIST_SETUP.md`),
 et affiche les logos des établissements, des financeurs et des fondateurs, des pièces
 jointes du document lues avec un jeton d'accès en lecture seule (1.14.0, facultatif,
-étape 5 de `GRIST_SETUP.md`). Depuis la 1.15.0, un administrateur allume un « mode admin »
-pour modifier la fiche de n'importe qui, e-mail et établissement compris, et la fenêtre de
-modification suit la maquette validée par Antoine. 548 tests (dont 184 dans un
-vrai navigateur, optionnels sans Playwright).
+étape 5 de `GRIST_SETUP.md`). Le champ de recherche a un nom pour les lecteurs d'écran et
+un anneau violet montre le contrôle actif au clavier (1.14.1, audit UI/UX). Depuis la
+1.15.0, un administrateur allume un « mode admin » pour modifier la fiche de n'importe qui,
+e-mail et établissement compris, et la fenêtre de modification suit la maquette validée
+par Antoine. 555 tests (dont 187 dans un vrai navigateur, optionnels sans
+Playwright).

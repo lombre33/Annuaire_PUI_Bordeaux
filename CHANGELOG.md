@@ -124,8 +124,8 @@ fiche d'une autre personne modifiée par un administrateur.
 
 ### Tests
 
-**548 tests** (dont 184 dans un vrai navigateur, optionnels sans Playwright) contre 499 (dont 164)
-à la sortie de la 1.14.0.
+**555 tests** (dont 187 dans un vrai navigateur, optionnels sans Playwright) contre 506 (dont 167)
+à la sortie de la 1.14.1.
 
 - *Mode admin* : éteint à l'ouverture, un administrateur ne voit « Modifier » que sur sa fiche ; allumé,
   sur toutes les cartes ; le bouton s'actionne au clavier, annonce son état (`aria-pressed`) et garde
@@ -156,6 +156,57 @@ fiche d'une autre personne modifiée par un administrateur.
   et les deux colonnes de la relecture, que le test des logos retrouve.
 - Les tests de la 1.12.0 qui décrivaient l'ancienne fenêtre (textes, étapes, sélecteurs) sont
   réécrits pour la nouvelle ; aucun n'a été supprimé sans remplaçant.
+
+## 1.14.1 — Champ de recherche nommé, anneau de focus visible au clavier
+
+Premier des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre
+2026, un gain par version). Deux non-conformités d'accessibilité (WCAG 2.2 AA) levées sur la
+recherche, **sans rien changer à l'aspect de la page pour qui n'utilise que la souris** (constats
+U13 et U14 de l'audit).
+
+- **Le champ de recherche a un nom.** Dans l'arbre d'accessibilité de Chromium, le champ n'avait
+  aucun nom : son `<label>` ne contenait que l'icône de loupe, masquée aux lecteurs d'écran, et
+  l'invite grisée (`placeholder`) n'est pas un nom fiable. Il porte maintenant
+  `aria-label="Rechercher par nom ou prénom"`, qui reprend le texte affiché dans le champ
+  (« Rechercher par nom ou prénom… ») : le nom que dit un lecteur d'écran ou qu'épelle une commande
+  vocale (« cliquer sur Rechercher par nom ou prénom ») est celui qu'on lit à l'écran (WCAG 2.5.3).
+  C'était le seul contrôle de la page sans nom ; la recherche à l'intérieur d'un menu de filtre
+  (« Rechercher dans Compétences ») en avait déjà un.
+- **On voit où l'on est au clavier.** Le champ de recherche supprimait son anneau de focus
+  (`outline: 0`) sans le remplacer : tabuler jusqu'à lui ne montrait rien (0 pixel de différence
+  entre les captures avant et après, mesuré). Un anneau violet de 2 px entoure maintenant le cadre
+  entier, loupe comprise, en suivant ses coins arrondis (`.search-box:focus-within`) ; comme pour
+  tout champ de saisie, il s'affiche aussi quand on clique dans le champ. La recherche à
+  l'intérieur d'un menu avait seulement une bordure violette de 1 px (4,4:1) : elle reçoit le même
+  anneau, en plus de sa bordure.
+- **Un seul anneau pour tous les contrôles**, défini une fois en tête de `style.css`
+  (`:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible` : 2 px, violet
+  `#6257d9`, à 2 px du bord). Avant, les contrôles sans règle propre gardaient l'anneau par défaut du
+  navigateur, qui varie d'un navigateur à l'autre et n'a pas été pensé pour ce thème. Le violet fait 5,4:1
+  sur blanc (3:1 exigés pour un indicateur de focus, WCAG 1.4.11). L'anneau commun n'ayant aucune
+  spécificité (`:where()`), les règles propres aux contrôles qui en avaient déjà une (la
+  flèche des domaines, « ✎ Modifier », « Modifier mon profil », les champs des fenêtres) gardent la leur ;
+  à la souris, il n'apparaît pas (`:focus-visible`), sauf dans un champ de saisie.
+- **Pour les développeurs** : une section « Accessibilité » dans `docs/developpeurs.md` (noms accessibles,
+  anneau de focus, ce qui reste à vérifier), `tests/support/contrast.mjs` (rapport de contraste WCAG
+  à partir des couleurs calculées par le navigateur, que les gains suivants réemploient) et la section 15
+  de `TESTING.md` (contrôle à jouer au clavier et au lecteur d'écran).
+- **Tests** : 506 tests (167 dans un vrai navigateur, optionnels sans Playwright). Nouveau fichier
+  `tests/accessibility.test.mjs` (6 tests) : rapports de contraste de référence (sans navigateur) ; une
+  garde sur les feuilles de style, qui refuse tout nouveau `outline: 0` ou `outline: none` non déclaré avec sa
+  raison (sans navigateur) ; le champ de recherche nommé par son rôle, et dont le nom reprend le texte visible ;
+  aucun contrôle sans nom accessible dans l'arbre d'accessibilité (`ariaSnapshot()`), page au repos puis menu
+  ouvert avec un domaine déplié ; le parcours complet à la tabulation, où chaque arrêt doit changer de
+  capture avec et sans focus, porter un anneau plein de 2 px au moins et de 3:1 au moins ; le même parcours dans
+  un menu ouvert (recherche, cases, flèches de détail).
+- **Contrôle négatif.** Cinq modifications volontaires (nom retiré du champ, anneau du cadre retiré,
+  `outline: 0` rétabli sur la recherche des menus, anneau commun retiré, anneau ramené à 1 px) ont été
+  essayées une à une, le code étant remis en état après chacune : chacune fait échouer au moins un des
+  nouveaux tests.
+- **Pas encore essayé avec un vrai lecteur d'écran** (NVDA, VoiceOver, TalkBack), ni dans Firefox et Safari :
+  section 15 de `TESTING.md`. Restent ouverts dans l'audit, pour d'autres lots : la sémantique des menus
+  de filtres (`aria-expanded`, Échap pour les fermer), l'ordre de tabulation dans les menus et la région que
+  les lecteurs d'écran relisent (toute la grille de cartes, `aria-live`).
 
 ## 1.14.0 — Habillage du PUI : logos des établissements, financeurs et bandeau des fondateurs
 

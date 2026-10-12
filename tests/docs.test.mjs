@@ -577,6 +577,25 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
   assert.doesNotMatch(read('style.css'), /@import|url\(\s*["']?https?:/, 'style.css ne doit rien charger d\'externe.');
 });
 
+// Une adresse web écrite en dur dans le code est une porte vers l'extérieur : le test précédent
+// ne voit que celles d'index.html, or le lien du bandeau du bas est posé par le code
+// (branding-ui.js). docs/securite.md doit nommer son serveur et dire comment il s'ouvre.
+test('la page de sécurité nomme chaque adresse web écrite en dur dans le code du widget', () => {
+  const literal = /(['"`])(https?:\/\/[^'"`\s]+)\1/g;
+  const found = WIDGET_SOURCES().flatMap(({ name, code }) => [...code.matchAll(literal)].map(match => ({ name, url: match[2] })));
+  assert.deepEqual(found.map(({ name }) => name), ['constants.js'],
+    'Une adresse web a été ajoutée au code (ou retirée de constants.js) : décrivez-la dans docs/securite.md (puce « Réseau »), puis ce test.');
+  const security = read('docs/securite.md');
+  const unnamed = found.map(({ url }) => new URL(url).hostname).filter(host => !security.includes(host));
+  assert.deepEqual(unnamed, [], 'docs/securite.md (puce « Réseau ») doit nommer le serveur de chaque adresse écrite en dur.');
+
+  // Le lien s'ouvre dans un autre onglet sans transmettre la page du widget, comme la page le dit.
+  const link = read('index.html').match(/<a\b[^>]*\bid="bandLink"[^>]*>/)?.[0] ?? '';
+  assert.match(link, /\btarget="_blank"/, 'Le lien du bandeau du bas doit s\'ouvrir dans un nouvel onglet.');
+  assert.match(link, /\brel="noopener noreferrer"/, 'Le lien du bandeau du bas doit porter rel="noopener noreferrer".');
+  assert.ok(security.includes('rel="noopener noreferrer"'), 'docs/securite.md doit dire que ce lien porte rel="noopener noreferrer".');
+});
+
 // Le widget écrit (la sonde, le choix de présence) : une page qui le dit « en lecture seule »
 // serait fausse, et c'est l'erreur la plus facile à laisser traîner après une évolution.
 test('aucune page ne présente le widget comme étant en lecture seule', () => {
