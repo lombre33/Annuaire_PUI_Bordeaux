@@ -255,7 +255,7 @@ ni historique), le widget ne crée aucune table et n'ajoute aucune colonne.
 - **Fermé par défaut.** `saveProfile()` refuse d'écrire l'e-mail ou l'établissement si la
   relecture n'a pas été préparée par un administrateur. Comme tout le mode admin, ce n'est qu'un
   verrou d'interface : seules les règles d'accès de Grist protègent les données
-  (`GRIST_SETUP.md`, section 3).
+  (`GRIST_SETUP.md`, section 4).
 
 ### La modification de fiche, comme la maquette
 
