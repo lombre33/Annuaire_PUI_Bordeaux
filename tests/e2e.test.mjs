@@ -65,6 +65,12 @@ const server = browser ? await startStaticServer() : null;
 const baseUrl = server ? `http://127.0.0.1:${server.address().port}` : '';
 const skip = browser ? false : 'Playwright/Chromium indisponible (voir TESTING.md)';
 
+// En CI (REQUIRE_E2E=1), un navigateur absent est un échec, pas un « tout vert »
+// sur des tests ignorés.
+if (!browser && process.env.REQUIRE_E2E) {
+  test('le navigateur de test est disponible', () => assert.fail('Playwright/Chromium introuvable alors que REQUIRE_E2E est défini'));
+}
+
 after(async () => {
   await browser?.close();
   server?.close();

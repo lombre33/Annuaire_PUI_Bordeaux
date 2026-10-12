@@ -24,3 +24,6 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Tests
         run: node --test
+        env:
+          # Échoue si le test navigateur ne peut pas démarrer, au lieu de l'ignorer.
+          REQUIRE_E2E: '1'
