@@ -317,10 +317,12 @@ export function mailtoHref(email) {
 // ===== CHARGEMENT COMPLET DE L'ANNUAIRE =====
 
 // Sans l'une de ces colonnes aucun contact n'est affichable : mieux vaut une
-// erreur explicite qu'un annuaire vide. Les autres colonnes de BDD (Fonction,
-// email, numero_de_telephone, Role_dans_le_PUI…) sont facultatives : absentes,
-// elles ne s'affichent simplement pas.
-const REQUIRED_COLUMNS = ['nom', 'prenom', 'Etablissement', 'perimetre'];
+// erreur explicite qu'un annuaire vide. Accepte_apparaitre en fait partie : sans
+// elle on ne sait pas qui a accepté d'apparaître, et afficher tout le monde dans
+// le doute serait pire qu'afficher personne. Les autres colonnes de BDD
+// (Fonction, email, numero_de_telephone, Role_dans_le_PUI…) sont facultatives :
+// absentes, elles ne s'affichent simplement pas.
+const REQUIRED_COLUMNS = ['nom', 'prenom', 'Etablissement', 'perimetre', 'Accepte_apparaitre'];
 
 // Colonnes d'Etablissements dont dépend l'éligibilité des contacts (specs.md) :
 // l'une d'elles renommée, et plus aucun contact ne s'affiche.
@@ -335,9 +337,16 @@ export class DirectoryLoadError extends Error {
   }
 }
 
+// Une personne n'apparaît que si elle l'a accepté (BDD.Accepte_apparaitre, une
+// case à cocher) : seul `true` vaut accord. Vide, faux, 0 ou texte : pas d'accord.
+export function hasAccepted(record) {
+  return record.Accepte_apparaitre === true;
+}
+
 // `scopedRows` : lignes de BDD déjà filtrées par isInScope().
 export function buildContacts(scopedRows, referenceMaps, etabFlags) {
   return scopedRows
+    .filter(hasAccepted)
     .map(row => enrich(row, referenceMaps, etabFlags))
     .filter(contact => contact.nom || contact.prenom)
     .filter(isEtablissementEligible);
@@ -353,6 +362,10 @@ function describeEmptyDirectory(rowCount, scopedRows, contacts) {
   }
   if (scopedRows.every(row => isEmptyReference(row.Etablissement))) {
     return 'Etablissement est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
+  }
+  if (!scopedRows.some(hasAccepted)) {
+    return 'Personne n\'a accepté d\'apparaître : Accepte_apparaitre n\'est coché pour aucun contact. '
+      + 'Cochez cette colonne dans Grist pour les personnes qui doivent figurer dans l\'annuaire.';
   }
   return `Aucun contact affichable alors que la table ${MAIN_TABLE} contient des lignes : vérifiez les noms, Etablissement `
     + '(établissement validé, fondateur ou partenaire) et perimetre.';
@@ -475,6 +488,13 @@ function warnAboutMissingEtablissement(scopedRows, log) {
     + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
 }
 
+// Les personnes du périmètre qui n'ont pas accepté d'apparaître sont normales,
+// pas une anomalie : la console en donne seulement le nombre (jamais leurs noms).
+function logWithoutConsent(scopedRows, log) {
+  const count = scopedRows.filter(row => !hasAccepted(row)).length;
+  if (count) log.info(`[CONSENTEMENT] ${count}/${scopedRows.length} contact(s) du périmètre masqué(s) : Accepte_apparaitre n'est pas coché.`);
+}
+
 // Des acronymes en double ne masquent des contacts que lorsque Grist envoie
 // l'établissement en texte : avec un identifiant de ligne, chaque contact garde
 // le statut de sa propre ligne d'Etablissements.
@@ -523,6 +543,7 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   const contacts = buildContacts(scopedRows, referenceMaps, etabFlags);
   log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
   warnAboutMissingEtablissement(scopedRows, log);
+  logWithoutConsent(scopedRows, log);
 
   const emptyReason = describeEmptyDirectory(rows.length, scopedRows, contacts);
   return {

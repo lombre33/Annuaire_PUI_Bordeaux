@@ -39,7 +39,7 @@ Sans dépendance, un fichier de tests par module :
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 30
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 34
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
 Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
@@ -240,6 +240,10 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       affichée sans section `card-tags` visible (pas de section vide).
 - [ ] Contact avec `perimetre` vide → absent de la grille (et absent du
       compte `#resultCount`).
+- [ ] Contact dont `Accepte_apparaitre` est décoché ou vide → absent de la
+      grille, sans bandeau. Le cocher dans Grist puis recharger le widget : la
+      carte apparaît. La console indique `[CONSENTEMENT] n/m …` (nombre
+      seulement, aucun nom).
 - [ ] Contact sans `nom` ni `prenom` → absent de la grille (filtré par
       `buildContacts()`).
 - [ ] Établissement dont l'acronyme est vide (seul `nom_complet` renseigné) →
@@ -272,6 +276,9 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       recharger : bandeau d'erreur qui nomme la colonne (« colonne
       « ok_pour_apparaitre » absente de la table Etablissements »), pas un
       annuaire vide. Remettre son nom ensuite.
+- [ ] Décocher `Accepte_apparaitre` pour tout le monde, recharger : bandeau
+      « Personne n'a accepté d'apparaître… » et aucune carte. Renommer
+      temporairement la colonne : bandeau d'erreur qui la nomme, aucune carte.
 - [ ] Après modification de `ok_pour_apparaitre` dans `Etablissements`,
       **recharger le widget** (Grist ne le prévient pas, voir README « Limites
       connues ») puis vérifier le nombre de contacts et le badge de chaque carte.

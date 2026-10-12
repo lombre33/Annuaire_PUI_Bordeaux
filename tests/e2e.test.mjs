@@ -148,6 +148,53 @@ test('exclut les contacts non éligibles : établissement « autres », non vali
     }
   }));
 
+test('une personne qui n\'a pas accepté d\'apparaître n\'a pas de carte, même avec l\'interrupteur Partenaires', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.locator('.scope-btn[data-scope="partenaire"]').click();
+    await waitForCards(page, 5);
+    const names = (await cardNames(page)).join('|');
+    for (const hidden of ['Iris', 'Jules']) assert.ok(!names.includes(hidden), `${hidden} n'a pas accepté : pas de carte`);
+    assert.equal(await page.locator('#statusBanner').isHidden(), true, 'des refus individuels ne sont pas une anomalie');
+  }));
+
+test('cocher Accepte_apparaitre dans Grist fait apparaître la personne au rechargement suivant, la décocher la retire', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.evaluate(() => { window.__tables.BDD.Accepte_apparaitre[10] = true; });
+    await reload(page);
+    await waitForCards(page, 5);
+    assert.ok((await cardNames(page)).includes('Iris Refus'));
+    assert.equal(await resultCount(page), '5 contacts');
+    await page.evaluate(() => { window.__tables.BDD.Accepte_apparaitre[10] = false; });
+    await reload(page);
+    await waitForCards(page, 4);
+    assert.ok(!(await cardNames(page)).includes('Iris Refus'));
+  }));
+
+test('personne n\'a accepté d\'apparaître : le bandeau le dit au lieu de laisser un « 0 contact » muet', { skip }, () => {
+  const tables = sampleTables();
+  tables.BDD.Accepte_apparaitre = tables.BDD.Accepte_apparaitre.map(() => false);
+  return withWidget({ tables }, async ({ page }) => {
+    await waitForBanner(page);
+    assert.match(await bannerText(page), /Personne n'a accepté d'apparaître/);
+    assert.match(await bannerText(page), /Accepte_apparaitre/);
+    assert.equal(await cardCount(page), 0);
+    assert.equal(await resultCount(page), '0 contact');
+  });
+});
+
+test('colonne Accepte_apparaitre absente de BDD : erreur explicite, jamais l\'annuaire de tout le monde', { skip }, () => {
+  const tables = sampleTables();
+  delete tables.BDD.Accepte_apparaitre;
+  return withWidget({ tables }, async ({ page }) => {
+    await waitForBanner(page);
+    assert.match(await bannerText(page), /Accepte_apparaitre/);
+    assert.equal(await cardCount(page), 0, 'dans le doute, personne n\'est affiché');
+    assert.equal(await resultCount(page), 'Chargement impossible');
+  });
+});
+
 test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);

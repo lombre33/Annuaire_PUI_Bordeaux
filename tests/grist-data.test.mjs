@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, compareLabels,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
-  labelMapFromRows, mailtoHref, groupLabelMap
+  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts
 } from '../grist-data.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
@@ -195,4 +195,22 @@ test('groupLabelMap ignores rows that are not in the detailed map and works with
   assert.deepEqual(groupLabelMap({ 1: 'X', 9: 'Orphelin' }, { 1: 'A', 2: 'B' }, 'Autres'), { 1: 'X', 2: 'Autres' });
   assert.deepEqual(groupLabelMap({ 1: 'X' }, { 1: 'A', 2: 'B' }), { 1: 'X' }, 'sans repli, une ligne non classée est omise');
   assert.deepEqual(groupLabelMap({}, {}, 'Autres'), {});
+});
+
+test('hasAccepted counts a checked box (true) as consent and nothing else', () => {
+  assert.equal(hasAccepted({ Accepte_apparaitre: true }), true);
+  [false, null, undefined, 0, 1, '', 'true', 'oui', ['L']].forEach(value => {
+    assert.equal(hasAccepted({ Accepte_apparaitre: value }), false, `${JSON.stringify(value)} n'est pas un accord`);
+  });
+  assert.equal(hasAccepted({}), false, 'colonne absente : pas d\'accord');
+});
+
+test('buildContacts keeps only the people who accepted, whatever their establishment allows', () => {
+  const etabFlags = { byId: { 1: { fondateur: true, partenaire: false, ok_pour_apparaitre: true } }, byLabel: {} };
+  const rows = [
+    { id: 1, prenom: 'Ana', nom: 'A', Etablissement: 1, Accepte_apparaitre: true },
+    { id: 2, prenom: 'Bea', nom: 'B', Etablissement: 1, Accepte_apparaitre: false },
+    { id: 3, prenom: 'Cleo', nom: 'C', Etablissement: 1, Accepte_apparaitre: null }
+  ];
+  assert.deepEqual(buildContacts(rows, {}, etabFlags).map(contact => contact.prenom), ['Ana']);
 });
