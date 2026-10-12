@@ -106,6 +106,7 @@ flowchart TD
     main --> profileui
     render --> data
     render --> constants
+    render --> filters
     filters --> data
     filters --> constants
     identity --> data
@@ -141,8 +142,8 @@ Une flèche signifie « importe » ; tous les `import` des fichiers à la racine
 | `style.css` | Feuille de style unique (variables de couleur en tête de fichier) |
 | `constants.js` | Noms de la table principale (`MAIN_TABLE`, soit `BDD`), de la case de consentement (`CONSENT_COLUMN`, soit `Accepte_apparaitre`) et de la table-sonde (`PROBE_TABLE`, soit `Annuaire_Sonde`), puis taxonomie : `CATEGORIES` donne, pour chaque catégorie, son libellé, sa couleur, sa table de référence, ses colonnes de libellé et, sauf pour l'établissement et le rôle (des Références simples), sa colonne de liste dans la table principale. `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES`, `REFERENCE_SOURCES` et `LIST_CATEGORIES` en sont dérivés. `PROFILE_FIELDS` liste ce qu'une personne peut modifier sur sa fiche (colonne, libellé, nature : texte, téléphone, référence ou liste) |
 | `grist-data.js` | Lecture des tables (`loadDirectory()`), décodage des formats Grist, enrichissement des contacts, règles d'éligibilité et de consentement (`hasAccepted()`, `buildContacts()`), l'index des personnes par adresse e-mail ou par identifiant de ligne (`createPeopleIndex()`, dont `findByEmail()` et `findById()`), `describeVisibility()` et `displayName()` (le nom d'un contact tel que les cartes l'affichent) |
-| `filters.js` | Forme de l'état des filtres (`createEmptyFilterState()`), `filterContacts()`, `computeFilterCounts()`, `pruneStaleFilters()` |
-| `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`) et cartes (`renderCards()`, avec le bouton « Modifier » des fiches que la personne peut modifier) ; cartes de relecture sans interaction (`renderPreviewCard()`), où ce qui change est repéré ; `initials()` sert aussi au bandeau « Ma présence » |
+| `filters.js` | Forme de l'état des filtres (`createEmptyFilterState()`), `filterContacts()`, `computeFilterCounts()`, `pruneStaleFilters()`, et le menu rangé par groupe (les compétences par domaine) : `menuGroups()`, `groupState()`, `toggleGroup()`, `selectionCount()` |
+| `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`, dont le menu Compétences rangé par domaine) et cartes (`renderCards()`, avec le bouton « Modifier » des fiches que la personne peut modifier) ; cartes de relecture sans interaction (`renderPreviewCard()`), où ce qui change est repéré ; `initials()` sert aussi au bandeau « Ma présence » |
 | `identity.js` | `readIdentity()` : qui est connecté ? Ajoute une ligne dans la table-sonde `Annuaire_Sonde` (dont Grist calcule l'adresse par une formule `user.Email`), la relit par son identifiant puis la supprime. Renvoie l'adresse et la case administrateur, ou « personne » au moindre doute ; ne bloque jamais l'annuaire |
 | `presence.js` | « Ma présence » : `describePresence()` dit à la personne si elle apparaît et pourquoi, `setPresence()` écrit son accord (`Accepte_apparaitre`) sur sa ou ses lignes en une seule action atomique. `describeHiddenFiche()` dit, à la relecture d'une modification, pourquoi la fiche modifiée ne figurerait pas dans l'annuaire ; `classifyWriteError()` range un refus de Grist (règle d'accès, colonne à formule, autre) et sert aussi à `profile-save.js` |
 | `account-ui.js` | Le bandeau « Ma présence » au-dessus des filtres, avec le bouton « Modifier mon profil » (`setActions()`) : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier |
@@ -160,7 +161,7 @@ Règles de répartition, à respecter pour que les tests restent possibles sans 
 
 1. `constants.js`, `grist-data.js`, `filters.js`, `identity.js`, `presence.js`, `profile.js`, `profile-save.js`, `preview.js` et `schema.js` n'utilisent jamais le DOM.
 2. Seules `loadDirectory()` et `readColumnTypes()` (lectures), `readIdentity()`, `setPresence()` et les fonctions de `profile-save.js` (`prepareReview()` lit, `saveProfile()` écrit) parlent à Grist, par le `docApi` qu'on leur passe : les tests leur fournissent un faux `docApi` (`tests/support/fake-grist.js`). `profile.js` et `preview.js` ne l'utilisent jamais.
-3. `render.js` ne contient aucune règle métier : il reçoit des contacts déjà filtrés et une fonction de rappel `onToggle`.
+3. `render.js` ne contient aucune règle métier : il reçoit des contacts déjà filtrés et des fonctions de rappel (`onToggle`, et `onToggleGroup` pour la case d'un domaine). Ce qu'il sait d'un menu rangé par groupe (les groupes, l'état d'une case de domaine, le chiffre du bouton) vient des fonctions pures de `filters.js`, d'où la flèche `render.js` → `filters.js` du schéma.
 4. `filters.js` n'a pas d'effet de bord : `pruneStaleFilters()` renvoie un nouvel état au lieu de modifier son argument.
 5. Seul `main.js` détient l'état de l'application (`state`). La fenêtre de modification ne garde que l'état de sa propre session (étape, brouillon), jeté à sa fermeture ; `profile-ui.js`, `changes-ui.js` et `dom.js` ne contiennent aucune règle métier : `main.js` leur donne ce que les autres modules ont calculé.
 
