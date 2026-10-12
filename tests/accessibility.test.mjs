@@ -1,5 +1,5 @@
 // Accessibilité du widget : noms accessibles, anneau de focus au clavier et contrastes
-// (WCAG 2.2 AA). Les mesures viennent de l'audit UI/UX (constats U13, U14, U19 et U47 à U49) ;
+// (WCAG 2.2 AA). Les mesures viennent de l'audit UI/UX (constats U08, U13, U14, U19, U20 et U47 à U49) ;
 // chaque test ci-dessous échoue sur le code d'avant leur correction.
 //
 // Les tests de contraste et de feuille de style ne demandent aucun navigateur ; les
@@ -14,6 +14,7 @@ import { CATEGORIES } from '../constants.js';
 import { sampleTables, withIdentity, ANA_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 import { skip, waitForCards, withWidget } from './support/browser.mjs';
 import { parseColor, blend, contrastRatio, WHITE } from './support/contrast.mjs';
+import { measureCards } from './support/card-metrics.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readCss = name => fs.readFileSync(path.join(ROOT, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -362,5 +363,28 @@ test('avec « réduire les animations », la piste et le curseur changent sans t
     assert.deepEqual(await durations(), ['0.15s', '0.15s'], 'sans préférence, le curseur glisse (sinon ce test ne prouve rien)');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     assert.deepEqual(await durations(), ['0s', '0s']);
+  });
+});
+
+// ===== Taille du texte et des cibles de la carte de la personne connectée =====
+
+// « Votre fiche » et le bouton « Modifier » n'apparaissent que sur la carte de la personne connectée
+// (le jeu de test de la mise en page, tests/responsive.test.mjs, n'a pas d'identité) : même mesure que
+// pour les autres éléments des cartes, 12px de texte au moins et 24px de haut pour le bouton. Le
+// lien e-mail, qui n'a pas 24px de haut, doit rester assez loin de ce bouton (WCAG 2.5.8).
+test('sur la carte de la personne connectée, « Votre fiche » et « Modifier » font 12px, le bouton 24px de haut au moins, et le lien e-mail reste à l’écart (audit U08, U20)', { skip }, async () => {
+  await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.locator('.contact-card .card-actions:not([hidden]) .card-edit').waitFor();
+    for (const width of [320, 600, 1480]) {
+      await page.setViewportSize({ width, height: 1200 });
+      const { smallText, shortTargets, smallTargets, crowdedSmall } = await measureCards(page);
+      const own = await page.locator('.contact-card .own-flag:visible, .contact-card .card-edit:visible').count();
+      assert.ok(own >= 2, `à ${width}px, « Votre fiche » et « Modifier » sont affichés et mesurés (${own})`);
+      assert.ok(smallTargets >= 1, `à ${width}px, un lien e-mail est mesuré (${smallTargets})`);
+      assert.deepEqual([...new Set(smallText)], [], `à ${width}px, du texte de carte sous 12px`);
+      assert.deepEqual([...new Set(shortTargets)], [], `à ${width}px, des boutons ou pastilles sous 24px de haut`);
+      assert.deepEqual([...new Set(crowdedSmall)], [], `à ${width}px, un lien e-mail trop près d’une autre cible`);
+    }
   });
 });
