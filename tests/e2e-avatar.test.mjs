@@ -294,10 +294,14 @@ test('un clic sur la photo d\'une carte l\'agrandit avec le nom, la fonction et 
 test('la photo s\'agrandit aussi au clavier, par Entrée et par Espace', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
+    // Les cartes sont redessinées quand l'identité arrive (le bouton « Modifier » de la carte d'Ana) : on
+    // attend ce moment avant de donner le focus, qu'un redessin ferait perdre.
+    await waitForEditButtons(page, 1);
     const ana = avatarOf(page, 'Ana Martin');
     await waitForPhoto(ana);
     for (const key of ['Enter', 'Space']) {
       await ana.focus();
+      await activeIs(page, '.avatar-zoom');
       await page.keyboard.press(key);
       await viewer(page).locator('img.photo-img').waitFor();
       assert.equal(await viewer(page).evaluate(node => node.open), true, key);
@@ -363,7 +367,7 @@ test('le formulaire offre la photo en premier : la photo actuelle, deux boutons,
     assert.equal(await field.getByRole('button', { name: 'Retirer la photo', exact: true }).isVisible(), true);
     assert.equal(await field.getByRole('button', { name: 'Ajouter une photo', exact: true }).count(), 0);
     const input = page.locator('#profilePhotoFile');
-    assert.equal(await input.getAttribute('accept'), 'image/png,image/jpeg,image/webp', 'pas de SVG pour une photo');
+    assert.equal(await input.getAttribute('accept'), 'image/jpeg,image/png,image/webp', 'pas de SVG pour une photo');
     assert.equal(await input.getAttribute('aria-describedby'), 'profilePhotoHelp profilePhotoError');
     assert.equal(await input.isHidden(), true, 'le champ de fichier est caché : les boutons le déclenchent');
     assert.equal(await photoError(page).isHidden(), true);
@@ -593,6 +597,10 @@ test('un fichier refusé avant l\'envoi (format, poids, contenu illisible) ne ch
 test('pendant que l\'image se prépare, les boutons de la photo et « Relire » attendent, sans perdre le focus du clavier', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
+    // L'écoute du sélecteur de fichier est branchée bien avant l'appui : une touche, plus rapide qu'un clic
+    // (qui attend d'abord que le bouton soit prêt), peut arriver avant que le navigateur intercepte la
+    // boîte, et l'événement est alors perdu (dans la suite complète, près d'une fois sur deux).
+    const chooserOpened = new Promise(resolve => page.once('filechooser', resolve));
     await page.evaluate(() => {
       window.__seen = [];
       const field = document.querySelector('#profileDialog .photo-field');
@@ -606,7 +614,11 @@ test('pendant que l\'image se prépare, les boutons de la photo et « Relire » 
     });
     const change = photoField(page).getByRole('button', { name: 'Changer la photo', exact: true });
     await change.focus();
-    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Enter')]);
+    await page.keyboard.press('Enter');
+    const chooser = await Promise.race([
+      chooserOpened,
+      new Promise((resolve, reject) => setTimeout(() => reject(new Error('le sélecteur de fichier ne s\'est pas ouvert')), 10000).unref())
+    ]);
     assert.equal(chooser.isMultiple(), false);
     // Un grand fichier, pour que la préparation dure.
     await chooser.setFiles(await photoFile(page, { width: 5000, height: 3000 }));
