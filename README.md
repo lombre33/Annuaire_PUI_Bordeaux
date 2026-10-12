@@ -116,7 +116,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── CHANGELOG.md          Historique des versions
 ├── VERSION.md            Version courante
 ├── TESTING.md            Protocole de test manuel
-├── tests/                Tests unitaires et test navigateur
+├── tests/                Tests unitaires et tests navigateur
 ├── docs/                 Documentation, images, démonstration fictive
 └── .github/workflows/    Intégration continue
 ```
@@ -140,7 +140,7 @@ Ces tests ne remplacent pas un essai dans un vrai document Grist : voir [`TESTIN
 ## Limites connues
 
 - **Une modification d'une table de référence n'apparaît pas toute seule.** Grist ne prévient le widget que des changements de la table des contacts (`BDD`). Après avoir modifié `Etablissements` (par exemple `ok_pour_apparaitre`) ou une table de valeurs de filtre, rechargez la page.
-- **Écran d'ordinateur uniquement** : pas de version mobile.
+- **Mise en page éprouvée dans Chromium seulement** : le widget s'adapte à la largeur de son cadre, d'un téléphone à un grand écran, mais les tests automatiques couvrent Chromium (écran tactile émulé compris), pas Safari, Firefox ni un vrai Grist sur téléphone. Le protocole de [`TESTING.md`](TESTING.md) (section 12) couvre ce reste.
 - **Script de l'API Grist** : `index.html` charge `grist-plugin-api.js` depuis `docs.getgrist.com`, sans version figée ([Sécurité et confidentialité](docs/securite.md#risques-et-protections)).
 - **Pas de test contre un vrai Grist** : les tests simulent l'API, et seul le protocole de [`TESTING.md`](TESTING.md) valide le comportement dans Grist.
 

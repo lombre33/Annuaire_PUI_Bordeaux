@@ -47,6 +47,16 @@ sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
+`tests/responsive.test.mjs` y ajoute 15 scénarios sur la mise en page, de 280 à
+1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
+noms, e-mails, fonctions et tags très longs, dont certains sans point de
+coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
+jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
+d'outils, menus de filtres entièrement dans le cadre, cibles tactiles (écran
+tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
+mise en page de référence à partir de 1400px. Les barres de défilement y sont
+visibles (15px de moins), le cas le plus serré.
+
 Limite assumée : l'API Grist y est simulée (`docApi.fetchTable` sur des
 données aux encodages observés en production). Le test garantit que le vrai
 `main.js`/`render.js` réagissent correctement à ces encodages et à ces pannes ;
@@ -56,7 +66,8 @@ manuel ci-dessous, à jouer dans un vrai document avant déploiement.
 Si vous ajoutez une fonction à `grist-data.js` ou `filters.js` : ajoutez son
 test dans le fichier de `tests/` qui correspond à son rôle (liste ci-dessus).
 Si vous changez l'affichage, ajoutez ou adaptez un scénario de
-`tests/e2e.test.mjs` — n'attendez pas une revue ultérieure.
+`tests/e2e.test.mjs` — n'attendez pas une revue ultérieure. Si vous changez la
+mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 
 ## Préparation
 
@@ -264,3 +275,30 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 - [ ] Après modification de `ok_pour_apparaitre` dans `Etablissements`,
       **recharger le widget** (Grist ne le prévient pas, voir README « Limites
       connues ») puis vérifier le nombre de contacts et le badge de chaque carte.
+
+## 12. Largeur du cadre (1.9.1)
+
+Les tests automatisés couvrent Chromium (écran tactile émulé compris). À jouer
+dans un vrai document Grist, y compris sur un téléphone ou une tablette (Safari
+iOS, Chrome Android) que les tests ne couvrent pas :
+
+- [ ] Largeur d'au moins 1400px : une seule rangée dans la barre d'outils
+      (recherche, filtres, interrupteurs), trois colonnes de cartes, comme avant
+      la 1.9.1.
+- [ ] Réduire la section du widget (poignée entre deux sections de Grist) sous
+      1400px : la recherche, les interrupteurs et « Réinitialiser » passent sur
+      une première rangée, les filtres sur la largeur dessous.
+- [ ] Sous 840px : deux colonnes de cartes. Sous 600px : une colonne, la
+      recherche, puis les filtres étirés, puis les interrupteurs.
+- [ ] À 320px (ou le panneau le plus étroit possible) : aucune barre de
+      défilement horizontale, ni dans le widget ni sur la page Grist.
+- [ ] Dans un cadre étroit, ouvrir chaque menu de filtre, y compris le dernier
+      de la rangée : il reste entièrement visible, sans être coupé à droite, et
+      se referme d'un clic ailleurs. Élargir le cadre puis le rouvrir : il
+      s'ouvre de nouveau sous son bouton.
+- [ ] Carte avec un nom, un prénom et une fonction très longs : le nom tient sur
+      deux lignes au plus, le badge d'établissement reste à sa droite, rien ne
+      passe sous le badge ni hors de la carte.
+- [ ] Téléphone ou tablette : toucher le champ de recherche ne zoome pas la page
+      (champs à 16px), les badges, tags et le lien e-mail se touchent sans
+      viser, et un filtre touché ne reste pas coloré une fois relâché.
