@@ -24,4 +24,4 @@ Depuis la 1.17.0, le responsable d'un établissement (une ligne d'`ACL`) modifie
 du logo à Grist (réglages dans `GRIST_SETUP.md`, non essayés dans un vrai Grist).
 Depuis la 1.17.1, tout le texte des cartes fait 12 px au moins et les pastilles 24 px de haut : les cartes
 sont plus hautes d'un tiers environ, un écart voulu avec la maquette v5 (audit UI/UX).
-TESTS_TOTAL tests (dont TESTS_BROWSER dans un vrai navigateur, optionnels sans Playwright).
+799 tests (dont 282 dans un vrai navigateur, optionnels sans Playwright).

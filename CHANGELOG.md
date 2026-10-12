@@ -27,6 +27,7 @@ pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) e
   | E-mail et téléphone (`.detail-row`) | 10,5 px (12 px) | 12 px |
   | « Votre fiche » (`.own-flag`) | 9,5 px (11 px) | 12 px |
   | « Modifier » (`.card-edit`) | 10,5 px (12 px) | 12 px, 24 px de haut au moins |
+  | « Modifier » de l'établissement, sous le logo (`.etab-edit`, ajouté par la 1.17.0) | 10,5 px | 12 px, 24 px de haut au moins |
   | Nombre d'un bouton de filtre et d'une option de menu (`.filter-count`, `.option-count`) | 11 px | 12 px |
 
   Le nom (14 px, 15 px sous 600 px), le titre de la page et les cibles tactiles de 28 px ne changent pas.
@@ -51,9 +52,10 @@ pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) e
 - **Cibles (WCAG 2.5.8).** Les 119 pastilles de la démonstration font 24 px de haut et plus de 70 px de large :
   aucune n'est sous le seuil. Le lien e-mail (12 px de texte, 15 px de haut) n'est pas agrandi : il tient par
   l'exception d'espacement de la norme, un cercle de 24 px centré sur lui ne touche aucune autre cible, de
-  320 à 1 920 px, y compris le bouton « Modifier » qui le précède sur la carte de la personne connectée ; un
-  test le garde. Avant, la démonstration comptait 128 cibles sous 24 px, dont jusqu'à 30 (à 600 px) qui
-  échouaient même à l'exception.
+  320 à 1 920 px, y compris les boutons « Modifier » qui l'entourent sur la carte de la personne connectée
+  (le sien, et celui de son établissement sous le logo si elle en est responsable) ; un test le garde.
+  Avant, la démonstration comptait 128 cibles sous 24 px, dont jusqu'à 30 (à 600 px) qui échouaient même
+  à l'exception.
 - **Reste ouvert dans l'audit.** Cette version porte sur les cartes. Pas traités : les textes de l'en-tête
   (« Projet financé par l'État… » à 10 px, noms des financeurs à 11 px) et du bandeau des fondateurs, les
   repères « avant / après » de la fenêtre de relecture (`.mk-pill`, 8,5 px), les unités en `px` (la
@@ -64,23 +66,27 @@ pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) e
   texte, hauteur des pastilles, isolement des petites cibles. La section « Accessibilité » de
   `docs/developpeurs.md` a une règle de plus (le plancher de 12 px et les 24 px), `TESTING.md` (sections 12
   et 15) deux contrôles à l'œil pour un vrai Grist, et `specs.md` une exigence de lisibilité.
-- **Tests** : 657 tests (232 dans un vrai navigateur, optionnels sans Playwright), 5 de plus qu'à la
-  1.16.3 (4 dans `tests/responsive.test.mjs`, 1 dans `tests/accessibility.test.mjs`). Dans `tests/responsive.test.mjs` : le test des tailles de texte « le bureau garde ses
-  tailles » est remplacé par « le texte des cartes fait 12 px à toute largeur » (14 px pour le nom sur
-  ordinateur, 15 px sous 600 px) ; à la souris, de 320 à 1 920 px, aucun texte de carte sous 12 px et aucune
-  pastille ou badge sous 24 px de haut ; la même mesure au doigt (414 et 820 px) ; chaque cible de moins de
-  24 px est isolée des autres (le cercle de la norme) ; les nombres des filtres font 12 px. Dans
-  `tests/accessibility.test.mjs` : sur la carte de la personne connectée, « Votre fiche » et « Modifier »
-  font 12 px, le bouton 24 px de haut, et le lien e-mail reste à l'écart de ce bouton. Les six tests écrits
-  ou réécrits échouent tous sur la feuille de style de la 1.16.3. Dix-neuf variantes fautives de
-  `style.css` (chaque taille remise à l'ancienne valeur, chaque hauteur ou marge retirée, les anciennes
-  tailles rétablies sous 600 px ou au doigt, le lien e-mail collé au bouton « Modifier », les pastilles
-  remontées sur le lien e-mail) ont été essayées une à une, le fichier étant remis en état après chacune :
-  toutes font échouer au moins un test.
+- **Tests** : 799 tests (282 dans un vrai navigateur, optionnels sans Playwright), 5 de plus qu'à la
+  1.17.0 (4 dans `tests/responsive.test.mjs`, 1 dans `tests/accessibility.test.mjs`). Dans
+  `tests/responsive.test.mjs` : le test des tailles de texte « le bureau garde ses tailles » est remplacé
+  par « le texte des cartes fait 12 px à toute largeur » (14 px pour le nom sur ordinateur, 15 px sous
+  600 px) ; à la souris, de 320 à 1 920 px, aucun texte de carte sous 12 px et aucune pastille ou badge
+  sous 24 px de haut ; la même mesure au doigt (414 et 820 px) ; chaque cible de moins de 24 px est isolée
+  des autres (le cercle de la norme) ; les nombres des filtres font 12 px. Dans
+  `tests/accessibility.test.mjs` : sur la carte de la personne connectée, « Votre fiche » et les boutons
+  « Modifier » (le sien et celui de son établissement) font 12 px et 24 px de haut au moins, et le lien
+  e-mail reste à l'écart de ces boutons. Les six tests écrits ou réécrits échouent tous sur la feuille de
+  style d'avant cette version. Vingt et une variantes fautives de `style.css` (chaque taille remise à
+  l'ancienne valeur, chaque hauteur ou marge retirée, y compris pour le bouton de l'établissement, les
+  anciennes tailles rétablies sous 600 px ou au doigt, le lien e-mail collé au bouton « Modifier », les
+  pastilles remontées sur le lien e-mail) ont été essayées une à une, le fichier étant remis en état après
+  chacune : toutes font échouer au moins un test.
 - **Documentation** : quinze captures sont refaites (aperçu, cartes sans logo, quatre menus de filtre, filtres
   combinés, partenaires, recherche, bandeau de données partielles, légende de la carte, bouton, relecture et
-  confirmation de « Modifier ma fiche », mode admin) ; les huit autres sont celles de la 1.16.3 (les images où
-  seule bougeait la marge ou le décalage d'un demi-pixel n'ont pas été remplacées). `docs/demo/capturer.mjs`
+  confirmation de « Modifier ma fiche », mode admin) ; les neuf autres sont celles de la 1.17.0 (les images où
+  seule bougeait la marge, le décalage d'un demi-pixel ou le fond derrière une fenêtre n'ont pas été
+  remplacées : celles des fenêtres « Modifier ma fiche », « Modifier la fiche de… » et « Fiche de
+  l'établissement » montrent le même contenu). `docs/demo/capturer.mjs`
   s'adapte aux cartes plus hautes : la légende demande une fenêtre de 3 600 px (la carte de Camille Rousseau est
   loin dans la liste) et la relecture lève le plafond de 900 px de la fenêtre le temps de la capture, puisqu'elle
   le dépasse maintenant.

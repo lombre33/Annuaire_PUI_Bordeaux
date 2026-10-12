@@ -207,8 +207,8 @@ menu ouvert), le parcours complet à la tabulation (page, puis menu ouvert) où 
 avec et sans focus, avec un anneau plein de 2 px au moins et de 3:1 au moins, les pastilles, les titres de
 groupe et le lien e-mail d'une carte mesurés sur la page rendue (4,5:1 au moins), la piste et le curseur
 de l'interrupteur (3:1 au moins, en contraste forcé et sans transition quand on réduit les animations), et,
-sur la carte de la personne connectée, « Votre fiche » et « Modifier » à 12px, le bouton à 24px de haut et
-le lien e-mail à l'écart de ce bouton.
+sur la carte de la personne connectée, « Votre fiche » et les boutons « Modifier » (le sien et celui de son
+établissement) à 12px, ces boutons à 24px de haut et le lien e-mail à l'écart d'eux.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -581,10 +581,11 @@ iOS, Chrome Android) que les tests ne couvrent pas :
       (champs à 16px), les badges, tags et le lien e-mail se touchent sans
       viser, et un filtre touché ne reste pas coloré une fois relâché.
 - [ ] **Texte des cartes** (1.17.1) : à 1 440 px comme à 390 px, étiquettes, titres de groupe, fonction, e-mail,
-      téléphone, « Votre fiche » et « Modifier » ont la même taille (12px) et se lisent sans effort ; seul le nom
-      grossit sous 600 px. Une étiquette a une hauteur confortable à viser (24px) et deux étiquettes voisines ne
-      se touchent pas. Les cartes sont plus hautes qu'avant la 1.17.1 (un tiers environ à 1 440 px) : faire défiler
-      une longue liste et juger si le défilement reste agréable. Comparer à `docs/images/apercu.png`.
+      téléphone, « Votre fiche », « Modifier » et, pour un responsable d'établissement, le « Modifier » sous le
+      logo de son établissement ont la même taille (12px) et se lisent sans effort ; seul le nom grossit sous
+      600 px. Une étiquette a une hauteur confortable à viser (24px) et deux étiquettes voisines ne se touchent
+      pas. Les cartes sont plus hautes qu'avant la 1.17.1 (un tiers environ à 1 440 px) : faire défiler une
+      longue liste et juger si le défilement reste agréable. Comparer à `docs/images/apercu.png`.
 - [ ] **Badge de l'établissement en texte** (1.17.1) (un établissement sans logo, ou `?sanslogos` dans la
       démonstration) : l'acronyme est lu en 12px, entier, à droite du nom sans passer dessous ; un nom
       plus long que 136px est coupé par « … ».
@@ -744,9 +745,9 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
       d'un coup d'œil, et le point de chaque bouton de filtre a la couleur des pastilles de sa catégorie.
       À comparer avec `docs/images/carte-anatomie.png`.
 - [ ] **Cibles à la souris** (1.17.1) : cliquer sur une étiquette de carte (elle ajoute le filtre correspondant),
-      sur le bouton « Modifier » de sa propre carte et sur le lien e-mail : chaque clic touche la bonne cible du
-      premier coup, sans toucher la voisine ; passer de l'une à l'autre à la souris ne donne pas l'impression de
-      viser trop petit.
+      sur le bouton « Modifier » de sa propre carte, sur celui de son établissement sous le logo (pour un
+      responsable) et sur le lien e-mail : chaque clic touche la bonne cible du premier coup, sans toucher la
+      voisine ; passer de l'une à l'autre à la souris ne donne pas l'impression de viser trop petit.
 - [ ] **Interrupteur de présence au clavier** (1.16.3) : tabuler jusqu'à « Apparaître dans l'annuaire »
       (compte identifié, fiche présente) et appuyer sur **Espace** : l'interrupteur bascule et **l'anneau
       violet reste sur lui**, pendant « Enregistrement… » comme après ; la touche Tab suivante va au champ de
