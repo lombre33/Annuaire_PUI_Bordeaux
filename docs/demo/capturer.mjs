@@ -6,9 +6,10 @@
 //   node docs/demo/capturer.mjs
 //
 // À relancer, puis à committer, après toute modification de l'interface.
-// Chaque capture est précédée d'une vérification (nombre de cartes, bandeau) :
-// si le widget n'affiche pas ce qui est attendu, le script échoue au lieu de
-// photographier un écran faux.
+// Chaque capture est précédée d'une vérification (nombre de cartes, bandeau,
+// boutons « Modifier », étape de la fenêtre de modification) : si le widget
+// n'affiche pas ce qui est attendu, le script échoue au lieu de photographier un
+// écran faux.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,6 +23,8 @@ const HAUTEUR_FENETRE = 2200; // grande : chaque capture est rognée sur ce qui 
 const FACTEUR_ECHELLE = 1.5; // captures nettes sur écran à haute densité sans alourdir le dépôt
 const MARGE = 28; // espace gardé sous l'élément qui borne la capture
 const MARGE_RANGEE = 8; // plus petite que l'écart entre deux rangées de cartes (14 px) : la rangée suivante ne déborde pas sur la capture
+const HAUTEUR_FENETRE_MODIFICATION = 1000; // la fenêtre de modification mesure au plus 900 px (dialogs.css) : elle tient en entier à l'écran
+const MARGE_FENETRE = 24; // fond assombri gardé autour de la fenêtre de modification
 
 let chromium;
 try {
@@ -55,6 +58,76 @@ async function cocher(page, cle, libelle) {
   await page.mouse.click(5, 5);
 }
 
+// ===== Modifier une fiche =====
+
+// Le brouillon de Camille Rousseau, saisi comme le ferait la personne : une fonction
+// modifiée, une action et une compétence ajoutées, une autre action et une autre
+// compétence retirées. Le formulaire (modifier-fiche-formulaire.png) puis la relecture
+// (modifier-fiche-relecture.png) le montrent : les deux captures racontent la même histoire.
+const BROUILLON = {
+  fonction: 'Responsable de l\'innovation',
+  listes: [
+    { groupe: 'Actions', ajout: 'Formation à l\'innovation', retrait: 'Recherche de financements' },
+    { groupe: 'Compétences', ajout: 'Intelligence artificielle', retrait: 'Gestion de projet' }
+  ]
+};
+const CHAMPS_MODIFIES = 1 + BROUILLON.listes.length; // la fonction et les deux listes
+
+const echapper = texte => texte.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const fenetre = page => page.locator('#profileDialog');
+const groupe = (page, titre) =>
+  fenetre(page).locator('.grp').filter({ has: page.locator('.grp-title', { hasText: new RegExp(`^${echapper(titre)}$`) }) });
+const pastille = (page, titre, libelle) =>
+  groupe(page, titre).locator('.pick', { hasText: new RegExp(`^${echapper(libelle)}$`) });
+
+// Une vérification qui ne se règle pas en attendant : le script s'arrête sur un écran faux.
+function exiger(condition, message) {
+  if (!condition) throw new Error(`Écran inattendu : ${message}`);
+}
+
+// Le bandeau propose « Modifier mon profil » et la carte de la personne, la seule à avoir
+// un bouton, porte « Votre fiche » et « ✎ Modifier » ; elle figure sur la première rangée.
+const attendreBoutonsModifier = (page, nom) =>
+  page.waitForFunction(attendu => {
+    const bouton = document.querySelector('#accountBar .account-edit');
+    const cartes = [...document.querySelectorAll('.contact-card')];
+    const avecBouton = cartes.filter(carte => !carte.querySelector('.card-actions').hidden);
+    if (!bouton || bouton.hidden || bouton.textContent !== 'Modifier mon profil' || avecBouton.length !== 1) return false;
+    const [carte] = avecBouton;
+    const premierRang = Math.min(...cartes.map(autre => Math.round(autre.getBoundingClientRect().top)));
+    return carte.querySelector('.name').textContent === attendu
+      && !carte.querySelector('.own-flag').hidden && carte.querySelector('.own-flag').textContent === 'Votre fiche'
+      && carte.querySelector('.card-edit').textContent === '✎ Modifier'
+      && Math.round(carte.getBoundingClientRect().top) === premierRang;
+  }, nom, { timeout: 10_000 });
+
+// La fenêtre est ouverte sur l'étape qui porte ce titre (« Modifier mon profil », « Relire vos modifications »).
+const attendreEtape = (page, titre) =>
+  page.waitForFunction(attendu => document.getElementById('profileDialog').open
+    && document.getElementById('profileTitle').textContent === attendu, titre, { timeout: 10_000 });
+
+// Ouvre la fenêtre par le bouton du bandeau, comme le ferait la personne.
+async function ouvrirMonProfil(page) {
+  await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+  await attendreBoutonsModifier(page, 'Camille Rousseau');
+  await page.click('#accountBar .account-edit');
+  await attendreEtape(page, 'Modifier mon profil');
+}
+
+// Saisit le brouillon dans le formulaire, puis revient en haut de la fenêtre : une pastille
+// de la liste des compétences, tout en bas, fait défiler le formulaire pour être cliquée.
+async function saisirBrouillon(page) {
+  await page.fill('#profile-Fonction', BROUILLON.fonction);
+  for (const { groupe: titre, ajout, retrait } of BROUILLON.listes) {
+    await pastille(page, titre, ajout).click();
+    await pastille(page, titre, retrait).click();
+  }
+  await page.evaluate(() => {
+    document.activeElement.blur(); // pas de contour de saisie sur la capture
+    document.querySelector('#profileDialog .dlg-body').scrollTop = 0;
+  });
+}
+
 // ===== Zones de capture : pleine largeur, du haut de la page jusqu'à... =====
 
 const enPleineLargeur = (bas, marge = MARGE) => ({ x: 0, y: 0, width: LARGEUR, height: Math.ceil(bas + marge) });
@@ -72,6 +145,12 @@ const jusquALaRangee = rangees => async page =>
     const hauts = [...new Set(boites.map(boite => Math.round(boite.top)))].sort((a, b) => a - b).slice(0, nombre);
     return Math.max(...boites.filter(boite => hauts.includes(Math.round(boite.top))).map(boite => boite.bottom));
   }, rangees), MARGE_RANGEE);
+
+// ...ou : la fenêtre de modification d'une fiche, avec un peu du fond assombri autour.
+const autourDeLaFenetre = async page => {
+  const boite = await fenetre(page).boundingBox();
+  return { x: boite.x - MARGE_FENETRE, y: boite.y - MARGE_FENETRE, width: boite.width + 2 * MARGE_FENETRE, height: boite.height + 2 * MARGE_FENETRE };
+};
 
 // ===== Légende numérotée d'une carte =====
 
@@ -119,7 +198,8 @@ async function poserReperes(page) {
 }
 
 // Chaque scène : fichier produit, adresse à ouvrir (`requete`), mise en situation
-// vérifiée par `preparer`, et zone rognée (par défaut toute la fenêtre).
+// vérifiée par `preparer`, zone rognée (par défaut toute la fenêtre) et, si elle doit
+// différer de HAUTEUR_FENETRE, hauteur de la fenêtre du navigateur (`hauteur`).
 const SCENES = [
   {
     fichier: 'apercu.png', zone: jusquALaRangee(2),
@@ -230,6 +310,64 @@ const SCENES = [
       const boite = await page.locator('.contact-card').first().boundingBox();
       return { x: boite.x - 24, y: boite.y - 14, width: boite.width + 48, height: boite.height + 28 };
     }
+  },
+  {
+    // L'annuaire vu par Camille Rousseau : « Modifier mon profil » dans le bandeau, et sur sa
+    // carte (la première) « Votre fiche » et « ✎ Modifier ». Aucune autre carte n'a de bouton.
+    fichier: 'modifier-fiche-bouton.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquALaRangee(1),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      await attendrePresence(page, 'Vous apparaissez dans l\'annuaire.');
+      await attendreBoutonsModifier(page, 'Camille Rousseau');
+    }
+  },
+  {
+    // La fenêtre ouverte sur le formulaire, avec le brouillon saisi : le pied dit combien de champs
+    // changent et « Relire mes modifications » est devenu cliquable.
+    fichier: 'modifier-fiche-formulaire.png', requete: `?connecte=${PERSONNES_DEMO.visible}`,
+    hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFenetre,
+    async preparer(page) {
+      await ouvrirMonProfil(page);
+      await saisirBrouillon(page);
+      const resume = await fenetre(page).locator('.dlg-summary').textContent();
+      exiger(resume === `${CHAMPS_MODIFIES} champs modifiés`, `le pied de la fenêtre dit « ${resume} »`);
+      exiger(await page.locator('#profile-Fonction').inputValue() === BROUILLON.fonction, 'la fonction saisie n\'est pas dans le champ');
+      for (const { groupe: titre, ajout, retrait } of BROUILLON.listes) {
+        exiger(await pastille(page, titre, ajout).getAttribute('aria-pressed') === 'true', `« ${ajout} » n'est pas coché`);
+        exiger(await pastille(page, titre, retrait).getAttribute('aria-pressed') === 'false', `« ${retrait} » est resté coché`);
+      }
+      exiger(await fenetre(page).getByRole('button', { name: 'Relire mes modifications', exact: true }).isEnabled(), '« Relire mes modifications » est grisé');
+      exiger(await page.evaluate(() => document.querySelector('#profileDialog .dlg-body').scrollTop) === 0, 'le formulaire n\'est pas en haut');
+      exiger(await fenetre(page).locator('.ident-name').textContent() === 'Camille Rousseau', 'la fenêtre n\'est pas celle de Camille Rousseau');
+    }
+  },
+  {
+    // La relecture : la carte « Avant » telle quelle, la carte « Après » avec ce qui change repéré
+    // (pastille « modifié » sur la fonction, « + » et barré sur les tags), et la liste « Ce qui change ».
+    fichier: 'modifier-fiche-relecture.png', requete: `?connecte=${PERSONNES_DEMO.visible}`,
+    hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFenetre,
+    async preparer(page) {
+      await ouvrirMonProfil(page);
+      await saisirBrouillon(page);
+      await fenetre(page).getByRole('button', { name: 'Relire mes modifications', exact: true }).click();
+      await attendreEtape(page, 'Relire vos modifications');
+      const compter = selecteur => fenetre(page).locator(selecteur).count();
+      exiger(await fenetre(page).locator('.preview-before .preview-label').textContent() === 'Avant', 'pas de carte « Avant »');
+      exiger(await fenetre(page).locator('.preview-after .preview-label').textContent() === 'Après', 'pas de carte « Après »');
+      exiger(await compter('.preview-before .mk-pill, .preview-before .mark-new, .preview-before .mark-gone') === 0, 'la carte « Avant » porte des repères');
+      exiger(await compter('.preview-after .fonction.mark-new .mk-pill') === 1, 'la fonction modifiée n\'est pas repérée sur la carte « Après »');
+      exiger(await compter('.preview-after .tag.mark-new') === BROUILLON.listes.length, 'les tags ajoutés ne sont pas tous repérés');
+      exiger(await compter('.preview-after .tag.mark-gone') === BROUILLON.listes.length, 'les tags retirés ne sont pas tous repérés');
+      exiger(await fenetre(page).locator('.recap-title').textContent() === 'Ce qui change', 'pas de liste « Ce qui change »');
+      exiger(await compter('.recap .diff-row') === CHAMPS_MODIFIES, 'la liste « Ce qui change » n\'a pas une ligne par champ modifié');
+      exiger(await fenetre(page).locator('.dlg-summary').textContent() === `${CHAMPS_MODIFIES} champs modifiés`, 'le pied ne résume pas les changements');
+      // Rien de coupé : la relecture entière tient dans la fenêtre, sans défilement.
+      exiger(await page.evaluate(() => {
+        const corps = document.querySelector('#profileDialog .dlg-body');
+        return corps.scrollHeight - corps.clientHeight <= 1;
+      }), 'la relecture est plus haute que la fenêtre : une partie serait coupée');
+      exiger(await fenetre(page).getByRole('button', { name: 'Valider', exact: true }).isEnabled(), '« Valider » n\'est pas cliquable');
+    }
   }
 ];
 
@@ -246,6 +384,7 @@ try {
 
   for (const scene of SCENES) {
     const page = await contexte.newPage();
+    if (scene.hauteur) await page.setViewportSize({ width: LARGEUR, height: scene.hauteur });
     await page.goto(`${url}/${scene.requete ?? ''}`);
     await scene.preparer(page);
     await page.mouse.move(0, 0); // pas de survol parasite sur la capture
