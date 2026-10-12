@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   safeValues, tableToRows, isInScope, text, pickLabel, enrich, refId, refLabel,
-  normalize, compareLabels, formatPhone, fetchTable, createRequestSequencer, referenceMapsEqual,
-  sortWithCheckedFirst, resolveListItem, fetchEtablissementsFlags, etablissementFlags,
-  isEtablissementEligible, filterVisibleEstablishments
+  normalize, compareLabels, formatPhone, createRequestSequencer, referenceMapsEqual,
+  sortWithCheckedFirst, resolveListItem, labelMapFromRows, etablissementFlagsFromRows, etablissementFlags,
+  isEtablissementEligible, filterVisibleEstablishments, mailtoHref, loadDirectory, DirectoryLoadError
 } from '../grist-data.js';
 import { filterContacts, createEmptyFilterState, pruneStaleFilters, computeFilterCounts } from '../filters.js';
+import { sampleTables, DEFAULT_CARD_NAMES } from './fixtures.mjs';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
   assert.deepEqual(safeValues(['L']), []);
@@ -288,34 +289,22 @@ test('enrich: competences_labels reads exactly competences_1 through competences
   assert.deepEqual(enrich(contact, {}).competences_labels, ['A', 'O']);
 });
 
-test('fetchTable resolves a table into an id->label map, using the given label field', async (t) => {
-  t.after(() => { delete globalThis.window; });
-  globalThis.window = { grist: { docApi: { fetchTable: async () => (
-    { id: [1, 2], Action: ['Vaccination', ''] }
-  ) } } };
-  const map = await fetchTable('Actions', 'Action');
-  assert.deepEqual(map, { 1: 'Vaccination' });
+test('labelMapFromRows resolves rows into an id->label map using the given label field, skipping rows without a label', () => {
+  const rows = tableToRows({ id: [1, 2], Action: ['Vaccination', ''] });
+  assert.deepEqual(labelMapFromRows(rows, 'Action'), { 1: 'Vaccination' });
 });
 
-test('fetchTable falls back through multiple label fields in order (acronyme -> nom_complet)', async (t) => {
-  t.after(() => { delete globalThis.window; });
-  globalThis.window = { grist: { docApi: { fetchTable: async () => (
-    { id: [1, 2], acronyme: ['CHU', ''], nom_complet: ['CHU de Bordeaux', 'Clinique X'] }
-  ) } } };
-  const map = await fetchTable('Etablissements', ['acronyme', 'nom_complet']);
-  assert.deepEqual(map, { 1: 'CHU', 2: 'Clinique X' });
+test('labelMapFromRows falls back through multiple label fields in order (acronyme -> nom_complet)', () => {
+  const rows = tableToRows({ id: [1, 2], acronyme: ['CHU', ''], nom_complet: ['CHU de Bordeaux', 'Clinique X'] });
+  assert.deepEqual(labelMapFromRows(rows, ['acronyme', 'nom_complet']), { 1: 'CHU', 2: 'Clinique X' });
 });
 
-test('fetchTable swallows a docApi error and returns an empty map rather than throwing', async (t) => {
-  t.after(() => { delete globalThis.window; });
-  globalThis.window = { grist: { docApi: { fetchTable: async () => { throw new Error('network down'); } } } };
-  const map = await fetchTable('Actions', 'Action');
-  assert.deepEqual(map, {});
+test('labelMapFromRows ignores rows without an id', () => {
+  assert.deepEqual(labelMapFromRows([{ id: null, Action: 'Orpheline' }, { id: 3, Action: 'Audit' }], 'Action'), { 3: 'Audit' });
 });
 
-test('fetchEtablissementsFlags indexes the fondateur/partenaire/ok_pour_apparaitre booleans by row id AND by resolved label', async (t) => {
-  t.after(() => { delete globalThis.window; });
-  globalThis.window = { grist: { docApi: { fetchTable: async () => ({
+test('etablissementFlagsFromRows indexes the fondateur/partenaire/ok_pour_apparaitre booleans by row id AND by resolved label', () => {
+  const rows = tableToRows({
     id: [1, 2, 3],
     acronyme: ['CHU', '', 'Clinique'],
     nom_complet: ['CHU de Bordeaux', 'UBM', 'Clinique du Parc'],
@@ -323,8 +312,8 @@ test('fetchEtablissementsFlags indexes the fondateur/partenaire/ok_pour_apparait
     partenaire: [false, true, false],
     autres: [false, false, true],
     ok_pour_apparaitre: [true, true, false]
-  }) } } };
-  const flags = await fetchEtablissementsFlags();
+  });
+  const flags = etablissementFlagsFromRows(rows);
   assert.deepEqual(flags.byId['1'], { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
   assert.deepEqual(flags.byId['2'], { fondateur: false, partenaire: true, ok_pour_apparaitre: true });
   assert.deepEqual(flags.byId['3'], { fondateur: false, partenaire: false, ok_pour_apparaitre: false });
@@ -332,20 +321,25 @@ test('fetchEtablissementsFlags indexes the fondateur/partenaire/ok_pour_apparait
   assert.deepEqual(flags.byLabel['CHU'], flags.byId['1']);
   assert.deepEqual(flags.byLabel['UBM'], flags.byId['2']);
   assert.deepEqual(flags.byLabel['Clinique'], flags.byId['3']);
+  assert.deepEqual(flags.conflicts, []);
 });
 
-test('fetchEtablissementsFlags swallows a docApi error and returns empty maps flagged failed rather than throwing', async (t) => {
-  t.after(() => { delete globalThis.window; });
-  globalThis.window = { grist: { docApi: { fetchTable: async () => { throw new Error('network down'); } } } };
-  const flags = await fetchEtablissementsFlags();
-  assert.deepEqual(flags, { byId: {}, byLabel: {}, failed: true });
+test('etablissementFlagsFromRows: two rows with the same label keep the strictest status whatever their order, and report the conflict', () => {
+  const validated = { id: 1, acronyme: 'CHU', fondateur: true, partenaire: false, ok_pour_apparaitre: true };
+  const notValidated = { id: 2, acronyme: 'CHU', fondateur: true, partenaire: false, ok_pour_apparaitre: false };
+  [[validated, notValidated], [notValidated, validated]].forEach(rows => {
+    const flags = etablissementFlagsFromRows(rows);
+    assert.deepEqual(flags.byLabel['CHU'], { fondateur: true, partenaire: false, ok_pour_apparaitre: false },
+      'ok_pour_apparaitre n\'est vrai que s\'il l\'est sur toutes les lignes');
+    assert.deepEqual(flags.conflicts, ['CHU']);
+  });
 });
 
-test('fetchEtablissementsFlags does not flag a successful read as failed', async (t) => {
-  t.after(() => { delete globalThis.window; });
-  globalThis.window = { grist: { docApi: { fetchTable: async () => ({ id: [1], acronyme: ['CHU'], ok_pour_apparaitre: [true] }) } } };
-  const flags = await fetchEtablissementsFlags();
-  assert.equal(flags.failed, undefined);
+test('etablissementFlagsFromRows: duplicate rows with identical statuses are not a conflict', () => {
+  const row = { acronyme: 'CHU', fondateur: true, partenaire: false, ok_pour_apparaitre: true };
+  const flags = etablissementFlagsFromRows([{ id: 1, ...row }, { id: 2, ...row }]);
+  assert.deepEqual(flags.byLabel['CHU'], { fondateur: true, partenaire: false, ok_pour_apparaitre: true });
+  assert.deepEqual(flags.conflicts, []);
 });
 
 test('etablissementFlags resolves via byLabel from Etablissement2 (Text, seule source de vérité)', () => {
@@ -449,4 +443,141 @@ test('computeFilterCounts keys are normalized (case/accent-insensitive), matchin
   const activeFilters = createEmptyFilterState();
   const counts = computeFilterCounts(contacts, activeFilters, '', undefined);
   assert.equal(counts.competences[normalize('Oncologie')], 1, 'le tally doit matcher un libellé de référence "Oncologie" malgré la casse différente du texte libre');
+});
+
+test('mailtoHref builds a link for a plain address and refuses anything that could add recipients or parameters', () => {
+  assert.equal(mailtoHref('ana.martin@chu-bordeaux.fr'), 'mailto:ana.martin@chu-bordeaux.fr');
+  assert.equal(mailtoHref('  ana+pui@chu.fr  '), 'mailto:ana+pui@chu.fr', 'espaces autour retirés, + conservé');
+  assert.equal(mailtoHref("o'brien@chu.fr"), "mailto:o'brien@chu.fr");
+  ['a@b.fr?cc=x@y.fr', 'a@b.fr,c@d.fr', 'a@b.fr;c@d.fr', 'a@b.fr&bcc=x@y.fr', 'a@b.fr#x', 'a b@c.fr',
+    'pas-une-adresse', '@b.fr', 'a@', '', null, undefined].forEach(value => {
+    assert.equal(mailtoHref(value), '', `${value} ne doit pas devenir un lien`);
+  });
+});
+
+// ===== loadDirectory : lecture de Grist → contacts affichables =====
+
+// Faux docApi : sert les tables de tests/fixtures.mjs, compte les lectures par
+// table et peut simuler des tables illisibles.
+function fakeDocApi(tables, { failing = [], throwSync = [] } = {}) {
+  const calls = {};
+  return {
+    calls,
+    fetchTable(name) {
+      calls[name] = (calls[name] || 0) + 1;
+      if (throwSync.includes(name)) throw new Error(`échec synchrone ${name}`);
+      if (failing.includes(name)) return Promise.reject(new Error(`échec ${name}`));
+      return Promise.resolve(structuredClone(tables[name]));
+    }
+  };
+}
+
+function recordingLog() {
+  const log = { infos: [], warnings: [], info: (...args) => log.infos.push(args), warn: (...args) => log.warnings.push(args) };
+  return log;
+}
+
+test('loadDirectory returns the displayable contacts, each with its Etablissement2 label, and reads every table exactly once', async () => {
+  const docApi = fakeDocApi(sampleTables());
+  const { contacts, issues } = await loadDirectory(docApi, { log: recordingLog() });
+  // Contrôle demandé avant chaque changement : nombre de contacts + Etablissement2 rempli.
+  assert.deepEqual(contacts.filter(c => c.etablissement_fondateur).map(c => `${c.Prenom} ${c.Nom}`), DEFAULT_CARD_NAMES);
+  assert.equal(contacts.length, 5, '4 fondateurs + 1 partenaire (Bob), avant l\'interrupteur Partenaires de l\'UI');
+  assert.ok(contacts.every(c => c.etablissement_label), 'tous les contacts affichables ont un établissement');
+  assert.deepEqual(issues, []);
+  Object.values(docApi.calls).forEach(count => assert.equal(count, 1));
+  assert.equal(docApi.calls.Etablissements, 1, 'Etablissements n\'est lu qu\'une fois (libellés ET indicateurs)');
+});
+
+test('loadDirectory resolves reference tables and keeps the establishment menu data', async () => {
+  const { referenceMaps, etabFlags } = await loadDirectory(fakeDocApi(sampleTables()), { log: recordingLog() });
+  assert.deepEqual(referenceMaps.Instances, { 1: 'CME', 3: 'COVIRIS' }, 'la ligne sans libellé est ignorée');
+  assert.deepEqual(referenceMaps.Etablissements, { 1: 'CHU', 2: 'UBM', 3: 'Clinique', 4: 'INSERM', 5: 'Institut Bergonié' });
+  assert.equal(etabFlags.byLabel['Institut Bergonié'].fondateur, true);
+});
+
+test('loadDirectory logs contacts without Etablissement2 by row id only, never by email', async () => {
+  const log = recordingLog();
+  await loadDirectory(fakeDocApi(sampleTables()), { log });
+  const diagnostic = log.warnings.find(args => String(args[0]).startsWith('[ETABLISSEMENT]'));
+  assert.ok(diagnostic);
+  assert.deepEqual(diagnostic[1], [5]);
+  assert.ok(!JSON.stringify(log.warnings).includes('@'));
+});
+
+test('loadDirectory throws a DirectoryLoadError naming the table when Annuaire or Etablissements cannot be read', async () => {
+  for (const table of ['Annuaire', 'Etablissements']) {
+    await assert.rejects(
+      loadDirectory(fakeDocApi(sampleTables(), { failing: [table] }), { log: recordingLog() }),
+      error => error instanceof DirectoryLoadError && error.message.includes(table)
+    );
+  }
+});
+
+test('loadDirectory treats a docApi that throws synchronously like a rejected read', async () => {
+  await assert.rejects(
+    loadDirectory(fakeDocApi(sampleTables(), { throwSync: ['Etablissements'] }), { log: recordingLog() }),
+    DirectoryLoadError
+  );
+  const { issues } = await loadDirectory(fakeDocApi(sampleTables(), { throwSync: ['Actions'] }), { log: recordingLog() });
+  assert.match(issues[0], /Actions/);
+});
+
+test('loadDirectory keeps going when a reference table is unreadable: previous labels are reused and the problem is reported', async () => {
+  const previousMaps = { Actions: { 1: 'Vaccination', 2: 'Audit' } };
+  const withPrevious = await loadDirectory(fakeDocApi(sampleTables(), { failing: ['Actions'] }), { previousMaps, log: recordingLog() });
+  assert.deepEqual(withPrevious.referenceMaps.Actions, previousMaps.Actions);
+  assert.equal(withPrevious.issues.length, 1);
+  assert.match(withPrevious.issues[0], /Actions/);
+  assert.equal(withPrevious.contacts.length, 5, 'les contacts restent affichés');
+
+  const firstLoad = await loadDirectory(fakeDocApi(sampleTables(), { failing: ['Actions', 'GT'] }), { log: recordingLog() });
+  assert.deepEqual(firstLoad.referenceMaps.Actions, {});
+  assert.match(firstLoad.issues[0], /Actions, GT/);
+});
+
+test('loadDirectory refuses an Annuaire table that lacks Etablissement2 or perimetre_all instead of silently showing nothing', async () => {
+  for (const column of ['Etablissement2', 'perimetre_all']) {
+    const tables = sampleTables();
+    delete tables.Annuaire[column];
+    await assert.rejects(
+      loadDirectory(fakeDocApi(tables), { log: recordingLog() }),
+      error => error instanceof DirectoryLoadError && error.message.includes(column)
+    );
+  }
+});
+
+test('loadDirectory explains an empty directory instead of leaving an unexplained « 0 contact »', async () => {
+  const noEtablissement = sampleTables();
+  noEtablissement.Annuaire.Etablissement2 = noEtablissement.Annuaire.Etablissement2.map(() => '');
+  const noPerimetre = sampleTables();
+  noPerimetre.Annuaire.perimetre_all = noPerimetre.Annuaire.perimetre_all.map(() => ['L']);
+  const nothingValidated = sampleTables();
+  nothingValidated.Etablissements.ok_pour_apparaitre = nothingValidated.Etablissements.ok_pour_apparaitre.map(() => false);
+
+  const explain = async tables => (await loadDirectory(fakeDocApi(tables), { log: recordingLog() })).issues;
+  assert.match((await explain(noEtablissement))[0], /Etablissement2 est vide/);
+  assert.match((await explain(noPerimetre))[0], /perimetre_all est vide/);
+  assert.match((await explain(nothingValidated))[0], /Aucun contact affichable/);
+});
+
+test('loadDirectory stays quiet when the Annuaire table is genuinely empty', async () => {
+  const tables = sampleTables();
+  Object.keys(tables.Annuaire).forEach(column => { tables.Annuaire[column] = []; });
+  const { contacts, issues } = await loadDirectory(fakeDocApi(tables), { log: recordingLog() });
+  assert.deepEqual([contacts, issues], [[], []]);
+});
+
+test('loadDirectory hides the contacts of an establishment whose duplicate rows disagree, and reports it', async () => {
+  const tables = sampleTables();
+  tables.Etablissements.id.push(6);
+  tables.Etablissements.acronyme.push('CHU');
+  tables.Etablissements.nom_complet.push('CHU (doublon)');
+  tables.Etablissements.fondateur.push(true);
+  tables.Etablissements.partenaire.push(false);
+  tables.Etablissements.autres.push(false);
+  tables.Etablissements.ok_pour_apparaitre.push(false);
+  const { contacts, issues } = await loadDirectory(fakeDocApi(tables), { log: recordingLog() });
+  assert.deepEqual(contacts.map(c => c.Nom), ['Durand', 'Bergonié'], 'plus aucun contact du CHU');
+  assert.match(issues[0], /CHU/);
 });

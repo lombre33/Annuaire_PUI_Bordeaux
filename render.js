@@ -1,7 +1,7 @@
 // Rendu DOM — pas de logique métier ici, uniquement de la construction d'éléments.
 
 import { TAG_GROUPS, FILTERS } from './constants.js';
-import { compareLabels, formatPhone, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { compareLabels, formatPhone, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
 
 export function createFilterUI(container, referenceMaps, activeFilters, onToggle, counts) {
   if (!container) return;
@@ -170,7 +170,8 @@ export function renderCards(grid, template, contacts, onToggle) {
     const email = clone.querySelector('.email');
     if (contact.Email) {
       email.textContent = contact.Email;
-      email.href = `mailto:${contact.Email}`;
+      const href = mailtoHref(contact.Email);
+      if (href) email.href = href;
       email.classList.add('visible');
     }
     const tel = clone.querySelector('.tel');

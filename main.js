@@ -1,16 +1,9 @@
 // Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
 // grist-data.js / filters.js / render.js et est testée séparément.
 
-import { fetchTable, tableToRows, fetchEtablissementsFlags, enrich, isInScope, isEtablissementEligible, filterVisibleEstablishments, text, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
+import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
 import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts } from './render.js';
-import { FILTERS, ROLE_REFERENCE } from './constants.js';
-
-// Dérivé de FILTERS (constants.js) plutôt que dupliqué à la main : les deux
-// listes avaient divergé (cf. audit) avant ce refactor. Role_Dans_le_PUI n'a
-// pas de filtre dédié (voir ROLE_REFERENCE) donc pas d'entrée dans FILTERS —
-// ajouté à part.
-const REFERENCE_TABLES = [...FILTERS.map(f => [f.table, f.field]), [ROLE_REFERENCE.table, ROLE_REFERENCE.field]];
 
 const state = {
   allContacts: [],
@@ -40,7 +33,7 @@ const elements = {
   emptyState: document.getElementById('emptyState'),
   searchInput: document.getElementById('searchInput'),
   resetFilters: document.getElementById('resetFilters'),
-  loadError: document.getElementById('loadError'),
+  statusBanner: document.getElementById('statusBanner'),
   scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
 
@@ -54,6 +47,11 @@ function toggleFilter(filterKey, value) {
   // nouvelle sélection (coché en tête + badge de comptage).
   updateFilterUI(elements.filtersContainer, filterKey, state.activeFilters);
   refreshCards();
+}
+
+function rebuildFilterUI() {
+  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter,
+    computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
 }
 
 function refreshCards() {
@@ -94,8 +92,7 @@ elements.resetFilters.addEventListener('click', () => {
   // session (ex: activer Partenaires) survit au clic sur ce bouton.
   // Reconstruit l'UI des filtres pour vider aussi les champs de recherche
   // internes à chaque dropdown (pas seulement les cases cochées).
-  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter,
-    computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
+  rebuildFilterUI();
   refreshCards();
 });
 
@@ -103,32 +100,22 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
 
-// Aide au diagnostic (console navigateur) : signale les contacts sans
-// Etablissement2 renseigné (colonne Text, formule côté Grist = acronyme de
-// l'établissement déduit de l'email — cf. etablissementFlags()/enrich() dans
-// grist-data.js) — ces contacts n'ont aucun indicateur fondateur/partenaire/
-// ok_pour_apparaitre à faire valoir et sont donc exclus par
-// isEtablissementEligible().
-function logEtablissementDiagnostics(records) {
-  const unresolved = records.filter(r => !text(r.Etablissement2));
-  if (unresolved.length) {
-    console.warn(`[ETABLISSEMENT] ${unresolved.length}/${records.length} contact(s) sans Etablissement2 renseigné :`,
-      unresolved.slice(0, 20).map(r => ({ contactId: r.id, email: r.Email })));
-  }
+// Bandeau d'état : vide = masqué. Sert aux pannes de lecture et aux données à
+// corriger dans Grist, pour qu'un annuaire incomplet ne passe jamais pour un
+// annuaire vide.
+function showStatus(messages) {
+  elements.statusBanner.textContent = messages.join(' ');
+  elements.statusBanner.hidden = messages.length === 0;
 }
 
-// Un échec de lecture Grist ne doit pas se présenter comme un annuaire vide
-// ("0 contact" / "Aucun contact trouvé") : on l'affiche explicitement. Les
-// cartes déjà affichées (chargement précédent réussi) restent en place.
-function showLoadError(message) {
-  elements.loadError.textContent = message;
-  elements.loadError.hidden = false;
+// Un échec de lecture Grist ne doit pas se présenter comme « 0 contact » : on
+// l'affiche explicitement. Les cartes déjà affichées (chargement précédent
+// réussi) restent en place.
+function showLoadError(error) {
+  const reason = error instanceof DirectoryLoadError ? ` (${error.message})` : '';
+  showStatus([`Impossible de charger l'annuaire depuis Grist${reason}. Rechargez la page ; `
+    + 'si le problème persiste, le détail est dans la console du navigateur.']);
   if (state.allContacts.length === 0) elements.resultCount.textContent = 'Chargement impossible';
-}
-
-function hideLoadError() {
-  elements.loadError.hidden = true;
-  elements.loadError.textContent = '';
 }
 
 function debounce(fn, wait) {
@@ -149,75 +136,45 @@ const recordsSequencer = createRequestSequencer();
 
 window.grist.ready({ requiredAccess: 'full' });
 
-// onRecords() ne sert plus qu'à SAVOIR QUAND rafraîchir (son paramètre
-// `records` n'est plus utilisé) : son payload par ligne s'est avéré ne pas
-// forcément inclure toutes les colonnes de la table Annuaire (ex:
-// Etablissement2, colonne formule récente) — dépend de la vue/section sur
-// laquelle le widget est branché côté Grist. fetchTable('Annuaire') (même
-// mécanisme déjà utilisé et fiable pour toutes les tables de référence
-// ci-dessous, avec l'accès 'full' déclaré dans grist.ready()) renvoie
-// TOUJOURS la table complète, sans cette incertitude.
+// Applique un annuaire chargé : état, menus de filtres (reconstruits seulement
+// si les libellés ont changé) puis cartes.
+function applyDirectory({ contacts, referenceMaps, etabFlags }) {
+  // Le menu du filtre Établissement ne propose que les établissements
+  // ok_pour_apparaitre ; referenceMaps complet reste utilisé pour résoudre le
+  // libellé affiché sur une carte (enrich()).
+  const filterReferenceMaps = {
+    ...referenceMaps,
+    Etablissements: filterVisibleEstablishments(referenceMaps.Etablissements, etabFlags)
+  };
+  // Reconstruire l'UI des filtres est destructif (ferme les menus ouverts, vide
+  // leur champ de recherche) : on ne le fait que si les libellés ont changé.
+  const referenceMapsChanged = !referenceMapsEqual(state.filterReferenceMaps, filterReferenceMaps);
+  state.referenceMaps = referenceMaps;
+  state.filterReferenceMaps = filterReferenceMaps;
+
+  // Une sélection dont le libellé a été renommé/supprimé côté Grist (ou, pour
+  // Établissement, dont ok_pour_apparaitre est passé à false) est purgée
+  // avant de filtrer les cartes.
+  pruneStaleFilters(state.activeFilters, filterReferenceMaps);
+
+  state.allContacts = contacts;
+  if (referenceMapsChanged) rebuildFilterUI();
+  refreshCards();
+}
+
+// onRecords() ne sert qu'à SAVOIR QUAND rafraîchir : son payload par ligne ne
+// contient pas forcément toutes les colonnes d'Annuaire (ex. Etablissement2,
+// colonne formule), alors que fetchTable() renvoie toujours la table complète.
 window.grist.onRecords(debounce(async () => {
   const requestId = recordsSequencer.next();
   try {
-    const [annuaireTable, maps, etabFlags] = await Promise.all([
-      window.grist.docApi.fetchTable('Annuaire'),
-      Promise.all(REFERENCE_TABLES.map(([table, field]) => fetchTable(table, field))),
-      fetchEtablissementsFlags()
-    ]);
-    if (!recordsSequencer.isLatest(requestId)) return; // une invocation plus récente a déjà démarré, on jette ce résultat périmé
-    // Sans les indicateurs Etablissements, isEtablissementEligible() exclurait
-    // TOUS les contacts : on n'écrase pas l'affichage courant avec une liste vide.
-    if (etabFlags.failed) throw new Error('lecture de la table Etablissements impossible');
-
-    const rows = tableToRows(annuaireTable);
-    console.log('[GRIST] Enregistrements reçus:', rows.length);
-    const scopedRecords = rows.filter(isInScope);
-
-    const newReferenceMaps = {};
-    REFERENCE_TABLES.forEach(([table], index) => {
-      newReferenceMaps[table] = maps[index];
-    });
-    // Menu du filtre Établissement restreint aux établissements ok_pour_apparaitre
-    // (cf. demande) — referenceMaps complet (ci-dessus) reste utilisé pour
-    // résoudre le libellé affiché sur une carte (enrich()), qui ne dépend pas
-    // de cette validation.
-    const newFilterReferenceMaps = {
-      ...newReferenceMaps,
-      Etablissements: filterVisibleEstablishments(newReferenceMaps['Etablissements'], etabFlags)
-    };
-    // Ne reconstruit l'UI des filtres (destructive : ferme les menus ouverts,
-    // vide leur champ de recherche interne) que si les libellés ont vraiment
-    // changé — pas à chaque édition d'un contact sans rapport avec les filtres.
-    const referenceMapsChanged = !referenceMapsEqual(state.filterReferenceMaps, newFilterReferenceMaps);
-    state.referenceMaps = newReferenceMaps;
-    state.filterReferenceMaps = newFilterReferenceMaps;
-
-    // Une sélection de filtre dont le libellé a été renommé/supprimé côté
-    // Grist (ou, pour Établissement, dont ok_pour_apparaitre est passé à
-    // false) doit être purgée avec les nouvelles tables de référence, avant
-    // de filtrer les cartes.
-    pruneStaleFilters(state.activeFilters, state.filterReferenceMaps);
-
-    state.allContacts = scopedRecords
-      .map(record => enrich(record, state.referenceMaps, etabFlags))
-      .filter(c => c.Nom || c.Prenom)
-      // Établissement ni fondateur ni partenaire, ou non validé par lui
-      // (ok_pour_apparaitre) : jamais affiché, quels que soient les
-      // interrupteurs Fondateurs/Partenaires de l'UI (cf. specs.md).
-      .filter(isEtablissementEligible);
-
-    logEtablissementDiagnostics(scopedRecords);
-
-    if (referenceMapsChanged) {
-      createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter,
-        computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
-    }
-    refreshCards();
-    hideLoadError();
+    const directory = await loadDirectory(window.grist.docApi, { previousMaps: state.referenceMaps });
+    if (!recordsSequencer.isLatest(requestId)) return; // une invocation plus récente a démarré : résultat périmé
+    applyDirectory(directory);
+    showStatus(directory.issues);
   } catch (error) {
     if (!recordsSequencer.isLatest(requestId)) return;
     console.error('Erreur dans le traitement des contacts:', error);
-    showLoadError("Impossible de charger l'annuaire depuis Grist. Rechargez la page ; si le problème persiste, le détail est dans la console du navigateur.");
+    showLoadError(error);
   }
 }, 250));
