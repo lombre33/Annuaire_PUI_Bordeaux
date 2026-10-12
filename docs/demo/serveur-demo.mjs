@@ -29,6 +29,15 @@
 //                                            visibilité, responsables) s'enregistre en mémoire ; un
 //                                            nouveau logo est reçu par ce serveur (POST sur
 //                                            /__pieces-jointes/attachments) et servi ensuite comme les autres
+//   ?photos                                  ajoute la colonne Avatar (pièces jointes) à BDD et donne une
+//                                            photo de profil à six personnes : sur leurs cartes, la
+//                                            photo remplace les initiales et s'agrandit au clic. Dans
+//                                            « ✎ Modifier mon profil », la carte « Photo de profil »
+//                                            choisit, remplace ou retire la photo (rien n'est proposé
+//                                            sans ?photos : le document n'a alors pas de colonne
+//                                            Avatar). Les visages sont des dessins inventés
+//                                            (portraits-fictifs.mjs) ; une photo choisie est reçue par
+//                                            ce serveur et servie ensuite comme les autres
 //   ...&refus=BDD                            simule une règle d'accès qui refuse d'écrire dans
 //                                            BDD, pour le choix de présence comme pour la
 //                                            modification d'une fiche (liste de tables séparées
@@ -50,12 +59,12 @@
 // partagent. Ses adresses de démonstration sont dans PERSONNES_DEMO
 // (donnees-fictives.mjs).
 //
-// Les logos sont des pièces jointes : le faux Grist remet au widget un jeton d'accès et
-// l'adresse de ce serveur (/__pieces-jointes), qui sert les dessins inventés de
-// logos-fictifs.mjs à la place de Grist, à condition de recevoir le jeton. Il reçoit aussi les
-// logos qu'un responsable d'établissement envoie (POST /__pieces-jointes/attachments?auth=…,
-// comme l'API REST de Grist) : le fichier est gardé en mémoire, reçoit l'identifiant suivant et
-// se télécharge ensuite comme les autres.
+// Les logos et les photos de profil sont des pièces jointes : le faux Grist remet au widget un jeton
+// d'accès et l'adresse de ce serveur (/__pieces-jointes), qui sert les dessins inventés de
+// logos-fictifs.mjs et de portraits-fictifs.mjs à la place de Grist, à condition de recevoir le jeton.
+// Il reçoit aussi les fichiers qu'un responsable d'établissement (un logo) ou une personne (sa photo)
+// envoie (POST /__pieces-jointes/attachments?auth=…, comme l'API REST de Grist) : le fichier est gardé
+// en mémoire, reçoit l'identifiant suivant et se télécharge ensuite comme les autres.
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -63,6 +72,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tablesFictives } from './donnees-fictives.mjs';
 import { pieceJointe } from './logos-fictifs.mjs';
+import { portraitFictif } from './portraits-fictifs.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const URL_SIMULATEUR = '/__grist-simule.js';
@@ -70,7 +80,7 @@ const URL_PIECES_JOINTES = '/__pieces-jointes';
 const JETON_DEMO = 'jeton-de-demonstration';
 const PIECE_JOINTE = new RegExp(`^${URL_PIECES_JOINTES}/attachments/(\\d+)/download$`);
 const ENVOI = `${URL_PIECES_JOINTES}/attachments`;
-const PREMIER_ENVOI = 5000; // les dessins inventés ont de petits numéros
+const PREMIER_ENVOI = 5000; // les dessins inventés (logos : 101 à 114, visages : 201 à 207) ont de petits numéros
 const TAILLE_MAX_ENVOI = 2 * 1024 * 1024;
 const BALISE_API_GRIST = /<script\s+src="[^"]*grist-plugin-api\.js"\s*><\/script>/;
 
@@ -132,13 +142,14 @@ function scriptApiSimulee(tables) {
 })();`;
 }
 
-function pageAvecSimulateur() {
+// `avecPhotos` : la page a été demandée avec ?photos, le simulateur lui sert le jeu de données qui a des photos.
+function pageAvecSimulateur(avecPhotos) {
   const html = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf8');
   if (!BALISE_API_GRIST.test(html)) {
     throw new Error('index.html ne charge plus grist-plugin-api.js par une balise <script src="…">'
       + ' : adaptez BALISE_API_GRIST dans docs/demo/serveur-demo.mjs.');
   }
-  return html.replace(BALISE_API_GRIST, `<script src="${URL_SIMULATEUR}"></script>`);
+  return html.replace(BALISE_API_GRIST, `<script src="${URL_SIMULATEUR}${avecPhotos ? '?photos' : ''}"></script>`);
 }
 
 // Le premier fichier d'un envoi multipart : { type, octets }, ou null s'il n'y en a pas.
@@ -154,7 +165,8 @@ function fichierEnvoye(requete, corps) {
   return { type, octets: corps.subarray(finEntete + 4, fin) };
 }
 
-export function startDemoServer({ port = 0, tables = tablesFictives() } = {}) {
+// `tables` : les données servies ; `tablesAvecPhotos` : celles que sert ?photos (la colonne Avatar de BDD).
+export function startDemoServer({ port = 0, tables = tablesFictives(), tablesAvecPhotos = tablesFictives({ photos: true }) } = {}) {
   const envois = new Map(); // identifiant de pièce jointe → { type, octets }
   const server = http.createServer((requete, reponse) => {
     try {
@@ -191,12 +203,13 @@ export function startDemoServer({ port = 0, tables = tablesFictives() } = {}) {
         });
         return;
       }
+      const avecPhotos = new URL(requete.url, 'http://x').searchParams.has('photos');
       if (pathname === URL_SIMULATEUR) {
-        reponse.writeHead(200, { 'content-type': TYPES['.js'] }).end(scriptApiSimulee(tables));
+        reponse.writeHead(200, { 'content-type': TYPES['.js'] }).end(scriptApiSimulee(avecPhotos ? tablesAvecPhotos : tables));
         return;
       }
       if (pathname === '/' || pathname === '/index.html') {
-        reponse.writeHead(200, { 'content-type': TYPES['.html'] }).end(pageAvecSimulateur());
+        reponse.writeHead(200, { 'content-type': TYPES['.html'] }).end(pageAvecSimulateur(avecPhotos));
         return;
       }
       const piece = pathname.match(PIECE_JOINTE);
@@ -208,12 +221,12 @@ export function startDemoServer({ port = 0, tables = tablesFictives() } = {}) {
           reponse.writeHead(200, { 'content-type': envoye.type }).end(envoye.octets);
           return;
         }
-        const logo = auth === JETON_DEMO ? pieceJointe(Number(piece[1])) : null;
-        if (!logo) {
+        const dessin = auth === JETON_DEMO ? (portraitFictif(Number(piece[1])) ?? pieceJointe(Number(piece[1]))) : null;
+        if (!dessin) {
           reponse.writeHead(auth === JETON_DEMO ? 404 : 403).end();
           return;
         }
-        reponse.writeHead(200, { 'content-type': TYPES['.svg'] }).end(logo);
+        reponse.writeHead(200, { 'content-type': TYPES['.svg'] }).end(dessin);
         return;
       }
       const fichier = path.join(RACINE, decodeURIComponent(pathname));

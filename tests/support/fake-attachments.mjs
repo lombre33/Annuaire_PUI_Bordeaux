@@ -22,6 +22,7 @@
 //   delay  millisecondes d'attente avant de répondre
 
 import { FAKE_ATTACHMENTS_URL } from './fake-grist.js';
+import { visageSvg } from '../../docs/demo/portraits-fictifs.mjs';
 
 export const FIRST_UPLOAD_ID = 2000;
 export const MISSING_FILE = 999;
@@ -52,25 +53,8 @@ function logoSvg(id) {
     + `<text x="50%" y="55%" fill="#fff" font-family="sans-serif" font-size="14" text-anchor="middle">${id}</text></svg>`;
 }
 
-// Six illustrations de visages, les mêmes que celles de la maquette v5 (de simples dessins, pas de
-// vraies personnes) : { fond, peau, haut, cheveux, longs }.
-const PORTRAITS = [
-  { bg: '#dbeafe', skin: '#f2c9a0', shirt: '#6257d9', hair: '#3b2a20', long: false },
-  { bg: '#fde7d9', skin: '#c68a62', shirt: '#1ba99a', hair: '#1b1b1f', long: true },
-  { bg: '#e8e6ff', skin: '#f5d3b3', shirt: '#d85b9d', hair: '#8a5a2b', long: true },
-  { bg: '#dff5ef', skin: '#8d5a3b', shirt: '#172033', hair: '#141414', long: false },
-  { bg: '#fff3d6', skin: '#ecbf97', shirt: '#f28a54', hair: '#d9a441', long: false },
-  { bg: '#e9ecf5', skin: '#d9a581', shirt: '#4f8ee8', hair: '#5b3a29', long: true }
-];
-
-function portraitSvg(id) {
-  const { bg, skin, shirt, hair, long } = PORTRAITS[(id - PORTRAIT_FIRST) % PORTRAITS.length];
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 120 120">'
-    + `<rect width="120" height="120" fill="${bg}"/>`
-    + (long ? `<ellipse cx="60" cy="58" rx="25" ry="31" fill="${hair}"/>` : '')
-    + `<path d="M16 120c2-26 22-38 44-38s42 12 44 38z" fill="${shirt}"/><rect x="52" y="64" width="16" height="22" rx="7" fill="${skin}"/>`
-    + `<ellipse cx="60" cy="52" rx="18" ry="21" fill="${skin}"/><path d="M41 50c-1-17 9-27 20-27 13 0 21 9 19 27-4-7-10-11-19-11s-15 4-20 11z" fill="${hair}"/></svg>`;
-}
+// Les visages sont ceux de la démonstration (docs/demo/portraits-fictifs.mjs) : de simples dessins.
+const portraitSvg = id => visageSvg(id - PORTRAIT_FIRST);
 
 const ORIGIN = new URL(FAKE_ATTACHMENTS_URL).origin;
 const PATH = new URL(FAKE_ATTACHMENTS_URL).pathname;

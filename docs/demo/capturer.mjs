@@ -17,7 +17,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startDemoServer } from './serveur-demo.mjs';
-import { CARTES_ATTENDUES, HABILLAGE_ATTENDU, PERSONNES_DEMO } from './donnees-fictives.mjs';
+import { CARTES_ATTENDUES, HABILLAGE_ATTENDU, PERSONNES_AVEC_PHOTO, PERSONNES_DEMO } from './donnees-fictives.mjs';
+import { visageSvg } from './portraits-fictifs.mjs';
 
 const DOSSIER_IMAGES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'images');
 const LARGEUR = 1440; // un écran de PC : à partir de 1400 px, la mise en page est celle de départ (style.css)
@@ -30,6 +31,7 @@ const HAUTEUR_FENETRE_MODIFICATION = 1000; // la fenêtre de modification mesure
 const MARGE_FENETRE = 12; // fond assombri gardé autour de la fenêtre de modification
 const HAUTEUR_FENETRE_RELECTURE = 1250; // la relecture, sans le plafond de 900 px de la fenêtre (voir la scène), mesure environ 1 030 px
 const HAUTEUR_CONFIRMATION = 900; // le message de confirmation est fixé en bas de l'écran : la capture garde l'écran entier
+const HAUTEUR_FENETRE_PHOTO = 1000; // l'agrandissement d'une photo tient dans moins de 700 px : une fenêtre de la hauteur de celle de modification suffit
 const HAUTEUR_FENETRE_LEGENDE = 3600; // la carte de la légende est loin dans la liste (cartes triées par nom, hautes de 520 px) : elle doit tenir dans la fenêtre pour que les repères, fixés à l'écran, la suivent
 
 let chromium;
@@ -197,6 +199,52 @@ async function saisirBrouillon(page) {
   });
 }
 
+// ===== La photo de profil (colonne Avatar de BDD, 1.18.0) =====
+
+// Les cartes de la grille dont l'avatar montre une photo, dans l'ordre (les cartes sont triées par nom).
+const cartesAvecPhoto = page => page.evaluate(() =>
+  [...document.querySelectorAll('#cardsGrid .contact-card')]
+    .filter(carte => carte.querySelector('.avatar.has-photo'))
+    .map(carte => carte.querySelector('.name').textContent));
+
+const fenetrePhoto = page => page.locator('#photoDialog');
+
+// Le fichier que Camille Rousseau choisit : le premier visage inventé qu'aucune carte de l'annuaire n'a,
+// dessiné en PNG de 600 x 600 px par le navigateur dans une feuille à part (pas dans le widget), comme le
+// donnerait un appareil photo.
+async function fichierPhoto(page) {
+  const feuille = await page.context().newPage();
+  try {
+    const base64 = await feuille.evaluate(async dessin => {
+      const image = new Image();
+      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(dessin)}`;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = 600;
+      canvas.height = 600;
+      canvas.getContext('2d').drawImage(image, 0, 0, 600, 600);
+      return canvas.toDataURL('image/png').split(',')[1];
+    }, visageSvg(PERSONNES_AVEC_PHOTO.length));
+    return { name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from(base64, 'base64') };
+  } finally {
+    await feuille.close();
+  }
+}
+
+// Camille choisit sa photo : le widget la recadre en carré de 256 px et l'aperçu la montre à la place
+// des initiales ; seule modification du brouillon.
+async function choisirPhoto(page) {
+  await page.locator('#profilePhotoFile').setInputFiles(await fichierPhoto(page));
+  await page.waitForFunction(() => {
+    const aperçu = document.querySelector('#profileDialog .photo-preview .avatar');
+    return aperçu?.classList.contains('has-photo') && document.querySelector('#profileDialog .photo-status').textContent === '';
+  }, null, { timeout: 10_000 });
+  await page.evaluate(() => {
+    document.activeElement.blur(); // pas de contour de saisie sur la capture
+    document.querySelector('#profileDialog .dlg-body').scrollTop = 0;
+  });
+}
+
 // ===== Zones de capture : pleine largeur, du haut de la page jusqu'à... =====
 
 const enPleineLargeur = (bas, marge = MARGE) => ({ x: 0, y: 0, width: LARGEUR, height: Math.ceil(bas + marge) });
@@ -229,6 +277,12 @@ const autourDe = (selecteur, marge = MARGE) => async page => {
 // ...ou : la fenêtre de modification d'une fiche, avec un peu du fond assombri autour.
 const autourDeLaFenetre = async page => {
   const boite = await fenetre(page).boundingBox();
+  return { x: boite.x - MARGE_FENETRE, y: boite.y - MARGE_FENETRE, width: boite.width + 2 * MARGE_FENETRE, height: boite.height + 2 * MARGE_FENETRE };
+};
+
+// ...ou : la fenêtre qui agrandit une photo, cadrée de la même façon.
+const autourDeLaPhoto = async page => {
+  const boite = await fenetrePhoto(page).boundingBox();
   return { x: boite.x - MARGE_FENETRE, y: boite.y - MARGE_FENETRE, width: boite.width + 2 * MARGE_FENETRE, height: boite.height + 2 * MARGE_FENETRE };
 };
 
@@ -646,6 +700,87 @@ const SCENES = [
         const corps = document.querySelector('#etabDialog .dlg-body');
         return corps.scrollHeight - corps.clientHeight <= 1;
       }), 'la fiche est plus haute que la fenêtre : une partie serait coupée');
+    }
+  },
+  {
+    // Avec la colonne Avatar de BDD (?photos), la photo remplace les initiales : Sofia Almeida, Mehdi Bensaïd et
+    // Julien Garnier en ont une, Romain Delmas, Léa Fontaine et Paul Girard gardent leurs initiales.
+    fichier: 'photo-profil-cartes.png', requete: '?photos', zone: jusquALaRangee(2),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      const avecPhoto = (await cartesAvecPhoto(page)).slice(0, 3).join();
+      exiger(avecPhoto === 'Sofia Almeida,Mehdi Bensaïd,Julien Garnier',
+        `les premières photos sont celles de « ${avecPhoto} » au lieu de Sofia Almeida, Mehdi Bensaïd et Julien Garnier`);
+      for (const nom of ['Romain Delmas', 'Léa Fontaine', 'Paul Girard']) {
+        exiger(await carteDe(page, nom).locator('.avatar:not(.has-photo)').count() === 1, `la carte de ${nom} devrait garder ses initiales`);
+      }
+      exiger(await carteDe(page, 'Sofia Almeida').locator('button.avatar-zoom').getAttribute('aria-label') === 'Agrandir la photo de Sofia Almeida',
+        'la photo de Sofia Almeida n\'est pas un bouton qui l\'agrandit');
+    }
+  },
+  {
+    // Un clic sur la photo de Sofia Almeida l'agrandit, avec son nom, sa fonction et son établissement.
+    fichier: 'photo-profil-agrandie.png', requete: '?photos', hauteur: HAUTEUR_FENETRE_PHOTO, zone: autourDeLaPhoto,
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      await carteDe(page, 'Sofia Almeida').locator('button.avatar-zoom').click();
+      await page.waitForFunction(() => {
+        const photo = document.querySelector('#photoDialog .photo-img');
+        return document.getElementById('photoDialog').open && photo !== null && photo.classList.contains('loaded')
+          && getComputedStyle(photo).opacity === '1' && photo.naturalWidth > 0;
+      }, null, { timeout: 10_000 });
+      exiger(await fenetrePhoto(page).locator('.photo-cap').evaluate(legende => legende.firstChild.textContent) === 'Sofia Almeida', 'la légende ne dit pas le nom de la personne');
+      exiger(await fenetrePhoto(page).locator('.photo-cap small').textContent() === 'Directrice de la recherche clinique · Centre Hospitalier de Démonstration',
+        'la légende ne dit pas la fonction et l\'établissement');
+      exiger(await fenetrePhoto(page).locator('.dlg-x').getAttribute('aria-label') === 'Fermer la photo', 'la croix de la fenêtre n\'est pas « Fermer la photo »');
+      await page.evaluate(() => document.activeElement.blur());
+    }
+  },
+  {
+    // « Modifier mon profil » de Camille Rousseau, qui n'a pas de photo : elle en a choisi une. L'aperçu la montre, les
+    // boutons deviennent « Changer la photo » et « Retirer la photo », et le pied compte la photo comme un champ modifié.
+    fichier: 'photo-profil-formulaire.png', requete: `?photos&connecte=${PERSONNES_DEMO.visible}`,
+    hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFenetre,
+    async preparer(page) {
+      await ouvrirMonProfil(page);
+      exiger(await fenetre(page).locator('.photo-title').textContent() === 'Photo de profil', 'la carte « Photo de profil » manque');
+      exiger((await fenetre(page).locator('.photo-actions button:visible').allTextContents()).join() === 'Ajouter une photo',
+        'sans photo, seul « Ajouter une photo » devrait être proposé');
+      await choisirPhoto(page);
+      exiger((await fenetre(page).locator('.photo-actions button:visible').allTextContents()).join() === 'Changer la photo,Retirer la photo',
+        'les boutons ne sont pas « Changer la photo » et « Retirer la photo »');
+      exiger(await fenetre(page).locator('.dlg-summary').textContent() === '1 champ modifié', 'le pied ne compte pas la photo comme un champ modifié');
+      exiger(await fenetre(page).getByRole('button', { name: 'Relire mes modifications', exact: true }).isEnabled(), '« Relire mes modifications » est grisé');
+    }
+  },
+  {
+    // La relecture : la carte « Après » a l'anneau vert autour de la photo et la pastille « photo ajoutée », la carte « Avant »
+    // garde ses initiales, et le détail montre la photo avant (aucune) et après.
+    fichier: 'photo-profil-relecture.png', requete: `?photos&connecte=${PERSONNES_DEMO.visible}`,
+    hauteur: HAUTEUR_FENETRE_RELECTURE, zone: autourDeLaFenetre,
+    async preparer(page) {
+      await ouvrirMonProfil(page);
+      await choisirPhoto(page);
+      await fenetre(page).getByRole('button', { name: 'Relire mes modifications', exact: true }).click();
+      await attendreEtape(page, 'Relire avant de valider');
+      await page.addStyleTag({ content: '.dlg { max-height: none; }' }); // voir modifier-fiche-relecture.png
+      await page.waitForFunction(() => {
+        const photo = document.querySelector('#profileDialog .rv-col-after .avatar-img');
+        const miniature = document.querySelector('#profileDialog .recap .thumb img');
+        return photo?.classList.contains('loaded') && miniature?.classList.contains('loaded');
+      }, null, { timeout: 10_000 });
+      const compter = selecteur => fenetre(page).locator(selecteur).count();
+      exiger(await compter('.rv-col-after .avatar.rv-ring.has-photo') === 1, 'la photo de la carte « Après » n\'a pas son anneau vert');
+      exiger(await fenetre(page).locator('.rv-col-after .rv-note .mk-pill').textContent() === 'photo ajoutée', 'la pastille « photo ajoutée » manque');
+      exiger(await compter('.rv-col-before .avatar.has-photo') === 0 && await compter('.rv-col-before .rv-ring, .rv-col-before .rv-note') === 0,
+        'la carte « Avant » devrait garder ses initiales, sans repère');
+      exiger(await compter('.recap .diff-row') === 1 && await fenetre(page).locator('.recap .diff-label').textContent() === 'Photo de profil',
+        'le détail n\'a pas la seule ligne « Photo de profil »');
+      exiger(await fenetre(page).locator('.recap .diff-val .none').textContent() === 'aucune photo' && await compter('.recap .thumb') === 1,
+        'le détail ne montre pas « aucune photo » puis la nouvelle photo');
+      exiger(await fenetre(page).locator('.dlg-summary').textContent() === '1 champ modifié', 'le pied ne résume pas le changement');
+      exiger(await fenetre(page).getByRole('button', { name: 'Valider', exact: true }).isEnabled(), '« Valider » n\'est pas cliquable');
+      await page.evaluate(() => document.activeElement.blur());
     }
   }
 ];

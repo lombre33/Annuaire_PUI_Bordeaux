@@ -26,7 +26,8 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { CATEGORIES, FILTERS } from '../constants.js';
-import { loadDirectory } from '../grist-data.js';
+import { displayName, loadDirectory } from '../grist-data.js';
+import { avatarIdOf } from '../attachments.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
 import { readIdentity } from '../identity.js';
 import { describePresence, describeHiddenFiche, describeUnknownAccount, setPresence, explainWriteError } from '../presence.js';
@@ -35,7 +36,8 @@ import { prepareReview, saveProfile } from '../profile-save.js';
 import { diffEtablissement, draftOfEtablissement, etablissementRightsFor, nominate, toggleResponsable } from '../etablissement.js';
 import { readEtablissement, savePlanOf, saveEtablissement } from '../etablissement-save.js';
 import { checkImageFile } from '../image-prep.js';
-import { tablesFictives, CARTES_ATTENDUES, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
+import { tablesFictives, CARTES_ATTENDUES, PERSONNES_AVEC_PHOTO, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
+import { NOMBRE_VISAGES, PREMIER_PORTRAIT, portraitFictif } from '../docs/demo/portraits-fictifs.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -177,6 +179,30 @@ test('le jeu de données fictif est lu sans incident par le vrai loadDirectory()
   // Le guide cite le compteur de la capture d'ensemble : il doit rester celui du jeu fictif.
   assert.ok(read('docs/utilisateurs.md').includes(`« ${CARTES_ATTENDUES.fondateurs} contacts »`),
     `docs/utilisateurs.md doit citer « ${CARTES_ATTENDUES.fondateurs} contacts » (capture apercu.png) : régénérez les captures et le guide.`);
+});
+
+test('le jeu de données fictif avec photos (?photos) ajoute la colonne Avatar et six photos fictives, sans changer les cartes', async () => {
+  // Sans ?photos, BDD n'a pas de colonne Avatar : les captures d'avant la 1.18.0 restent justes.
+  const without = tablesFictives();
+  assert.ok(!('Avatar' in without.BDD) && !JSON.stringify(without._grist_Tables_column).includes('"Avatar"'));
+
+  const tables = tablesFictives({ photos: true });
+  const type = tables._grist_Tables_column.type[tables._grist_Tables_column.colId.indexOf('Avatar')];
+  assert.equal(type, 'Attachments', 'La colonne Avatar de la démonstration est une colonne « Pièces jointes », comme dans Grist.');
+  const { contacts, issues } = await loadDirectory(fakeDocApi(tables), { log: SILENT_LOG });
+  assert.deepEqual(issues, [], 'Le widget signale un problème sur le jeu fictif avec photos.');
+  const displayed = scope => filterContacts(contacts, createEmptyFilterState(), '', scope).length;
+  assert.equal(displayed({ fondateur: true, partenaire: false }), CARTES_ATTENDUES.fondateurs);
+  assert.equal(displayed({ fondateur: true, partenaire: true }), CARTES_ATTENDUES.fondateursEtPartenaires);
+
+  // Les personnes qui ont une photo sont celles que les captures annoncent, et chaque photo est un dessin inventé.
+  const withPhoto = contacts.filter(contact => avatarIdOf(contact.Avatar) > 0);
+  assert.deepEqual(withPhoto.map(displayName).sort(), [...PERSONNES_AVEC_PHOTO].sort());
+  assert.equal(new Set(withPhoto.map(contact => avatarIdOf(contact.Avatar))).size, withPhoto.length, 'Chaque personne a son propre visage.');
+  for (const contact of withPhoto) {
+    assert.match(portraitFictif(avatarIdOf(contact.Avatar)) ?? '', /^<svg /, `${displayName(contact)} : pas de dessin pour sa photo`);
+  }
+  assert.ok(PERSONNES_AVEC_PHOTO.length < NOMBRE_VISAGES, 'Il faut un visage libre pour la photo que les captures choisissent (capturer.mjs).');
 });
 
 test('le jeu de données fictif ne contient que des coordonnées fictives', () => {
@@ -421,6 +447,31 @@ test('?refus=Etablissements : la fiche d\'un établissement est refusée avec un
   await assert.rejects(saveEtablissement(page.grist.docApi, savePlanOf(fiche.row, diff.champs, { responsable: true }), { log: QUIET_LOG }),
     error => error.name === 'EtablissementSaveError' && /Grist a refusé la modification/.test(error.message));
   assert.equal((await readEtablissement(page.grist.docApi, chd, { log: QUIET_LOG })).etablissement.visible, true);
+});
+
+test('la démonstration ne montre des photos que sur demande (?photos) : les dessins sont servis avec le jeton, rien sans lui', async () => {
+  const { server, url } = await startDemoServer();
+  try {
+    const jeton = 'jeton-de-demonstration';
+    const sans = await (await fetch(`${url}/`)).text();
+    const avec = await (await fetch(`${url}/?photos`)).text();
+    assert.match(sans, /<script src="\/__grist-simule\.js"><\/script>/);
+    assert.match(avec, /<script src="\/__grist-simule\.js\?photos"><\/script>/, '?photos demande au simulateur le jeu de données qui a des photos');
+    assert.doesNotMatch(await (await fetch(`${url}/__grist-simule.js`)).text(), /"Avatar"/, 'sans ?photos, pas de colonne Avatar');
+    assert.match(await (await fetch(`${url}/__grist-simule.js?photos`)).text(), /"Avatar"/, 'avec ?photos, la colonne Avatar existe');
+
+    const premier = await fetch(`${url}/__pieces-jointes/attachments/${PREMIER_PORTRAIT}/download?auth=${jeton}`);
+    assert.equal(premier.status, 200);
+    assert.equal(premier.headers.get('content-type'), 'image/svg+xml');
+    assert.equal(await premier.text(), portraitFictif(PREMIER_PORTRAIT));
+    assert.equal((await fetch(`${url}/__pieces-jointes/attachments/${PREMIER_PORTRAIT}/download`)).status, 403, 'sans jeton, pas de photo');
+    assert.equal((await fetch(`${url}/__pieces-jointes/attachments/${PREMIER_PORTRAIT + NOMBRE_VISAGES}/download?auth=${jeton}`)).status, 404,
+      'au-delà du dernier visage, aucune pièce jointe');
+    assert.equal((await fetch(`${url}/__pieces-jointes/attachments/101/download?auth=${jeton}`)).status, 200, 'les logos fictifs restent servis');
+  } finally {
+    server.close();
+    server.closeAllConnections?.();
+  }
 });
 
 test('le serveur de démonstration reçoit le logo qu\'un responsable envoie, puis le sert comme les autres pièces jointes', async () => {
