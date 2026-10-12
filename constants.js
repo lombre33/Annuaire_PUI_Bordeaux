@@ -1,36 +1,37 @@
-// Taxonomie des filtres/tags — source unique partagée par le rendu des filtres,
-// le rendu des cartes et la logique de filtrage.
+// Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
+// unique des menus, des tags et des tables de référence à lire.
+//   label, color  affichage
+//   table, field  table de référence et colonne de libellé (`field` peut lister
+//                 plusieurs colonnes, essayées dans l'ordre)
+//   column        colonne ReferenceList d'Annuaire qui y renvoie ; absente pour
+//                 Compétences (texte libre) et pour les Références simples
+//                 Établissement et Rôle
+export const CATEGORIES = {
+  actions: { label: 'Actions', color: '#f28a54', table: 'Actions', field: 'Action', column: 'Actions' },
+  taches: { label: 'Tâches', color: '#ff9800', table: 'Taches', field: 'taches', column: 'Taches' },
+  communautes: { label: 'Communautés', color: '#d85b9d', table: 'Communautees', field: 'communaute', column: 'Communautee_s_' },
+  gt: { label: 'GT', color: '#1ba99a', table: 'GT', field: 'nom', column: 'GT' },
+  competences: { label: 'Compétences', color: '#9c27b0', table: 'Competances', field: 'Competences' },
+  instances: { label: 'Instances', color: '#4f8ee8', table: 'Instances', field: 'nom_instance', column: 'Instances' },
+  etablissement: { label: 'Établissement', color: '#147c72', table: 'Etablissements', field: ['acronyme', 'nom_complet'] },
+  role: { label: 'Rôle PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
+};
 
-export const FILTERS = [
-  { key: 'actions', label: 'Actions', table: 'Actions', field: 'Action', color: '#f28a54' },
-  { key: 'taches', label: 'Tâches', table: 'Taches', field: 'taches', color: '#ff9800' },
-  { key: 'communautes', label: 'Communautés', table: 'Communautees', field: 'communaute', color: '#d85b9d' },
-  { key: 'gt', label: 'GT', table: 'GT', field: 'nom', color: '#1ba99a' },
-  { key: 'competences', label: 'Compétences', table: 'Competances', field: 'Competences', color: '#9c27b0' },
-  { key: 'instances', label: 'Instances', table: 'Instances', field: 'nom_instance', color: '#4f8ee8' },
-  // acronyme d'abord, nom_complet en repli si l'acronyme n'est pas renseigné
-  // pour cette ligne (cf. CHANGELOG — cause du bug "établissement invisible").
-  { key: 'etablissement', label: 'Établissement', table: 'Etablissements', field: ['acronyme', 'nom_complet'], color: '#147c72' }
-];
+// Ordre des boutons de filtre. Rôle PUI n'a pas de filtre (specs.md).
+const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement'];
 
-// Source unique : main.js dérive sa liste de tables à charger de FILTERS (plus
-// ROLE_REFERENCE ci-dessous) au lieu de dupliquer table/field à la main — évite
-// le risque de désynchronisation entre les deux (constaté lors de l'audit :
-// FILTERS.etablissement et la liste dupliquée de main.js avaient divergé).
-//
-// Établissement n'apparaît pas dans TAG_GROUPS : il a son propre badge dédié
-// sur la carte (voir render.js), pas une section de tags générique.
-export const TAG_GROUPS = [
-  { key: 'instances', label: 'Instances', color: '#4f8ee8' },
-  { key: 'actions', label: 'Actions', color: '#f28a54' },
-  { key: 'gt', label: 'GT', color: '#1ba99a' },
-  { key: 'competences', label: 'Compétences', color: '#9c27b0' },
-  { key: 'communautes', label: 'Communautés', color: '#d85b9d' },
-  { key: 'taches', label: 'Tâches', color: '#ff9800' },
-  { key: 'role', label: 'Rôle PUI', color: '#8b5fc4' }
-];
+// Ordre des sections de tags d'une carte. Établissement a son badge dédié.
+const TAG_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role'];
 
-// Role_dans_le_PUI n'a pas de filtre dédié (seulement un tag de carte, cf.
-// TAG_GROUPS), donc pas d'entrée dans FILTERS — sa table de référence est
-// déclarée ici pour que main.js puisse quand même la charger.
-export const ROLE_REFERENCE = { table: 'Role_Dans_le_PUI', field: 'Role' };
+const withKey = key => ({ key, ...CATEGORIES[key] });
+
+export const FILTERS = FILTER_KEYS.map(withKey);
+export const TAG_GROUPS = TAG_KEYS.map(withKey);
+
+// [table, colonne de libellé] de chaque table de référence à lire.
+export const REFERENCE_TABLES = Object.values(CATEGORIES).map(({ table, field }) => [table, field]);
+
+// Catégories dont Annuaire porte une colonne ReferenceList.
+export const LIST_CATEGORIES = Object.entries(CATEGORIES)
+  .filter(([, category]) => category.column)
+  .map(([key, { column, table }]) => ({ key, column, table }));

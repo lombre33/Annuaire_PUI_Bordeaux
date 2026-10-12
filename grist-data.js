@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { FILTERS, ROLE_REFERENCE } from './constants.js';
+import { CATEGORIES, LIST_CATEGORIES, REFERENCE_TABLES } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -139,25 +139,15 @@ export function resolveListItem(item, referenceMap) {
   return referenceMap?.[String(item)] || '';
 }
 
-// Colonnes ReferenceList d'Annuaire résolues par une table de référence :
-// [colonne, table de référence, clé de sortie]. Une catégorie de plus = une ligne.
-const LIST_REFERENCE_FIELDS = [
-  ['Instances', 'Instances', 'instances_labels'],
-  ['Actions', 'Actions', 'actions_labels'],
-  ['GT', 'GT', 'gt_labels'],
-  ['Communautee_s_', 'Communautees', 'communautes_labels'],
-  ['Taches', 'Taches', 'taches_labels']
-];
-
 // Ajoute à un contact les libellés de ses catégories et les indicateurs de son
 // établissement. `etabFlags` est optionnel : sans lui, aucun indicateur n'est
 // vrai et le contact n'est pas éligible.
 export function enrich(contact, referenceMaps, etabFlags) {
   const enriched = { ...contact };
 
-  LIST_REFERENCE_FIELDS.forEach(([contactField, table, outputKey]) => {
+  LIST_CATEGORIES.forEach(({ key, column, table }) => {
     // Un id sans libellé est ignoré plutôt qu'affiché brut (« 47 » n'aide personne).
-    enriched[outputKey] = safeValues(contact[contactField])
+    enriched[`${key}_labels`] = safeValues(contact[column])
       .map(id => resolveListItem(id, referenceMaps[table]))
       .filter(Boolean);
   });
@@ -182,7 +172,7 @@ export function enrich(contact, referenceMaps, etabFlags) {
   enriched.etablissement_partenaire = flags?.partenaire === true;
   enriched.etablissement_ok_pour_apparaitre = flags?.ok_pour_apparaitre === true;
 
-  const roleLabel = refLabel(contact.Role_dans_le_PUI, referenceMaps['Role_Dans_le_PUI']);
+  const roleLabel = refLabel(contact.Role_dans_le_PUI, referenceMaps[CATEGORIES.role.table]);
   // Tableau comme les autres groupes de tags : le rendu des cartes ne lit que
   // `${clé}_labels`, une valeur singulière ne serait lue nulle part.
   enriched.role_labels = roleLabel ? [roleLabel] : [];
@@ -205,7 +195,7 @@ export function isInScope(record) {
 // Deux lignes de même libellé et de statuts différents ne se départagent pas par
 // leur ordre : on garde le plus strict (vrai seulement s'il l'est partout, donc
 // contacts masqués dans le doute) et le libellé est listé dans `conflicts`.
-const ETABLISSEMENT_LABEL_FIELDS = ['acronyme', 'nom_complet'];
+const ETABLISSEMENT_LABEL_FIELDS = CATEGORIES.etablissement.field;
 
 const FLAG_NAMES = ['fondateur', 'partenaire', 'ok_pour_apparaitre'];
 
@@ -270,13 +260,6 @@ export function mailtoHref(email) {
 }
 
 // ===== CHARGEMENT COMPLET DE L'ANNUAIRE =====
-
-// Tables de référence à lire, dérivées de la taxonomie (constants.js) plutôt
-// que recopiées à la main. Role_Dans_le_PUI n'a pas de filtre : déclarée à part.
-const REFERENCE_TABLES = [
-  ...FILTERS.map(filter => [filter.table, filter.field]),
-  [ROLE_REFERENCE.table, ROLE_REFERENCE.field]
-];
 
 // Sans l'une de ces colonnes aucun contact n'est éligible : mieux vaut une
 // erreur explicite qu'un annuaire vide.
