@@ -254,6 +254,33 @@ function tableDeReference({ corrigee, brute }, libelles) {
   return { id: libelles.map((_, index) => index + 1), [brute]: libelles.map(brut), [corrigee]: [...libelles] };
 }
 
+// Les métadonnées que Grist expose par fetchTable('_grist_Tables') et
+// fetchTable('_grist_Tables_column') : pour modifier une fiche, le widget y lit le type
+// des colonnes de BDD (schema.js) afin d'écrire le téléphone dans la forme de sa
+// colonne. Ici Numeric, comme dans le document d'origine (grist_structure.txt) : sans
+// ces tables, la démonstration marcherait aussi mais la console signalerait des types
+// illisibles.
+function metadonneesFictives() {
+  const colonnesBDD = [
+    ['prenom', 'Text'], ['nom', 'Text'], ['email', 'Text'], ['Fonction', 'Text'],
+    ['numero_de_telephone', 'Numeric'],
+    ['Etablissement', 'Ref:Etablissements'], ['Role_dans_le_PUI', `Ref:${ROLES.table}`],
+    ...Object.values(REFERENCES).map(ref => [ref.colonneBDD, `RefList:${ref.table}`]),
+    ['Competences', 'RefList:Competences'],
+    ['perimetre', 'RefList:REMMAPING_PERIMETRES_COMPETENCES'],
+    ['Accepte_apparaitre', 'Bool']
+  ];
+  return {
+    _grist_Tables: { id: [1, 2], tableId: ['BDD', 'Etablissements'] },
+    _grist_Tables_column: {
+      id: colonnesBDD.map((_, index) => index + 1),
+      parentId: colonnesBDD.map(() => 1),
+      colId: colonnesBDD.map(([colId]) => colId),
+      type: colonnesBDD.map(([, type]) => type)
+    }
+  };
+}
+
 export function tablesFictives() {
   const idsEtablissements = ids(ETABLISSEMENTS.map(etablissement => etablissement.acronyme));
   const idsReferences = Object.fromEntries(Object.entries(REFERENCES).map(([cle, ref]) => [cle, ids(ref.libelles)]));
@@ -313,7 +340,8 @@ export function tablesFictives() {
       email: admins.map(adresse),
       Responsable_de_l_Etablissement: admins.map(() => 0),
       admin: admins.map(() => true)
-    }
+    },
+    ...metadonneesFictives()
   };
   Object.values(REFERENCES).forEach(ref => {
     tables[ref.table] = tableDeReference(ref, ref.libelles);

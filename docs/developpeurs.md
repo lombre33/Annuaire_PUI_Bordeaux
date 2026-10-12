@@ -4,7 +4,7 @@ Cette page explique comment le widget est construit et comment le modifier sans 
 
 Pages liées : [README](../README.md) (présentation et installation), [guide utilisateur](utilisateurs.md), [sécurité](securite.md), [maintenance](maintenance.md).
 
-> **Cette page décrit la version 1.11.0** : le widget lit la table `BDD` (1.8.0), propose le filtre « Domaines » (1.9.0), s'adapte à la largeur de son cadre (1.9.1), n'affiche que les personnes qui ont accepté d'apparaître (1.10.0) et laisse la personne connectée choisir d'apparaître ou non, « Ma présence » (1.11.0). L'édition de sa fiche par la personne va encore en modifier une partie : elle est résumée dans [Chantiers en cours](#chantiers-en-cours) et la page sera mise à jour à sa fusion.
+> **Cette page décrit la version 1.12.0** : le widget lit la table `BDD` (1.8.0), propose le filtre « Domaines » (1.9.0), s'adapte à la largeur de son cadre (1.9.1), n'affiche que les personnes qui ont accepté d'apparaître (1.10.0), laisse la personne connectée choisir d'apparaître ou non, « Ma présence » (1.11.0), puis modifier sa fiche (celle de toute personne affichée, pour un administrateur) après une relecture de la carte avant et après (1.12.0). Cette modification s'applique directement : il n'y a ni validation par un administrateur ni historique tenu par le widget. Ce qui n'est pas encore là est résumé dans [Chantiers en cours](#chantiers-en-cours).
 
 ## Sommaire
 
@@ -14,6 +14,7 @@ Pages liées : [README](../README.md) (présentation et installation), [guide ut
 - [Données Grist : structure et encodages](#données-grist--structure-et-encodages)
 - [Règles d'affichage](#règles-daffichage)
 - [Identité et « Ma présence »](#identité-et--ma-présence-)
+- [Modifier une fiche](#modifier-une-fiche)
 - [Filtres, compteurs et recherche](#filtres-compteurs-et-recherche)
 - [Rendu des cartes et des menus](#rendu-des-cartes-et-des-menus)
 - [Fiabilité : que se passe-t-il en cas de panne ?](#fiabilité--que-se-passe-t-il-en-cas-de-panne-)
@@ -26,7 +27,7 @@ Pages liées : [README](../README.md) (présentation et installation), [guide ut
 
 ## Vue d'ensemble
 
-Le widget est une page web statique : HTML, CSS et JavaScript natif en modules ES. Il n'y a ni compilation, ni bundler, ni dépendance npm à l'exécution. Grist l'affiche dans une iframe sur une page de document et lui fournit son API de widget (`grist-plugin-api.js`) pour lire les tables du document et, dans deux cas précis, y écrire.
+Le widget est une page web statique : HTML, CSS et JavaScript natif en modules ES. Il n'y a ni compilation, ni bundler, ni dépendance npm à l'exécution. Grist l'affiche dans une iframe sur une page de document et lui fournit son API de widget (`grist-plugin-api.js`) pour lire les tables du document et, dans trois cas précis, y écrire.
 
 ```mermaid
 flowchart LR
@@ -59,13 +60,13 @@ flowchart LR
 
 Ce que le widget fait, dans la version 1.12.0 :
 
-- il **lit** les tables du document Grist : neuf lectures `fetchTable` par chargement de l'annuaire et, pour savoir qui est connecté, la liste des tables (`listTables`) puis la table-sonde ;
+- il **lit** les tables du document Grist : neuf lectures `fetchTable` par chargement de l'annuaire et, pour savoir qui est connecté, la liste des tables (`listTables`) puis la table-sonde. Quand une personne prépare la relecture d'une modification, il relit aussi `BDD` (puis une dernière fois juste avant d'écrire) et lit les tables de métadonnées `_grist_Tables` et `_grist_Tables_column` (`schema.js`) ;
 - il **écrit** dans trois cas seulement, toujours à l'initiative d'un chargement ou d'un clic, jamais en tâche de fond :
   1. à chaque chargement, il ajoute puis supprime une ligne de la table-sonde `Annuaire_Sonde` (`identity.js`), sauf pour un compte Lecteur ou quand la table n'existe pas ;
   2. quand la personne connectée actionne l'interrupteur « Ma présence », il écrit la case `Accepte_apparaitre` de sa ou de ses lignes de `BDD` (`presence.js`), en une seule action atomique ;
-  3. quand une personne valide la relecture de la modification de sa fiche (un administrateur : de n'importe quelle fiche), il écrit les colonnes modifiées de cette seule ligne de `BDD` (`profile-save.js`), en une seule action atomique, sans validation ni historique.
+  3. quand une personne valide la relecture de la modification de sa fiche (un administrateur : de la fiche d'une personne affichée), il écrit les colonnes modifiées de cette seule ligne de `BDD` (`profile-save.js`), en une seule action atomique, sans validation ni historique tenu par le widget.
 
-  Il ne crée ni ne modifie jamais une table ou une colonne ;
+  Il ne crée ni ne modifie jamais la structure du document (tables, colonnes) ;
 - il ne stocke rien dans le navigateur et n'émet lui-même aucune requête réseau ;
 - il demande l'accès `full` (`grist.ready({ requiredAccess: 'full' })` dans `main.js`, `accessLevel: full` dans `manifest.yml`), un choix assumé : il lit plusieurs tables autres que celle de sa section et écrit dans le document. Les conséquences et les garde-fous sont détaillés dans [sécurité](securite.md#niveau-daccès-demandé-à-grist).
 
@@ -74,12 +75,25 @@ Ce que le widget fait, dans la version 1.12.0 :
 ```mermaid
 flowchart TD
     main["main.js<br/>état, événements, câblage Grist"]
-    render["render.js<br/>construction du DOM"]
-    filters["filters.js<br/>filtrage et compteurs"]
+    subgraph annuaire["L'annuaire"]
+        render["render.js<br/>construction du DOM"]
+        filters["filters.js<br/>filtrage et compteurs"]
+    end
+    subgraph personne["La personne connectée"]
+        identity["identity.js<br/>qui est connecté ?"]
+        presence["presence.js<br/>choix d'apparaître"]
+        account["account-ui.js<br/>bandeau Ma présence"]
+    end
+    subgraph fiche["Modifier une fiche"]
+        profile["profile.js<br/>droits, formulaire, changements"]
+        save["profile-save.js<br/>relire, écrire"]
+        preview["preview.js<br/>cartes avant et après"]
+        schema["schema.js<br/>type des colonnes"]
+        profileui["profile-ui.js<br/>la fenêtre"]
+        changes["changes-ui.js<br/>liste Ce qui change"]
+        dom["dom.js<br/>el()"]
+    end
     data["grist-data.js<br/>lecture et enrichissement"]
-    identity["identity.js<br/>qui est connecté ?"]
-    presence["presence.js<br/>choix d'apparaître"]
-    account["account-ui.js<br/>bandeau Ma présence"]
     constants["constants.js<br/>taxonomie, tables et colonnes"]
     main --> render
     main --> filters
@@ -87,29 +101,51 @@ flowchart TD
     main --> identity
     main --> presence
     main --> account
+    main --> profile
+    main --> save
+    main --> profileui
     render --> data
-    filters --> data
-    identity --> data
     render --> constants
+    filters --> data
     filters --> constants
-    data --> constants
+    identity --> data
     identity --> constants
     presence --> constants
+    data --> constants
+    profile --> data
+    profile --> constants
+    save --> data
+    save --> constants
+    save --> presence
+    save --> profile
+    save --> preview
+    save --> schema
+    preview --> data
+    preview --> constants
+    schema --> data
+    schema --> constants
+    profileui --> data
+    profileui --> constants
+    profileui --> dom
+    profileui --> profile
+    profileui --> changes
+    changes --> constants
+    changes --> dom
 ```
 
-Une flèche signifie « importe ».
+Une flèche signifie « importe » ; tous les `import` des fichiers à la racine y figurent.
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | Squelette de la page, `<template id="cardTemplate">` d'une carte, chargement de l'API Grist puis de `main.js` |
+| `index.html` | Squelette de la page, `<template id="cardTemplate">` d'une carte, `<dialog id="profileDialog">` de la fenêtre de modification, chargement de l'API Grist puis de `main.js` |
 | `style.css` | Feuille de style unique (variables de couleur en tête de fichier) |
-| `constants.js` | Noms de la table principale (`MAIN_TABLE`, soit `BDD`), de la case de consentement (`CONSENT_COLUMN`, soit `Accepte_apparaitre`) et de la table-sonde (`PROBE_TABLE`, soit `Annuaire_Sonde`), puis taxonomie : `CATEGORIES` donne, pour chaque catégorie, son libellé, sa couleur, sa table de référence, ses colonnes de libellé et, sauf pour l'établissement et le rôle (des Références simples), sa colonne de liste dans la table principale. `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES`, `REFERENCE_SOURCES` et `LIST_CATEGORIES` en sont dérivés |
-| `grist-data.js` | Lecture des tables (`loadDirectory()`), décodage des formats Grist, enrichissement des contacts, règles d'éligibilité et de consentement (`hasAccepted()`, `buildContacts()`), et l'index des personnes par adresse e-mail (`createPeopleIndex()`, `describeVisibility()`) |
+| `constants.js` | Noms de la table principale (`MAIN_TABLE`, soit `BDD`), de la case de consentement (`CONSENT_COLUMN`, soit `Accepte_apparaitre`) et de la table-sonde (`PROBE_TABLE`, soit `Annuaire_Sonde`), puis taxonomie : `CATEGORIES` donne, pour chaque catégorie, son libellé, sa couleur, sa table de référence, ses colonnes de libellé et, sauf pour l'établissement et le rôle (des Références simples), sa colonne de liste dans la table principale. `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES`, `REFERENCE_SOURCES` et `LIST_CATEGORIES` en sont dérivés. `PROFILE_FIELDS` liste ce qu'une personne peut modifier sur sa fiche (colonne, libellé, nature : texte, téléphone, référence ou liste) |
+| `grist-data.js` | Lecture des tables (`loadDirectory()`), décodage des formats Grist, enrichissement des contacts, règles d'éligibilité et de consentement (`hasAccepted()`, `buildContacts()`), l'index des personnes par adresse e-mail ou par identifiant de ligne (`createPeopleIndex()`, dont `findByEmail()` et `findById()`), `describeVisibility()` et `displayName()` (le nom d'un contact tel que les cartes l'affichent) |
 | `filters.js` | Forme de l'état des filtres (`createEmptyFilterState()`), `filterContacts()`, `computeFilterCounts()`, `pruneStaleFilters()` |
 | `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`) et cartes (`renderCards()`, avec le bouton « Modifier » des fiches que la personne peut modifier) ; cartes de relecture sans interaction (`renderPreviewCard()`), où ce qui change est repéré ; `initials()` sert aussi au bandeau « Ma présence » |
 | `identity.js` | `readIdentity()` : qui est connecté ? Ajoute une ligne dans la table-sonde `Annuaire_Sonde` (dont Grist calcule l'adresse par une formule `user.Email`), la relit par son identifiant puis la supprime. Renvoie l'adresse et la case administrateur, ou « personne » au moindre doute ; ne bloque jamais l'annuaire |
-| `presence.js` | « Ma présence » : `describePresence()` dit à la personne si elle apparaît et pourquoi, `setPresence()` écrit son accord (`Accepte_apparaitre`) sur sa ou ses lignes en une seule action atomique |
-| `account-ui.js` | Le bandeau « Ma présence » au-dessus des filtres : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier |
+| `presence.js` | « Ma présence » : `describePresence()` dit à la personne si elle apparaît et pourquoi, `setPresence()` écrit son accord (`Accepte_apparaitre`) sur sa ou ses lignes en une seule action atomique. `describeHiddenFiche()` dit, à la relecture d'une modification, pourquoi la fiche modifiée ne figurerait pas dans l'annuaire ; `classifyWriteError()` range un refus de Grist (règle d'accès, colonne à formule, autre) et sert aussi à `profile-save.js` |
+| `account-ui.js` | Le bandeau « Ma présence » au-dessus des filtres, avec le bouton « Modifier mon profil » (`setActions()`) : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier |
 | `profile.js` | Modifier une fiche, sans DOM ni Grist : `rightsFor()` (qui peut modifier quelle fiche : la sienne, ou toutes pour un administrateur ; fermé par défaut), `profileFormModel()` et `draftOf()` (ce que le formulaire propose), `diffProfile()` (ce que la personne a changé, sous forme de delta, et pourquoi une saisie serait refusée), `rebaseChanges()` (ramener ces changements sur la fiche telle qu'elle est maintenant dans Grist) et `describeChanges()` (la liste « Ce qui change ») |
 | `profile-save.js` | Relire puis écrire une fiche : `prepareReview()` relit la fiche dans Grist et prépare les cartes avant et après, `saveProfile()` écrit en une seule action atomique (`UpdateRecord`), et seulement si les champs touchés n'ont pas changé depuis la relecture (`signatureOf()`). `buildRowUpdate()` calcule les valeurs à écrire sur la fiche telle qu'elle est au moment d'écrire, `readRow()` la relit, `unsavedLabels()` dit ce que Grist n'a pas gardé |
 | `preview.js` | `previewOf()` : la carte « avant » et la carte « après » (la ligne avec les valeurs qui seront écrites, enrichie comme l'annuaire) ; `diffContacts()` : ce qui les distingue |
@@ -126,7 +162,7 @@ Règles de répartition, à respecter pour que les tests restent possibles sans 
 2. Seules `loadDirectory()` et `readColumnTypes()` (lectures), `readIdentity()`, `setPresence()` et les fonctions de `profile-save.js` (`prepareReview()` lit, `saveProfile()` écrit) parlent à Grist, par le `docApi` qu'on leur passe : les tests leur fournissent un faux `docApi` (`tests/support/fake-grist.js`). `profile.js` et `preview.js` ne l'utilisent jamais.
 3. `render.js` ne contient aucune règle métier : il reçoit des contacts déjà filtrés et une fonction de rappel `onToggle`.
 4. `filters.js` n'a pas d'effet de bord : `pruneStaleFilters()` renvoie un nouvel état au lieu de modifier son argument.
-5. Seul `main.js` détient l'état (`state`).
+5. Seul `main.js` détient l'état de l'application (`state`). La fenêtre de modification ne garde que l'état de sa propre session (étape, brouillon), jeté à sa fermeture ; `profile-ui.js`, `changes-ui.js` et `dom.js` ne contiennent aucune règle métier : `main.js` leur donne ce que les autres modules ont calculé.
 
 ## Chargement des données
 
@@ -164,7 +200,7 @@ sequenceDiagram
 5. `applyDirectory()` (dans `main.js`) restreint le menu Établissement aux établissements validés (`filterVisibleEstablishments()`), retire des filtres actifs les valeurs qui n'existent plus (`pruneStaleFilters()`), reconstruit les menus **seulement si les libellés ont changé** (`referenceMapsEqual()`, car reconstruire ferme les menus ouverts), puis rafraîchit les cartes (`refreshCards()`) et le bandeau « Ma présence » (`refreshAccount()`).
 6. `showStatus()` affiche ou masque le bandeau d'état avec les messages de `issues`.
 
-Cette suite est enveloppée dans `reloadDirectory()` (`main.js`), qui renvoie `'applied'`, `'stale'` (une lecture plus récente a pris le relais) ou `'failed'` (le bandeau d'état le dit). `onRecords` l'appelle après le délai d'anti-rebond ; l'interrupteur « Ma présence » l'appelle directement après son écriture, pour que l'écran montre ce que Grist a enregistré.
+Cette suite est enveloppée dans `reloadDirectory()` (`main.js`), qui renvoie `'applied'`, `'stale'` (une lecture plus récente a pris le relais) ou `'failed'` (le bandeau d'état le dit). `onRecords` l'appelle après le délai d'anti-rebond ; l'interrupteur « Ma présence » et l'enregistrement d'une fiche (`saveReviewed()`) l'appellent directement après leur écriture, pour que l'écran montre ce que Grist a enregistré.
 
 `loadDirectory()` renvoie `{ contacts, referenceMaps, etabFlags, people, issues }` : les contacts éligibles et enrichis, les libellés de chaque catégorie (`referenceMaps`, rangés par **clé de catégorie** et non par table, parce que « Compétences » et « Domaines » lisent la même table `Competences`), les indicateurs des établissements, l'index des personnes par adresse e-mail (`people`) et les messages français destinés au bandeau d'état.
 
@@ -236,7 +272,7 @@ flowchart TD
 
 - Parmi les huit étapes du schéma, les six premières sont appliquées une fois par chargement, dans `loadDirectory()`. Les deux dernières le sont à chaque action de l'utilisateur, dans `main.js` : `refreshCards()` appelle `filterContacts()` sur la liste des contacts éligibles.
 - **Les deux accords sont indépendants.** Celui de l'établissement (`ok_pour_apparaitre`, que décident ceux qui valident les établissements) ne remplace pas celui de la personne (`Accepte_apparaitre`, que la personne donne elle-même), et celui de la personne ne contourne pas l'établissement. Seul `true` vaut accord : une case vide, décochée, `0` ou un texte ne suffisent pas.
-- `describeVisibility()` reprend ces critères un à un pour une ligne de `BDD` et dit pourquoi elle apparaît ou non. `tests/people.test.mjs` vérifie qu'elle concorde avec `buildContacts()` pour chaque ligne du jeu de test : « Ma présence » ne peut donc pas dire autre chose que l'annuaire.
+- `describeVisibility()` reprend ces critères un à un pour une ligne de `BDD` et dit pourquoi elle apparaît ou non. `tests/people.test.mjs` vérifie qu'elle concorde avec `buildContacts()` pour chaque ligne du jeu de test : « Ma présence » ne peut donc pas dire autre chose que l'annuaire. `describeHiddenFiche()` (`presence.js`) reprend le même verdict pour la relecture d'une modification, sans ajouter de règle : « Votre fiche est masquée de l'annuaire : vous n'avez pas accepté d'apparaître (interrupteur « Apparaître dans l'annuaire » en haut de page). » pour la personne concernée, « Cette fiche est masquée de l'annuaire : la personne n'a pas accepté d'apparaître. » pour un administrateur, et, si la personne a accepté mais reste masquée, « Votre fiche reste masquée de l'annuaire : … » ou « Cette fiche reste masquée de l'annuaire : … » suivi de la ou des raisons.
 - Un établissement « autres » (une structure extérieure au PUI qui a collaboré à certaines tâches, à la différence des établissements fondateurs et des partenaires) n'est jamais affiché : aucune branche du code ne le rend éligible.
 - Un établissement inconnu (`Etablissement` vide, ou sans ligne correspondante dans `Etablissements`) n'a aucun indicateur : le contact est exclu plutôt qu'affiché sans validation.
 - La Référence `Etablissement` désigne une ligne par son identifiant : deux lignes de même acronyme ne se mélangent pas. Seul le repli par libellé, quand Grist envoie la Référence déjà résolue en texte, ne peut pas les départager : `etablissementFlagsFromRows()` retient alors le statut le plus strict (vrai seulement s'il l'est partout) et signale le libellé dans `conflicts` : les contacts de ce libellé sont masqués si ce statut ne les rend plus éligibles.
@@ -307,6 +343,120 @@ Tout ce qui précède est du JavaScript qui tourne dans le navigateur de la pers
 
 `identity.js`, `presence.js` et l'index des personnes se testent sans navigateur grâce au faux document Grist de `tests/support/fake-grist.js` : `tests/identity.test.mjs`, `tests/people.test.mjs` et `tests/presence.test.mjs`. Ce faux document reproduit ce dont le widget dépend : lectures, écritures atomiques qui renvoient `retValues` comme Grist, formules de déclenchement de la sonde, pannes de lecture, écritures refusées. Les tests navigateur (`tests/support/browser.mjs`, utilisé par `tests/e2e.test.mjs` et `tests/e2e-profile.test.mjs`) et le serveur de démonstration en injectent le texte tel quel dans la page, `export` retiré : ce fichier ne doit donc rien importer.
 
+## Modifier une fiche
+
+Depuis la version 1.12.0, une personne connectée modifie sa propre fiche, et un administrateur celle de toute personne affichée dans l'annuaire. Les modifications s'appliquent **directement** : il n'y a ni validation par un administrateur, ni historique tenu par le widget, ni table créée par lui. Avant d'enregistrer, une fenêtre de relecture montre la carte « Avant » et la carte « Après », avec ce qui change repéré. Les réglages à faire dans Grist (colonnes de données, règles d'accès) sont dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) ; le protocole d'essai manuel est la [section 13 de `TESTING.md`](../TESTING.md#13-modifier-sa-fiche-1120).
+
+### Qui peut modifier quoi
+
+`rightsFor()` (`profile.js`) reçoit l'identité de la personne connectée (voir [Qui est connecté ?](#qui-est-connecté-)) et renvoie une fonction qui dit, pour une ligne de `BDD`, ce que la personne peut en faire. Elle est **fermée par défaut** : sans identité fiable (pas de table-sonde, compte Lecteur…), personne ne peut rien modifier.
+
+| Droit | Quand | Ce que la personne voit |
+|---|---|---|
+| `'own'` | `email` de la ligne est l'adresse de la personne connectée (casse et espaces ignorés) | « ✎ Modifier » et « Votre fiche » sur sa carte, « Modifier mon profil » dans le bandeau ; fenêtre « Modifier mon profil » |
+| `'admin'` | `identity.admin` vaut exactement `true` (case `admin` d'`ACL`) et la ligne est celle d'une autre personne | « ✎ Modifier » sur la carte ; fenêtre « Modifier la fiche de X » |
+| aucun | tout le reste | aucun bouton |
+
+Ce que la personne peut changer est déclaré une fois, dans `PROFILE_FIELDS` (`constants.js`) : prénom, nom, fonction, téléphone, rôle dans le PUI (une valeur d'une table de référence) et six listes (instances, actions, GT, compétences, communautés, tâches). **Jamais** `email` (c'est lui qui désigne la personne), `Etablissement` ni `perimetre` (ils décident de qui apparaît : l'affaire des administrateurs, dans Grist), ni `Accepte_apparaitre` (l'interrupteur « Ma présence » l'écrit). Une colonne facultative absente de `BDD` n'est pas proposée.
+
+Les boutons « ✎ Modifier » sont sur les cartes (`fillActions()` dans `render.js`) : un administrateur ne modifie donc pas, depuis le widget, une fiche que l'annuaire masque (pas de carte, donc pas de bouton), ni l'adresse e-mail, l'établissement ou le périmètre d'une fiche. Cela se fait dans Grist. La personne concernée, elle, modifie toujours sa propre fiche par « Modifier mon profil », même si elle n'apparaît pas dans l'annuaire ; ce bouton du bandeau n'est proposé que si une seule ligne porte son adresse. Un seul écouteur sur la grille (`main.js`) ouvre la fenêtre, et `openProfile()` revérifie le droit : un bouton ajouté à la main dans la page n'ouvre rien.
+
+Tout cela est un **verrou d'interface**, pas une sécurité : `rightsFor()` décide de ce que le widget propose, il ne protège rien. Seules les règles d'accès de Grist empêchent vraiment la modification de la fiche d'un autre, ou de `email`, `Etablissement` et `perimetre` : voir [sécurité](securite.md#écritures-et-règles-daccès) et l'étape 4 de [`GRIST_SETUP.md`](../GRIST_SETUP.md). Ces règles n'ont pas été essayées dans un vrai Grist.
+
+### Le parcours
+
+```mermaid
+sequenceDiagram
+    actor P as Personne
+    participant U as profile-ui.js
+    participant M as main.js
+    participant S as profile-save.js
+    participant G as Grist
+    P->>M: clic sur « ✎ Modifier » ou « Modifier mon profil »
+    M->>M: openProfile : le droit est vérifié (rightsFor)
+    M->>U: open : formulaire rempli avec la fiche
+    P->>U: modifie les champs
+    U->>M: evaluate : diffProfile, ni lecture ni écriture
+    P->>U: « Relire mes modifications »
+    U->>M: review
+    M->>S: prepareReview
+    S->>G: fetchTable BDD (readRow)
+    G-->>S: la fiche telle qu'elle est maintenant
+    S->>G: fetchTable _grist_Tables et _grist_Tables_column
+    G-->>S: types des colonnes
+    Note over S: rebaseChanges, buildRowUpdate, previewOf, signatureOf
+    S-->>U: cartes « Avant » et « Après », « Ce qui change », signature
+    P->>U: « Valider »
+    U->>M: save
+    M->>S: saveProfile
+    S->>G: fetchTable BDD (readRow)
+    G-->>S: la fiche juste avant l'écriture
+    alt les colonnes touchées ont changé depuis la relecture
+        S-->>M: status changed, rien n'est écrit
+        M->>S: prepareReview : nouvelle relecture
+        M-->>U: retour à la relecture, avec un avis
+    else
+        S->>G: applyUserActions : un seul UpdateRecord de BDD
+        G-->>S: accepté
+        S-->>M: status saved
+        M->>M: reloadDirectory : relit l'annuaire
+        M->>M: unsavedLabels : Grist a-t-il gardé ce qui était demandé ?
+        M-->>U: « Fiche enregistrée »
+    end
+```
+
+1. **Ouvrir.** `openProfile()` (`main.js`) retrouve la ligne dans l'index des personnes (`findById()`, qui couvre toutes les lignes de `BDD`), vérifie le droit, construit le formulaire (`profileFormModel()`, `draftOf()`) et ouvre la fenêtre (`createProfileDialog()`). La fiche montrée est celle du dernier chargement de l'annuaire : rien n'est lu dans Grist à ce stade.
+2. **Saisir.** À chaque frappe, `diffProfile()` compare le brouillon à la fiche : le résumé du pied de fenêtre (« Aucune modification », « Corrigez les champs signalés » ou le nombre de champs modifiés), les messages sous les champs refusés et le bouton « Relire mes modifications » en dépendent. Ni lecture ni écriture.
+3. **Relire.** `prepareReview()` relit la fiche, y ramène les changements (`rebaseChanges()`), calcule les valeurs à écrire (`buildRowUpdate()`), puis en tire les deux cartes (`previewOf()`) et la liste « Ce qui change » (`describeChanges()`). La carte « Après » est la ligne de `BDD` avec les valeurs à écrire, enrichie par le même `enrich()` que l'annuaire : elle montre ce que l'annuaire affichera. Si la fiche modifiée ne figurerait pas dans l'annuaire, la relecture le dit, avec la raison (`describeHiddenFiche()`).
+4. **Valider.** `saveProfile()` relit la fiche une dernière fois, compare sa signature à celle de la relecture (voir plus bas), puis envoie **une seule** action `UpdateRecord` sur cette ligne de `BDD` : tout ou rien.
+5. **Vérifier.** `reloadDirectory()` relit tout l'annuaire, puis `unsavedLabels()` compare la fiche relue à ce qui était demandé : si Grist n'a pas gardé un champ, la confirmation le dit.
+
+**Rien n'est écrit avant « Valider ».** Le formulaire, `diffProfile()`, `prepareReview()`, « Retour » (qui ramène au formulaire avec le brouillon intact), « Annuler », la croix et Échap n'écrivent rien : le seul appel à `applyUserActions` de ce parcours est celui de `saveProfile()`.
+
+### Un delta, pas une copie de la fiche
+
+Pendant que la personne remplit le formulaire, d'autres peuvent modifier la fiche, et le formulaire ne montre pas tout (la valeur d'une liste dont la ligne de référence n'a plus de libellé n'a pas de pastille). Écrire une copie de la fiche telle que le formulaire l'a montrée écraserait ce que les autres ont changé et perdrait ce qu'il ne montre pas. `diffProfile()` calcule donc un **delta**, qui ne contient que ce qui change :
+
+| Champ | Forme du delta | Écriture |
+|---|---|---|
+| Texte (prénom, nom, fonction) et téléphone | `{ avant, apres }` | la nouvelle valeur remplace celle de la fiche |
+| Référence (rôle dans le PUI) | `{ avant: { id, label }, apres: { id, label } }` | l'identifiant de la nouvelle ligne |
+| Liste | `{ ajout: [...], retrait: [...] }` | les retraits sont ôtés et les ajouts ajoutés à la liste **actuelle** de la fiche (`['L', ...conservées, ...ajoutées]`), rien d'autre |
+
+`rebaseChanges()` ramène ensuite ce delta sur la fiche telle qu'elle est maintenant dans Grist : un texte, un téléphone ou une référence repart de sa valeur actuelle et disparaît du delta si la fiche a déjà la valeur voulue ; une liste garde ses ajouts et ses retraits, moins ceux qui sont déjà faits ; `moved` nomme les champs dont la valeur a changé dans Grist depuis l'ouverture du formulaire, ce que la relecture dit. `buildRowUpdate()` produit enfin les cellules à écrire, sur la fiche **au moment d'écrire** : `saveProfile()` le refait avec la ligne qu'il vient de relire, si bien qu'un tag ajouté entre-temps par un autre n'est pas perdu. Il refuse une liste qui contient autre chose que des identifiants de ligne, une colonne absente de `BDD` et une fiche qui n'aurait plus ni prénom ni nom. Le **téléphone** s'écrit dans la forme de sa colonne : un nombre si elle est numérique (le 0 initial est perdu, l'affichage le rétablit), un texte sinon ; vidé, il devient une cellule vide.
+
+### Détecter un changement concurrent
+
+`signatureOf()` renvoie le contenu des seules colonnes touchées, sérialisé. `prepareReview()` la calcule sur la fiche relue et la range dans la relecture ; `saveProfile()` relit la fiche et la recalcule. Si elle diffère, quelqu'un d'autre a modifié, depuis la relecture, une colonne que la personne modifie (même par un simple ajout dans la même liste) : **rien n'est écrit**, `saveProfile()` renvoie `{ status: 'changed', row }` et `saveReviewed()` (`main.js`) refait la relecture sur la fiche actuelle. La fenêtre y revient avec l'avis « La fiche a changé dans Grist pendant la relecture. Relisez ce qui suit, puis validez à nouveau. » : la personne n'écrit jamais par-dessus une valeur qu'elle n'a pas vue. Un changement fait par un autre dans une colonne qu'elle ne touche pas n'entre pas dans la signature et reste en place, puisque seules les colonnes touchées sont écrites.
+
+Limite : la relecture de la fiche et l'écriture sont deux appels successifs, pas une transaction. Un changement qui arriverait entre les deux ne serait pas vu.
+
+### Les échecs
+
+Un échec attendu devient une `ProfileSaveError` dont le message est une phrase française, montrée dans la fenêtre (`role="alert"`) ; l'erreur d'origine reste dans la console (`[PROFIL]`). Toute autre erreur est remplacée par « L'opération n'a pas pu aboutir. Le détail est dans la console du navigateur. » (`userFacing()`). La fenêtre reste ouverte sur l'étape où l'échec s'est produit, avec le brouillon intact, et un échec avant l'écriture ne change rien dans Grist. Les cas et leurs messages exacts sont dans le tableau de [Fiabilité](#fiabilité--que-se-passe-t-il-en-cas-de-panne-).
+
+### Accessibilité
+
+- La fenêtre est un vrai `<dialog>` ouvert par `showModal` : modale, le reste de la page est inerte et le focus ne s'en échappe pas. Son titre la nomme (`aria-labelledby`).
+- À chaque étape (formulaire, relecture, confirmation), le focus est placé sur le titre (`tabindex="-1"`), que le lecteur d'écran annonce, et non sur un bouton qui vient de disparaître.
+- Échap ne fait pas perdre un travail par mégarde : avec des modifications, un premier appui affiche « Des modifications ne sont pas enregistrées. Appuyez encore sur Échap pour les abandonner. » et un second ferme. Pendant l'enregistrement, Échap ne ferme rien.
+- À la fermeture, le focus revient à l'endroit d'où la fenêtre a été ouverte : le bouton de la même fiche, retrouvé dans la grille redessinée, ou « Modifier mon profil » dans le bandeau.
+- Dans la carte « Après », la couleur n'est jamais le seul repère : une ligne de texte modifiée porte une pastille écrite (« modifié », « ajouté » ou « supprimé »), un tag ajouté un « + », un tag retiré reste visible, barré, et chaque repère est aussi dit en texte réservé aux lecteurs d'écran (`sr-only`).
+- Une saisie refusée est rattachée à son champ (`aria-invalid`, `aria-describedby`), le résumé est une zone `aria-live`, les avis ont `role="status"` et les erreurs `role="alert"`.
+- Dans un cadre de 560 px ou moins, la fenêtre occupe tout l'écran et les cartes « Avant » et « Après » sont l'une sous l'autre (`dialogs.css`).
+
+### Le type des colonnes (schema.js)
+
+`readColumnTypes()` lit deux tables de métadonnées de Grist avec `fetchTable`, `_grist_Tables` et `_grist_Tables_column`, et renvoie `{ colonne → type }` pour `BDD` (« Text », « Numeric », « Ref:Etablissements »…). Le widget n'en tire qu'une chose : écrire le téléphone dans la forme de sa colonne. `prepareReview()` l'appelle une fois par relecture et range le résultat dans la relecture, que `saveProfile()` réutilise. Si les métadonnées sont illisibles, la fonction renvoie `{}` et la console avertit (`[SCHEMA]`) : le téléphone suit alors la forme de la cellule actuelle. Ce ne sont pas des méthodes d'API nouvelles : seul ce que `fetchTable` lit change.
+
+### Aucune validation, aucun historique
+
+Le widget n'attend la validation de personne, ne tient aucun historique des modifications et ne crée aucune table. Pour savoir qui a changé quoi, il faut sans doute se tourner vers l'historique du document Grist lui-même : ce que Grist y garde exactement n'a pas été vérifié. Selon [`GRIST_SETUP.md`](../GRIST_SETUP.md), le bouton « Annuler » de Grist défait toute la modification d'un geste, puisque c'est une seule action ; cela n'a pas été constaté.
+
+### Tests de la modification
+
+`profile.js`, `profile-save.js`, `preview.js` et `schema.js` se testent sans navigateur avec le faux document de `tests/support/fake-grist.js` (qui sait refuser une ligne précise, `denyRows`, et cache les tables `_grist_*` de `listTables`, comme Grist) : `tests/profile.test.mjs`, `tests/profile-save.test.mjs`, `tests/preview.test.mjs` et `tests/schema.test.mjs`. Le parcours complet, dans Chromium, est `tests/e2e-profile.test.mjs`, qui vérifie aussi la tenue de la fenêtre dans des cadres de 280, 320 et 360 px de large.
+
 ## Filtres, compteurs et recherche
 
 `filterContacts(contacts, activeFilters, searchTerm, scope, excludeKey)` combine trois prédicats : `matchesSearch()` (nom ou prénom), `matchesScope()` (interrupteurs) et `matchesSelections()` (menus).
@@ -330,7 +480,7 @@ Tout ce qui précède est du JavaScript qui tourne dans le navigateur de la pers
 
 ## Fiabilité : que se passe-t-il en cas de panne ?
 
-Principe : une panne de lecture ou une donnée indispensable manquante ne doit jamais passer pour un annuaire vide. Les situations ci-dessous produisent un message dans le bandeau d'état (`#statusBanner`, `role="alert"`), sauf celles de « Ma présence », qui parlent dans le bandeau de la personne ou dans la console. Deux cas de lecture restent muets : un contact dont l'établissement désigne une ligne qui n'existe pas (masqué, sans message sauf si la colonne est vide) et une colonne facultative supprimée de `BDD` (l'information n'est plus affichée) ; voir [Limites connues](maintenance.md#limites-connues).
+Principe : une panne de lecture ou une donnée indispensable manquante ne doit jamais passer pour un annuaire vide. Les situations ci-dessous produisent un message dans le bandeau d'état (`#statusBanner`, `role="alert"`), sauf celles de « Ma présence », qui parlent dans le bandeau de la personne ou dans la console, et celles de la modification d'une fiche, qui parlent dans la fenêtre de modification. Deux cas de lecture restent muets : un contact dont l'établissement désigne une ligne qui n'existe pas (masqué, sans message sauf si la colonne est vide) et une colonne facultative supprimée de `BDD` (l'information n'est plus affichée) ; voir [Limites connues](maintenance.md#limites-connues).
 
 | Situation | Ce que voit l'utilisateur | Où c'est géré |
 |---|---|---|
@@ -348,17 +498,33 @@ Principe : une panne de lecture ou une donnée indispensable manquante ne doit j
 | Grist refuse d'écrire le choix (règle d'accès), ou `Accepte_apparaitre` est une colonne à formule | Message en français sous le bandeau ; l'interrupteur reste dans son état réel, rien n'a changé | `setPresence()`, `explainWriteError()` |
 | Double clic sur l'interrupteur | Un seul envoi : l'interrupteur est gelé pendant l'écriture | `setBusy()`, `togglePending` |
 | Écriture réussie mais relecture de l'annuaire ratée | Message « Modification enregistrée ; l'annuaire n'a pas pu être rechargé. » | `togglePresence()` |
+| Modification d'une fiche : la fiche ne peut pas être relue dans Grist | Dans la fenêtre, la relecture ou la validation reste là avec le brouillon : « La fiche n'a pas pu être relue dans Grist : rien n'a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | `readRow()`, `ProfileSaveError` |
+| La fiche a été supprimée pendant que la fenêtre était ouverte | « Cette fiche n'existe plus dans Grist : rien n'a été modifié. » | `readRow()` |
+| Grist refuse d'écrire la fiche (règle d'accès) | « Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche. Contactez un administrateur. » La relecture reste ouverte, rien n'a été écrit | `saveProfile()`, `classifyWriteError()` |
+| Une colonne de la fiche est une colonne à formule | « Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md. » | `saveProfile()` |
+| Autre échec d'écriture | « La modification n'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | `saveProfile()` |
+| Les colonnes touchées ont changé dans Grist depuis la relecture | Rien n'est écrit ; retour à la relecture, recalculée sur la fiche actuelle : « La fiche a changé dans Grist pendant la relecture. Relisez ce qui suit, puis validez à nouveau. » | `signatureOf()`, `saveProfile()`, `saveReviewed()` |
+| Des champs ont changé dans Grist entre l'ouverture du formulaire et la relecture | Avis dans la relecture : « Ces informations ont changé dans Grist depuis l'ouverture de la fenêtre : … La carte « Avant » montre leur état actuel. » (les champs à la place des points de suspension) | `rebaseChanges()`, `prepareReview()` |
+| Les modifications sont déjà dans la fiche, ou il n'y a rien à relire | « Ces modifications sont déjà dans la fiche : il n'y a rien à enregistrer. » ou « Il n'y a rien à relire : corrigez les champs signalés ou modifiez la fiche. » | `prepareReview()` |
+| Une liste contient autre chose que des identifiants de ligne, une colonne manque, ou la fiche n'aurait plus ni prénom ni nom | « Ces modifications ne peuvent pas être enregistrées : … » suivi de la cause ; rien n'est écrit | `buildRowUpdate()` |
+| Écriture réussie, mais Grist n'a pas gardé tout ce qui était demandé | Dans la confirmation : « Grist n'a pas gardé tout ce qui était demandé (…). Vérifiez la fiche dans Grist ou contactez un administrateur. » (les champs entre parenthèses) | `unsavedLabels()` |
+| Écriture réussie, mais annuaire non rechargé | « Les modifications sont enregistrées, mais l'annuaire n'a pas pu être rechargé. Rechargez la page pour les voir. » | `saveReviewed()`, `renderSaved()` |
+| Types de colonnes illisibles | Rien à l'écran : le téléphone suit la forme de la cellule actuelle ; la console avertit (`[SCHEMA]`) | `readColumnTypes()` |
+| Erreur inattendue pendant la modification | « L'opération n'a pas pu aboutir. Le détail est dans la console du navigateur. » | `userFacing()` |
+| Double clic sur « Valider », ou Échap pendant l'écriture | Un seul envoi ; la fenêtre ne se ferme pas pendant l'écriture | `createProfileDialog()` |
 
-La console du navigateur garde le détail, avec six préfixes (plus l'erreur brute d'un chargement raté, sans préfixe) :
+La console du navigateur garde le détail, avec huit préfixes (plus l'erreur brute d'un chargement raté, sans préfixe) :
 
 - `[GRIST]` : nombre d'enregistrements reçus et de contacts affichables ;
 - `[REFS]` : entrées chargées par catégorie, lectures échouées, colonnes de libellé introuvables et compétences que `Macro_competences` ne classe pas ;
 - `[ETABLISSEMENT]` : contacts qui ont un périmètre mais pas d'`Etablissement` renseigné (vingt identifiants au plus) ;
 - `[CONSENTEMENT]` : combien de personnes du périmètre sont masquées faute d'accord (`n/m`) ;
 - `[IDENTITE]` : pourquoi personne n'est identifié, ou, pour la personne identifiée, si elle est administrateur ; avertissements sur la fiche introuvable ou portée par plusieurs lignes ;
-- `[PRESENCE]` : le détail d'une écriture refusée.
+- `[PRESENCE]` : le détail d'une écriture refusée ;
+- `[PROFIL]` : la lecture ou l'écriture d'une fiche qui a échoué, ou une erreur inattendue pendant la modification ;
+- `[SCHEMA]` : les types de colonnes illisibles.
 
-Les journaux du widget ne contiennent ni nom ni adresse, seulement des nombres et des identifiants de ligne : la console peut être partagée pendant une démonstration. La seule exception est le détail brut d'une erreur renvoyée par Grist (dans `[PRESENCE]`, dans `[IDENTITE] lecture impossible : …`, ou lors d'un chargement raté), que le widget ne contrôle pas.
+Les journaux du widget ne contiennent ni nom ni adresse, seulement des nombres et des identifiants de ligne : la console peut être partagée pendant une démonstration. La seule exception est le détail brut d'une erreur renvoyée par Grist (dans `[PRESENCE]`, `[PROFIL]` ou `[SCHEMA]`, dans `[IDENTITE] lecture impossible : …`, ou lors d'un chargement raté), que le widget ne contrôle pas.
 
 Le tableau des symptômes et des actions à mener côté Grist est dans [maintenance](maintenance.md#diagnostiquer-un-problème).
 
@@ -397,7 +563,7 @@ npx playwright install chromium         # ou CHROMIUM_PATH=/chemin/vers/chromium
 - Les tests unitaires n'ont aucune dépendance. `tests/e2e.test.mjs`, `tests/e2e-profile.test.mjs` et `tests/responsive.test.mjs` ont besoin de Playwright et de Chromium (l'outillage commun des deux premiers est dans `tests/support/browser.mjs`) ; sans eux leurs scénarios sont ignorés et `node --test` reste vert. La CI définit `REQUIRE_E2E=1` : un navigateur absent y est un échec, pas un « tout vert » sur des tests ignorés.
 - Le test navigateur est isolé du réseau : seuls le serveur local et l'API Grist simulée répondent, tout le reste est bloqué.
 - Limite assumée : l'API Grist est simulée, avec des données aux encodages observés en production. Ces tests garantissent que le vrai `main.js` et le vrai `render.js` réagissent correctement à ces encodages et à ces pannes ; ils ne garantissent pas que Grist les envoie toujours. Le faux document ne reproduit ni les règles d'accès de Grist ni le calcul réel des formules : il ne rejoue que le résultat attendu de la formule de la sonde (`Email` = adresse de la personne, `Admin` d'après `ACL`). D'où le protocole manuel de [`TESTING.md`](../TESTING.md), à jouer dans un vrai document avant un déploiement qui touche `main.js`, `render.js`, `index.html` ou `style.css`.
-- Chaque correction s'accompagne d'un test de non-régression, dans le fichier du module concerné. Une fonction ajoutée à `grist-data.js` ou `filters.js` a son test ; un changement d'affichage adapte ou ajoute un scénario de `tests/e2e.test.mjs`, et un changement de mise en page (`style.css`) un scénario de `tests/responsive.test.mjs`.
+- Chaque correction s'accompagne d'un test de non-régression, dans le fichier du module concerné. Une fonction ajoutée à `grist-data.js` ou `filters.js` a son test ; un changement d'affichage adapte ou ajoute un scénario de `tests/e2e.test.mjs` (ou de `tests/e2e-profile.test.mjs` pour la fenêtre de modification), et un changement de mise en page (`style.css`) un scénario de `tests/responsive.test.mjs`.
 
 ## Données et captures de démonstration
 
@@ -407,15 +573,21 @@ Le dossier `docs/demo/` permet d'essayer le vrai widget **sans document Grist** 
 |---|---|
 | `docs/demo/donnees-fictives.mjs` | Jeu de données inventé (personnes, établissements, tables de référence, domaines de compétences, table-sonde vide et table `ACL`) à la structure de [`grist_structure.txt`](../grist_structure.txt) et au format que renvoie `fetchTable()`. `tablesFictives()` le construit, `CARTES_ATTENDUES` donne le nombre de cartes qu'il doit produire et `PERSONNES_DEMO` les adresses fictives que la démonstration peut connecter |
 | `docs/demo/serveur-demo.mjs` | Sert le dépôt avec le faux document Grist des tests (`tests/support/fake-grist.js`) à la place de l'API de widget. `index.html` n'est pas dupliqué : il est lu à chaque requête, et seule la balise qui charge `grist-plugin-api.js` est remplacée |
-| `docs/demo/capturer.mjs` | Régénère les images de `docs/images/` avec Playwright ; chaque capture est précédée d'une vérification (nombre de cartes, bandeau) |
+| `docs/demo/capturer.mjs` | Régénère les images de `docs/images/` avec Playwright ; chaque capture est précédée d'une vérification (nombre de cartes, bandeau, fenêtre de modification) |
 
 ```bash
 node docs/demo/serveur-demo.mjs                # puis http://127.0.0.1:8080  (PORT=9000 pour changer de port)
 # http://127.0.0.1:8080/?panne=Actions,GT      simule des tables de référence illisibles
 # http://127.0.0.1:8080/?connecte=camille.rousseau@chd.example
-#                                              ouvre le widget comme cette personne : bandeau « Ma présence »
+#                                              ouvre le widget comme cette personne : bandeau « Ma présence »,
+#                                              et sa carte porte « Votre fiche » et « ✎ Modifier »
+# http://127.0.0.1:8080/?connecte=mehdi.bensaid@udd.example
+#                                              un administrateur : « ✎ Modifier » sur toutes les cartes affichées
+# http://127.0.0.1:8080/?connecte=sarah.colin@fdx.example
+#                                              une fiche masquée de l'annuaire : la relecture dit pourquoi elle le reste
 # …&refus=BDD                                  simule une règle d'accès qui refuse d'écrire dans BDD
-# …&readonly=true                              ouvre le widget comme un compte Lecteur
+#                                              (choix de présence comme modification de fiche)
+# …&readonly=true                              ouvre le widget comme un compte Lecteur : ni bandeau ni bouton « Modifier »
 
 npm install --no-save playwright && npx playwright install chromium
 node docs/demo/capturer.mjs                    # réécrit docs/images/*.png
@@ -426,8 +598,8 @@ Règles :
 - **Rien de réel dans le dépôt.** Les personnes et établissements sont inventés, les adresses se terminent par `.example` (domaine réservé à la documentation, RFC 2606) et les numéros appartiennent au plan réservé à la fiction (`05 36 49 xx xx`, `06 39 98 xx xx`, décision ARCEP n° 2018-0881). `tests/docs.test.mjs` le vérifie.
 - Après toute modification de l'interface, relancer `docs/demo/capturer.mjs`, regarder les images et les committer avec le changement.
 - Quand la structure Grist change, adapter `docs/demo/donnees-fictives.mjs` : `tests/docs.test.mjs` échoue tant que le jeu fictif n'est pas lu sans erreur par le vrai `loadDirectory()`.
-- Dans le jeu fictif, tout le monde a accepté d'apparaître (`Accepte_apparaitre`) sauf une personne qui a refusé : seuls les établissements et le périmètre décident des autres. `PERSONNES_DEMO` désigne une personne qui apparaît, une qui a refusé, une qui a accepté mais reste masquée (son établissement n'est pas validé) et un administrateur : ce sont elles que photographient les captures « Ma présence », et `tests/docs.test.mjs` vérifie que le bandeau dit pour chacune ce que le guide annonce.
-- Les écritures de la démonstration vivent en mémoire dans la page : recharger la page repart du jeu d'origine, et aucun fichier n'est modifié.
+- Dans le jeu fictif, tout le monde a accepté d'apparaître (`Accepte_apparaitre`) sauf une personne qui a refusé : seuls les établissements et le périmètre décident des autres. `PERSONNES_DEMO` désigne une personne qui apparaît, une qui a refusé, une qui a accepté mais reste masquée (son établissement n'est pas validé) et un administrateur : ce sont elles que photographient les captures « Ma présence » (les trois captures de la modification d'une fiche, le bouton, le formulaire et la relecture, montrent la même modification de la personne qui apparaît), et `tests/docs.test.mjs` vérifie que le bandeau dit pour chacune ce que le guide annonce.
+- Les écritures de la démonstration (l'interrupteur « Ma présence » comme la modification d'une fiche) vivent en mémoire dans la page : recharger la page repart du jeu d'origine, et aucun fichier n'est modifié.
 - Il n'y a plus qu'un simulateur de l'API Grist : le faux document des tests sert aussi à la démonstration, ce qui évite qu'ils divergent.
 
 ## Recettes
@@ -453,7 +625,7 @@ Règles :
 
 **Renommer une table ou une colonne Grist**
 
-1. La table principale (`MAIN_TABLE`), les tables de référence, leurs colonnes de libellé et les colonnes de liste de `BDD` sont dans `constants.js`. Les autres noms sont écrits en dur : dans `grist-data.js`, le nom de la table `Etablissements`, les colonnes obligatoires de `BDD` (`REQUIRED_COLUMNS`) et d'`Etablissements` (`REQUIRED_ETABLISSEMENT_COLUMNS`), `Etablissement`, `perimetre`, `Role_dans_le_PUI` et les indicateurs d'établissement ; et, pour les colonnes d'identité, dans `grist-data.js`, `filters.js` et `render.js` (`nom`, `prenom`, `email`, `Fonction`, `numero_de_telephone`). La case de consentement et la table-sonde ont leur constante dans `constants.js` (`CONSENT_COLUMN`, `PROBE_TABLE`) ; les colonnes `Email` et `Admin` de la sonde sont écrites en dur dans `identity.js`, comme dans les formules de Grist ([`GRIST_SETUP.md`](../GRIST_SETUP.md)).
+1. La table principale (`MAIN_TABLE`), les tables de référence, leurs colonnes de libellé et les colonnes de liste de `BDD` sont dans `constants.js`. Les autres noms sont écrits en dur : dans `grist-data.js`, le nom de la table `Etablissements`, les colonnes obligatoires de `BDD` (`REQUIRED_COLUMNS`) et d'`Etablissements` (`REQUIRED_ETABLISSEMENT_COLUMNS`), `Etablissement`, `perimetre`, `Role_dans_le_PUI` et les indicateurs d'établissement ; et, pour les colonnes d'identité, dans `grist-data.js`, `filters.js`, `render.js`, `preview.js`, `profile.js` et `profile-save.js` (`nom`, `prenom`, `email`, `Fonction`, `numero_de_telephone`) ; les colonnes que la personne peut modifier sont déclarées dans `PROFILE_FIELDS` (`constants.js`). La case de consentement et la table-sonde ont leur constante dans `constants.js` (`CONSENT_COLUMN`, `PROBE_TABLE`) ; les colonnes `Email` et `Admin` de la sonde sont écrites en dur dans `identity.js`, comme dans les formules de Grist ([`GRIST_SETUP.md`](../GRIST_SETUP.md)).
 2. Mettre à jour `grist_structure.txt`, `tests/fixtures.mjs`, `docs/demo/donnees-fictives.mjs` et, si la sonde ou `ACL` changent, `GRIST_SETUP.md`.
 3. Lancer `node --test`, puis jouer [`TESTING.md`](../TESTING.md) dans une copie du document.
 
@@ -476,17 +648,22 @@ Règles :
 
 ## Chantiers en cours
 
-Au 12 octobre 2026, `main` est en version 1.11.0. Cette documentation décrit `main` et sera mise à jour à chaque fusion.
+Au 12 octobre 2026, `main` est en version 1.12.0. Cette documentation la décrit et sera mise à jour à chaque fusion.
 
 **Déjà fusionné**
 
 1. **Nouvelle structure Grist** (1.8.0) : la table principale est `BDD`, avec des références directes (établissement, compétences, instances, actions…) et des tables de référence renommées. Le [CHANGELOG](../CHANGELOG.md) liste chaque changement.
 2. **Filtre « Domaines »** (1.9.0) : la recherche par compétences macro, décrite dans [Filtres, compteurs et recherche](#filtres-compteurs-et-recherche).
 3. **Mise en page adaptative** (1.9.1) : le widget s'adapte à la largeur de son cadre, d'un téléphone à un grand écran, comme le décrit [Rendu des cartes et des menus](#rendu-des-cartes-et-des-menus).
-
 4. **Consentement individuel** (1.10.0) : seules les personnes dont `BDD.Accepte_apparaitre` est coché apparaissent, en plus de la validation de leur établissement. La colonne est obligatoire et un annuaire vide est expliqué par le bandeau d'état : voir [Règles d'affichage](#règles-daffichage).
 5. **« Ma présence »** (1.11.0) : le widget identifie la personne connectée grâce à une table-sonde et lui laisse choisir d'apparaître ou non, comme le décrit [Identité et « Ma présence »](#identité-et--ma-présence-). C'est la première fois que le widget écrit dans le document : [sécurité](securite.md) en tire les conséquences, et [`GRIST_SETUP.md`](../GRIST_SETUP.md) liste les réglages à faire dans Grist.
+6. **Modifier sa fiche directement, avec relecture avant et après** (1.12.0) : une personne connectée modifie sa propre fiche de `BDD`, un administrateur celle de toute personne affichée. Avant d'enregistrer, une fenêtre de relecture montre la carte « Avant » et la carte « Après », les changements étant repérés sur la carte « Après », avec un bouton pour valider. Les modifications s'appliquent directement : le widget ne tient ni validation par un administrateur ni historique, et ne crée aucune table. Voir [Modifier une fiche](#modifier-une-fiche).
 
-**À venir**
+**Pas encore dans la 1.12.0**
 
-6. **Modifier sa fiche directement, avec relecture avant et après** (1.12.0, en préparation) : la personne connectée modifie elle-même sa fiche de `BDD`. Avant d'enregistrer, une fenêtre de relecture lui montre sa carte avant et après, les changements étant repérables sur la carte « après », et un bouton pour valider. Les modifications s'appliquent directement : aucune validation par un administrateur et aucun historique des modifications ne sont prévus, et les administrateurs pourront modifier les fiches de tout le monde. Cette page, la page de sécurité et le guide utilisateur seront mis à jour à sa fusion.
+Ce qui suit n'est pas dans le code, et aucune date n'est promise.
+
+7. **Un mode administrateur que l'on active par un interrupteur** : pas encore. Aujourd'hui, un administrateur voit « ✎ Modifier » sur toutes les cartes affichées, en permanence.
+8. **La modification de l'adresse e-mail et de l'établissement par un administrateur** : pas encore. Elle se fait dans Grist, comme celle du périmètre. Un administrateur ne modifie pas non plus, depuis le widget, une fiche que l'annuaire masque (pas de carte, donc pas de bouton).
+9. **La modification de la fiche d'un établissement par son responsable** : pas encore. Aucun code du widget ne lit la colonne `Responsable_de_l_Etablissement` d'`ACL`.
+10. **Un avatar** : pas encore. Les cartes n'affichent que les initiales de la personne ; aucun code ne lit de colonne Avatar.
