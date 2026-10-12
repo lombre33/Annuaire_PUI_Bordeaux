@@ -16,4 +16,4 @@ e-mail et établissement compris, et la fenêtre de modification suit la maquett
 par Antoine. Depuis la 1.16.1, les cartes sont triées par nom de famille puis par prénom et
 la recherche trouve « prénom nom » dans n'importe quel ordre, tirets, apostrophes et « œ » compris
 (audit UI/UX).
-639 tests (dont 219 dans un vrai navigateur, optionnels sans Playwright).
+640 tests (dont 220 dans un vrai navigateur, optionnels sans Playwright).

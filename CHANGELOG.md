@@ -42,7 +42,7 @@ filtres, les menus, les compteurs, la mise en page et les bandeaux sont ceux de 
   dernière ; la capture de son bouton montre sa rangée, celle de la confirmation défile jusqu'à sa carte,
   celle de la carte légendée la choisit par son nom, et `node docs/demo/capturer.mjs apercu partenaires`
   ne refait que les captures dont le nom commence ainsi.
-- **Tests** : 639 tests (219 dans un vrai navigateur, optionnels sans Playwright), 17 de plus qu'à la 1.16.0
+- **Tests** : 640 tests (220 dans un vrai navigateur, optionnels sans Playwright), 18 de plus qu'à la 1.16.0
   (622, dont 213). Le tri : un
   test d'unité de l'ordre (accents, particules, prénom en second critère, nom vide, valeurs vides) et un
   test de `loadDirectory()` ; dans le navigateur, les cartes d'une table à l'envers apparaissent triées, et
@@ -59,7 +59,10 @@ filtres, les menus, les compteurs, la mise en page et les bandeaux sont ceux de 
   alphabétique. Cinq tests du menu Tâches par action de la 1.16.0 (`tests/e2e-taches.test.mjs`) attendaient
   aussi cet ordre : leurs listes de noms sont dans l'ordre alphabétique, la carte de la fiche relue est
   retrouvée par son nom, et le menu est refermé avant de cliquer le badge de Bob, que le menu recouvrait
-  depuis que sa carte est la première de la rangée.
+  depuis que sa carte est la première de la rangée. Le banc d'essai (`tests/support/browser.mjs`) ne fait
+  plus échouer tout un fichier quand une page se ferme pendant la lecture d'une ligne de console : sur une
+  machine chargée, `tests/e2e.test.mjs` échouait ainsi malgré ses 68 scénarios verts. Un scénario fait
+  échouer cette lecture à la main (sans le correctif, il échoue à chaque essai).
 - **Documentation** : guide utilisateur (« Rechercher une personne », l'ordre des cartes), maintenance (limites
   connues), spécifications, README, `TESTING.md` (section 2 du protocole manuel, à jouer dans un vrai Grist) et
   les captures où l'ordre des cartes se voit (aperçu, filtres, partenaires, mode admin, carte légendée, bouton

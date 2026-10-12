@@ -85,7 +85,8 @@ Sans dépendance, un fichier de tests par module :
   suppression), formules déclenchées de la sonde, pannes, écritures refusées (par
   table ou par ligne).
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : serveur
-  statique, Chromium, faux Grist injecté dans la page.
+  statique, Chromium, faux Grist injecté dans la page, console des pages relue sans
+  qu'une lecture interrompue par la fermeture de la page fasse échouer le fichier.
 - `tests/support/grouped-menu.mjs` — les aides communes aux tests des menus rangés par
   groupe (Compétences par domaine, Tâches par action) : groupe, case, flèche,
   nombres, éléments visibles.
@@ -101,7 +102,7 @@ Sans dépendance, un fichier de tests par module :
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 68
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 69
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, cartes triées
 par nom (même quand Grist envoie les lignes dans le désordre), interrupteurs
@@ -113,7 +114,8 @@ ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
 bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
 double clic, écriture refusée, personne sans fiche, qui voit alors une mention sans
-interrupteur).
+interrupteur), et le banc d'essai lui-même (une lecture de la console interrompue par la
+fermeture de la page ne laisse aucun rejet non traité).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
@@ -214,15 +216,15 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 - [ ] Taper un nom existant (ex. 3 premières lettres) → seuls les contacts
       correspondants restent, une fraction de seconde après la dernière lettre.
 - [ ] Recherche sur le prénom, pas seulement le nom.
-- [ ] **Prénom et nom ensemble** (1.15.1) : taper « prénom nom » d'une personne réelle
+- [ ] **Prénom et nom ensemble** (1.16.1) : taper « prénom nom » d'une personne réelle
       → sa carte ; le même couple dans l'autre ordre (« nom prénom ») → la même carte ;
       quelques lettres de chacun (« pré nom ») → la même carte ; le prénom d'une personne
       et le nom d'une autre → aucun résultat.
-- [ ] **Écritures tolérées** (1.15.1) : pour un nom composé réel (« Marie-Christine »),
+- [ ] **Écritures tolérées** (1.16.1) : pour un nom composé réel (« Marie-Christine »),
       taper la même chose avec une espace au lieu du tiret → la carte ; pour un nom avec
       apostrophe (« D'Arcy »), taper sans apostrophe → la carte. À défaut de tels noms dans
       le document, le contrôle se fait sur la copie de démonstration.
-- [ ] **Cartes triées** (1.15.1) : sans filtre, les cartes se lisent de A à Z par nom de
+- [ ] **Cartes triées** (1.16.1) : sans filtre, les cartes se lisent de A à Z par nom de
       famille (puis prénom) ; ajouter un contact dans Grist, au bout de la table, le place
       à sa lettre dans les secondes qui suivent, sans recharger la page.
 - [ ] **Frappe rapide** : taper six lettres d'un coup → la liste ne scintille pas et ne
