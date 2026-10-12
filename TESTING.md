@@ -76,7 +76,7 @@ Sans dépendance, un fichier de tests par module :
 - `tests/attachments.test.mjs` — `attachmentIds` (cellules `['L', …]`, identifiant seul,
   cellule vide) et `createAttachments` (jeton en lecture seule demandé une seule fois,
   renouvelé avant son expiration, échecs et délai d'attente, réponses inattendues,
-  aucune adresse ni aucun jeton dans la console).
+  un seul avertissement quand Grist refuse le jeton).
 - `tests/etablissement.test.mjs` — la fiche d'un établissement sans Grist ni DOM :
   `etablissementRightsFor` (fermé par défaut, un administrateur n'est pas responsable pour
   autant), `etablissementOf`, `responsablesOf`, `peopleOfEtablissement` (fiches visibles
@@ -87,15 +87,16 @@ Sans dépendance, un fichier de tests par module :
   faux Grist : droit exigé, une seule action atomique, conflit sur le nom, la visibilité ou
   le logo, déjà appliqué, ligne d'`ACL` d'administrateur conservée, adresse reprise ou
   créée, au moins un responsable (aussi sur la liste relue), envoi du logo puis relecture,
-  refus de Grist, fichier orphelin, vérification après écriture, aucune adresse dans la
-  console.
+  refus de Grist, fichier orphelin, vérification après écriture, aucune adresse dans
+  l'avertissement d'une table `ACL` illisible.
 - `tests/upload.test.mjs` — `uploadAttachment` : jeton en écriture demandé à chaque envoi et
   jamais gardé, adresse refusée hors https, requête sans cookie ni adresse de page, délai,
-  statuts 401, 403, 413 et autres, réponse illisible, ni jeton ni adresse dans les messages
-  ni dans la console.
-- `tests/image-prep.test.mjs` — `checkImageFile`, `fitWithin` et `prepareImage` : formats, poids
-  et fichier vide refusés avant lecture, image redessinée à 480 px au plus, SVG agrandi, PNG
-  produit.
+  statuts 401, 403, 413 et autres, réponse illisible, ni jeton ni adresse dans la
+  console.
+- `tests/image-prep.test.mjs` — `megabytes`, `checkImageFile`, `fitWithin` et les refus de
+  `prepareImage` avant lecture : formats, poids et fichier vide refusés, plus grand côté ramené
+  à 480 px au plus, SVG agrandi. Le dessin lui-même et le PNG produit s'essaient dans Chromium
+  (`tests/e2e-etablissement.test.mjs`).
 - `tests/branding.test.mjs` — `buildBranding` (fondateurs validés du bandeau du bas dans
   l'ordre, financeurs, rond « France 2030 », logo de chaque établissement),
   `logoForContact`, `logoSize` et le branchement sur `loadDirectory` (table `Financeurs`
@@ -125,6 +126,11 @@ Sans dépendance, un fichier de tests par module :
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
   colonne `nom_de_domaine`.
+- `tests/docs.test.mjs` — la documentation ne se périme pas : liens, ancres et images de
+  `README.md` et de `docs/`, fichiers et fonctions cités, jeu de données fictif et serveur de
+  démonstration, phrases du guide utilisateur, schéma des imports, préfixes de la console et
+  affirmations de la page de sécurité qui doivent suivre le code (méthodes de l'API Grist, une
+  seule requête réseau et ses protections, aucun stockage). Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
 `npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 72
@@ -138,8 +144,9 @@ domaine (case de domaine, détail replié, case partielle, recherche à deux niv
 ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
 bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
-double clic, écriture refusée, personne sans fiche, qui voit alors une mention sans
-interrupteur), et le banc d'essai lui-même (une lecture de la console interrompue par la
+double clic, focus gardé pendant et après l'écriture, réussite annoncée puis effacée,
+écriture refusée, personne sans fiche, qui voit alors une mention sans interrupteur), et le
+banc d'essai lui-même (une lecture de la console interrompue par la
 fermeture de la page ne laisse aucun rejet non traité).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
@@ -179,7 +186,8 @@ serveur, réponse illisible, jeton refusé), le fichier resté sans servir, le r
 pendant que la fenêtre est ouverte, Échap, le double clic, le clavier et les noms accessibles, la
 mise en page de 320 à 1280px et l'absence de tout appel réseau autre que l'API simulée.
 
-`tests/responsive.test.mjs` y ajoute 24 scénarios sur la mise en page, de 280 à
+`tests/responsive.test.mjs` y ajoute 23 scénarios (et 1 test sans navigateur : le jeu de
+données de la mise en page ne contient que des coordonnées fictives) sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
@@ -531,7 +539,7 @@ Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde
 - [ ] Avec la table, un compte qui peut modifier le document et dont l'adresse est
       dans `BDD.email` : le bandeau apparaît à droite de l'en-tête avec son nom et
       sa situation ; la console dit `[IDENTITE] personne identifiée (administrateur :
-      oui|non)` sans aucune adresse ; la table `Annuaire_Sonde` est vide.
+      oui|non, responsable de N établissement(s))` sans aucune adresse ; la table `Annuaire_Sonde` est vide.
 - [ ] Administrateur : le compte dont l'adresse est dans `ACL` avec `admin` coché
       est « administrateur : oui », un autre « non » (même avec une adresse écrite en
       majuscules dans `ACL`).
@@ -612,7 +620,7 @@ l'e-mail et de l'établissement sont à la section 16.
       interrupteur de présence ni bouton « Modifier ».
 - [ ] Ouvrir sa fiche : un bloc d'identité (initiales, nom, e-mail, et à droite le logo de
       l'établissement, ou sa pastille s'il n'a pas de logo) et la
-      phrase « Verrouillé : l'e-mail et l'établissement sont liés à votre compte… » ; les
+      phrase « Verrouillé : l’e-mail et l’établissement sont liés à votre compte… » ; les
       champs contiennent les valeurs de Grist (le téléphone avec son 0 initial et ses
       espaces). La console ne dit pas `[SCHEMA] Types de colonnes illisibles` (sinon le
       widget suit la forme de la cellule : vérifier le téléphone plus bas).
@@ -621,15 +629,15 @@ l'e-mail et de l'établissement sont à la section 16.
       formulaire. Vider le prénom **et** le nom : « Indiquez au moins un prénom ou un
       nom. » sous les deux champs, « Relire mes modifications » grisé.
 - [ ] « Relire mes modifications » : la fenêtre s'élargit, une légende explique les
-      repères, la carte « Avant » (« telle qu'elle est aujourd'hui ») est à côté de la carte
-      « Après » (« telle qu'elle apparaîtra »), puis vient le « Détail des changements ».
+      repères, la carte « Avant » (« telle qu’elle est aujourd’hui ») est à côté de la carte
+      « Après » (« telle qu’elle apparaîtra »), puis vient le « Détail des changements ».
       Sur la carte « Après » : contour vert et pastille « modifié » ou « ajouté » sur une
       ligne de texte, « + » devant un tag ajouté, tag retiré barré, ligne vidée barrée
       avec la pastille « supprimé ». **Rien n'a changé dans Grist** à ce stade.
 - [ ] Une personne qui n'a pas accepté d'apparaître, ou dont l'établissement n'est pas
       validé : la relecture de sa fiche porte un avis qui le dit (« Votre fiche est masquée
-      de l'annuaire : vous n'avez pas accepté d'apparaître… » / « Votre établissement n'a
-      pas validé sa présence : votre fiche reste masquée dans l'annuaire. »). Une personne
+      de l’annuaire : vous n’avez pas accepté d’apparaître… » / « Votre établissement n’a
+      pas validé sa présence : votre fiche reste masquée dans l’annuaire. »). Une personne
       visible n'a aucun avis.
 - [ ] « Retour » : les saisies sont conservées. « Annuler » : rien n'est écrit.
 - [ ] « Valider » : la fenêtre se ferme et un message « Vos modifications sont enregistrées. »
@@ -793,8 +801,8 @@ sur une copie du document.
       utilisée par … » (le nom si cette personne est visible dans l'annuaire, « une autre
       fiche » sinon). Une adresse mal formée, ou vidée, est refusée aussi.
 - [ ] Choisir un établissement qui n'a pas validé sa présence : l'avertissement sous le champ,
-      puis dans la relecture l'avis « … n'a pas validé sa présence : après cette modification,
-      la fiche ne sera plus visible dans l'annuaire. ». Après « Valider », la carte disparaît.
+      puis dans la relecture l'avis « … n’a pas validé sa présence : après cette modification,
+      la fiche ne sera plus visible dans l’annuaire. ». Après « Valider », la carte disparaît.
 - [ ] Changer l'e-mail : la relecture prévient que la table `ACL` ne suit pas. Après
       « Valider », `BDD.email` a changé et `ACL` est intacte.
 - [ ] La relecture montre la nouvelle adresse et le nouvel établissement sur la carte
@@ -813,8 +821,9 @@ sur une copie du document.
 
 ## 17. Fiche d'un établissement (1.17.0)
 
-Réglages d'abord : `GRIST_SETUP.md`, étape 2 (colonne `Responsable_de` de la sonde), étape 4 (règles
-d'accès sur `Etablissements`, `ACL` et les pièces jointes) et étape 5 (colonne `logo`). À jouer sur une
+Réglages d'abord : `GRIST_SETUP.md`, étape 1 (les colonnes écrites sont des colonnes de données), étape 2
+(colonne `Responsable_de` de la sonde), étape 3 (les lignes d'`ACL`), étape 4 (règles d'accès sur
+`Etablissements`, `ACL` et les pièces jointes) et étape 5 (colonne `logo`). À jouer sur une
 **copie** du document, avec la console et l'onglet Réseau du navigateur ouverts (F12), avec :
 
 - un compte **responsable** : son adresse figure dans `ACL`, avec un établissement (cas ordinaire : un seul) ;
@@ -822,10 +831,11 @@ d'accès sur `Etablissements`, `ACL` et les pièces jointes) et étape 5 (colonn
 - un compte ordinaire, pour les règles d'accès.
 
 **Ce protocole est le seul contrôle de l'envoi du logo et des règles d'accès : les tests automatiques
-simulent la réponse de Grist.** Trois points ne peuvent être constatés que dans un vrai document : (1) que
+simulent la réponse de Grist.** Quatre points ne peuvent être constatés que dans un vrai document : (1) que
 Grist **accepte** l'envoi du fichier avec le jeton en écriture que le widget demande, (2) que le navigateur
 **laisse le widget lire la réponse** (identifiant de la pièce jointe), (3) que les règles d'accès laissent un
-responsable écrire dans `Etablissements` et `ACL` et ajouter une pièce jointe. Si l'un échoue, relever le
+responsable écrire dans `Etablissements` et `ACL` et ajouter une pièce jointe, (4) que la formule de la
+colonne `Responsable_de` de la sonde, elle non plus jamais essayée, renvoie bien les établissements de la personne. Si l'un échoue, relever le
 message du widget, la ligne de la console, la requête et son code de réponse dans l'onglet Réseau.
 
 **Entrées et droits**
@@ -835,7 +845,7 @@ message du widget, la ligne de la console, la requête et son code de réponse d
       sous un logo, rien d'autre ne change.
 - [ ] Colonne ajoutée, une ligne d'`ACL` (adresse du responsable, établissement) : après rechargement, la console
       dit « personne identifiée (administrateur : non, responsable de 1 établissement) », le bandeau porte
-      « Mon établissement » et **toutes** les cartes de cet établissement (et elles seules) portent « ✎ Modifier »
+      « Mon établissement » et **toutes** les cartes affichées de cet établissement (et elles seules) portent « ✎ Modifier »
       sous le logo. Aucune adresse dans la console.
 - [ ] L'administrateur qui n'est pas responsable : ni « Mon établissement » ni « ✎ Modifier » sous les logos,
       même mode admin allumé. Le nommer responsable dans `ACL` (même adresse, ligne qui garde `admin` coché) : les
@@ -847,10 +857,10 @@ message du widget, la ligne de la console, la requête et son code de réponse d
 
 **Contenu de la fenêtre**
 
-- [ ] Le titre « Fiche de l'établissement : … », le logo actuel (ou le sigle en pastille), le sigle et le statut en
-      lecture seule, le nom complet, la case « Établissement visible dans l'annuaire », les responsables.
+- [ ] Le titre « Fiche de l’établissement : … », le logo actuel (ou le sigle en pastille), le sigle et le statut en
+      lecture seule, le nom complet, la case « Établissement visible dans l’annuaire », les responsables.
 - [ ] La liste des responsables donne le nom des personnes dont la fiche figure dans l'annuaire, « Fiche masquée de
-      l'annuaire » pour une adresse dont la fiche n'y figure pas, « Adresse sans fiche dans l'annuaire » sinon.
+      l’annuaire » pour une adresse dont la fiche n'y figure pas, « Adresse sans fiche dans l’annuaire » sinon.
       Aucun nom d'une fiche masquée n'apparaît, ni dans la liste ni dans la liste déroulante.
 - [ ] Règle d'accès qui interdit à ce compte de lire `ACL` : la fenêtre s'ouvre, dit que la liste des responsables
       n'est ni affichée ni modifiable, et le reste s'enregistre.
@@ -876,14 +886,16 @@ message du widget, la ligne de la console, la requête et son code de réponse d
 **Le logo : l'envoi** (les trois points ci-dessus)
 
 - [ ] « Ajouter un logo » ou « Remplacer le logo » avec un PNG de moins de 1 Mo : un aperçu remplace le logo, rien
-      n'est encore envoyé (onglet Réseau : aucune requête d'envoi, aucune demande de jeton en écriture).
+      n'est encore envoyé (onglet Réseau : aucune requête d'envoi ; la demande de jeton en écriture, selon la façon dont
+      Grist la sert, peut ne pas s'y afficher).
 - [ ] « Enregistrer » : **une** demande de jeton, puis **une** requête `POST …/attachments?auth=…` de réponse 200 dont
       le corps est `[<numéro>]`, sans cookie ni en-tête `Referer`. Aucune erreur de la console (en particulier aucun
       « blocked by CORS policy »). Dans Grist, la cellule `logo` de l'établissement contient le **nouveau** fichier (un seul),
       c'est un **PNG** de 480 px au plus ; les cartes de l'établissement portent le nouveau logo sans recharger.
-- [ ] **Si l'envoi échoue** : le message dit quoi faire (déposer le fichier à la main dans Grist). Relever la
+- [ ] **Si l'envoi échoue** : le message dit pourquoi et, sauf pour un fichier trop volumineux, quoi faire (déposer le
+      fichier à la main dans Grist, ou « Contactez un administrateur » quand les droits manquent). Relever la
       requête. Cas « réponse sans en-têtes d'autorisation entre sites » : la console du navigateur parle de
-      « CORS » et le widget dit « L'envoi du fichier à Grist a échoué » ; vérifier si le fichier s'est pourtant ajouté
+      « CORS » et le widget dit « L’envoi du fichier à Grist a échoué » ; vérifier si le fichier s'est pourtant ajouté
       aux pièces jointes du document (fichier orphelin) et le noter.
 - [ ] Un fichier trop lourd (plus de 1 Mo), d'un autre format (PDF, GIF), vide ou illisible : refusé sous le logo
       **avant** tout envoi, avec une phrase claire.
@@ -893,7 +905,7 @@ message du widget, la ligne de la console, la requête et son code de réponse d
 - [ ] Noter ce que devient l'**ancien** fichier après un remplacement : Grist garde-t-il la pièce jointe tant qu'elle
       est référencée dans l'historique, puis la supprime-t-il ? Le widget ne sait pas supprimer une pièce jointe.
 - [ ] Un compte à qui une règle interdit d'ajouter une pièce jointe : « Grist a refusé le fichier : vos droits ne
-      permettent pas d'ajouter une pièce jointe au document. », rien d'écrit dans la fiche.
+      permettent pas d’ajouter une pièce jointe au document. », rien d'écrit dans la fiche.
 
 **Refus, conflits, pannes**
 
@@ -915,8 +927,9 @@ message du widget, la ligne de la console, la requête et son code de réponse d
       responsable, choisir un fichier, enregistrer. Un anneau de focus visible à chaque arrêt. À la fermeture, le focus revient
       au bouton d'où la fenêtre a été ouverte.
 - [ ] Lecteur d'écran (au moins une fois) : la fenêtre est annoncée par son titre ; la case est lue « Établissement visible dans
-      l'annuaire » puis son explication ; chaque bouton « Retirer » dit de qui il s'agit ; « Préparation de l'image… » et
-      les erreurs sont annoncés.
+      l’annuaire » puis son explication ; chaque bouton « Retirer » dit de qui il s'agit ; « Préparation de l’image… », le
+      résumé du pied (nom vide, dernier responsable), l'échec d'un enregistrement et une adresse refusée sont annoncés ;
+      le refus d'un fichier sous le logo ne l'est pas de lui-même, il se lit en revenant sur le champ du fichier.
 - [ ] En réduisant la section du widget de 1280 à 320 px : le bouton « Mon établissement » reste dans le bandeau
       sans chevaucher le nom ni les autres boutons (à partir de 860 px, quelqu'un qui a à la fois « Mode admin »,
       « Mon établissement » et sa propre fiche voit trois rangées de boutons), la fenêtre occupe l'écran sur un

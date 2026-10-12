@@ -10,7 +10,7 @@ la faire et comment vérifier qu'elle a marché.
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement | personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, et depuis la 1.17.0 une fiche d'établissement aussi |
-| 5 | Les logos : colonnes `logo` et `ordre_bandeau` dans `Etablissements`, table `Financeurs` (facultatif) ; le remplacement d'un logo depuis le widget en dépend | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas, pas de financeurs en tête de page ; rien d'autre ne change |
+| 5 | Les logos : colonnes `logo` et `ordre_bandeau` dans `Etablissements`, table `Financeurs` (facultatif) ; le remplacement d'un logo depuis le widget en dépend | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas, pas de financeurs en tête de page ; un responsable ne peut plus changer le logo de son établissement depuis le widget (la fenêtre le dit) ; rien d'autre ne change |
 
 Le widget ne crée ni ne modifie jamais la structure du document (table, colonne,
 règle d'accès) : tout ce qui est ci-dessous se fait à la main, une fois. Il n'écrit que
@@ -226,16 +226,19 @@ Pour « un responsable de cette ligne d'`Etablissements` » (ou de cette ligne d
 attribut d'utilisateur qui cherche `user.Email` dans la colonne `email` d'`ACL` ne rend que
 la **première** ligne : pour une personne responsable de plusieurs établissements, une
 condition qui consulte toutes les lignes d'`ACL` de son adresse (par exemple en
-parcourant `ACL.lookupRecords(email=user.Email)`, ou en s'appuyant sur la valeur de la
-colonne `Responsable_de` de la sonde) est plus sûre. À essayer sur une copie.
+parcourant `ACL.lookupRecords(email=user.Email)`) est plus sûre. La table-sonde n'est pas une
+source utilisable ici : elle est vide au repos, la valeur de sa colonne `Responsable_de` n'existe
+que le temps de l'identification. À essayer sur une copie.
 
 Pour « la personne dont `email` est la sienne », une condition comme
 `user.Email and rec.email and user.Email.strip().lower() == rec.email.strip().lower()`.
 Pour « les administrateurs », le plus simple est un attribut d'utilisateur de Grist
 (« Ajouter des attributs d'utilisateur ») qui cherche `user.Email` dans la colonne
 `email` de `ACL` : la condition devient `user.Acl.admin`, si vous avez nommé l'attribut
-`Acl`. La recherche de Grist tient compte de la casse : écrivez les adresses d'`ACL` en
-minuscules.
+`Acl`. Comme cet attribut ne lit qu'une ligne (voir ci-dessus), cochez `admin` sur **chaque**
+ligne d'`ACL` d'un administrateur qui en a plusieurs (le bouton « Mode admin » du widget, lui,
+regarde toutes les lignes). La recherche de Grist tient compte de la casse : écrivez les
+adresses d'`ACL` en minuscules.
 
 Si vous préférez que le rôle dans le PUI (`Role_dans_le_PUI`) soit attribué par les
 administrateurs, retirez-le de la deuxième ligne : le champ reste affiché dans la
@@ -244,8 +247,12 @@ fenêtre, mais Grist refusera la modification.
 Un refus des règles d'accès n'abîme rien : le widget affiche « Grist a refusé la
 modification : vos droits ne permettent pas de changer cette fiche… » (« … cet
 établissement ou la liste de ses responsables… » pour une fiche d'établissement), la
-fenêtre reste ouverte, rien n'a été écrit : l'enregistrement d'une fiche est une seule
-action Grist, qui passe ou ne passe pas en entier.
+fenêtre reste ouverte et aucune cellule n'a été écrite : l'enregistrement d'une fiche est une
+seule action Grist, qui passe ou ne passe pas en entier. Seule exception : le fichier d'un
+nouveau logo, déjà envoyé, reste alors dans les pièces jointes sans servir (étape 5). Si c'est
+l'envoi du fichier que Grist refuse, le message est un autre (« Grist a refusé le fichier : vos
+droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. »)
+et rien n'a été envoyé.
 
 ## 5. Les logos (facultatif)
 
@@ -342,8 +349,8 @@ avec ce jeton, que le navigateur laisse le widget lire la réponse (cela dépend
 d'autorisation entre sites que renvoie l'instance Grist), et
 que les règles d'accès de l'étape 4 laissent un responsable faire tout cela
 ([`TESTING.md`](TESTING.md), section 17). Si l'envoi ne marche pas, rien n'est cassé : le
-widget affiche une phrase (« Déposez le fichier directement dans Grist ») et le logo se change
-dans Grist, comme avant.
+widget affiche une phrase qui dit quoi faire (le plus souvent « Déposez le fichier directement
+dans Grist ») et le logo se change dans Grist, comme avant.
 
 Vérifier : ouvrez le widget, console ouverte. Les logos des établissements apparaissent
 sur les cartes, ceux des financeurs au centre de l'en-tête, ceux des fondateurs en bas
@@ -362,7 +369,9 @@ de page. Si ce n'est pas le cas, la console dit pourquoi :
 ## À savoir
 
 - **Deux actions d'historique par chargement.** Chaque ouverture du widget laisse une
-  création et une suppression dans `Annuaire_Sonde`. C'est normal. Si une page est
+  création et une suppression dans `Annuaire_Sonde`, de même que chaque enregistrement qui
+  change les responsables d'un établissement (le widget relit alors les droits de la
+  personne). C'est normal. Si une page est
   fermée entre les deux, une ligne orpheline peut rester : vous pouvez vider la table
   sans risque.
 - **« Annuler » de Grist** défait sans doute le dernier changement fait par le widget, y
@@ -385,8 +394,8 @@ de page. Si ce n'est pas le cas, la console dit pourquoi :
   avec sa saisie, sans rien perdre ; sinon les deux modifications se cumulent, y compris
   les responsables nommés par l'un et par l'autre.
 - **Des pièces jointes orphelines** : si un responsable envoie un logo et que l'écriture de la
-  fiche échoue ensuite, ou qu'il l'annule en cours de route, le fichier reste dans les
-  pièces jointes du document. Le widget ne sait pas le supprimer.
+  fiche échoue ensuite, que la fiche a changé dans Grist pendant l'envoi, ou que la page est
+  fermée entre l'envoi et l'écriture, le fichier reste dans les pièces jointes du document. Le widget ne sait pas le supprimer.
 - **Une adresse sur plusieurs lignes de `BDD`** : le choix de présence s'applique à
   toutes ces lignes (la console le signale). Mieux vaut corriger les doublons.
 - **Une personne connectée avec une autre adresse que celle de `BDD`** n'est pas
