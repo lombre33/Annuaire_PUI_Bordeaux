@@ -1,4 +1,4 @@
-# Version 1.14.0 — Habillage : logos, financeurs, bandeau des fondateurs (voir CHANGELOG.md)
+# Version 1.14.1 — Champ de recherche nommé, anneau de focus visible (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -9,4 +9,6 @@ de n'importe qui pour un administrateur) directement, après une relecture de la
 avant et après (1.12.0, réglages dans `GRIST_SETUP.md`), et affiche les logos des
 établissements, des financeurs et des fondateurs, des pièces jointes du document lues
 avec un jeton d'accès en lecture seule (1.14.0, facultatif, étape 5 de `GRIST_SETUP.md`).
-499 tests (dont 164 dans un vrai navigateur, optionnels sans Playwright).
+Le champ de recherche a un nom pour les lecteurs d'écran et un anneau violet montre le
+contrôle actif au clavier (1.14.1, audit UI/UX).
+506 tests (dont 167 dans un vrai navigateur, optionnels sans Playwright).
