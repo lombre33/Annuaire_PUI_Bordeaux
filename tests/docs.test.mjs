@@ -29,8 +29,8 @@ import { CATEGORIES, FILTERS } from '../constants.js';
 import { loadDirectory } from '../grist-data.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
 import { readIdentity } from '../identity.js';
-import { describePresence, describeHiddenFiche, setPresence, explainWriteError } from '../presence.js';
-import { rightsFor, profileFormModel, draftOf } from '../profile.js';
+import { describePresence, describeHiddenFiche, describeUnknownAccount, setPresence, explainWriteError } from '../presence.js';
+import { rightsFor, profileFormModel, draftOf, MAX_TEXT_LENGTH } from '../profile.js';
 import { prepareReview, saveProfile } from '../profile-save.js';
 import { tablesFictives, CARTES_ATTENDUES, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
@@ -415,6 +415,7 @@ test('?refus=BDD : la modification de fiche est refusée avec un message en fran
 const widgetCode = () => fs.readdirSync(ROOT).filter(name => name.endsWith('.js') || name === 'index.html')
   .map(name => read(name)).join('\n')
   .replace(/['`]\s*\+\s*['`]/g, '')   // une phrase écrite en plusieurs morceaux
+  .replaceAll('${MAX_TEXT_LENGTH}', String(MAX_TEXT_LENGTH))   // « 200 caractères au plus. »
   .replaceAll('\\\'', '\'');
 
 test('les messages cités dans « Modifier ma fiche » sont ceux du code', () => {
@@ -426,7 +427,8 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
 
   // Messages composés à l'exécution : on les demande à la fonction qui les compose.
   const hidden = overrides => ({ accepted: true, visible: false, named: true, inScope: true, etablissement: 'not_validated', ...overrides });
-  const composed = [describeHiddenFiche(hidden({}), { own: true }), describeHiddenFiche(hidden({}), { own: false })];
+  const composed = [describeHiddenFiche(hidden({}), { own: true }), describeHiddenFiche(hidden({}), { own: false }),
+    describeHiddenFiche(hidden({ etablissement: 'not_eligible' }), { own: false })];
   composed.forEach(message => assert.ok(section.includes(message), `Le guide doit citer : ${message}`));
 
   const code = widgetCode();
@@ -440,6 +442,19 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
   assert.ok(fragments.length >= 15, 'Ce test ne vérifie plus assez de messages : la section a-t-elle changé de forme ?');
   assert.deepEqual(fragments.filter(fragment => !known(fragment)), [],
     'Ces citations du guide ne figurent pas dans le code : recopiez le message tel qu\'il s\'affiche.');
+});
+
+// Depuis la 1.15.0, un compte que l'annuaire reconnaît mais dont l'adresse ne figure sur aucune
+// fiche a un bandeau (sans interrupteur) : le guide en cite les titres et les phrases, la
+// partie variable (l'adresse du compte) remplacée par …
+test('le guide cite le bandeau d\'un compte reconnu mais sans fiche', () => {
+  const guide = read('docs/utilisateurs.md');
+  const unknown = describeUnknownAccount({ email: '…', admin: false });
+  const admin = describeUnknownAccount({ email: '…', admin: true });
+  const noColumn = describeUnknownAccount({ email: '…', admin: false, emailColumn: false });
+  [unknown.name, unknown.message, admin.name, noColumn.name, noColumn.message]
+    .forEach(cited => assert.ok(guide.includes(cited), `Le guide doit citer : ${cited}`));
+  assert.equal(unknown.switchable, false, 'le guide dit que ce bandeau n\'a pas d\'interrupteur');
 });
 
 test('les personnes fictives citées dans le guide sont masquées, ou visibles, pour la raison qu\'il donne', async () => {
