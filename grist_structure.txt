@@ -9,6 +9,11 @@
 #
 # Version du schéma : table BDD (remplace l'ancienne table Annuaire, qui reste
 # dans le document mais n'est plus lue).
+#
+# Le widget ÉCRIT dans deux tables, jamais dans une autre : BDD (une seule colonne,
+# Accepte_apparaitre, par l'interrupteur « Ma présence ») et Annuaire_Sonde (une
+# ligne ajoutée puis supprimée à chaque chargement). Il ne crée ni ne modifie
+# jamais une table ou une colonne : voir GRIST_SETUP.md pour les créer.
 
 Table BDD (table principale : une ligne par personne, lue par son nom via fetchTable)
   prenom, nom       : Text          OBLIGATOIRES (sans l'une d'elles, erreur explicite)
@@ -28,12 +33,14 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
     Encodage brut renvoyé par l'API Grist pour les colonnes liste :
     ['L', id1, id2, ...] — une liste vide est donc ['L'] (longueur 1) et non [].
     Voir isInScope() / safeValues() dans grist-data.js.
-  Accepte_apparaitre : Bool         OBLIGATOIRE
+  Accepte_apparaitre : Bool         OBLIGATOIRE (lue ET écrite par le widget)
     Accord de la personne pour figurer dans l'annuaire (cf. specs.md). Doit
-    être une colonne de DONNÉES de type Bascule, pas une formule. Seule la
-    valeur vraie compte : vide, décochée ou autre valeur masque la personne.
-    Sans cette colonne, le widget affiche une erreur au lieu d'afficher tout le
-    monde. Voir hasAccepted() dans grist-data.js.
+    être une colonne de DONNÉES de type Bascule, pas une formule : Grist refuse
+    d'écrire dans une colonne à formule, et l'interrupteur « Ma présence » en
+    dépend. Seule la valeur vraie compte : vide, décochée ou autre valeur masque
+    la personne. Sans cette colonne, le widget affiche une erreur au lieu
+    d'afficher tout le monde. Voir hasAccepted() dans grist-data.js et
+    setPresence() dans presence.js.
   Actions           : ReferenceList(Actions)
   Communautes       : ReferenceList(Communautes)
   Taches            : ReferenceList(Taches)
@@ -41,6 +48,9 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
   GT                : ReferenceList(GT)
   Competences       : ReferenceList(Competences)
   email             : Text          facultative
+    Affichée sur la carte, et sert à retrouver la fiche de la personne connectée
+    (comparaison sans casse ni espaces autour). Sans elle, pas de bandeau « Ma
+    présence » : la console le dit. Voir createPeopleIndex() dans grist-data.js.
   Fonction          : Text          facultative
 
   Colonnes facultatives, rajoutées dans BDD sous ces noms : le widget les
@@ -79,3 +89,16 @@ Tables de référence (id -> libellé, chargées via fetchTable)
     laisse voir ses contacts — "autres" n'est jamais affiché. Voir
     etablissementFlagsFromRows() / isEtablissementEligible() dans grist-data.js.
   Role_Dans_le_PUI   : Role (Text)
+
+Table Annuaire_Sonde (à créer dans Grist, voir GRIST_SETUP.md ; vide au repos)
+  Email : Text    formule de déclenchement `user.Email`, appliquée aux nouvelles
+                  lignes : l'adresse de la personne qui a créé la ligne
+  Admin : Bool    formule de déclenchement : vrai si cette adresse figure dans ACL
+                  avec admin coché (casse et espaces ignorés)
+  Le widget y ajoute une ligne à chaque chargement, la relit par son identifiant
+  puis la supprime. Un compte Lecteur ne peut pas y écrire : il n'est pas
+  identifié. Voir readIdentity() dans identity.js.
+
+Table ACL (lue par la formule de Annuaire_Sonde.Admin, jamais par le widget lui-même)
+  email : Text, Responsable_de_l_Etablissement : Reference(Etablissements),
+  admin : Bool (donnée, à cocher pour les administrateurs)

@@ -92,6 +92,28 @@ export function withoutOptionalColumns(tables) {
   return copy;
 }
 
+// Adresses de personnes de l'exemple. Ana figure dans BDD et dans ACL (administratrice,
+// écrite avec des majuscules dans ACL) ; ADMIN_EMAIL est administrateur sans ligne
+// dans BDD ; Iris a refusé d'apparaître ; Bob est partenaire (UBM).
+export const ANA_EMAIL = 'ana.martin@chu-bordeaux.fr';
+export const BOB_EMAIL = 'bob@u-bordeaux-montaigne.fr';
+export const IRIS_EMAIL = 'iris@chu-bordeaux.fr';
+export const ADMIN_EMAIL = 'admin@chu-bordeaux.fr';
+
+// Le document complété des deux tables que le widget lit pour identifier la
+// personne connectée (GRIST_SETUP.md) : ACL, et la table-sonde, vide au repos.
+export function withIdentity(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  copy.ACL = {
+    id: [1, 2, 3],
+    email: ['Ana.Martin@CHU-Bordeaux.fr', ADMIN_EMAIL, BOB_EMAIL],
+    Responsable_de_l_Etablissement: [1, 0, 2],
+    admin: [true, true, false]
+  };
+  copy.Annuaire_Sonde = { id: [], Email: [], Admin: [] };
+  return copy;
+}
+
 // Noms affichés (« Prénom Nom ») dans l'ordre des cartes, périmètre par défaut.
 export const DEFAULT_CARD_NAMES = [
   'Ana Martin',

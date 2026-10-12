@@ -33,17 +33,34 @@ Sans dépendance, un fichier de tests par module :
   prioritaire, tables indispensables illisibles, table de référence illisible,
   colonnes obligatoires, facultatives ou introuvables, annuaire vide expliqué,
   doublons d'acronymes, domaines des compétences).
+- `tests/identity.test.mjs` — `readIdentity` avec un faux document Grist (adresse
+  lue sur la ligne de la sonde, administrateur d'après `ACL`, compte Lecteur,
+  table-sonde absente, formule muette, écriture refusée, lecture en panne, ligne de
+  sonde toujours retirée, personnes simultanées, aucune adresse dans la console) et
+  `isReadOnlyAddress`.
+- `tests/people.test.mjs` — l'index des lignes de `BDD` par adresse
+  (`findByEmail`, doublons, colonne `email` absente) et `describeVisibility` : le
+  verdict « apparaît ou non, et pourquoi » concorde avec `buildContacts`, ligne par
+  ligne.
+- `tests/presence.test.mjs` — `describePresence` (les messages dits à la
+  personne), `setPresence` (une écriture atomique, seule la case de la personne,
+  plusieurs lignes, refus de Grist) et `explainWriteError`.
+- `tests/support/fake-grist.js` — le faux document Grist commun aux tests Node et
+  au test navigateur : lectures, `applyUserActions` atomique (ajout, modification,
+  suppression), formules déclenchées de la sonde, pannes, écritures refusées.
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 34
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 51
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
 Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
-sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées).
+sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
+bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
+double clic, écriture refusée, personne sans fiche).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
@@ -57,8 +74,10 @@ tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
 
-Limite assumée : l'API Grist y est simulée (`docApi.fetchTable` sur des
-données aux encodages observés en production). Le test garantit que le vrai
+Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
+`docApi.fetchTable` sur des données aux encodages observés en production, et des
+écritures dont la formule déclenchée de la sonde est reproduite, pas exécutée par
+Grist). Le test garantit que le vrai
 `main.js`/`render.js` réagissent correctement à ces encodages et à ces pannes ;
 il ne garantit pas que Grist envoie toujours ces formes — d'où le protocole
 manuel ci-dessous, à jouer dans un vrai document avant déploiement.
@@ -282,6 +301,34 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 - [ ] Après modification de `ok_pour_apparaitre` dans `Etablissements`,
       **recharger le widget** (Grist ne le prévient pas, voir README « Limites
       connues ») puis vérifier le nombre de contacts et le badge de chaque carte.
+
+## 11. Ma présence (1.11.0)
+
+Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde`, case
+`admin`). À jouer sur une **copie** du document, console du navigateur ouverte.
+
+- [ ] Sans la table `Annuaire_Sonde` : aucun bandeau « Ma présence », l'annuaire
+      s'affiche comme avant, la console dit `[IDENTITE] table « Annuaire_Sonde »
+      introuvable`.
+- [ ] Avec la table, un compte qui peut modifier le document et dont l'adresse est
+      dans `BDD.email` : le bandeau apparaît au-dessus des filtres avec son nom et
+      sa situation ; la console dit `[IDENTITE] personne identifiée (administrateur :
+      oui|non)` sans aucune adresse ; la table `Annuaire_Sonde` est vide.
+- [ ] Administrateur : le compte dont l'adresse est dans `ACL` avec `admin` coché
+      est « administrateur : oui », un autre « non » (même avec une adresse écrite en
+      majuscules dans `ACL`).
+- [ ] Interrupteur : le décocher retire la carte de la personne et décoche
+      `Accepte_apparaitre` dans Grist ; le recocher la fait revenir. Il n'écrit que
+      cette case, sur la ligne de la personne.
+- [ ] Compte **Lecteur** : pas de bandeau, aucune ligne ajoutée à `Annuaire_Sonde`.
+- [ ] Compte connecté dont l'adresse n'est pas dans `BDD` : pas de bandeau, la
+      console l'explique sans citer d'adresse.
+- [ ] Règle d'accès qui refuse la modification de `BDD` pour ce compte : l'interrupteur
+      affiche « Grist a refusé la modification… » et reste dans son état réel.
+- [ ] Deux comptes dans deux navigateurs, widgets ouverts en même temps : chacun voit
+      son propre nom.
+- [ ] Établissement non validé : la personne qui a accepté voit pourquoi sa fiche
+      reste masquée.
 
 ## 12. Largeur du cadre (1.9.1)
 

@@ -193,7 +193,7 @@ function reveal(element, text) {
   element.classList.add('visible');
 }
 
-function initials(contact) {
+export function initials(contact) {
   return `${(contact.prenom || '').charAt(0)}${(contact.nom || '').charAt(0)}`.toUpperCase() || '?';
 }
 

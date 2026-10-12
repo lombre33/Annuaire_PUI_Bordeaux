@@ -17,25 +17,33 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sampleTables, withoutOptionalColumns, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME } from './fixtures.mjs';
+import {
+  sampleTables, withoutOptionalColumns, withIdentity, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL, ADMIN_EMAIL
+} from './fixtures.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
 const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 
-// Remplace grist-plugin-api.js. __tables / __failTables sont posés par le test
-// avant le chargement ; __triggerRecords rejoue un onRecords (édition Grist).
-const GRIST_MOCK = `
+// Remplace grist-plugin-api.js : le faux document que partagent les tests Node
+// (tests/support/fake-grist.js, `export` retiré), branché sur des variables que le
+// test pose avant le chargement et peut modifier ensuite (relues à chaque appel) :
+// __tables, __failTables, __user (la personne connectée), __denyWrites (tables dont
+// l'écriture est refusée), __delay. __triggerRecords rejoue un onRecords (édition
+// Grist) ; __fake.calls liste les actions envoyées à Grist.
+const FAKE_GRIST = fs.readFileSync(path.join(ROOT, 'tests/support/fake-grist.js'), 'utf8').replace(/^export /gm, '');
+const GRIST_MOCK = `${FAKE_GRIST}
+window.__fake = createFakeGrist({
+  tables: () => window.__tables,
+  failTables: () => window.__failTables,
+  user: () => window.__user,
+  denyWrites: () => window.__denyWrites,
+  delay: () => window.__delay
+});
 window.grist = {
   ready(options) { window.__gristReady = options; },
   onRecords(callback) { window.__triggerRecords = callback; setTimeout(callback, 0); },
-  docApi: {
-    async fetchTable(name) {
-      if (window.__failTables.includes(name)) throw new Error('Grist indisponible : ' + name);
-      if (!window.__tables[name]) throw new Error('Table inconnue : ' + name);
-      return JSON.parse(JSON.stringify(window.__tables[name]));
-    }
-  }
+  docApi: window.__fake.docApi
 };`;
 
 async function startBrowser() {
@@ -76,13 +84,15 @@ after(async () => {
   server?.close();
 });
 
-async function openWidget({ tables = sampleTables(), failTables = [] } = {}) {
+// `user` : l'adresse de la personne connectée (null : compte anonyme) ; `readOnly` :
+// le cadre d'un compte Lecteur (?readonly=true).
+async function openWidget({ tables = sampleTables(), failTables = [], user = null, denyWrites = [], delay = 0, readOnly = false } = {}) {
   const context = await browser.newContext();
   // Hermétique : seul le serveur local et l'API Grist simulée répondent.
   await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
   await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));
   const page = await context.newPage();
-  const logs = { errors: [], warnings: [] };
+  const logs = { errors: [], warnings: [], infos: [] };
   page.on('pageerror', error => logs.errors.push(error.message));
   page.on('console', message => {
     // text() réduit un objet à « JSHandle@object » : on relit les arguments.
@@ -90,12 +100,16 @@ async function openWidget({ tables = sampleTables(), failTables = [] } = {}) {
       .map(value => (typeof value === 'string' ? value : JSON.stringify(value))).join(' ');
     if (message.type() === 'error') logs.errors.push(readable());
     if (message.type() === 'warning') logs.warnings.push(readable());
+    if (message.type() === 'info') logs.infos.push(readable());
   });
-  await page.addInitScript(({ tables, failTables }) => {
-    window.__tables = tables;
-    window.__failTables = failTables;
-  }, { tables, failTables });
-  await page.goto(`${baseUrl}/index.html`);
+  await page.addInitScript(values => {
+    window.__tables = values.tables;
+    window.__failTables = values.failTables;
+    window.__user = values.user;
+    window.__denyWrites = values.denyWrites;
+    window.__delay = values.delay;
+  }, { tables, failTables, user: user && { email: user }, denyWrites, delay });
+  await page.goto(`${baseUrl}/index.html${readOnly ? '?readonly=true' : ''}`);
   return { page, context, logs };
 }
 
@@ -544,4 +558,202 @@ test('contacts sans Etablissement : diagnostic console par identifiant, sans adr
     assert.ok(diagnostic, 'avertissement présent');
     assert.ok(!diagnostic.includes('@'), 'aucune adresse email dans la console');
     assert.match(diagnostic, /\[5\]/, 'l\'identifiant de ligne d\'Eve (5) permet de la retrouver dans Grist');
+  }));
+
+// ===== Ma présence : identité de la personne connectée et interrupteur =====
+
+const accountBar = page => page.locator('#accountBar');
+const presenceSwitch = page => page.locator('#accountBar .presence-switch');
+const waitForAccountBar = (page, visible = true) =>
+  page.waitForFunction(expected => !document.getElementById('accountBar').hidden === expected, visible);
+const isSwitchOn = async page => (await presenceSwitch(page).getAttribute('aria-checked')) === 'true';
+const accountMessage = page => page.locator('#accountBar .account-detail').textContent();
+const accountStatus = page => page.locator('#accountBar .account-status').textContent();
+const grist = page => page.evaluate(() => window.__fake.calls);
+const writesTo = async (page, table) => (await grist(page)).filter(call => call.table === table);
+const identityLogs = async logs => (await Promise.all([...logs.warnings, ...logs.infos])).filter(line => line.includes('[IDENTITE]'));
+
+// Pas de table-sonde : personne n'est identifié, l'annuaire s'affiche comme avant.
+test('sans table-sonde (Annuaire_Sonde) personne n\'est identifié : pas de bandeau, annuaire intact, aucune écriture', { skip }, () =>
+  withWidget({ user: ANA_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => window.__fake.calls !== undefined);
+    assert.equal(await accountBar(page).isHidden(), true);
+    assert.deepEqual(await grist(page), [], 'rien n\'est écrit dans le document');
+    const warning = (await Promise.all(logs.warnings)).find(line => line.includes('[IDENTITE]'));
+    assert.match(warning, /Annuaire_Sonde.*GRIST_SETUP\.md/);
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
+test('compte Lecteur (?readonly=true) : pas de bandeau et aucune tentative d\'écriture', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL, readOnly: true }, async ({ page }) => {
+    await waitForCards(page, 4);
+    assert.equal(await accountBar(page).isHidden(), true);
+    assert.deepEqual(await grist(page), [], 'un Lecteur ne peut rien écrire : le widget n\'essaie pas');
+  }));
+
+test('une personne identifiée qui apparaît voit son nom, sa situation et l\'interrupteur allumé', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await waitForAccountBar(page);
+    assert.equal(await accountBar(page).locator('.account-name').textContent(), 'Ana Martin');
+    assert.equal(await accountBar(page).locator('.account-avatar').textContent(), 'AM');
+    assert.equal(await accountMessage(page), 'Vous apparaissez dans l\'annuaire.');
+    assert.equal(await isSwitchOn(page), true);
+    assert.equal(await presenceSwitch(page).getAttribute('role'), 'switch');
+    assert.equal(await accountStatus(page), '');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
+test('l\'identification laisse le document propre : la ligne de la sonde est retirée, rien d\'autre n\'est écrit', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForAccountBar(page);
+    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    assert.deepEqual((await grist(page)).map(call => [call.action, call.table]),
+      [['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
+    assert.deepEqual(await page.evaluate(() => window.__tables.Annuaire_Sonde.id), []);
+  }));
+
+test('l\'adresse d\'une personne n\'est jamais écrite dans la console', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await waitForAccountBar(page);
+    const lines = await identityLogs(logs);
+    assert.ok(lines.length > 0, 'l\'identification est journalisée');
+    assert.ok(lines.every(line => !line.includes('@')));
+  }));
+
+test('l\'interrupteur fait apparaître puis disparaître la personne, en écrivant seulement Accepte_apparaitre de sa ligne', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: IRIS_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await waitForAccountBar(page);
+    assert.equal(await isSwitchOn(page), false);
+    assert.equal(await accountMessage(page), 'Vous n\'apparaissez pas dans l\'annuaire.');
+    assert.ok(!(await cardNames(page)).includes('Iris Refus'));
+
+    await presenceSwitch(page).click();
+    await waitForCards(page, 5);
+    assert.ok((await cardNames(page)).includes('Iris Refus'), 'sa carte apparaît sans rechargement manuel');
+    assert.equal(await isSwitchOn(page), true);
+    assert.equal(await accountMessage(page), 'Vous apparaissez dans l\'annuaire.');
+    assert.equal(await accountStatus(page), '');
+    assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), true);
+
+    await presenceSwitch(page).click();
+    await waitForCards(page, 4);
+    assert.equal(await isSwitchOn(page), false);
+    assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), false);
+
+    assert.deepEqual((await writesTo(page, 'BDD')).map(call => [call.action, call.rowId, call.values]),
+      [['UpdateRecord', 11, { Accepte_apparaitre: true }], ['UpdateRecord', 11, { Accepte_apparaitre: false }]],
+      'seule la case de la ligne d\'Iris est écrite, deux fois');
+  }));
+
+test('une personne qui n\'a jamais répondu (case vide) est invitée comme les autres, et un clic coche la case', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: 'jules@chu-bordeaux.fr' }, async ({ page }) => {
+    await waitForAccountBar(page);
+    assert.equal(await isSwitchOn(page), false);
+    await presenceSwitch(page).click();
+    await waitForCards(page, 5);
+    assert.strictEqual(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[11]), true);
+  }));
+
+test('l\'interrupteur se range pendant l\'écriture : un double clic n\'écrit qu\'une fois', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: IRIS_EMAIL, delay: 150 }, async ({ page }) => {
+    await waitForAccountBar(page);
+    await presenceSwitch(page).dblclick();
+    await waitForCards(page, 5);
+    assert.equal((await writesTo(page, 'BDD')).length, 1);
+    assert.equal(await isSwitchOn(page), true);
+    assert.equal(await presenceSwitch(page).isEnabled(), true, 'l\'interrupteur redevient utilisable');
+  }));
+
+test('écriture refusée par les règles d\'accès de Grist : message clair, rien ne change, l\'interrupteur reste utilisable', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: IRIS_EMAIL, denyWrites: ['BDD'] }, async ({ page, logs }) => {
+    await waitForAccountBar(page);
+    await presenceSwitch(page).click();
+    await page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent !== '');
+    assert.match(await accountStatus(page), /^Grist a refusé la modification/);
+    assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'error');
+    assert.equal(await isSwitchOn(page), false, 'l\'interrupteur montre l\'état réel, pas le souhait');
+    assert.equal(await cardCount(page), 4);
+    assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), false);
+    assert.equal(await presenceSwitch(page).isEnabled(), true);
+    assert.ok((await Promise.all(logs.errors)).some(line => line.includes('[PRESENCE]')), 'le détail est dans la console');
+  }));
+
+test('après une erreur, un nouvel essai réussi efface le message d\'erreur', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: IRIS_EMAIL, denyWrites: ['BDD'] }, async ({ page }) => {
+    await waitForAccountBar(page);
+    await presenceSwitch(page).click();
+    await page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent !== '');
+    await page.evaluate(() => { window.__denyWrites = []; });
+    await presenceSwitch(page).click();
+    await waitForCards(page, 5);
+    assert.equal(await accountStatus(page), '');
+    assert.equal(await isSwitchOn(page), true);
+  }));
+
+test('une personne identifiée sans fiche dans BDD n\'a pas de bandeau, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ADMIN_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    assert.equal(await accountBar(page).isHidden(), true);
+    const warning = (await identityLogs(logs)).find(line => line.includes('Aucune ligne de BDD'));
+    assert.ok(warning, 'avertissement présent');
+    assert.ok(!warning.includes('@'));
+  }));
+
+test('BDD sans colonne email : la console l\'explique, pas de bandeau, annuaire intact', { skip }, () => {
+  const tables = withIdentity();
+  delete tables.BDD.email;
+  return withWidget({ tables, user: ANA_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    assert.equal(await accountBar(page).isHidden(), true);
+    assert.ok((await identityLogs(logs)).some(line => line.includes('colonne « email »')));
+  });
+});
+
+test('un partenaire apprend qu\'il faut l\'interrupteur Partenaires pour le voir', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: BOB_EMAIL }, async ({ page }) => {
+    await waitForAccountBar(page);
+    assert.match(await accountMessage(page), /visible avec l'interrupteur « Partenaires »/);
+    assert.equal(await isSwitchOn(page), true);
+    assert.ok(!(await cardNames(page)).includes('Bob Durand'));
+  }));
+
+test('une personne qui a accepté mais reste masquée en apprend la raison', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: 'dan@inserm.fr' }, async ({ page }) => {
+    await waitForAccountBar(page);
+    assert.equal(await isSwitchOn(page), true, 'elle a bien accepté');
+    assert.match(await accountMessage(page), /votre établissement n'a pas encore été validé/);
+    assert.equal(await page.locator('#accountBar .account-detail').getAttribute('data-tone'), 'warn');
+  }));
+
+test('le nom d\'une personne s\'affiche en texte brut dans le bandeau (aucune injection)', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: 'hostile@chu-bordeaux.fr' }, async ({ page }) => {
+    await waitForAccountBar(page);
+    assert.equal(await accountBar(page).locator('.account-name').textContent(), `${HOSTILE_FIRST_NAME} Hostile`);
+    assert.equal(await accountBar(page).locator('img').count(), 0);
+    assert.equal(await page.evaluate(() => window.__xss), undefined);
+  }));
+
+test('une panne de la table-sonde n\'empêche jamais l\'annuaire de s\'afficher', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL, failTables: ['Annuaire_Sonde'] }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    assert.equal(await accountBar(page).isHidden(), true);
+    assert.equal(await page.locator('#statusBanner').isHidden(), true, 'pas de bandeau d\'erreur pour une identité introuvable');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
+test('le bandeau suit les modifications faites dans Grist : l\'accord retiré à la main éteint l\'interrupteur', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForAccountBar(page);
+    assert.equal(await isSwitchOn(page), true);
+    await page.evaluate(() => { window.__tables.BDD.Accepte_apparaitre[0] = false; });
+    await reload(page);
+    await waitForCards(page, 3);
+    await page.waitForFunction(() => document.querySelector('.presence-switch').getAttribute('aria-checked') === 'false');
+    assert.equal(await accountMessage(page), 'Vous n\'apparaissez pas dans l\'annuaire.');
   }));

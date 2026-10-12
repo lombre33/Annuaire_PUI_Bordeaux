@@ -1,6 +1,15 @@
 // Table principale du document Grist : une ligne par personne.
 export const MAIN_TABLE = 'BDD';
 
+// Case à cocher de BDD par laquelle une personne accepte d'apparaître. Un seul nom
+// pour la lecture (grist-data.js) et l'écriture (presence.js) : les deux ne
+// peuvent pas diverger.
+export const CONSENT_COLUMN = 'Accepte_apparaitre';
+
+// Table-sonde qui dit au widget qui est connecté (voir identity.js). Elle appartient
+// au document et se crée à la main : GRIST_SETUP.md donne ses colonnes.
+export const PROBE_TABLE = 'Annuaire_Sonde';
+
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.
 //   label, color  affichage

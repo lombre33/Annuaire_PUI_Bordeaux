@@ -17,6 +17,20 @@
       <div id="resultCount" class="result-count" aria-live="polite">0 contact</div>
     </header>
 
+    <section id="accountBar" class="account-bar" aria-label="Ma présence dans l'annuaire" hidden>
+      <div class="avatar account-avatar" aria-hidden="true"></div>
+      <div class="account-identity">
+        <p class="account-name"></p>
+        <p class="account-detail"></p>
+      </div>
+      <button type="button" class="presence-switch" role="switch" aria-checked="false">
+        <span class="presence-track" aria-hidden="true"><span class="presence-thumb"></span></span>
+        <span class="presence-label">Apparaître dans l'annuaire</span>
+      </button>
+      <div class="account-actions"></div>
+      <p class="account-status" role="status" data-tone="info"></p>
+    </section>
+
     <section class="toolbar" aria-label="Recherche et filtres">
       <label class="search-box" for="searchInput">
         <span class="search-icon" aria-hidden="true">⌕</span>

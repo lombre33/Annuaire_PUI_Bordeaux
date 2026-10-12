@@ -91,12 +91,15 @@ Une flèche signifie « importe ».
 | `grist-data.js` | Lecture des tables (`loadDirectory()`), décodage des formats Grist, enrichissement des contacts, règles d'éligibilité |
 | `filters.js` | Forme de l'état des filtres (`createEmptyFilterState()`), `filterContacts()`, `computeFilterCounts()`, `pruneStaleFilters()` |
 | `render.js` | Construction du DOM : menus de filtre (`createFilterUI()`) et cartes (`renderCards()`) |
+| `identity.js` | `readIdentity()` : qui est connecté ? Ajoute une ligne dans la table-sonde `Annuaire_Sonde` (dont Grist calcule l'adresse par une formule `user.Email`), la relit par son identifiant puis la supprime. Renvoie l'adresse et la case administrateur, ou « personne » au moindre doute ; ne bloque jamais l'annuaire |
+| `presence.js` | « Ma présence » : `describePresence()` dit à la personne si elle apparaît et pourquoi, `setPresence()` écrit son accord (`Accepte_apparaitre`) sur sa ou ses lignes en une seule action atomique |
+| `account-ui.js` | Le bandeau « Ma présence » au-dessus des filtres : construit le DOM à partir de ce que décrit `describePresence()`, sans règle métier |
 | `main.js` | Point d'entrée : détient l'état de l'application, relie `window.grist` et les événements du DOM aux autres modules |
 
 Règles de répartition, à respecter pour que les tests restent possibles sans navigateur :
 
 1. `constants.js`, `grist-data.js` et `filters.js` n'utilisent jamais le DOM.
-2. Seule `loadDirectory()` lit Grist, par le `docApi` qu'on lui passe : les tests lui fournissent un faux `docApi`.
+2. Seules `loadDirectory()` (lecture), `readIdentity()` et `setPresence()` (écritures) parlent à Grist, par le `docApi` qu'on leur passe : les tests leur fournissent un faux `docApi` (`tests/support/fake-grist.js`).
 3. `render.js` ne contient aucune règle métier : il reçoit des contacts déjà filtrés et une fonction de rappel `onToggle`.
 4. `filters.js` n'a pas d'effet de bord : `pruneStaleFilters()` renvoie un nouvel état au lieu de modifier son argument.
 5. Seul `main.js` détient l'état (`state`).
