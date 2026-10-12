@@ -96,13 +96,16 @@ Sans dépendance, un fichier de tests par module :
   fichier qui n'est pas une image, et un compte des téléchargements et des jetons employés.
 - `tests/support/contrast.mjs` — le rapport de contraste WCAG (`contrastRatio`, `parseColor`) à
   partir des couleurs calculées par le navigateur, pour les tests d'accessibilité.
+- `tests/support/card-metrics.mjs` — la taille du texte et des cibles des cartes sur la page rendue
+  (`measureCards` : texte sous 12px, pastilles ou boutons sous 24px de haut, petites cibles trop près
+  d'une autre), pour `tests/responsive.test.mjs` et `tests/accessibility.test.mjs`.
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 69
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 72
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, cartes triées
 par nom (même quand Grist envoie les lignes dans le désordre), interrupteurs
@@ -141,14 +144,15 @@ texte, un refus de Grist, un changement concurrent, une fiche supprimée, le dou
 rangé sous la fonction, le bandeau « Ma présence » qui ne se chevauche à aucune largeur et
 l'affichage de 280 à 360px.
 
-`tests/responsive.test.mjs` y ajoute 20 scénarios sur la mise en page, de 280 à
+`tests/responsive.test.mjs` y ajoute 24 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
 d'outils, menus de filtres (les menus Compétences et Tâches dépliés compris) entièrement
 dans le cadre, cibles tactiles (écran
-tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
+tactile émulé), taille du texte des cartes (12px au moins à toute largeur, souris ou doigt), pastilles de
+24px de haut et petites cibles isolées (WCAG 2.5.8), bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
 
@@ -160,14 +164,17 @@ supprimé ou illisible, aucune trace du jeton dans la console, relecture d'une f
 `tests/branding-layout.test.mjs` y ajoute 13 scénarios sur la mise en page de l'habillage, de
 320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case,
 bandeau du bas qui se replie, rien qui dépasse du cadre.
-`tests/accessibility.test.mjs` y ajoute 5 scénarios (et 4 tests sans navigateur : les rapports de
+`tests/accessibility.test.mjs` y ajoute 9 scénarios (et 5 tests sans navigateur : les rapports de
 contraste de référence, une garde sur les feuilles de style qui refuse tout `outline: 0` ou
-`outline: none` non justifié, et le contraste de chaque couleur de catégorie et du lien e-mail) sur le
-clavier, le lecteur d'écran et les couleurs : le champ de recherche nommé par son rôle, aucun contrôle sans
-nom dans l'arbre d'accessibilité (page au repos, menu ouvert), le parcours complet à la tabulation (page,
-puis menu ouvert) où chaque arrêt change de capture avec et sans focus, avec un anneau plein de 2 px au
-moins et de 3:1 au moins, et les pastilles, les titres de groupe et le lien e-mail d'une carte mesurés sur
-la page rendue (4,5:1 au moins).
+`outline: none` non justifié, le contraste de chaque couleur de catégorie et du lien e-mail, et celui de la
+piste et du curseur de l'interrupteur de présence) sur le clavier, le lecteur d'écran et les couleurs : le
+champ de recherche nommé par son rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au repos,
+menu ouvert), le parcours complet à la tabulation (page, puis menu ouvert) où chaque arrêt change de capture
+avec et sans focus, avec un anneau plein de 2 px au moins et de 3:1 au moins, les pastilles, les titres de
+groupe et le lien e-mail d'une carte mesurés sur la page rendue (4,5:1 au moins), la piste et le curseur
+de l'interrupteur (3:1 au moins, en contraste forcé et sans transition quand on réduit les animations), et,
+sur la carte de la personne connectée, « Votre fiche » et « Modifier » à 12px, le bouton à 24px de haut et
+le lien e-mail à l'écart de ce bouton.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -539,6 +546,14 @@ iOS, Chrome Android) que les tests ne couvrent pas :
 - [ ] Téléphone ou tablette : toucher le champ de recherche ne zoome pas la page
       (champs à 16px), les badges, tags et le lien e-mail se touchent sans
       viser, et un filtre touché ne reste pas coloré une fois relâché.
+- [ ] **Texte des cartes** (1.17.1) : à 1 440 px comme à 390 px, étiquettes, titres de groupe, fonction, e-mail,
+      téléphone, « Votre fiche » et « Modifier » ont la même taille (12px) et se lisent sans effort ; seul le nom
+      grossit sous 600 px. Une étiquette a une hauteur confortable à viser (24px) et deux étiquettes voisines ne
+      se touchent pas. Les cartes sont plus hautes qu'avant la 1.17.1 (un tiers environ à 1 440 px) : faire défiler
+      une longue liste et juger si le défilement reste agréable. Comparer à `docs/images/apercu.png`.
+- [ ] **Badge de l'établissement en texte** (1.17.1) (un établissement sans logo, ou `?sanslogos` dans la
+      démonstration) : l'acronyme est lu en 12px, entier, à droite du nom sans passer dessous ; un nom
+      plus long que 136px est coupé par « … ».
 
 ## 13. Modifier sa fiche (1.12.0, reprise en 1.15.0)
 
@@ -694,6 +709,10 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
       taille normale, comme les titres de groupe et l'adresse e-mail ; on distingue encore les catégories
       d'un coup d'œil, et le point de chaque bouton de filtre a la couleur des pastilles de sa catégorie.
       À comparer avec `docs/images/carte-anatomie.png`.
+- [ ] **Cibles à la souris** (1.17.1) : cliquer sur une étiquette de carte (elle ajoute le filtre correspondant),
+      sur le bouton « Modifier » de sa propre carte et sur le lien e-mail : chaque clic touche la bonne cible du
+      premier coup, sans toucher la voisine ; passer de l'une à l'autre à la souris ne donne pas l'impression de
+      viser trop petit.
 - [ ] **Interrupteur de présence au clavier** (1.16.3) : tabuler jusqu'à « Apparaître dans l'annuaire »
       (compte identifié, fiche présente) et appuyer sur **Espace** : l'interrupteur bascule et **l'anneau
       violet reste sur lui**, pendant « Enregistrement… » comme après ; la touche Tab suivante va au champ de

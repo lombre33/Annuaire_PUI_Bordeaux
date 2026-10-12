@@ -27,7 +27,9 @@ const MARGE_RANGEE = 8; // plus petite que l'écart entre deux rangées de carte
 const MARGE_ENTETE = 12; // sous l'en-tête : moins que l'écart qui le sépare de la barre de recherche, qui ne déborde donc pas sur la capture
 const HAUTEUR_FENETRE_MODIFICATION = 1000; // la fenêtre de modification mesure au plus 900 px (dialogs.css) : elle tient en entier à l'écran
 const MARGE_FENETRE = 12; // fond assombri gardé autour de la fenêtre de modification
+const HAUTEUR_FENETRE_RELECTURE = 1250; // la relecture, sans le plafond de 900 px de la fenêtre (voir la scène), mesure environ 1 030 px
 const HAUTEUR_CONFIRMATION = 900; // le message de confirmation est fixé en bas de l'écran : la capture garde l'écran entier
+const HAUTEUR_FENETRE_LEGENDE = 3600; // la carte de la légende est loin dans la liste (cartes triées par nom, hautes de 520 px) : elle doit tenir dans la fenêtre pour que les repères, fixés à l'écran, la suivent
 
 let chromium;
 try {
@@ -467,7 +469,7 @@ const SCENES = [
   },
   {
     // La carte de Camille Rousseau, qui porte les neuf éléments légendés (les cartes sont triées par nom).
-    fichier: 'carte-anatomie.png',
+    fichier: 'carte-anatomie.png', hauteur: HAUTEUR_FENETRE_LEGENDE,
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       await poserReperes(page, 'Camille Rousseau');
@@ -514,12 +516,17 @@ const SCENES = [
     // ce qui change repéré (pastille « modifié » sur la fonction, « + » et barré sur les tags), et le
     // « Détail des changements ».
     fichier: 'modifier-fiche-relecture.png', requete: `?connecte=${PERSONNES_DEMO.visible}`,
-    hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFenetre,
+    hauteur: HAUTEUR_FENETRE_RELECTURE, zone: autourDeLaFenetre,
     async preparer(page) {
       await ouvrirMonProfil(page);
       await saisirBrouillon(page);
       await fenetre(page).getByRole('button', { name: 'Relire mes modifications', exact: true }).click();
       await attendreEtape(page, 'Relire avant de valider');
+      // Depuis que le texte des cartes fait 12 px (1.17.1), la relecture dépasse de quelques dizaines de pixels le
+      // plafond de la fenêtre (900 px, dialogs.css) : sur un écran réel, son corps défile. Pour la photographier en
+      // entier, on lève le plafond le temps de la capture seulement (pas avant : le formulaire, lui, est bien plus
+      // long qu'une fenêtre) ; le widget lui-même n'est pas modifié.
+      await page.addStyleTag({ content: '.dlg { max-height: none; }' });
       const compter = selecteur => fenetre(page).locator(selecteur).count();
       exiger(await fenetre(page).locator('#review-before-title').evaluate(titre => titre.firstChild.textContent) === 'Avant', 'pas de carte « Avant »');
       exiger(await fenetre(page).locator('#review-after-title').evaluate(titre => titre.firstChild.textContent) === 'Après', 'pas de carte « Après »');

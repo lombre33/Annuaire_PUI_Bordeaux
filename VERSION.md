@@ -1,4 +1,4 @@
-# Version 1.16.3 — Interrupteur de présence accessible (voir CHANGELOG.md)
+# Version 1.17.1 — Texte de 12 px et pastilles de 24 px (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -19,4 +19,6 @@ la recherche trouve « prénom nom » dans n'importe quel ordre, tirets, apostro
 sont assez foncés pour être lus (4,5:1 au moins avec le blanc, audit UI/UX). Depuis la 1.16.3,
 l'interrupteur de présence garde le focus pendant l'écriture, annonce sa réussite aux lecteurs d'écran,
 a une piste à 3:1 au moins de son fond et reste lisible en contraste élevé (audit UI/UX).
-652 tests (dont 227 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.17.1, tout le texte des cartes fait 12 px au moins et les pastilles 24 px de haut : les cartes
+sont plus hautes d'un tiers environ, un écart voulu avec la maquette v5 (audit UI/UX).
+657 tests (dont 232 dans un vrai navigateur, optionnels sans Playwright).

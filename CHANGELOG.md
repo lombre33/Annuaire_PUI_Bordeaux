@@ -1,5 +1,90 @@
 # Changelog
 
+## 1.17.1 — Texte de 12 px au moins, pastilles de 24 px de haut
+
+Cinquième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un gain
+par version), pour les constats **U20** (texte trop petit) et **U08** (cibles trop petites à la souris).
+**C'est le gain du lot qui change le plus l'aspect des cartes, et il s'écarte de la maquette v5 validée**,
+qui dessinait un texte de 8,5 à 10,5 px : tout le texte des cartes fait maintenant 12 px au moins et les
+pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) et il en tient moins par
+écran. Un seul fichier de code porte le changement, `style.css` : revenir à la maquette, c'est
+`git revert` de la fusion de cette version.
+
+- **Pourquoi.** L'audit comptait 91 % des caractères des cartes sous 12 px (dont 71 % à 8,5 px) et 202
+  pastilles sur 202 sous les 24 px de haut qu'exige WCAG 2.5.8 (niveau AA) pour une cible à la souris :
+  elles en faisaient 16, et selon la largeur de 72 à 100 d'entre elles échouaient même à l'exception
+  d'espacement. Depuis la 1.9.1, un écran tactile ou un cadre de moins de 600 px avait déjà un texte un peu
+  plus grand (10 à 12 px) et des cibles de 28 px ; cette version donne le même plancher à tout le monde,
+  sans condition de largeur ni de pointeur.
+- **Ce qui change.** Sous 600 px ou au doigt, la taille d'avant est celle de la parenthèse :
+
+  | Élément | Avant | Après |
+  |---|---|---|
+  | Pastille (`.tag`) | 8,5 px (11 px), 16 px de haut | 12 px, 24 px de haut au moins, marges de 9 px, 4 px entre deux pastilles |
+  | Titre de groupe (`.tag-group-title`) | 8,5 px (10 px) | 12 px |
+  | Badge de l'établissement en texte, sans logo (`.etablissement-tag`) | 8,5 px (10 px), 16 px de haut, 96 px de large au plus | 12 px, 24 px de haut au moins, 136 px de large au plus (la même place pour les lettres qu'avant) |
+  | Fonction (`.fonction`) | 10,5 px (12 px) | 12 px |
+  | E-mail et téléphone (`.detail-row`) | 10,5 px (12 px) | 12 px |
+  | « Votre fiche » (`.own-flag`) | 9,5 px (11 px) | 12 px |
+  | « Modifier » (`.card-edit`) | 10,5 px (12 px) | 12 px, 24 px de haut au moins |
+  | Nombre d'un bouton de filtre et d'une option de menu (`.filter-count`, `.option-count`) | 11 px | 12 px |
+
+  Le nom (14 px, 15 px sous 600 px), le titre de la page et les cibles tactiles de 28 px ne changent pas.
+  Le bloc « Petit écran ou écran tactile » de `style.css` ne garde que le nom à 15 px et l'écart de 5 px
+  entre les pastilles : le reste est dans la feuille de base. **La fenêtre de relecture** (cartes « Avant »
+  et « Après » de « Modifier ma fiche ») utilise les mêmes cartes : elle suit, et passe d'environ 860 px de
+  haut à 960 px, donc au-dessus du plafond de 900 px de la fenêtre (`dialogs.css`) : son corps défile de
+  60 px, y compris sur un grand écran, où il tenait en entier.
+- **Ce que ça donne.** Mesuré sur la démonstration de 14 contacts (`docs/demo/serveur-demo.mjs`), avant et
+  après :
+
+  | Largeur | Hauteur moyenne d'une carte | Hauteur de la page |
+  |---|---|---|
+  | 1 440 px | 362 → 486 px (+34 %) | 2 463 → 3 093 px (+26 %) |
+  | 768 px | 355 → 467 px (+32 %) | 3 227 → 4 010 px (+24 %) |
+  | 390 px | 407 → 442 px (+9 %) | 6 722 → 7 212 px (+7 %) |
+
+  La part des caractères des cartes sous 12 px passe de 95 % à 0 % (de 73,5 % à 0 % à 390 px). Sur un écran
+  de 1 440 × 900 px, la première rangée de trois cartes tient toujours, mais on voit moins de la deuxième : le
+  prix de la lisibilité est une page plus longue d'un quart environ, ce qui compte pour les quelque
+  400 contacts de l'annuaire réel.
+- **Cibles (WCAG 2.5.8).** Les 119 pastilles de la démonstration font 24 px de haut et plus de 70 px de large :
+  aucune n'est sous le seuil. Le lien e-mail (12 px de texte, 15 px de haut) n'est pas agrandi : il tient par
+  l'exception d'espacement de la norme, un cercle de 24 px centré sur lui ne touche aucune autre cible, de
+  320 à 1 920 px, y compris le bouton « Modifier » qui le précède sur la carte de la personne connectée ; un
+  test le garde. Avant, la démonstration comptait 128 cibles sous 24 px, dont jusqu'à 30 (à 600 px) qui
+  échouaient même à l'exception.
+- **Reste ouvert dans l'audit.** Cette version porte sur les cartes. Pas traités : les textes de l'en-tête
+  (« Projet financé par l'État… » à 10 px, noms des financeurs à 11 px) et du bandeau des fondateurs, les
+  repères « avant / après » de la fenêtre de relecture (`.mk-pill`, 8,5 px), les unités en `px` (la
+  préférence de taille de police du navigateur n'agit toujours pas, le zoom oui ; passer en `rem` serait un
+  chantier de plus) et les 44 px recommandés au doigt pour les boutons de filtre (42 px sous 600 px) et
+  Fondateurs / Partenaires (36 px).
+- **Pour les développeurs** : `tests/support/card-metrics.mjs` (nouveau) mesure la page rendue : taille du
+  texte, hauteur des pastilles, isolement des petites cibles. La section « Accessibilité » de
+  `docs/developpeurs.md` a une règle de plus (le plancher de 12 px et les 24 px), `TESTING.md` (sections 12
+  et 15) deux contrôles à l'œil pour un vrai Grist, et `specs.md` une exigence de lisibilité.
+- **Tests** : 657 tests (232 dans un vrai navigateur, optionnels sans Playwright), 5 de plus qu'à la
+  1.16.3 (4 dans `tests/responsive.test.mjs`, 1 dans `tests/accessibility.test.mjs`). Dans `tests/responsive.test.mjs` : le test des tailles de texte « le bureau garde ses
+  tailles » est remplacé par « le texte des cartes fait 12 px à toute largeur » (14 px pour le nom sur
+  ordinateur, 15 px sous 600 px) ; à la souris, de 320 à 1 920 px, aucun texte de carte sous 12 px et aucune
+  pastille ou badge sous 24 px de haut ; la même mesure au doigt (414 et 820 px) ; chaque cible de moins de
+  24 px est isolée des autres (le cercle de la norme) ; les nombres des filtres font 12 px. Dans
+  `tests/accessibility.test.mjs` : sur la carte de la personne connectée, « Votre fiche » et « Modifier »
+  font 12 px, le bouton 24 px de haut, et le lien e-mail reste à l'écart de ce bouton. Les six tests écrits
+  ou réécrits échouent tous sur la feuille de style de la 1.16.3. Dix-neuf variantes fautives de
+  `style.css` (chaque taille remise à l'ancienne valeur, chaque hauteur ou marge retirée, les anciennes
+  tailles rétablies sous 600 px ou au doigt, le lien e-mail collé au bouton « Modifier », les pastilles
+  remontées sur le lien e-mail) ont été essayées une à une, le fichier étant remis en état après chacune :
+  toutes font échouer au moins un test.
+- **Documentation** : quinze captures sont refaites (aperçu, cartes sans logo, quatre menus de filtre, filtres
+  combinés, partenaires, recherche, bandeau de données partielles, légende de la carte, bouton, relecture et
+  confirmation de « Modifier ma fiche », mode admin) ; les huit autres sont celles de la 1.16.3 (les images où
+  seule bougeait la marge ou le décalage d'un demi-pixel n'ont pas été remplacées). `docs/demo/capturer.mjs`
+  s'adapte aux cartes plus hautes : la légende demande une fenêtre de 3 600 px (la carte de Camille Rousseau est
+  loin dans la liste) et la relecture lève le plafond de 900 px de la fenêtre le temps de la capture, puisqu'elle
+  le dépasse maintenant.
+
 ## 1.16.3 — Interrupteur de présence : focus gardé, réussite annoncée, contrastes
 
 Quatrième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un
