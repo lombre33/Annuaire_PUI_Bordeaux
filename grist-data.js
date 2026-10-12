@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { CATEGORIES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_TABLES } from './constants.js';
+import { CATEGORIES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -148,15 +148,50 @@ export function resolveListItem(item, referenceMap) {
   return referenceMap?.[String(item)] || '';
 }
 
+// Un libellé par valeur distincte, à la casse et aux accents près : le compte
+// d'une option de menu compte les contacts, pas leurs lignes de table liées.
+function uniqueLabels(labels) {
+  const seen = new Set();
+  return labels.filter(label => {
+    const key = normalize(label);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// libellé normalisé → identifiant de ligne (la plus petite en cas de doublon),
+// calculé une fois par table de libellés plutôt qu'à chaque contact.
+const rowIdsByLabel = new WeakMap();
+function rowIdByLabel(detailMap, label) {
+  if (!rowIdsByLabel.has(detailMap)) {
+    const index = new Map();
+    Object.entries(detailMap).forEach(([id, known]) => {
+      const key = normalize(known);
+      if (!index.has(key)) index.set(key, id);
+    });
+    rowIdsByLabel.set(detailMap, index);
+  }
+  return rowIdsByLabel.get(detailMap).get(normalize(label));
+}
+
+// Regroupement d'un élément de ReferenceList (par exemple le domaine d'une
+// compétence). Un identifiant désigne une ligne ; un texte déjà résolu désigne
+// la ligne par son libellé de détail, à retrouver dans `detailMap`.
+function resolveGroupItem(item, groupMap, detailMap) {
+  const id = typeof item === 'string' ? rowIdByLabel(detailMap || {}, item) : item;
+  return (id && groupMap?.[String(id)]) || '';
+}
+
 // Libellés des catégories dont BDD porte une ReferenceList. Un id sans
 // libellé est ignoré plutôt qu'affiché brut (« 47 » n'aide personne).
 function listLabels(contact, referenceMaps) {
-  return Object.fromEntries(LIST_CATEGORIES.map(({ key, column, table }) => [
-    key,
-    safeValues(contact[column])
-      .map(item => resolveListItem(item, referenceMaps[table]))
-      .filter(Boolean)
-  ]));
+  return Object.fromEntries(LIST_CATEGORIES.map(({ key, column, groups }) => {
+    const resolve = groups
+      ? item => resolveGroupItem(item, referenceMaps[key], referenceMaps[groups])
+      : item => resolveListItem(item, referenceMaps[key]);
+    return [key, uniqueLabels(safeValues(contact[column]).map(resolve).filter(Boolean))];
+  }));
 }
 
 // Ajoute à un contact `labels` (pour chaque catégorie, la liste de ses libellés) et
@@ -166,8 +201,8 @@ export function enrich(contact, referenceMaps, etabFlags) {
   // BDD.Etablissement est une Référence directe vers la ligne d'Etablissements
   // (jamais le nom de domaine de l'e-mail). refLabel() en gère les formes
   // possibles : identifiant de ligne, ['R', table, id] ou texte déjà résolu.
-  const etablissement = refLabel(contact.Etablissement, referenceMaps[CATEGORIES.etablissement.table]);
-  const role = refLabel(contact.Role_dans_le_PUI, referenceMaps[CATEGORIES.role.table]);
+  const etablissement = refLabel(contact.Etablissement, referenceMaps.etablissement);
+  const role = refLabel(contact.Role_dans_le_PUI, referenceMaps.role);
   const flags = etablissementFlags(contact, etabFlags);
 
   return {
@@ -325,7 +360,7 @@ function describeEmptyDirectory(rowCount, scopedRows, contacts) {
 
 // Lit toutes les tables en parallèle : { nom de table → résultat de Promise.allSettled }.
 async function readAllTables(docApi) {
-  const names = [MAIN_TABLE, ...REFERENCE_TABLES.map(([table]) => table)];
+  const names = [MAIN_TABLE, ...REFERENCE_TABLES];
   // async : une erreur levée de façon synchrone par docApi devient un rejet.
   const settled = await Promise.allSettled(names.map(async name => docApi.fetchTable(name)));
   return Object.fromEntries(names.map((name, index) => [name, settled[index]]));
@@ -353,37 +388,81 @@ function requireColumns(table, columns, rows) {
   }
 }
 
-// Lit la table de référence d'une catégorie : { map: id → libellé, labelColumnsMissing }
-// (aucune colonne de libellé n'existe : le menu et les tags seraient vides en
-// silence), ou null si sa lecture a échoué.
-function readReferenceMap(table, fields, result, log) {
-  if (result.status === 'rejected') {
-    log.warn(`[REFS] Impossible de charger ${table}`, result.reason);
-    return null;
-  }
+// Libellés d'un regroupement (les compétences macro) pour chaque ligne de la
+// catégorie qu'il regroupe, `detailMap` : une ligne que le regroupement ne couvre
+// pas prend le libellé `fallback`, pour qu'aucun de ses contacts ne devienne
+// introuvable. Deux écritures d'un même regroupement (casse, accents) n'en font
+// qu'un, celle de la plus petite ligne.
+export function groupLabelMap(groupMap, detailMap, fallback) {
+  const spellings = new Map();
+  const result = {};
+  Object.keys(detailMap).forEach(id => {
+    const label = text(groupMap[id]) || fallback;
+    if (!label) return;
+    const key = normalize(label);
+    if (!spellings.has(key)) spellings.set(key, label);
+    result[id] = spellings.get(key);
+  });
+  return result;
+}
+
+// Lit la colonne de libellé d'une catégorie : { map: id → libellé,
+// labelColumnsMissing } (aucune colonne de libellé n'existe : le menu et les tags
+// seraient vides en silence).
+function readReferenceMap({ key, table, field }, result, log) {
   const rows = tableToRows(result.value);
-  const labelFields = [].concat(fields);
+  const labelFields = [].concat(field);
   const map = labelMapFromRows(rows, labelFields);
   const withoutLabel = rows.length - Object.keys(map).length;
-  log.info(`[REFS] ${table}: ${Object.keys(map).length} entrées`
+  log.info(`[REFS] ${key} (${table}): ${Object.keys(map).length} entrées`
     + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${labelFields.join('/')})` : ''));
   const absent = missingColumns(rows, labelFields);
   if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
   return { map, labelColumnsMissing: absent.length === labelFields.length };
 }
 
-// Une table illisible garde ses libellés précédents ; `unreadable` la signale,
-// `unlabeled` celles dont aucune colonne de libellé n'existe.
+// Complète un regroupement avec le libellé de repli des lignes non classées ; la
+// console dit lesquelles, pour les classer dans Grist.
+function completeGroupMap({ key, table, groups, fallback }, referenceMaps, log) {
+  const detailMap = referenceMaps[groups] || {};
+  const groupMap = referenceMaps[key] || {};
+  const unclassified = Object.keys(detailMap).filter(id => !text(groupMap[id]));
+  if (unclassified.length) {
+    log.info(`[REFS] ${table}: ${unclassified.length} ligne(s) sans regroupement pour ${key}, `
+      + `classées sous « ${fallback} » (identifiants de ligne) :`, unclassified.slice(0, 20));
+  }
+  return groupLabelMap(groupMap, detailMap, fallback);
+}
+
+// Les libellés de chaque catégorie. Une table illisible garde les libellés
+// précédents de ses catégories ; `unreadable` la signale, `unlabeled` les
+// catégories dont aucune colonne de libellé n'existe.
 function readReferenceMaps(results, previousMaps, log) {
+  const unreadable = REFERENCE_TABLES.filter(table => results[table].status === 'rejected');
+  unreadable.forEach(table => log.warn(`[REFS] Impossible de charger ${table}`, results[table].reason));
+
   const referenceMaps = {};
-  const unreadable = [];
   const unlabeled = [];
-  REFERENCE_TABLES.forEach(([table, fields]) => {
-    const read = readReferenceMap(table, fields, results[table], log);
-    if (!read) unreadable.push(table);
-    else if (read.labelColumnsMissing) unlabeled.push({ table, fields: [].concat(fields) });
-    referenceMaps[table] = read?.map ?? previousMaps[table] ?? {};
+  const withoutLabelColumn = new Set();
+  REFERENCE_SOURCES.forEach(source => {
+    const result = results[source.table];
+    if (result.status === 'rejected') {
+      referenceMaps[source.key] = previousMaps[source.key] ?? {};
+      return;
+    }
+    const read = readReferenceMap(source, result, log);
+    referenceMaps[source.key] = read.map;
+    if (read.labelColumnsMissing) {
+      unlabeled.push({ table: source.table, fields: [].concat(source.field) });
+      withoutLabelColumn.add(source.key);
+    }
   });
+  // Les regroupements se complètent une fois toutes les maps lues. Sans colonne
+  // de regroupement, rien n'est classé : un filtre vide vaut mieux qu'un filtre
+  // où tout le monde est « Autres ».
+  REFERENCE_SOURCES
+    .filter(source => source.groups && !withoutLabelColumn.has(source.key))
+    .forEach(source => { referenceMaps[source.key] = completeGroupMap(source, referenceMaps, log); });
   return { referenceMaps, unreadable, unlabeled };
 }
 

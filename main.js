@@ -9,9 +9,9 @@ import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts } from 
 const state = {
   allContacts: [],
   referenceMaps: {},
-  // referenceMaps dont la table Etablissements est restreinte aux lignes
-  // ok_pour_apparaitre : réservé aux menus de filtres, jamais utilisé pour
-  // résoudre le libellé d'un contact.
+  // referenceMaps (libellés par clé de catégorie) dont celui des établissements
+  // est restreint aux lignes ok_pour_apparaitre : réservé aux menus de filtres,
+  // jamais utilisé pour résoudre le libellé d'un contact.
   filterReferenceMaps: {},
   activeFilters: createEmptyFilterState(),
   searchTerm: '',
@@ -123,7 +123,7 @@ window.grist.ready({ requiredAccess: 'full' });
 function applyDirectory({ contacts, referenceMaps, etabFlags }) {
   const filterReferenceMaps = {
     ...referenceMaps,
-    Etablissements: filterVisibleEstablishments(referenceMaps.Etablissements, etabFlags)
+    etablissement: filterVisibleEstablishments(referenceMaps.etablissement, etabFlags)
   };
   // Reconstruire les menus ferme ceux qui sont ouverts : seulement si les
   // libellés ont changé.

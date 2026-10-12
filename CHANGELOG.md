@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.9.0 — Filtre « Domaines » : la recherche par compétences macro
+
+Le document Grist regroupe désormais les compétences par domaine
+(`Competences.Macro_competences`). Le widget propose ce regroupement comme un
+filtre de plus, sans rien retirer au détail : le menu « Compétences » et les
+tags des cartes restent ceux de la 1.8.0.
+
+- **Nouveau filtre « Domaines »**, placé avant « Compétences ». Cocher un ou
+  plusieurs domaines garde les contacts qui ont au moins une compétence dans
+  l'un d'eux (OU entre domaines, ET avec les autres filtres, comme partout).
+  Le détail reste filtrable en plus : cocher « Cancérologie » puis
+  « Hématologie » donne les contacts de ce domaine qui ont cette compétence, et
+  le menu « Compétences » affiche alors le nombre de contacts de ce domaine.
+  Une infobulle fait le lien avec le nom « compétences macro ».
+- **Aucun contact introuvable** : une compétence sans domaine renseigné est
+  classée sous « Autres », et la console liste ses identifiants de ligne pour
+  la classer dans Grist. Un contact qui a deux compétences du même domaine
+  compte une seule fois dans ce domaine.
+- **Un seul domaine par écriture** : « Cancérologie » et « cancerologie » (casse,
+  accents) ne forment qu'une option, écrite comme la plus petite ligne de la
+  table. Si la colonne `Macro_competences` n'existe pas, le bandeau le dit et le
+  filtre reste vide (il ne classe pas tout le monde sous « Autres »).
+- **Le domaine d'un contact se déduit de `BDD.Competences`** (même colonne que
+  les compétences) : la colonne `BDD.Comptetences_macr` n'est pas lue.
+- **Libellés rangés par catégorie** : `referenceMaps` est indexé par clé de
+  catégorie (`competences`, `macro`…) et non plus par table, parce que deux
+  catégories lisent la même table `Competences`. Elle n'est toujours lue
+  qu'une fois par chargement (`REFERENCE_TABLES` liste les tables,
+  `REFERENCE_SOURCES` les libellés par catégorie). Un même libellé écrit deux
+  fois pour un contact (casse, accents) n'apparaît plus qu'une fois dans
+  une catégorie, et ne compte donc qu'une fois dans les compteurs des menus.
+- **Tests** : 122 tests (91 unitaires, 1 règle du projet, 30 dans un vrai
+  navigateur). Les données de test ont maintenant quatre compétences, dont une
+  sans domaine et un domaine écrit autrement.
+
 ## 1.8.0 — Nouvelle structure Grist : le widget lit la table BDD
 
 Le document Grist a été restructuré : la table principale est désormais `BDD`

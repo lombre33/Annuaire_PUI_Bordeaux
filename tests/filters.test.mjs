@@ -70,7 +70,7 @@ test('pruneStaleFilters drops a selected label that no longer exists in its refe
   const activeFilters = createEmptyFilterState();
   activeFilters.etablissement.add('CHU');
   activeFilters.etablissement.add('UBM');
-  const referenceMaps = { Etablissements: { 1: 'CHU-Bordeaux', 2: 'UBM' } };
+  const referenceMaps = { etablissement: { 1: 'CHU-Bordeaux', 2: 'UBM' } };
   const pruned = pruneStaleFilters(activeFilters, referenceMaps);
   assert.deepEqual([...pruned.etablissement], ['UBM'], 'CHU a été renommé en CHU-Bordeaux : la sélection orpheline doit disparaître, UBM doit rester');
   assert.deepEqual([...activeFilters.etablissement], ['CHU', 'UBM'], 'l\'état d\'origine n\'est pas modifié');
@@ -79,7 +79,7 @@ test('pruneStaleFilters drops a selected label that no longer exists in its refe
 test('pruneStaleFilters leaves selections untouched when nothing changed, even if temporarily no contact matches', () => {
   const activeFilters = createEmptyFilterState();
   activeFilters.instances.add('CME');
-  const referenceMaps = { INSTANCES: { 7: 'CME' } };
+  const referenceMaps = { instances: { 7: 'CME' } };
   const pruned = pruneStaleFilters(activeFilters, referenceMaps);
   assert.deepEqual([...pruned.instances], ['CME'], 'CME reste une option valide du menu, donc pas une sélection périmée');
   assert.deepEqual(Object.keys(pruned), Object.keys(createEmptyFilterState()), 'une entrée par catégorie, même sans sélection');
@@ -136,4 +136,51 @@ test('computeFilterCounts keys are normalized (case/accent-insensitive), matchin
   const activeFilters = createEmptyFilterState();
   const counts = computeFilterCounts(contacts, activeFilters, '', undefined);
   assert.equal(counts.competences[normalize('Oncologie')], 1, 'le tally doit matcher un libellé de référence "Oncologie" malgré la casse différente');
+});
+
+// ===== Compétences macro : un filtre de plus, sans toucher au détail =====
+
+test('filterContacts: the macro skills filter keeps the contacts with a skill in any selected domain, and combines with the detailed skills', () => {
+  const contacts = [
+    { nom: 'A', labels: { macro: ['Cancérologie'], competences: ['Oncologie', 'Hématologie'] } },
+    { nom: 'B', labels: { macro: ['Pharmacie', 'Cancérologie'], competences: ['Pharmacovigilance', 'Oncologie'] } },
+    { nom: 'C', labels: { macro: ['Autres'], competences: ['Divers'] } }
+  ];
+  const activeFilters = createEmptyFilterState();
+  activeFilters.macro.add('Pharmacie');
+  activeFilters.macro.add('Autres');
+  assert.deepEqual(filterContacts(contacts, activeFilters, '').map(c => c.nom), ['B', 'C'], 'OU entre domaines');
+
+  activeFilters.macro.clear();
+  activeFilters.macro.add('Cancérologie');
+  assert.deepEqual(filterContacts(contacts, activeFilters, '').map(c => c.nom), ['A', 'B']);
+
+  activeFilters.competences.add('Hématologie');
+  assert.deepEqual(filterContacts(contacts, activeFilters, '').map(c => c.nom), ['A'], 'ET avec le détail : le détail reste filtrable');
+});
+
+test('computeFilterCounts counts a contact once per domain, whatever the number of its skills in that domain', () => {
+  const contacts = [
+    { nom: 'A', labels: { macro: ['Cancérologie'], competences: ['Oncologie', 'Hématologie'] } },
+    { nom: 'B', labels: { macro: ['Cancérologie', 'Pharmacie'], competences: ['Oncologie', 'Pharmacovigilance'] } }
+  ];
+  const counts = computeFilterCounts(contacts, createEmptyFilterState(), '', undefined);
+  assert.deepEqual(counts.macro, { cancerologie: 2, pharmacie: 1 });
+  assert.equal(counts.competences.oncologie, 2);
+
+  const activeFilters = createEmptyFilterState();
+  activeFilters.competences.add('Pharmacovigilance');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', undefined).macro, { cancerologie: 1, pharmacie: 1 },
+    'les domaines tiennent compte des compétences cochées');
+});
+
+test('pruneStaleFilters drops a selected domain that no longer exists, and keeps the detailed skills untouched', () => {
+  const activeFilters = createEmptyFilterState();
+  activeFilters.macro.add('Ancien domaine');
+  activeFilters.macro.add('Cancérologie');
+  activeFilters.competences.add('Oncologie');
+  const referenceMaps = { macro: { 1: 'Cancérologie' }, competences: { 1: 'Oncologie' } };
+  const pruned = pruneStaleFilters(activeFilters, referenceMaps);
+  assert.deepEqual([...pruned.macro], ['Cancérologie']);
+  assert.deepEqual([...pruned.competences], ['Oncologie']);
 });

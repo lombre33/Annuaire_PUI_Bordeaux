@@ -161,7 +161,7 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
     assert.deepEqual(tagsByGroup, [
       ['Instances', ['CME']],
       ['Actions', ['Vaccination']],
-      ['Compétences', ['Oncologie']],
+      ['Compétences', ['Oncologie', 'Hématologie']],
       ['Communautés', ['Réseau douleur']],
       ['Rôle PUI', ['Référent qualité']]
     ]);
@@ -255,11 +255,100 @@ test('le filtre Compétences propose le libellé corrigé de la table Competence
     await waitForCards(page, 4);
     const filter = page.locator('.filter[data-filter-key="competences"]');
     await filter.locator('.filter-button').click();
-    assert.deepEqual(await filter.locator('.option-label').allTextContents(), ['Oncologie'], 'ni libellé brut ni doublon');
+    assert.deepEqual(await filter.locator('.option-label').allTextContents(),
+      ['Divers', 'Hématologie', 'Oncologie', 'Pharmacovigilance'], 'libellés corrigés ou bruts, jamais les deux');
     await filter.locator('.filter-option', { hasText: 'Oncologie' }).locator('input').check();
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
   }));
+
+// ===== Compétences macro =====
+
+const macroFilter = page => page.locator('.filter[data-filter-key="macro"]');
+const optionCounts = filter => filter.locator('.filter-option').evaluateAll(options =>
+  Object.fromEntries(options.map(option => [option.querySelector('.option-label').textContent,
+    option.querySelector('.option-count').textContent])));
+
+test('la barre de filtres place « Domaines » (compétences macro) juste avant « Compétences »', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    assert.deepEqual(await page.locator('.filter-button > span:nth-child(2)').allTextContents(),
+      ['Actions', 'Tâches', 'Communautés', 'GT', 'Domaines', 'Compétences', 'Instances', 'Établissement']);
+    assert.match(await macroFilter(page).locator('.filter-button').getAttribute('title'), /Compétences macro/);
+  }));
+
+test('le menu Domaines propose chaque domaine une fois, avec « Autres » pour les compétences non classées', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await macroFilter(page).locator('.filter-button').click();
+    assert.deepEqual(await optionCounts(macroFilter(page)), { Autres: '1', 'Cancérologie': '1', Pharmacie: '0' },
+      '« cancérologie » et « Cancérologie » ne font qu\'un domaine ; Ana compte une fois malgré ses deux compétences ; Bob (Pharmacie) est masqué par défaut');
+    assert.deepEqual(await macroFilter(page).locator('.option-label').allTextContents(), ['Autres', 'Cancérologie', 'Pharmacie']);
+  }));
+
+test('cocher un domaine garde les contacts d\'une compétence de ce domaine, et le détail des compétences reste filtrable', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await macroFilter(page).locator('.filter-button').click();
+    await macroFilter(page).locator('.filter-option', { hasText: 'Cancérologie' }).locator('input').check();
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), ['Ana Martin']);
+    assert.equal(await macroFilter(page).locator('.filter-count').textContent(), '1');
+
+    const detail = page.locator('.filter[data-filter-key="competences"]');
+    await detail.locator('.filter-button').click();
+    assert.deepEqual(await optionCounts(detail), { Divers: '0', 'Hématologie': '1', Oncologie: '1', Pharmacovigilance: '0' },
+      'le détail tient compte du domaine coché');
+    await detail.locator('.filter-option', { hasText: 'Hématologie' }).locator('input').check();
+    await waitForCards(page, 1);
+
+    await detail.locator('.filter-option', { hasText: 'Hématologie' }).locator('input').uncheck();
+    await macroFilter(page).locator('.filter-button').click();
+    await macroFilter(page).locator('.filter-option', { hasText: 'Autres' }).locator('input').check();
+    await waitForCards(page, 2);
+    assert.deepEqual(await cardNames(page), ['Ana Martin', 'Gina Bergonié'], 'OU entre les domaines cochés');
+  }));
+
+test('un domaine et une compétence sans rapport donnent « Aucun contact trouvé » plutôt qu\'un faux résultat', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await macroFilter(page).locator('.filter-button').click();
+    await macroFilter(page).locator('.filter-option', { hasText: 'Autres' }).locator('input').check();
+    await waitForCards(page, 1);
+    const detail = page.locator('.filter[data-filter-key="competences"]');
+    await detail.locator('.filter-button').click();
+    await detail.locator('.filter-option', { hasText: 'Oncologie' }).locator('input').check();
+    await waitForCards(page, 0);
+    assert.equal(await page.locator('#emptyState').isVisible(), true);
+  }));
+
+test('le domaine d\'un partenaire apparaît avec l\'interrupteur Partenaires, et « Réinitialiser » vide le filtre', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.click('[data-scope="partenaire"]');
+    await waitForCards(page, 5);
+    await macroFilter(page).locator('.filter-button').click();
+    assert.equal((await optionCounts(macroFilter(page))).Pharmacie, '1');
+    await macroFilter(page).locator('.filter-option', { hasText: 'Pharmacie' }).locator('input').check();
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), ['Bob Durand']);
+
+    await page.click('#resetFilters');
+    await waitForCards(page, 5);
+    assert.equal(await page.locator('.filter-count:not([hidden])').count(), 0);
+  }));
+
+test('sans colonne Macro_competences : le bandeau le dit, le filtre reste vide et le détail des compétences fonctionne', { skip }, () => {
+  const tables = sampleTables();
+  delete tables.Competences.Macro_competences;
+  return withWidget({ tables }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await waitForBanner(page);
+    assert.match(await bannerText(page), /Competences \(Macro_competences\)/);
+    assert.equal(await macroFilter(page).locator('.filter-option').count(), 0, 'pas de faux domaine « Autres » pour tout le monde');
+    assert.equal(await page.locator('.filter[data-filter-key="competences"] .filter-option').count(), 4);
+  });
+});
 
 test('chaque option de menu affiche le nombre de cartes qu\'elle donnerait', { skip }, () =>
   withWidget({}, async ({ page }) => {

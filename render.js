@@ -33,6 +33,7 @@ function buildFilterButton(filter, selectedCount) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'filter-button';
+  if (filter.hint) button.title = filter.hint;
 
   const dot = document.createElement('span');
   dot.className = 'filter-dot';
@@ -92,7 +93,7 @@ function buildFilterMenu(filter, referenceMaps, selected, counts, onToggle) {
   menu.style.borderTopColor = filter.color;
   menu.appendChild(buildMenuSearch(filter, menu));
 
-  const values = orderedValues(Object.values(referenceMaps[filter.table] || {}), selected);
+  const values = orderedValues(Object.values(referenceMaps[filter.key] || {}), selected);
   values.forEach(value => {
     menu.appendChild(buildOption(filter, value, selected.has(value), countFor(counts, filter.key, value), onToggle));
   });

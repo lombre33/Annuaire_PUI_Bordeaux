@@ -54,7 +54,7 @@ export function filterContacts(contacts, activeFilters, searchTerm, scope, exclu
 export function pruneStaleFilters(activeFilters, referenceMaps) {
   const pruned = {};
   FILTERS.forEach(filter => {
-    const available = new Set(Object.values(referenceMaps[filter.table] || {}));
+    const available = new Set(Object.values(referenceMaps[filter.key] || {}));
     pruned[filter.key] = new Set([...(activeFilters[filter.key] || [])].filter(value => available.has(value)));
   });
   return pruned;
