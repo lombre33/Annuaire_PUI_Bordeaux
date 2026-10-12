@@ -100,6 +100,39 @@ test('enrich: a skill already resolved to text is found by its label, never take
   assert.deepEqual(enrich({ Competences: ['L', 'HÉMATOLOGIE'] }, SKILL_MAPS).labels.macro, ['Cancérologie'], 'casse et accents sans importance');
 });
 
+// Les actions des tâches se lisent depuis BDD.Taches, comme les domaines depuis BDD.Competences :
+// la même colonne, rangée selon l'action que loadDirectory déduit du numéro de la tâche.
+const TASK_MAPS = {
+  taches: { 1: '1.1 Relecture', 2: '1.2 Rappel vaccinal', 3: '2.1 Inspection' },
+  macroTaches: { 1: 'Action 1: Vaccination', 2: 'Action 1: Vaccination', 3: 'Action 2: Audit' }
+};
+
+test('enrich: labels.macroTaches gives the action of each task from the same BDD.Taches column, without losing the tasks', () => {
+  const result = enrich({ Taches: ['L', 1, 3] }, TASK_MAPS);
+  assert.deepEqual(result.labels.taches, ['1.1 Relecture', '2.1 Inspection']);
+  assert.deepEqual(result.labels.macroTaches, ['Action 1: Vaccination', 'Action 2: Audit']);
+});
+
+test('enrich: two tasks of the same action give that action once, and tasks and skills are grouped independently', () => {
+  assert.deepEqual(enrich({ Taches: ['L', 1, 2] }, TASK_MAPS).labels.macroTaches, ['Action 1: Vaccination']);
+  const both = enrich({ Taches: ['L', 3], Competences: ['L', 1] }, { ...TASK_MAPS, ...SKILL_MAPS });
+  assert.deepEqual([both.labels.macroTaches, both.labels.macro], [['Action 2: Audit'], ['Cancérologie']]);
+});
+
+test('enrich: labels.macroTaches ignores tasks without a label, tasks without action, and contacts without tasks', () => {
+  assert.deepEqual(enrich({ Taches: ['L', 999] }, TASK_MAPS).labels.macroTaches, []);
+  assert.deepEqual(enrich({ Taches: ['L'] }, TASK_MAPS).labels.macroTaches, []);
+  assert.deepEqual(enrich({}, TASK_MAPS).labels.macroTaches, []);
+  assert.deepEqual(enrich({ Taches: ['L', 1] }, { taches: TASK_MAPS.taches }).labels.macroTaches, [], 'aucune lecture des actions : aucun groupe');
+  assert.deepEqual(enrich({ Taches: ['L', 1] }, { taches: TASK_MAPS.taches, macroTaches: {} }).labels.macroTaches, [], 'aucun numéro en commun');
+});
+
+test('enrich: a task already resolved to text is found by its label, never taken for an action', () => {
+  const result = enrich({ Taches: ['L', '1.1 relecture', 'Inconnue'] }, TASK_MAPS);
+  assert.deepEqual(result.labels.macroTaches, ['Action 1: Vaccination'], 'le texte « 1.1 relecture » retrouve sa ligne ; « Inconnue » est ignorée');
+  assert.deepEqual(result.labels.taches, ['1.1 relecture', 'Inconnue'], 'le détail garde le texte reçu');
+});
+
 test('enrich: the same label twice in one category appears once (a contact is counted once per option)', () => {
   const referenceMaps = { actions: { 1: 'Vaccination', 2: 'vaccination' } };
   assert.deepEqual(enrich({ Actions: ['L', 1, 2] }, referenceMaps).labels.actions, ['Vaccination']);

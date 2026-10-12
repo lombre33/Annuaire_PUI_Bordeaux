@@ -38,10 +38,10 @@ export function normalizeForSearch(value) {
     .trim();
 }
 
-// Tri alphabétique français (« chu » avant « UBM ») ; .sort() seul trie par code
-// UTF-16, majuscules d'abord.
+// Tri alphabétique français (« chu » avant « UBM »), les nombres dans l'ordre (« 1.2 »
+// avant « 1.10 ») ; .sort() seul trie par code UTF-16, majuscules d'abord.
 export function compareLabels(a, b) {
-  return text(a).localeCompare(text(b), 'fr-FR');
+  return text(a).localeCompare(text(b), 'fr-FR', { numeric: true });
 }
 
 // Ordre des cartes : nom de famille, puis prénom, alphabétique français (« Éluard » avec les E,
@@ -543,12 +543,71 @@ function readReferenceMap({ key, table, field }, result, log) {
   return { map, labelColumnsMissing: absent.length === labelFields.length };
 }
 
+// ===== TÂCHES RANGÉES PAR ACTION =====
+// Aucune colonne ne relie une tâche à son action : le numéro avant le point du libellé de la
+// tâche (« 1.3 Animer le réseau ») est celui de son action, que la table Actions porte dans
+// son libellé (« Action 1 : Gouvernance »). Voir `numberedIn` dans constants.js.
+
+// « 1.3 Animer le réseau », « T1.3 », « Tâche n° 1.3 : … » → 1. Un libellé qui ne commence
+// pas par un numéro de la forme 1.3 n'a pas d'action (« 2 formations » non plus).
+const TASK_ACTION_NUMBER = /^\s*(?:t(?:[aâ]che)?\.?\s*)?(?:n\s*°\s*)?(\d+)\s*\.\s*\d/i;
+
+// « Action 1 : Gouvernance », « Action n° 1 », « A1 », « 1. Gouvernance », « 1 - Gouvernance »
+// → 1. Un numéro de la forme 1.3 est celui d'une tâche, pas d'une action.
+const ACTION_NUMBER = /^\s*(?:action|a)?\s*(?:n\s*°\s*)?(\d+)(?!\d|\s*[.,]\s*\d)/i;
+
+const numberIn = (pattern, label) => {
+  const match = pattern.exec(text(label));
+  return match ? Number(match[1]) : null;
+};
+
+// Le numéro de l'action d'une tâche d'après son libellé ; null sans numéro.
+export const taskActionNumber = label => numberIn(TASK_ACTION_NUMBER, label);
+
+// Le numéro d'une action d'après son libellé ; null sans numéro.
+export const actionNumber = label => numberIn(ACTION_NUMBER, label);
+
+// numéro → libellé de l'action qui le porte (la plus petite ligne si deux le portent).
+function actionLabelsByNumber(actionMap) {
+  const byNumber = new Map();
+  Object.entries(actionMap)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .forEach(([, label]) => {
+      const number = actionNumber(label);
+      if (number !== null && !byNumber.has(number)) byNumber.set(number, label);
+    });
+  return byNumber;
+}
+
+// id de tâche → libellé de son action, pour les tâches dont le numéro est celui d'une action.
+function groupsFromNumbers(detailMap, actionMap) {
+  const actions = actionLabelsByNumber(actionMap);
+  const groupMap = {};
+  Object.entries(detailMap).forEach(([id, label]) => {
+    const action = actions.get(taskActionNumber(label));
+    if (action) groupMap[id] = action;
+  });
+  return groupMap;
+}
+
 // Complète un regroupement avec le libellé de repli des lignes non classées ; la
-// console dit lesquelles, pour les classer dans Grist.
-function completeGroupMap({ key, table, groups, fallback }, referenceMaps, log) {
+// console dit lesquelles, pour les classer dans Grist. Un regroupement déduit des
+// numéros (`numberedIn`) qui ne classe aucune ligne ne range rien : le menu reste à
+// plat plutôt que de tout cacher sous le seul groupe de repli.
+function completeGroupMap({ key, table, groups, fallback, numberedIn }, referenceMaps, log) {
   const detailMap = referenceMaps[groups] || {};
-  const groupMap = referenceMaps[key] || {};
-  const unclassified = Object.keys(detailMap).filter(id => !text(groupMap[id]));
+  const groupMap = numberedIn ? groupsFromNumbers(detailMap, referenceMaps[numberedIn] || {}) : referenceMaps[key] || {};
+  const ids = Object.keys(detailMap);
+  const unclassified = ids.filter(id => !text(groupMap[id]));
+  if (numberedIn && unclassified.length === ids.length) {
+    if (ids.length) {
+      const numbered = Object.values(detailMap).filter(label => taskActionNumber(label) !== null).length;
+      const actions = actionLabelsByNumber(referenceMaps[numberedIn] || {}).size;
+      log.info(`[REFS] ${table}: aucune ligne n'est rattachée à une action pour ${key} `
+        + `(${numbered} sur ${ids.length} ont un numéro, ${actions} action(s) en ont un) : le menu reste à plat.`);
+    }
+    return {};
+  }
   if (unclassified.length) {
     log.info(`[REFS] ${table}: ${unclassified.length} ligne(s) sans regroupement pour ${key}, `
       + `classées sous « ${fallback} » (identifiants de ligne) :`, unclassified.slice(0, 20));
@@ -567,6 +626,7 @@ function readReferenceMaps(results, previousMaps, log) {
   const unlabeled = [];
   const withoutLabelColumn = new Set();
   REFERENCE_SOURCES.forEach(source => {
+    if (source.numberedIn) return; // déduit des libellés déjà lus, voir completeGroupMap
     const result = results[source.table];
     if (result.status === 'rejected') {
       referenceMaps[source.key] = previousMaps[source.key] ?? {};
@@ -581,7 +641,8 @@ function readReferenceMaps(results, previousMaps, log) {
   });
   // Les regroupements se complètent une fois toutes les maps lues. Sans colonne
   // de regroupement, rien n'est classé : un filtre vide vaut mieux qu'un filtre
-  // où tout le monde est « Autres ».
+  // où tout le monde est « Autres ». Celui qui se déduit des numéros n'a rien à
+  // garder d'une lecture ratée : il se recalcule sur les libellés des deux tables.
   REFERENCE_SOURCES
     .filter(source => source.groups && !withoutLabelColumn.has(source.key))
     .forEach(source => { referenceMaps[source.key] = completeGroupMap(source, referenceMaps, log); });

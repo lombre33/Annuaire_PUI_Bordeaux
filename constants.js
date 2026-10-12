@@ -53,33 +53,51 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 //                 corrigé d'abord, le libellé brut de l'import en repli)
 //   column        colonne ReferenceList de BDD qui y renvoie ; absente pour les
 //                 Références simples Établissement et Rôle
-//   hint          infobulle du bouton de filtre, quand son nom ne suffit pas
-//   placeholder   texte du champ de recherche du menu, quand « Rechercher dans
-//                 <label> » ne dit pas tout
 //   groups        catégorie dont celle-ci est un regroupement : elle lit une
 //                 autre colonne de la même table (les compétences macro sont
-//                 une colonne de la table Competences) ; `fallback` est alors le
-//                 libellé des lignes que ce regroupement ne couvre pas
+//                 une colonne de la table Competences) ou la déduit (voir
+//                 `numberedIn`) ; `fallback` est alors le libellé des lignes que
+//                 ce regroupement ne couvre pas
 //   grouping      l'inverse de `groups` : la catégorie qui range celle-ci en
 //                 groupes. Le menu de cette catégorie présente ses valeurs par
-//                 groupe (les compétences par domaine) ; le regroupement n'a pas
-//                 de menu à lui, il ne sert qu'à ranger et à compter
+//                 groupe (les compétences par domaine, les tâches par action) ;
+//                 le regroupement n'a pas de menu à lui, il ne sert qu'à ranger
+//                 et à compter
+//   hint,         sur un regroupement : l'infobulle du bouton et le texte du
+//   placeholder   champ de recherche du menu qu'il range, tant que ce menu est
+//                 rangé par groupe (à plat, le menu garde les textes par défaut)
+//   numberedIn    sur un regroupement sans colonne à lire (ses `field` sont ceux
+//                 des lignes qu'il range, qu'on ne relit pas) : le numéro avant
+//                 le point du libellé d'une ligne (« 1.3 Animer le réseau ») est
+//                 celui de sa ligne de cette catégorie (« Action 1 : … »), dont
+//                 le libellé nomme le groupe. Tant qu'aucune ligne n'a son
+//                 groupe, le menu reste à plat
 //
 // Les libellés lus de Grist sont rangés par clé de catégorie (referenceMaps),
 // pas par table : deux catégories peuvent lire la même table.
 export const CATEGORIES = {
   actions: { label: 'Actions', color: '#f28a54', table: 'Actions', field: ['Actions_corrigees', 'Actions'], column: 'Actions' },
-  taches: { label: 'Tâches', color: '#ff9800', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches' },
+  taches: {
+    label: 'Tâches', color: '#ff9800', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
+    grouping: 'macroTaches'
+  },
   communautes: { label: 'Communautés', color: '#d85b9d', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], column: 'Communautes' },
   gt: { label: 'GT', color: '#1ba99a', table: 'GT', field: ['GT_corrige', 'GT'], column: 'GT' },
   competences: {
     label: 'Compétences', color: '#9c27b0', table: 'Competences', field: ['Competences_corrigees', 'Competences'], column: 'Competences',
-    hint: 'Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
-    placeholder: 'Domaine ou compétence…', grouping: 'macro'
+    grouping: 'macro'
   },
   macro: {
     label: 'Domaines', color: '#6a1b9a', table: 'Competences', field: ['Macro_competences'], column: 'Competences',
-    groups: 'competences', fallback: 'Autres'
+    groups: 'competences', fallback: 'Autres',
+    hint: 'Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
+    placeholder: 'Domaine ou compétence…'
+  },
+  macroTaches: {
+    label: 'Actions des tâches', color: '#9a3412', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
+    groups: 'taches', fallback: 'Sans action', numberedIn: 'actions',
+    hint: 'Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi elles',
+    placeholder: 'Action ou tâche…'
   },
   instances: { label: 'Instances', color: '#4f8ee8', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], column: 'Instances' },
   etablissement: { label: 'Établissement', color: '#147c72', table: 'Etablissements', field: ['acronyme', 'nom_complet'] },
@@ -93,11 +111,13 @@ export const CATEGORIES = {
 export const ETABLISSEMENT_NAMES = 'etablissementNom';
 
 // Ordre des boutons de filtre. Rôle PUI n'a pas de filtre (specs.md), ni les
-// compétences macro : leurs domaines sont les groupes du menu Compétences.
+// regroupements : les domaines sont les groupes du menu Compétences, les actions
+// celles du menu Tâches.
 const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement'];
 
 // Ordre des sections de tags d'une carte. Établissement a son badge dédié ; les
-// compétences macro n'y figurent pas : la carte garde le détail des compétences.
+// regroupements n'y figurent pas : la carte garde le détail des compétences et
+// des tâches.
 const TAG_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role'];
 
 const withKey = key => ({ key, ...CATEGORIES[key] });
@@ -110,9 +130,11 @@ export const TAG_GROUPS = TAG_KEYS.map(withKey);
 export const REFERENCE_TABLES = [...new Set(Object.values(CATEGORIES).map(({ table }) => table))];
 
 // Un libellé à lire par catégorie : { key, table, field } et, pour un
-// regroupement, { groups, fallback }.
+// regroupement, { groups, fallback } avec, s'il se déduit des numéros, numberedIn.
 export const REFERENCE_SOURCES = Object.entries(CATEGORIES)
-  .map(([key, { table, field, groups, fallback }]) => ({ key, table, field, ...(groups && { groups, fallback }) }));
+  .map(([key, { table, field, groups, fallback, numberedIn }]) => ({
+    key, table, field, ...(groups && { groups, fallback, ...(numberedIn && { numberedIn }) })
+  }));
 
 // Catégories dont BDD porte une colonne ReferenceList ; `groups` pour un
 // regroupement.

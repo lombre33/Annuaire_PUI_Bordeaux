@@ -23,7 +23,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { crowdedTables } from './fixtures-responsive.mjs';
+import { crowdedTables, crowdedTablesByAction } from './fixtures-responsive.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
@@ -395,38 +395,56 @@ test('un menu n\'est décalé que s\'il déborderait, et revient en place quand 
     assert.ok(aligned < 1, 'le menu reste sous son bouton');
   }));
 
-// Le menu Compétences, rangé par domaine : le jeu de données a neuf domaines, des libellés
-// longs et un sans point de coupure (50 caractères).
-const openedSkills = async page => {
+// Les menus rangés par groupe (Compétences par domaine, Tâches par action) : le jeu de données a
+// des libellés longs et un sans point de coupure (50 caractères).
+const openedMenu = async (page, key) => {
   await closeMenus(page);
-  const filter = page.locator('.filter[data-filter-key="competences"]');
+  const filter = page.locator(`.filter[data-filter-key="${key}"]`);
   await filter.locator('.filter-button').click();
   return filter;
 };
+const openedSkills = page => openedMenu(page, 'competences');
+
+// Déplie tous les groupes d'un menu, puis dit ce qui en sort : défilement horizontal, et
+// éléments dont le bord droit dépasse la zone utile du menu.
+async function expandedMenuReport(filter) {
+  await filter.locator('.group-toggle').evaluateAll(buttons => buttons.forEach(button => {
+    if (button.getAttribute('aria-expanded') !== 'true') button.click();
+  }));
+  return filter.locator('.filter-menu').evaluate(menu => {
+    // Le bord droit de la zone utile du menu : sans sa bordure ni sa barre de défilement.
+    const clientRight = menu.getBoundingClientRect().left + menu.clientLeft + menu.clientWidth;
+    const inside = selector => [...menu.querySelectorAll(selector)]
+      .filter(element => element.getClientRects().length > 0)
+      .filter(element => element.getBoundingClientRect().right > clientRight + 0.5);
+    return {
+      scrollWidth: menu.scrollWidth,
+      clientWidth: menu.clientWidth,
+      groups: menu.querySelectorAll('.filter-group').length,
+      shownItems: [...menu.querySelectorAll('.filter-option')].filter(option => option.getClientRects().length > 0).length,
+      outside: ['.group-toggle', '.option-count', '.option-label'].flatMap(selector => inside(selector).map(element => selector))
+    };
+  });
+}
 
 test('le menu Compétences, tout déplié, tient dans son cadre étroit : libellés longs à la ligne, nombres et boutons dans le menu', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await atEachWidth(page, [280, 320, 360, 414, 768], async width => {
-      const filter = await openedSkills(page);
-      await filter.locator('.group-toggle').evaluateAll(buttons => buttons.forEach(button => {
-        if (button.getAttribute('aria-expanded') !== 'true') button.click();
-      }));
-      const report = await filter.locator('.filter-menu').evaluate(menu => {
-        // Le bord droit de la zone utile du menu : sans sa bordure ni sa barre de défilement.
-        const clientRight = menu.getBoundingClientRect().left + menu.clientLeft + menu.clientWidth;
-        const inside = selector => [...menu.querySelectorAll(selector)]
-          .filter(element => element.getClientRects().length > 0)
-          .filter(element => element.getBoundingClientRect().right > clientRight + 0.5);
-        return {
-          scrollWidth: menu.scrollWidth,
-          clientWidth: menu.clientWidth,
-          groups: menu.querySelectorAll('.filter-group').length,
-          shownSkills: [...menu.querySelectorAll('.filter-option')].filter(option => option.getClientRects().length > 0).length,
-          outside: ['.group-toggle', '.option-count', '.option-label'].flatMap(selector => inside(selector).map(element => selector))
-        };
-      });
+      const report = await expandedMenuReport(await openedSkills(page));
       assert.equal(report.groups, 9, 'neuf domaines');
-      assert.equal(report.shownSkills, 13, 'toutes les compétences, une fois dépliées');
+      assert.equal(report.shownItems, 13, 'toutes les compétences, une fois dépliées');
+      assert.ok(report.scrollWidth <= report.clientWidth, `à ${width}px, le menu défile horizontalement (${report.scrollWidth}px pour ${report.clientWidth}px)`);
+      assert.deepEqual(report.outside, [], `à ${width}px, des éléments du menu sortent à droite`);
+      await closeMenus(page);
+    });
+  }));
+
+test('le menu Tâches, rangé par action et tout déplié, tient dans son cadre étroit : actions et tâches longues à la ligne, nombres et boutons dans le menu', { skip }, () =>
+  withWidget({ tables: crowdedTablesByAction() }, async ({ page }) => {
+    await atEachWidth(page, [280, 320, 360, 414, 768], async width => {
+      const report = await expandedMenuReport(await openedMenu(page, 'taches'));
+      assert.equal(report.groups, 7, 'six actions et « Sans action »');
+      assert.equal(report.shownItems, 12, 'toutes les tâches, une fois dépliées');
       assert.ok(report.scrollWidth <= report.clientWidth, `à ${width}px, le menu défile horizontalement (${report.scrollWidth}px pour ${report.clientWidth}px)`);
       assert.deepEqual(report.outside, [], `à ${width}px, des éléments du menu sortent à droite`);
       await closeMenus(page);

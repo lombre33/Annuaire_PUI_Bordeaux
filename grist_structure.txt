@@ -72,7 +72,17 @@ Tables de référence (id -> libellé, chargées via fetchTable)
   Chaque table porte un libellé brut (issu de l'import) et un libellé corrigé :
   le widget affiche le libellé corrigé quand il est rempli, le brut sinon.
   Actions            : Actions_corrigees (Choice)     puis Actions (Text)
+                       Le libellé commence par « Action n : » (ou « Action n: ») :
+                       ce numéro n rattache les tâches du même numéro à l'action
+                       (menu « Tâches » rangé par action).
   Taches             : Taches_corrige (Choice)        puis Taches (Text)
+                       Aucune colonne ne donne l'action d'une tâche : c'est le
+                       numéro avant le point de son libellé (« 1.3 Animer le
+                       réseau » est une tâche de l'action 1). Une tâche sans
+                       numéro, ou sans action de ce numéro, est classée sous
+                       « Sans action » ; si aucune tâche n'a son action, le menu
+                       Tâches reste à plat. Voir taskActionNumber() et
+                       actionNumber() dans grist-data.js.
   Communautes        : communautes_corrigees (Text)   puis communautes (Text)
   GT                 : GT_corrige (Choice)            puis GT (Text)
   Competences        : Competences_corrigees (Text)   puis Competences (Text)
