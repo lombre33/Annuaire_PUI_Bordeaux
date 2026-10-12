@@ -358,8 +358,10 @@ test('dans la démonstration, chacun ne peut modifier que sa fiche, et un admini
 
   const admin = await openProfileDemo(PERSONNES_DEMO.administrateur);
   assert.equal(admin.identity.admin, true);
-  assert.equal(rightsFor(admin.identity)(other.row), 'admin', 'un administrateur modifie la fiche de tout le monde');
+  assert.equal(rightsFor(admin.identity)(other.row), null, 'un administrateur ne modifie que sa fiche tant que le « Mode admin » est éteint');
+  assert.equal(rightsFor(admin.identity, { adminMode: true })(other.row), 'admin', 'avec le « Mode admin », un administrateur modifie la fiche de tout le monde');
   assert.equal(rightsFor(admin.identity)(admin.mine.row), 'own');
+  assert.equal(rightsFor(admin.identity, { adminMode: true })(admin.mine.row), 'own', 'sa propre fiche reste la sienne, mode admin ou non');
 });
 
 test('dans la démonstration, la relecture n\'écrit rien, puis une seule action ne change que la colonne modifiée', async () => {
@@ -429,6 +431,7 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
 
   const code = widgetCode();
   const known = fragment => code.includes(fragment) || code.includes(fragment.replace(/\.$/, '')) // le point final est ajouté à l'affichage
+    || code.includes(fragment.charAt(0).toLowerCase() + fragment.slice(1).replace(/\.$/, '')) // et la majuscule (sentence() dans profile.js)
     || composed.includes(fragment) || /^\d+ champs? modifiés?$/.test(fragment);
   const fragments = [...section.matchAll(/«\s?([^»]+?)\s?»/g)]
     .flatMap(match => match[1].split(/…|\.\.\./))

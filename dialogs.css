@@ -53,9 +53,13 @@ textarea {
   padding: 20px 22px 14px;
   border-bottom: 1px solid var(--line);
 }
+.dlg-head > div {
+  min-width: 0; /* sans cela, un nom sans espace plus large que le cadre élargit toute l'en-tête */
+}
 .dlg-head h2 {
   font-size: 20px;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 .dlg-head h2:focus {
   outline: none; /* le titre reçoit le focus à chaque étape, pour être annoncé : ce n'est pas un contrôle */
@@ -64,6 +68,7 @@ textarea {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .dlg-x {
   flex: none;
@@ -155,6 +160,23 @@ textarea {
 .btn-primary:hover {
   background: #5348c9;
 }
+/* « Valider » : le vert de la confirmation, pas le violet des étapes. */
+.btn-ok {
+  color: #fff;
+  background: var(--teal-deep);
+  border-color: var(--teal-deep);
+}
+.btn-ok:hover {
+  background: #0f6a62;
+  border-color: #0f6a62;
+}
+.btn-danger {
+  color: #a3262a;
+  border-color: #f0c2c2;
+}
+.btn-danger:hover {
+  border-color: #d85b5b;
+}
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -221,15 +243,36 @@ textarea {
   color: var(--muted);
   font-size: 12px;
 }
-.pill {
+.et-logo {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 108px;
+}
+/* Mêmes dimensions que sur les cartes : d'après les proportions du fichier (--w et --h, voir
+   sizeLogo() dans branding-ui.js), à défaut 32 px de haut. */
+.et-logo .logo-img {
+  display: block;
+  width: auto;
+  height: 32px;
+  max-width: 92px;
+  object-fit: contain;
+  object-position: right center;
+}
+.et-logo .logo-img.sized {
+  width: calc(var(--w) * 1px);
+  height: calc(var(--h) * 1px);
+}
+.et-pill {
   flex: none;
   max-width: 140px;
-  padding: 3px 8px;
+  padding: 3px 9px;
   overflow: hidden;
   color: #fff;
   background: var(--teal-deep);
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -281,7 +324,11 @@ textarea {
 }
 .fld-hint {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 12px;
+}
+.fld-hint.warn {
+  color: #8f4519;
+  font-weight: 700;
 }
 
 /* Sélecteurs à pastilles : toutes les valeurs visibles, un clic pour cocher */
@@ -361,71 +408,160 @@ textarea {
   font-weight: 800;
 }
 
-/* Relecture : la carte avant et la carte après, côte à côte */
-.legend {
+/* Relecture : la carte avant, la carte après, les changements repérés sur « Après ». La
+   fenêtre s'élargit pour que les deux cartes tiennent côte à côte. */
+.dlg.dlg-review {
+  width: min(1000px, calc(100vw - 32px));
+}
+.rv-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 16px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 8px 22px;
+  margin-bottom: 14px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
 }
-.legend-key::before {
-  content: "";
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  margin-right: 6px;
-  vertical-align: -2px;
-  border-radius: 3px;
+.rv-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
-.legend-new::before {
-  background: #e6f6f0;
-  border: 2px solid var(--teal);
+.lg {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
 }
-.legend-gone::before {
+.lg-add {
+  margin-right: 3px;
+  color: #fff;
+  background: var(--teal-deep);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--teal-deep);
+}
+.lg-del {
+  color: #9b2226;
   background: #fdecec;
-  border: 1px dashed #d85b5b;
+  box-shadow: 0 0 0 1px #f0c2c2 inset;
+  text-decoration: line-through;
 }
-.preview {
+.rv-cols {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 18px;
   align-items: start;
 }
-.preview-col {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.rv-col {
   min-width: 0;
 }
-.preview-caption {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.preview-label {
-  color: var(--muted);
-  font-size: 11px;
+.rv-col h3 {
+  margin-bottom: 8px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.preview-note {
-  color: var(--muted);
+.rv-col h3 small {
+  margin-left: 6px;
   font-size: 11.5px;
   font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
-.preview-after .preview-label {
+.rv-col-before h3 {
+  color: var(--muted);
+}
+.rv-col-after h3 {
   color: #0b6b4f;
 }
-.preview-after .contact-card {
-  border-color: #bfe6d7;
-  box-shadow: 0 6px 16px #1ba99a26;
+/* La carte est celle de l'annuaire, mais figée : la fenêtre ne lui prête ni sa police ni son
+   interligne. */
+.rv-card {
+  font-size: 16px;
+  line-height: normal;
+}
+.rv-col-after .rv-card {
+  border-color: #8fd3b8;
+  box-shadow: 0 0 0 3px #e6f6f0, 0 6px 16px #252a4d0f;
+}
+/* Le nom garde de la place autour de lui : le contour d'un repère ne serait pas rogné. */
+.rv-card .name {
+  margin: -2px -3px;
+  padding: 2px 3px;
+}
+.rv-card .etablissement-tag {
+  cursor: default;
+}
+.rv-card .tag-group-values {
+  gap: 6px 4px;
+}
+
+/* Les repères de la carte « Après » : un texte modifié ou ajouté est en relief et porte sa
+   pastille, un tag ajouté un contour, ce qui a été retiré reste visible, barré. */
+.mk {
+  margin: 0 -2px;
+  padding: 1px 4px;
+  color: #0b6b4f;
+  background: #e6f6f0;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px #8fd3b8;
+}
+.mk-gone {
+  color: #9b2226;
+  text-decoration: line-through;
+}
+.mk-pill {
+  margin-left: 2px; /* l'espace qui la précède dans le texte fait le reste : le mot ne se colle pas à la valeur */
+  padding: 1px 6px;
+  color: #fff;
+  background: var(--teal-deep);
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 800;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.mk-pill-del {
+  background: #b8303a;
+}
+.rv-ring {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--teal-deep);
+}
+.rv-card .etab-col {
+  display: flex;
+  flex-direction: column;
+  grid-column: 3;
+  grid-row: 1;
+  align-items: flex-end;
+  align-self: start;
+}
+.rv-card .etab-col .mk-pill {
+  margin: 5px -4px 0 0;
+}
+.tag-add {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--teal-deep);
+}
+.tag-add::before {
+  content: "+ ";
+}
+.tag-del {
+  color: #9b2226;
+  background: #fdecec;
+  box-shadow: 0 0 0 1px #f0c2c2 inset;
+  text-decoration: line-through;
+}
+.tag-del::before {
+  content: "−";
+  display: inline-block;
+  margin-right: 0.3em;
+  text-decoration: none;
 }
 
 /* Récapitulatif des changements, sous les cartes */
+.recap[hidden] {
+  display: none;
+}
 .recap {
   margin-top: 18px;
   padding: 14px;
@@ -454,9 +590,22 @@ textarea {
   align-items: baseline;
 }
 .diff-label {
-  color: var(--c, var(--ink));
+  position: relative;
+  color: var(--ink);
   font-size: 12px;
   font-weight: 800;
+}
+/* Le repère de catégorie reste dans la marge : le libellé reste aligné avec ceux des champs
+   sans catégorie. */
+.diff-label::before {
+  content: "";
+  position: absolute;
+  top: 0.3em;
+  left: -12px;
+  width: 8px;
+  height: 8px;
+  background: var(--c, transparent);
+  border-radius: 2px;
 }
 .diff-val {
   display: flex;
@@ -532,15 +681,20 @@ textarea {
   text-align: left;
 }
 
+@media (max-width: 720px) {
+  .rv-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (max-width: 560px) {
-  .fld-grid,
-  .preview {
+  .fld-grid {
     grid-template-columns: minmax(0, 1fr);
   }
   .diff-row {
     grid-template-columns: minmax(0, 1fr);
   }
-  .dlg {
+  .dlg,
+  .dlg.dlg-review {
     width: 100vw;
     max-width: 100vw;
     height: 100vh;
@@ -559,4 +713,27 @@ textarea {
     padding-right: 14px;
     padding-left: 14px;
   }
+}
+
+/* Message de confirmation, en bas de l'écran. */
+.toast {
+  position: fixed;
+  z-index: 2000;
+  bottom: 22px;
+  left: 50%;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 18px;
+  color: #fff;
+  background: var(--ink);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px #1b203d66;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  transform: translateX(-50%);
+}
+.toast::before {
+  content: "✓";
+  margin-right: 8px;
+  color: #7ee0c3;
 }

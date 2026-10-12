@@ -5,7 +5,9 @@
 import { CATEGORIES, PROFILE_FIELDS } from './constants.js';
 import { el } from './dom.js';
 
-const CATEGORY_OF = new Map(PROFILE_FIELDS.map(field => [field.key, field.category]));
+// Seules les listes ont une couleur de catégorie : un repère de la couleur de l'Établissement
+// ou du Rôle ne distinguerait rien.
+const CATEGORY_OF = new Map(PROFILE_FIELDS.filter(field => field.kind === 'list').map(field => [field.key, field.category]));
 
 // Un signe visible (+ ou −) et, pour un lecteur d'écran, le mot qui le dit.
 function listChange(kind, sign, spoken, label) {

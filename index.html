@@ -34,6 +34,7 @@
         </button>
         <div class="account-actions">
           <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
+          <button type="button" class="account-admin" aria-pressed="false" hidden>Mode admin</button>
         </div>
         <p class="account-status" role="status" data-tone="info"></p>
       </section>
@@ -51,6 +52,8 @@
       </div>
       <button id="resetFilters" class="reset-button" type="button">Réinitialiser</button>
     </section>
+
+    <p id="adminStrip" class="admin-strip" role="status" hidden>Mode admin : un bouton « Modifier la fiche » apparaît sur chaque carte. Vos changements sont relus avant d’être validés.</p>
 
     <p id="statusBanner" class="status-banner" role="alert" hidden></p>
     <section id="cardsGrid" class="cards-grid" aria-live="polite"></section>
@@ -87,6 +90,9 @@
     </div>
   </dialog>
 
+  <div id="toast" class="toast" aria-hidden="true" hidden></div>
+  <p id="toastLive" class="sr-only" role="status" aria-live="polite"></p>
+
   <template id="cardTemplate">
     <article class="contact-card">
       <div class="card-topline"></div>
@@ -95,6 +101,10 @@
         <div class="identity">
           <h2 class="name"></h2>
           <p class="fonction"></p>
+        </div>
+        <div class="card-actions" hidden>
+          <span class="own-flag" hidden>Votre fiche</span>
+          <button class="card-edit" type="button">✎ Modifier</button>
         </div>
         <div class="etab-col">
           <button class="etablissement-tag" type="button"></button>
@@ -105,10 +115,6 @@
           <p class="tel detail-row"></p>
         </div>
         <div class="card-tags"></div>
-        <div class="card-actions" hidden>
-          <span class="own-flag" hidden>Votre fiche</span>
-          <button class="card-edit" type="button">✎ Modifier</button>
-        </div>
       </div>
     </article>
   </template>

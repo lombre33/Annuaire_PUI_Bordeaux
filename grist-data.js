@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { BRANDING, CATEGORIES, CONSENT_COLUMN, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES } from './constants.js';
+import { BRANDING, CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -624,6 +624,7 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   requireColumns('Etablissements', REQUIRED_ETABLISSEMENT_COLUMNS, etablissementRows);
 
   const { referenceMaps, unreadable, unlabeled } = readReferenceMaps(results, previousMaps, log);
+  referenceMaps[ETABLISSEMENT_NAMES] = labelMapFromRows(etablissementRows, ['nom_complet', 'acronyme']);
   const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const scopedRows = rows.filter(isInScope);
   const contacts = buildContacts(scopedRows, referenceMaps, etabFlags);

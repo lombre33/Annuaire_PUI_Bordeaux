@@ -44,17 +44,24 @@ Sans dépendance, un fichier de tests par module :
   verdict « apparaît ou non, et pourquoi » concorde avec `buildContacts`, ligne par
   ligne.
 - `tests/presence.test.mjs` — `describePresence` (les messages dits à la
-  personne), `setPresence` (une écriture atomique, seule la case de la personne,
-  plusieurs lignes, refus de Grist) et `explainWriteError`.
+  personne), `describeUnknownAccount` (adresse absente de `BDD`, administrateur sans
+  fiche, colonne `email` manquante), `describeHiddenFiche` (les avis de la relecture),
+  `setPresence` (une écriture atomique, seule la case de la personne, plusieurs lignes,
+  refus de Grist) et `explainWriteError`.
 - `tests/profile.test.mjs` — `rightsFor` (qui peut modifier quelle fiche, fermé par
-  défaut), `profileFormModel` et `draftOf`, `diffProfile` (textes nettoyés et refusés,
-  téléphone français, références, listes en ajouts et retraits), `rebaseChanges`
-  (ramener les changements sur la fiche actuelle) et `describeChanges`.
+  défaut, le droit d'administrateur seulement avec le mode admin allumé),
+  `profileFormModel` et `draftOf` (dont l'e-mail et l'établissement d'un administrateur),
+  `diffProfile` (textes nettoyés et refusés, téléphone français, e-mail refusé s'il est mal
+  formé, trop long, vidé ou pris par une autre fiche, établissement jamais vidé ni inconnu,
+  références, listes en ajouts et retraits), `rebaseChanges` (ramener les changements sur
+  la fiche actuelle) et `describeChanges`.
 - `tests/profile-save.test.mjs` — `buildRowUpdate` (listes calculées sur la fiche
-  actuelle, téléphone numérique ou texte), `signatureOf`, `readRow`, `prepareReview`
-  (cartes avant et après, rien d'écrit), `saveProfile` (une seule action atomique,
-  changement concurrent, refus de Grist, aucune adresse ni valeur dans la console) et
-  `unsavedLabels`.
+  actuelle, téléphone numérique ou texte, e-mail et établissement), `signatureOf`,
+  `readRow`, `prepareReview` (cartes avant et après, rien d'écrit, l'e-mail et
+  l'établissement ignorés hors administrateur, une adresse prise refusée), `saveProfile`
+  (une seule action atomique, changement concurrent, adresse prise entre-temps, fermé par
+  défaut pour l'e-mail et l'établissement, refus de Grist, aucune adresse ni valeur dans la
+  console) et `unsavedLabels`.
 - `tests/preview.test.mjs` — `diffContacts` et `previewOf` : ce qui change entre la
   carte avant et la carte après.
 - `tests/schema.test.mjs` — `readColumnTypes` (type des colonnes de `BDD`, repli).
@@ -92,17 +99,23 @@ domaine (case de domaine, détail replié, case partielle, recherche à deux niv
 ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
 bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
-double clic, écriture refusée, personne sans fiche).
+double clic, écriture refusée, personne sans fiche, qui voit alors une mention sans
+interrupteur).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
-`tests/e2e-profile.test.mjs` y ajoute 43 scénarios sur la modification d'une fiche : qui
-voit un bouton « Modifier » (personne ordinaire, administrateur, compte Lecteur,
-anonyme, adresse inconnue, doublon), le formulaire et ses refus, la relecture (carte
-avant et carte après, ce qui change repéré, rien d'écrit), l'écriture en une seule
-action, la fiche modifiée par un administrateur, le téléphone numérique ou texte, un
-refus de Grist, un changement concurrent, une fiche supprimée, le double clic, Échap,
-un prénom piégé, le focus, la tabulation dans la fenêtre et l'affichage de 280 à 360px.
+`tests/e2e-profile.test.mjs` y ajoute 61 scénarios sur la modification d'une fiche : qui
+voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
+compte Lecteur, anonyme, adresse inconnue, doublon), le formulaire et ses refus, la
+relecture (carte avant et carte après, ce qui change repéré, rien d'écrit), l'écriture
+en une seule action, le mode admin (bouton à bascule, clavier, focus, annuaire relu),
+l'e-mail et l'établissement d'une autre personne (champs, refus, adresse prise, fiche
+retirée de l'annuaire), le message de confirmation et ses délais (horloge du navigateur),
+la fenêtre qui reste ouverte quand Grist n'a pas tout gardé, le téléphone numérique ou
+texte, un refus de Grist, un changement concurrent, une fiche supprimée, le double clic,
+Échap, un prénom piégé, le focus, la tabulation dans la fenêtre, le bouton « Modifier »
+rangé sous la fonction, le bandeau « Ma présence » qui ne se chevauche à aucune largeur et
+l'affichage de 280 à 360px.
 
 `tests/responsive.test.mjs` y ajoute 19 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
@@ -453,34 +466,44 @@ iOS, Chrome Android) que les tests ne couvrent pas :
       (champs à 16px), les badges, tags et le lien e-mail se touchent sans
       viser, et un filtre touché ne reste pas coloré une fois relâché.
 
-## 13. Modifier sa fiche (1.12.0)
+## 13. Modifier sa fiche (1.12.0, reprise en 1.15.0)
 
 Réglages d'abord : `GRIST_SETUP.md` (colonnes de données, règles d'accès). À jouer sur
 une **copie** du document, avec deux comptes (une personne ordinaire et un
-administrateur) dans deux navigateurs, console ouverte.
+administrateur) dans deux navigateurs, console ouverte. Le mode admin et la modification de
+l'e-mail et de l'établissement sont à la section 16.
 
-- [ ] Personne ordinaire : un bouton « ✎ Modifier » sur sa seule carte, marquée
-      « Votre fiche », et « Modifier mon profil » dans le bandeau. Aucune autre carte
-      n'a de bouton.
-- [ ] Administrateur : un bouton sur toutes les cartes ; celui de sa propre fiche ouvre
-      « Modifier mon profil », les autres « Modifier la fiche de … ».
-- [ ] Compte Lecteur, compte absent de `BDD`, document sans `Annuaire_Sonde` : aucun
-      bouton.
-- [ ] Ouvrir sa fiche : les champs contiennent les valeurs de Grist (le téléphone avec
-      son 0 initial et ses espaces) ; l'e-mail et l'établissement sont affichés mais
-      pas modifiables. La console ne dit pas `[SCHEMA] Types de colonnes illisibles`
-      (sinon le widget suit la forme de la cellule : vérifier le téléphone plus bas).
-- [ ] Changer la fonction, retirer un tag, en ajouter un, changer le téléphone, puis
-      « Relire » : la carte « Avant » est la fiche actuelle, la carte « Après » montre
-      les nouvelles valeurs repérées (relief et pastille « modifié » ou « ajouté » sur
-      une ligne de texte, « + » devant un tag ajouté, tag retiré barré, ligne vidée
-      barrée avec la pastille « supprimé »). **Rien n'a changé dans Grist** à ce stade.
+- [ ] Personne ordinaire : un bouton « ✎ Modifier » sous la fonction de sa seule carte,
+      avec la mention « Votre fiche », et « Modifier mon profil » dans le bandeau. Aucune
+      autre carte n'a de bouton, et il n'y a pas de bouton « Mode admin ».
+- [ ] Administrateur, mode admin éteint : exactement comme une personne ordinaire.
+- [ ] Compte Lecteur, document sans `Annuaire_Sonde` : ni bandeau ni bouton. Compte dont
+      l'adresse ne figure pas dans `BDD` : un bandeau « Compte absent de l'annuaire » sans
+      interrupteur de présence ni bouton « Modifier ».
+- [ ] Ouvrir sa fiche : un bloc d'identité (initiales, nom, e-mail, et à droite le logo de
+      l'établissement, ou son nom en pastille s'il n'a pas de logo) et la
+      phrase « Verrouillé : l'e-mail et l'établissement sont liés à votre compte… » ; les
+      champs contiennent les valeurs de Grist (le téléphone avec son 0 initial et ses
+      espaces). La console ne dit pas `[SCHEMA] Types de colonnes illisibles` (sinon le
+      widget suit la forme de la cellule : vérifier le téléphone plus bas).
+- [ ] Changer la fonction, retirer un tag, en ajouter un, changer le téléphone : le pied
+      de fenêtre compte les champs modifiés et « Ce qui va changer » apparaît sous le
+      formulaire. Vider le prénom **et** le nom : « Indiquez au moins un prénom ou un
+      nom. » sous les deux champs, « Relire mes modifications » grisé.
+- [ ] « Relire mes modifications » : la fenêtre s'élargit, une légende explique les
+      repères, la carte « Avant » (« telle qu'elle est aujourd'hui ») est à côté de la carte
+      « Après » (« telle qu'elle apparaîtra »), puis vient le « Détail des changements ».
+      Sur la carte « Après » : contour vert et pastille « modifié » ou « ajouté » sur une
+      ligne de texte, « + » devant un tag ajouté, tag retiré barré, ligne vidée barrée
+      avec la pastille « supprimé ». **Rien n'a changé dans Grist** à ce stade.
 - [ ] Une personne qui n'a pas accepté d'apparaître, ou dont l'établissement n'est pas
-      validé : la relecture de sa fiche porte un avis qui le dit, avec la raison
-      (« Votre fiche est masquée de l'annuaire… » / « Votre fiche reste masquée de
-      l'annuaire : … »). Une personne visible n'a aucun avis.
+      validé : la relecture de sa fiche porte un avis qui le dit (« Votre fiche est masquée
+      de l'annuaire : vous n'avez pas accepté d'apparaître… » / « Votre établissement n'a
+      pas validé sa présence : votre fiche reste masquée dans l'annuaire. »). Une personne
+      visible n'a aucun avis.
 - [ ] « Retour » : les saisies sont conservées. « Annuler » : rien n'est écrit.
-- [ ] « Valider » : « Fiche enregistrée ». Dans Grist, seuls les champs modifiés ont
+- [ ] « Valider » : la fenêtre se ferme et un message « Vos modifications sont enregistrées. »
+      reste six secondes en bas de l'écran. Dans Grist, seuls les champs modifiés ont
       changé ; `email`, `Etablissement`, `perimetre` et `Accepte_apparaitre` sont
       intacts ; un seul « Annuler » de Grist défait toute la modification. L'annuaire
       montre la fiche à jour sans rechargement.
@@ -502,12 +525,17 @@ administrateur) dans deux navigateurs, console ouverte.
       formule et renvoie à `GRIST_SETUP.md`. Remettre une colonne de données.
 - [ ] Une fiche dont une liste contient une valeur sans libellé : modifier une autre
       liste conserve cette valeur.
+- [ ] Si Grist ne garde pas tout (par exemple une colonne à formule qui recalcule la valeur)
+      ou si l'annuaire ne se recharge pas : la fenêtre reste ouverte sur « Fiche enregistrée »
+      avec la réserve, et aucun message de confirmation n'apparaît.
 - [ ] Échap : avec des modifications, un premier appui avertit et un second ferme ;
       sans modification, un seul appui ferme. Pendant l'enregistrement, Échap ne ferme
       pas.
 - [ ] Clavier et lecteur d'écran (au moins une fois, NVDA ou VoiceOver) : le titre de
       chaque étape est annoncé, « ajouté », « retiré » et « modifié » sont lus dans la
-      carte « Après » (les pastilles sont du texte, les tags ont un mot caché), le focus revient au bouton d'origine à la fermeture.
+      carte « Après » (les pastilles sont du texte, les tags ont un mot caché), le message
+      de confirmation est annoncé à la fermeture (une seule fois), le focus revient au
+      bouton d'origine à la fermeture.
 - [ ] Téléphone ou tablette : la fenêtre tient dans l'écran, les cartes avant et après
       sont l'une sous l'autre, « Valider » reste accessible.
 - [ ] La console ne montre aucune erreur ni aucune adresse e-mail.
@@ -588,3 +616,41 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
 - [ ] Zoom du navigateur à 200 % : l'anneau n'est coupé par aucun bord (ni celui de la barre d'outils, ni celui
       d'une carte, ni celui d'un menu).
 
+## 16. Mode admin, e-mail et établissement (1.15.0)
+
+À jouer avec un compte administrateur (case `admin` d'`ACL`) et un compte ordinaire,
+sur une copie du document.
+
+- [ ] Administrateur : le bandeau « Ma présence » porte un bouton « Mode admin » (absent
+      pour un compte ordinaire). À l'ouverture il est éteint et seule la carte de
+      l'administrateur a un bouton « Modifier ».
+- [ ] Allumer le mode admin : le bouton passe à l'état appuyé, une bande « Mode admin : … »
+      apparaît sous les filtres et toutes les cartes affichées portent « ✎ Modifier la
+      fiche ». Recharger la page : le mode est éteint. Le rallumer au clavier (Tab, Entrée).
+- [ ] Un administrateur sans fiche dans `BDD` : un bandeau « Administrateur » avec le seul
+      bouton « Mode admin », sans interrupteur de présence.
+- [ ] Modifier la fiche d'une autre personne : le titre est « Modifier la fiche de … », une
+      phrase rappelle le mode admin, et les champs **E-mail** et **Établissement** sont
+      modifiables (l'établissement parmi les noms complets). Sur sa propre fiche ils restent
+      verrouillés.
+- [ ] Changer l'e-mail pour une adresse que porte une autre fiche : « Cette adresse est déjà
+      utilisée par … » (le nom si cette personne est visible dans l'annuaire, « une autre
+      fiche » sinon). Une adresse mal formée, ou vidée, est refusée aussi.
+- [ ] Choisir un établissement qui n'a pas validé sa présence : l'avertissement sous le champ,
+      puis dans la relecture l'avis « … n'a pas validé sa présence : après cette modification,
+      la fiche ne sera plus visible dans l'annuaire. ». Après « Valider », la carte disparaît.
+- [ ] Changer l'e-mail : la relecture prévient que la table `ACL` ne suit pas. Après
+      « Valider », `BDD.email` a changé et `ACL` est intacte.
+- [ ] La relecture montre la nouvelle adresse et le nouvel établissement sur la carte
+      « Après » (le badge d'établissement entouré), et « Valider » écrit tout en une seule
+      action Grist (un seul « Annuler » de Grist défait tout).
+- [ ] Après « Valider » : le message « La fiche de … est enregistrée. » apparaît six secondes.
+- [ ] Prendre l'adresse choisie dans Grist (autre fenêtre) entre la relecture et « Valider » :
+      « Cette adresse e-mail est maintenant celle d'une autre fiche : rien n'a été modifié »,
+      rien n'est écrit.
+- [ ] Console (contexte de l'iframe) : un compte ordinaire ne peut pas changer `email` ni
+      `Etablissement` sur une fiche, avec la règle d'accès de l'étape 4 de `GRIST_SETUP.md`.
+- [ ] Comparaison à la maquette v5 : ouvrir la maquette et le widget côte à côte à la même
+      largeur (1280 px, puis 390 px) et vérifier la fenêtre de modification, la relecture,
+      les repères de la carte « Après », le bandeau, la bande « Mode admin » et le message
+      de confirmation. Les écarts voulus sont dans le CHANGELOG (1.15.0).

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { describeHiddenFiche, describePresence, setPresence, explainWriteError, PresenceError } from '../presence.js';
+import { describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, explainWriteError, PresenceError } from '../presence.js';
 import { loadDirectory } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { sampleTables, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
@@ -57,6 +57,40 @@ test('describePresence lists every reason when several apply', async () => {
   assert.match(message, /pas de périmètre ; votre établissement n'a pas encore été validé/);
 });
 
+// ===== describeUnknownAccount : une adresse que BDD ne connaît pas =====
+
+test('describeUnknownAccount tells a person whose address is not in BDD that there is no fiche to edit, with no switch to show', () => {
+  const view = describeUnknownAccount({ email: 'inconnu@example.fr', admin: false });
+  assert.equal(view.name, 'Compte absent de l\'annuaire');
+  assert.equal(view.initials, '?');
+  assert.equal(view.switchable, false, 'pas d\'interrupteur de présence : il n\'y a pas de fiche');
+  assert.equal(view.accepted, false);
+  assert.equal(view.tone, 'info');
+  assert.equal(view.message, 'Connecté avec inconnu@example.fr : cette adresse ne figure pas dans l\'annuaire, il n\'y a donc pas de fiche à modifier.');
+});
+
+test('describeUnknownAccount tells an administrator without a fiche that the admin mode edits the others', () => {
+  const view = describeUnknownAccount({ email: 'admin@chu-bordeaux.fr', admin: true });
+  assert.equal(view.name, 'Administrateur');
+  assert.equal(view.switchable, false);
+  assert.match(view.message, /vous n'avez donc pas de fiche à modifier\. Le mode admin vous permet de modifier celles des autres\./);
+});
+
+test('describeUnknownAccount blames the configuration, not the person, when BDD has no email column', () => {
+  const view = describeUnknownAccount({ email: 'ana@example.fr', admin: false, emailColumn: false });
+  assert.equal(view.name, 'Fiche introuvable');
+  assert.equal(view.message, 'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.');
+  assert.doesNotMatch(view.message, /ana@example\.fr/, 'l\'adresse n\'est pas la cause : elle n\'est pas citée');
+  assert.equal(describeUnknownAccount({ email: 'ana@example.fr', admin: true, emailColumn: false }).name, 'Administrateur');
+  assert.equal(describeUnknownAccount({ email: 'ana@example.fr', admin: false, emailColumn: true }).name, 'Compte absent de l\'annuaire');
+});
+
+test('describeUnknownAccount does not choke on a missing address', () => {
+  assert.equal(describeUnknownAccount({ email: '', admin: false }).message,
+    'Cette adresse ne figure pas dans l\'annuaire, il n\'y a donc pas de fiche à modifier.');
+  assert.doesNotMatch(describeUnknownAccount({ admin: false }).message, /undefined|null/);
+});
+
 // ===== describeHiddenFiche : ce que la relecture dit d'une fiche absente de l'annuaire =====
 
 test('describeHiddenFiche says nothing about a fiche that figures in the directory', async () => {
@@ -72,18 +106,21 @@ test('describeHiddenFiche tells a person who has not accepted where the switch i
   const { find } = await setup();
   const [iris] = find(IRIS_EMAIL);
   assert.equal(describeHiddenFiche(iris.status, { own: true }),
-    'Votre fiche est masquée de l\'annuaire : vous n\'avez pas accepté d\'apparaître (interrupteur « Apparaître dans l\'annuaire » en haut de page).');
+    'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).');
   assert.equal(describeHiddenFiche(iris.status, { own: false }),
-    'Cette fiche est masquée de l\'annuaire : la personne n\'a pas accepté d\'apparaître.');
+    'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.');
   const [jules] = find('jules@chu-bordeaux.fr');
-  assert.match(describeHiddenFiche(jules.status, { own: false }), /n'a pas accepté d'apparaître/, 'une case vide n\'est pas un accord');
+  assert.match(describeHiddenFiche(jules.status, { own: false }), /n’a pas accepté d’apparaître/, 'une case vide n\'est pas un accord');
 });
 
 test('describeHiddenFiche gives the reason a fiche that was accepted stays hidden, in the voice of the reader', async () => {
   const { find } = await setup();
   const say = (email, own) => describeHiddenFiche(find(email)[0].status, { own });
-  assert.equal(say('dan@inserm.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'a pas encore été validé.');
-  assert.equal(say('dan@inserm.fr', false), 'Cette fiche reste masquée de l\'annuaire : son établissement n\'a pas encore été validé.');
+  assert.equal(say('dan@inserm.fr', true), 'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.');
+  assert.equal(say('dan@inserm.fr', false),
+    'Son établissement n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.');
+  assert.equal(describeHiddenFiche(find('dan@inserm.fr')[0].status, { own: false, etablissement: 'Inserm Bordeaux' }),
+    'Inserm Bordeaux n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.', 'l\'administrateur lit le nom de l\'établissement');
   assert.equal(say('carla@clinique.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'est ni fondateur ni partenaire.');
   assert.equal(say('eve@example.fr', false), 'Cette fiche reste masquée de l\'annuaire : la fiche n\'a pas d\'établissement.');
   assert.equal(say('fred@chu-bordeaux.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre.');
