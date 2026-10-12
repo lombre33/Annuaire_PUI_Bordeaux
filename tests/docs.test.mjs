@@ -25,17 +25,19 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { CATEGORIES, FILTERS } from '../constants.js';
-import { loadDirectory } from '../grist-data.js';
+import { CATEGORIES, FILTERS, IMAGE_RULES } from '../constants.js';
+import { displayName, loadDirectory } from '../grist-data.js';
+import { avatarIdOf } from '../attachments.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
 import { readIdentity } from '../identity.js';
 import { describePresence, describeHiddenFiche, describeUnknownAccount, setPresence, explainWriteError } from '../presence.js';
 import { rightsFor, profileFormModel, draftOf, MAX_TEXT_LENGTH } from '../profile.js';
-import { prepareReview, saveProfile } from '../profile-save.js';
+import { PHOTO_UPLOAD_HINT, prepareReview, saveProfile } from '../profile-save.js';
 import { diffEtablissement, draftOfEtablissement, etablissementRightsFor, nominate, toggleResponsable } from '../etablissement.js';
 import { readEtablissement, savePlanOf, saveEtablissement } from '../etablissement-save.js';
 import { checkImageFile } from '../image-prep.js';
-import { tablesFictives, CARTES_ATTENDUES, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
+import { tablesFictives, CARTES_ATTENDUES, PERSONNES_AVEC_PHOTO, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
+import { NOMBRE_VISAGES, PREMIER_PORTRAIT, portraitFictif } from '../docs/demo/portraits-fictifs.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -177,6 +179,30 @@ test('le jeu de données fictif est lu sans incident par le vrai loadDirectory()
   // Le guide cite le compteur de la capture d'ensemble : il doit rester celui du jeu fictif.
   assert.ok(read('docs/utilisateurs.md').includes(`« ${CARTES_ATTENDUES.fondateurs} contacts »`),
     `docs/utilisateurs.md doit citer « ${CARTES_ATTENDUES.fondateurs} contacts » (capture apercu.png) : régénérez les captures et le guide.`);
+});
+
+test('le jeu de données fictif avec photos (?photos) ajoute la colonne Avatar et six photos fictives, sans changer les cartes', async () => {
+  // Sans ?photos, BDD n'a pas de colonne Avatar : les captures d'avant la 1.19.0 restent justes.
+  const without = tablesFictives();
+  assert.ok(!('Avatar' in without.BDD) && !JSON.stringify(without._grist_Tables_column).includes('"Avatar"'));
+
+  const tables = tablesFictives({ photos: true });
+  const type = tables._grist_Tables_column.type[tables._grist_Tables_column.colId.indexOf('Avatar')];
+  assert.equal(type, 'Attachments', 'La colonne Avatar de la démonstration est une colonne « Pièces jointes », comme dans Grist.');
+  const { contacts, issues } = await loadDirectory(fakeDocApi(tables), { log: SILENT_LOG });
+  assert.deepEqual(issues, [], 'Le widget signale un problème sur le jeu fictif avec photos.');
+  const displayed = scope => filterContacts(contacts, createEmptyFilterState(), '', scope).length;
+  assert.equal(displayed({ fondateur: true, partenaire: false }), CARTES_ATTENDUES.fondateurs);
+  assert.equal(displayed({ fondateur: true, partenaire: true }), CARTES_ATTENDUES.fondateursEtPartenaires);
+
+  // Les personnes qui ont une photo sont celles que les captures annoncent, et chaque photo est un dessin inventé.
+  const withPhoto = contacts.filter(contact => avatarIdOf(contact.Avatar) > 0);
+  assert.deepEqual(withPhoto.map(displayName).sort(), [...PERSONNES_AVEC_PHOTO].sort());
+  assert.equal(new Set(withPhoto.map(contact => avatarIdOf(contact.Avatar))).size, withPhoto.length, 'Chaque personne a son propre visage.');
+  for (const contact of withPhoto) {
+    assert.match(portraitFictif(avatarIdOf(contact.Avatar)) ?? '', /^<svg /, `${displayName(contact)} : pas de dessin pour sa photo`);
+  }
+  assert.ok(PERSONNES_AVEC_PHOTO.length < NOMBRE_VISAGES, 'Il faut un visage libre pour la photo que les captures choisissent (capturer.mjs).');
 });
 
 test('le jeu de données fictif ne contient que des coordonnées fictives', () => {
@@ -423,6 +449,31 @@ test('?refus=Etablissements : la fiche d\'un établissement est refusée avec un
   assert.equal((await readEtablissement(page.grist.docApi, chd, { log: QUIET_LOG })).etablissement.visible, true);
 });
 
+test('la démonstration ne montre des photos que sur demande (?photos) : les dessins sont servis avec le jeton, rien sans lui', async () => {
+  const { server, url } = await startDemoServer();
+  try {
+    const jeton = 'jeton-de-demonstration';
+    const sans = await (await fetch(`${url}/`)).text();
+    const avec = await (await fetch(`${url}/?photos`)).text();
+    assert.match(sans, /<script src="\/__grist-simule\.js"><\/script>/);
+    assert.match(avec, /<script src="\/__grist-simule\.js\?photos"><\/script>/, '?photos demande au simulateur le jeu de données qui a des photos');
+    assert.doesNotMatch(await (await fetch(`${url}/__grist-simule.js`)).text(), /"Avatar"/, 'sans ?photos, pas de colonne Avatar');
+    assert.match(await (await fetch(`${url}/__grist-simule.js?photos`)).text(), /"Avatar"/, 'avec ?photos, la colonne Avatar existe');
+
+    const premier = await fetch(`${url}/__pieces-jointes/attachments/${PREMIER_PORTRAIT}/download?auth=${jeton}`);
+    assert.equal(premier.status, 200);
+    assert.equal(premier.headers.get('content-type'), 'image/svg+xml');
+    assert.equal(await premier.text(), portraitFictif(PREMIER_PORTRAIT));
+    assert.equal((await fetch(`${url}/__pieces-jointes/attachments/${PREMIER_PORTRAIT}/download`)).status, 403, 'sans jeton, pas de photo');
+    assert.equal((await fetch(`${url}/__pieces-jointes/attachments/${PREMIER_PORTRAIT + NOMBRE_VISAGES}/download?auth=${jeton}`)).status, 404,
+      'au-delà du dernier visage, aucune pièce jointe');
+    assert.equal((await fetch(`${url}/__pieces-jointes/attachments/101/download?auth=${jeton}`)).status, 200, 'les logos fictifs restent servis');
+  } finally {
+    server.close();
+    server.closeAllConnections?.();
+  }
+});
+
 test('le serveur de démonstration reçoit le logo qu\'un responsable envoie, puis le sert comme les autres pièces jointes', async () => {
   const { server, url } = await startDemoServer();
   try {
@@ -511,6 +562,15 @@ const widgetCode = () => fs.readdirSync(ROOT).filter(name => name.endsWith('.js'
   .replaceAll('${MAX_TEXT_LENGTH}', String(MAX_TEXT_LENGTH))   // « 200 caractères au plus. »
   .replaceAll('\\\'', '\'');
 
+// Les messages d'échec d'un envoi sont composés dans upload.js : une consigne (`hint`), écrite par
+// l'appelant, termine chacun d'eux. Le code des logos garde la consigne par défaut (BY_HAND), celui
+// des photos de profil dit de contacter un administrateur : on recompose ici les messages comme le
+// fait le code, avec la consigne de la fonction qu'on documente.
+const lowerFirst = text => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+const withUploadHint = (code, hint) => code
+  .replaceAll('${lowerFirst(hint)}', lowerFirst(hint))
+  .replaceAll('${hint}', hint);
+
 test('les messages cités dans « Modifier ma fiche » sont ceux du code', () => {
   const guide = read('docs/utilisateurs.md');
   const start = guide.indexOf('\n## Modifier ma fiche');
@@ -520,11 +580,18 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
 
   // Messages composés à l'exécution : on les demande à la fonction qui les compose.
   const hidden = overrides => ({ accepted: true, visible: false, named: true, inScope: true, etablissement: 'not_validated', ...overrides });
+  // Les refus de la photo : celui d'un format liste les formats acceptés, celui du poids dit le poids du
+  // fichier choisi (2,4 Mo dans le guide) ; ils sont composés par checkImageFile.
+  const photoRefusals = [
+    checkImageFile({ type: 'application/pdf', size: 10 }, IMAGE_RULES.avatar),
+    checkImageFile({ type: 'image/jpeg', size: Math.round(2.4 * 1024 * 1024) }, IMAGE_RULES.avatar),
+    checkImageFile({ type: 'image/jpeg', size: 0 }, IMAGE_RULES.avatar)
+  ];
   const composed = [describeHiddenFiche(hidden({}), { own: true }), describeHiddenFiche(hidden({}), { own: false }),
-    describeHiddenFiche(hidden({ etablissement: 'not_eligible' }), { own: false })];
+    describeHiddenFiche(hidden({ etablissement: 'not_eligible' }), { own: false }), ...photoRefusals];
   composed.forEach(message => assert.ok(section.includes(message), `Le guide doit citer : ${message}`));
 
-  const code = widgetCode();
+  const code = withUploadHint(widgetCode(), PHOTO_UPLOAD_HINT);
   const known = fragment => code.includes(fragment) || code.includes(fragment.replace(/\.$/, '')) // le point final est ajouté à l'affichage
     || code.includes(fragment.charAt(0).toLowerCase() + fragment.slice(1).replace(/\.$/, '')) // et la majuscule (sentence() dans profile.js)
     || composed.includes(fragment) || /^\d+ champs? modifiés?$/.test(fragment);
@@ -535,6 +602,11 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
   assert.ok(fragments.length >= 15, 'Ce test ne vérifie plus assez de messages : la section a-t-elle changé de forme ?');
   assert.deepEqual(fragments.filter(fragment => !known(fragment)), [],
     'Ces citations du guide ne figurent pas dans le code : recopiez le message tel qu\'il s\'affiche.');
+
+  // Les limites annoncées sont celles du code.
+  assert.equal(IMAGE_RULES.avatar.maxBytes, 2 * 1024 * 1024, 'le guide dit « 2 Mo au plus » pour la photo');
+  assert.equal(IMAGE_RULES.avatar.maxSide, 256, 'le guide dit « 256 pixels de côté » pour la photo');
+  assert.ok(section.includes('256 pixels de côté') && section.includes('2 Mo au plus'), 'Le guide doit dire la taille maximale de la photo et celle de l\'image envoyée.');
 });
 
 test('les messages cités dans « La fiche de mon établissement » sont ceux du code', () => {
@@ -547,10 +619,8 @@ test('les messages cités dans « La fiche de mon établissement » sont ceux du
   // seule fois, termine chacun d'eux. On la recompose ici, comme le fait le code.
   const rawCode = widgetCode();
   const byHand = /const BY_HAND = '([^']+)';/.exec(rawCode)?.[1];
-  assert.ok(byHand, 'upload.js doit définir la consigne commune des échecs d\'envoi (BY_HAND).');
-  const code = rawCode
-    .replaceAll('${BY_HAND.charAt(0).toLowerCase()}${BY_HAND.slice(1)}', byHand.charAt(0).toLowerCase() + byHand.slice(1))
-    .replaceAll('${BY_HAND}', byHand);
+  assert.ok(byHand, 'upload.js doit définir la consigne par défaut des échecs d\'envoi (BY_HAND), celle des logos.');
+  const code = withUploadHint(rawCode, byHand);
   // Le refus d'un format liste les formats acceptés : on le demande à la fonction qui le compose.
   const composed = [checkImageFile({ type: 'application/pdf', size: 10 })];
   const known = fragment => code.includes(fragment) || code.includes(fragment.replace(/\.$/, '')) || composed.includes(fragment)
@@ -711,7 +781,7 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
   // `fetch` n'est admis que dans upload.js (voir le test suivant) : ni `fetch(`, ni `globalThis.fetch`, ni un
   // paramètre qui le porte (`fetchImpl`) ailleurs.
   assert.deepEqual(sources.filter(({ code }) => /\bfetch(?:Impl)?\b/.test(withoutComments(code))).map(({ name }) => name), ['upload.js'],
-    'Seul upload.js émet une requête réseau (docs/securite.md, « L\'envoi d\'un logo et le jeton en écriture ») : un autre fichier en émet une.');
+    'Seul upload.js émet une requête réseau (docs/securite.md, « L\'envoi d\'un fichier et le jeton en écriture ») : un autre fichier en émet une.');
   const injected = sources.flatMap(({ name, code }) => [...code.matchAll(/\.innerHTML\s*=\s*([^\n]*)/g)]
     .filter(([, value]) => value.trim().replace(/;$/, '') !== '\'\'').map(([line]) => `${name} : ${line}`));
   assert.deepEqual(injected, [], 'innerHTML ne sert qu\'à vider un conteneur : tout texte venu de Grist passe par textContent.');
@@ -753,7 +823,7 @@ test('l\'envoi d\'un logo garde ses protections, et la page de sécurité les d�
   const security = read('docs/securite.md');
   const missing = ['`upload.js`', 'getAccessToken({ readOnly: false })', '`credentials: \'omit\'`', '`referrerPolicy: \'no-referrer\'`', '`AbortController`', '30 secondes', 'image-prep.js', 'PNG']
     .filter(phrase => !security.includes(phrase));
-  assert.deepEqual(missing, [], 'docs/securite.md (« L\'envoi d\'un logo et le jeton en écriture ») doit décrire ces éléments de l\'envoi.');
+  assert.deepEqual(missing, [], 'docs/securite.md (« L\'envoi d\'un fichier et le jeton en écriture ») doit décrire ces éléments de l\'envoi.');
   assert.match(security, /seule requête réseau/, 'docs/securite.md doit dire que l\'envoi est la seule requête réseau du code.');
 });
 

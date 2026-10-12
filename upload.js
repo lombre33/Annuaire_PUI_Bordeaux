@@ -1,16 +1,16 @@
-// Envoi d'un fichier (l'image d'un logo, plus tard celle d'un avatar) dans les pièces jointes du
+// Envoi d'un fichier (l'image d'un logo, la photo d'un profil) dans les pièces jointes du
 // document Grist. C'est la SEULE requête réseau que le code du widget émet : tout le reste passe
-// par l'API du widget de Grist (docApi) ou par des balises <img> (logos).
+// par l'API du widget de Grist (docApi) ou par des balises <img> (logos, photos).
 //
 // Comment : l'API du widget n'a pas de méthode d'envoi. Le widget demande donc à Grist un jeton
 // d'accès en lecture ET écriture (`docApi.getAccessToken({ readOnly: false })`), puis envoie le
 // fichier à l'API REST du document (`POST <adresse>/attachments?auth=<jeton>`, en multipart), qui
 // répond par l'identifiant de la pièce jointe. L'écriture dans la cellule (`['L', identifiant]`)
-// est ensuite une action Grist ordinaire (etablissement-save.js).
+// est ensuite une action Grist ordinaire (etablissement-save.js, profile-save.js).
 //
 // Ce qui limite l'exposition du jeton d'écriture :
-//   - il n'est demandé qu'au moment d'un envoi voulu par la personne (« Enregistrer » avec un
-//     logo choisi), jamais au chargement ; contrairement au jeton de lecture des logos
+//   - il n'est demandé qu'au moment d'un envoi voulu par la personne (« Enregistrer » ou « Valider »
+//     avec une image choisie), jamais au chargement ; contrairement au jeton de lecture des logos
 //     (attachments.js), il n'est PAS gardé : il sert une fois et disparaît avec la fonction ;
 //   - il ne va qu'à l'adresse que Grist indique, en https (http seulement pour le poste local) ;
 //   - la requête n'envoie ni cookie (`credentials: 'omit'`) ni l'adresse de la page
@@ -34,19 +34,22 @@ export class UploadError extends Error {
   }
 }
 
+// Ce que la personne peut faire quand l'envoi échoue : pour un logo, déposer le fichier dans Grist ;
+// pour une photo de profil (`hint` de l'appelant), prévenir un administrateur.
 const BY_HAND = 'Déposez le fichier directement dans Grist (voir GRIST_SETUP.md).';
 
-const FAILURES = {
-  token: `Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. ${BY_HAND}`,
-  address: `Grist a indiqué une adresse d’envoi que le widget n’accepte pas. ${BY_HAND}`,
-  network: `L’envoi du fichier à Grist a échoué : le navigateur n’a pas pu joindre le serveur, ou l’a refusé. ${BY_HAND}`,
-  timeout: `Grist n’a pas répondu à temps à l’envoi du fichier. Réessayez ; ${BY_HAND.charAt(0).toLowerCase()}${BY_HAND.slice(1)}`,
+const lowerFirst = text => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+
+const failuresFor = hint => ({
+  token: `Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. ${hint}`,
+  address: `Grist a indiqué une adresse d’envoi que le widget n’accepte pas. ${hint}`,
+  network: `L’envoi du fichier à Grist a échoué : le navigateur n’a pas pu joindre le serveur, ou l’a refusé. ${hint}`,
+  timeout: `Grist n’a pas répondu à temps à l’envoi du fichier. Réessayez ; ${lowerFirst(hint)}`,
   denied: 'Grist a refusé le fichier : vos droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur.',
   tooLarge: 'Grist a refusé le fichier : il est trop volumineux.',
-  response: `Grist n’a pas confirmé l’envoi du fichier. Réessayez ; ${BY_HAND.charAt(0).toLowerCase()}${BY_HAND.slice(1)}`
-};
-
-const failedWith = status => `Grist a refusé le fichier (erreur ${status}). Réessayez ; ${BY_HAND.charAt(0).toLowerCase()}${BY_HAND.slice(1)}`;
+  response: `Grist n’a pas confirmé l’envoi du fichier. Réessayez ; ${lowerFirst(hint)}`,
+  failedWith: status => `Grist a refusé le fichier (erreur ${status}). Réessayez ; ${lowerFirst(hint)}`
+});
 
 // L'adresse d'envoi est celle que Grist a donnée pour le jeton : https, ou le poste local pour la
 // démonstration et les tests.
@@ -56,8 +59,10 @@ function trusted(baseUrl) {
 }
 
 // `file` : { blob, name }. Renvoie l'identifiant de la pièce jointe créée. Lève une UploadError.
-// `fetchImpl` et `timeout` ne changent que dans les tests.
-export async function uploadAttachment(docApi, file, { fetchImpl = globalThis.fetch, timeout = TIMEOUT_MS, log = console } = {}) {
+// `hint` : la phrase qui dit quoi faire quand l'envoi échoue (celle du logo par défaut). `fetchImpl`
+// et `timeout` ne changent que dans les tests.
+export async function uploadAttachment(docApi, file, { hint = BY_HAND, fetchImpl = globalThis.fetch, timeout = TIMEOUT_MS, log = console } = {}) {
+  const FAILURES = failuresFor(hint);
   let raw;
   try {
     raw = await docApi.getAccessToken({ readOnly: false });
@@ -93,7 +98,7 @@ export async function uploadAttachment(docApi, file, { fetchImpl = globalThis.fe
     log.warn(`[ENVOI] Grist a répondu ${response.status} à l'envoi du fichier.`);
     if (response.status === 401 || response.status === 403) throw new UploadError(FAILURES.denied);
     if (response.status === 413) throw new UploadError(FAILURES.tooLarge);
-    throw new UploadError(failedWith(response.status));
+    throw new UploadError(FAILURES.failedWith(response.status));
   }
   let ids;
   try {

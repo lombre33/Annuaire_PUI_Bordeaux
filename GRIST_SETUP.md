@@ -11,6 +11,7 @@ la faire et comment vérifier qu'elle a marché.
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, et depuis la 1.17.0 une fiche d'établissement aussi |
 | 5 | Les logos : colonnes `logo` et `ordre_bandeau` dans `Etablissements`, table `Financeurs` (facultatif) ; le remplacement d'un logo depuis le widget en dépend | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas, pas de financeurs en tête de page ; un responsable ne peut plus changer le logo de son établissement depuis le widget (la fenêtre le dit) ; rien d'autre ne change |
+| 6 | La photo de profil : colonne `Avatar` (Pièces jointes) dans `BDD` (facultatif) | les cartes gardent les initiales et le formulaire de modification n'a pas de carte « Photo de profil » ; rien d'autre ne change |
 
 Le widget ne crée ni ne modifie jamais la structure du document (table, colonne,
 règle d'accès) : tout ce qui est ci-dessous se fait à la main, une fois. Il n'écrit que
@@ -18,8 +19,8 @@ des lignes et des cellules : celle de la personne connectée dans `BDD` (son cho
 fiche) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
 passagère d'`Annuaire_Sonde` et, pour un responsable d'établissement, la ligne de son établissement
 dans `Etablissements` (nom complet, visibilité, logo) et les lignes d'`ACL` de ses responsables.
-Quand un responsable remplace le logo, il ajoute aussi une **pièce jointe** au document. Les logos
-affichés (étape 5) sont lus.
+Quand un responsable remplace le logo, ou une personne sa photo de profil (étape 6), il ajoute aussi
+une **pièce jointe** au document. Les logos et les photos affichés (étapes 5 et 6) sont lus.
 
 ## 1. Les colonnes que le widget écrit : des colonnes de données
 
@@ -29,7 +30,7 @@ Le widget écrit dans `BDD` dans trois cas :
   `Accepte_apparaitre` ;
 - quand elle enregistre la modification de sa fiche : `prenom`, `nom`, `Fonction`,
   `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`,
-  `Competences`, `Communautes` et `Taches` ;
+  `Competences`, `Communautes`, `Taches` et, si elle existe (étape 6), `Avatar` ;
 - quand un administrateur, mode admin allumé, enregistre la fiche d'une autre
   personne : les mêmes colonnes, plus `email` et `Etablissement`.
 
@@ -212,14 +213,14 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 | Où | Qui peut | Pourquoi |
 |---|---|---|
 | `Annuaire_Sonde` : créer, lire, supprimer des lignes | toute personne qui peut modifier le document | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
-| `BDD` : modifier `prenom`, `nom`, `Fonction`, `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
+| `BDD` : modifier `prenom`, `nom`, `Fonction`, `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Avatar` (si vous l'avez ajoutée, étape 6), `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
 | `BDD` : modifier `email`, `Etablissement` | les administrateurs | c'est ce que le widget écrit quand un administrateur, mode admin allumé, change l'adresse ou l'établissement d'une autre personne. `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` décide de qui apparaît |
 | `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais ; il décide de qui apparaît |
 | `BDD` : ajouter ou supprimer une ligne | les administrateurs | le widget ne crée ni ne supprime jamais de fiche |
 | `ACL` : lire les lignes de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce qui affiche la liste des responsables dans la fiche. Si la règle la leur refuse, la fiche s'ouvre sans cette liste et le dit |
 | `ACL` : ajouter, supprimer, modifier `email` et `Responsable_de_l_Etablissement` d'une ligne de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce que le widget écrit quand un responsable nomme ou retire un responsable. **`admin` : les administrateurs seulement** (le widget ne l'écrit jamais ; sans cette règle, un responsable pourrait se donner le droit d'administrateur depuis la console) |
 | `Etablissements` : modifier `nom_complet`, `ok_pour_apparaitre` et `logo` d'**une ligne** | les responsables de cette ligne, et les administrateurs | c'est ce que le widget écrit pour la fiche d'un établissement. `ok_pour_apparaitre` décide de qui apparaît ; `acronyme`, `fondateur`, `partenaire` et `autres` : l'équipe du PUI seulement, le widget ne les écrit pas |
-| Ajouter une pièce jointe au document | les responsables (et les administrateurs) | c'est ce que fait l'envoi du logo. Un compte au rôle **Lecteur** du document ne peut rien écrire, pas même cela |
+| Ajouter une pièce jointe au document | les responsables et les administrateurs (le logo) ; toute personne qui modifie sa fiche (sa photo de profil, étape 6) | c'est ce que fait l'envoi d'un logo ou d'une photo. Un compte au rôle **Lecteur** du document ne peut rien écrire, pas même cela |
 | `ACL` : lire et modifier les lignes des autres | les administrateurs | la formule d'`Annuaire_Sonde` la lit pour son propre compte, sans passer par les droits de la personne |
 
 Pour « un responsable de cette ligne d'`Etablissements` » (ou de cette ligne d'`ACL`), un
@@ -343,7 +344,7 @@ seule action. L'ancien fichier n'est pas supprimé par le widget ; ce que Grist 
 (conservation pour l'historique, nettoyage des pièces jointes inutilisées) est à constater
 sur votre document. Si l'envoi réussit mais que l'écriture est refusée ensuite, la pièce jointe
 reste dans le document sans servir : le widget le dit, et le nettoyage se fait dans Grist.
-Voir [`docs/securite.md`](docs/securite.md#lenvoi-dun-logo-et-le-jeton-en-écriture). Trois
+Voir [`docs/securite.md`](docs/securite.md#lenvoi-dun-fichier-et-le-jeton-en-écriture). Trois
 points **n'ont pas pu être essayés dans un vrai document Grist** : que Grist accepte l'envoi
 avec ce jeton, que le navigateur laisse le widget lire la réponse (cela dépend des en-têtes
 d'autorisation entre sites que renvoie l'instance Grist), et
@@ -365,6 +366,77 @@ de page. Si ce n'est pas le cas, la console dit pourquoi :
 | Pas de bandeau en bas de page | Aucun établissement n'est à la fois `fondateur` et `ok_pour_apparaitre` | Cocher les deux cases pour les fondateurs |
 | Le rond du bandeau manque | Le financeur ne s'appelle pas exactement `France 2030` | Corriger le `nom` |
 | Un logo paraît trop petit, ou entouré de blanc | Marge ou fond blanc dans le fichier | Rogner l'image, fond transparent |
+
+## 6. La photo de profil (facultatif)
+
+Depuis la 1.19.0, une personne peut ajouter sa **photo de profil** : elle remplace ses
+initiales sur sa carte, s'agrandit au clic et se montre aussi dans le bandeau « Ma
+présence » et dans les fenêtres. Comme un logo, c'est une **pièce jointe du document
+Grist** : le dépôt du widget n'en contient aucune (il est public, et le visage d'une
+personne n'y a pas sa place). Sans la colonne ci-dessous, rien ne casse : les cartes
+gardent leurs initiales et le formulaire de modification n'a pas de carte « Photo de
+profil ».
+
+**Dans `BDD`**, une colonne à ajouter (nom exact) :
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `Avatar` | Pièces jointes | La photo de profil de la personne : sur sa carte, dans le bandeau « Ma présence » et dans les fenêtres. Seul le premier fichier de la cellule est utilisé |
+
+1. Dans les données brutes de `BDD`, ajoutez une colonne nommée exactement `Avatar`, de
+   type **Pièces jointes**.
+2. Comme les autres colonnes que le widget écrit (étape 1), elle doit être une colonne de
+   **données**, pas une formule.
+3. À l'étape 4, ajoutez `Avatar` aux colonnes que la personne dont `email` est la sienne
+   (et les administrateurs) peut modifier, et laissez toute personne qui modifie sa fiche
+   ajouter une pièce jointe au document : sans cela, l'envoi est refusé (« Grist a refusé le
+   fichier : vos droits ne permettent pas d'ajouter une pièce jointe au document »).
+4. Rechargez le widget : ouvrez « Modifier mon profil », la carte « Photo de profil »
+   apparaît.
+
+**Ce que le widget fait d'une photo.** La personne choisit un fichier (JPG, PNG ou WebP,
+2 Mo au plus) ; le navigateur le redessine : recadré en carré au centre, 256 pixels de côté
+au plus, converti en JPEG, sans lieu, date ni modèle d'appareil. Rien n'est envoyé avant la
+relecture et le clic sur « Valider » : le widget demande alors à Grist un jeton d'accès
+**en écriture**, le temps de cet envoi seul et sans le garder, poste le fichier à l'API du
+document (`POST …/attachments`, comme pour un logo) et écrit l'identifiant de la pièce
+jointe dans la cellule `Avatar`, avec le reste de la fiche, en une seule action. Un
+administrateur, mode admin allumé, fait de même pour la fiche d'une autre personne. Voir
+[`docs/securite.md`](docs/securite.md#lenvoi-dun-fichier-et-le-jeton-en-écriture).
+
+**Retirer ou remplacer une photo ne supprime pas l'ancien fichier.** « Retirer la photo »
+vide la cellule ; remplacer une photo en met une autre. Dans les deux cas, l'ancien fichier
+reste dans les pièces jointes du document, lisible par toute personne qui y a accès, tant
+que vous ne l'y supprimez pas. Une photo est une **donnée personnelle** : à la demande d'une
+personne, supprimez aussi le fichier, pas seulement le contenu de la cellule (ce que Grist
+garde ensuite pour son historique et ses instantanés est à constater sur votre document).
+Même chose pour un fichier envoyé dont l'écriture a ensuite échoué : le widget le dit, mais
+ne sait pas le supprimer.
+
+**Poser une photo vous-même.** Dans Grist, cliquez la cellule `Avatar` de la personne,
+puis le « + » (ou glissez le fichier). Préférez une image carrée et légère : le widget
+l'affiche en rond, la réduit à l'affichage mais la télécharge entière. Rechargez la page
+du widget.
+
+**Trois points n'ont pas pu être essayés dans un vrai document Grist** (les tests simulent
+la réponse) : que Grist accepte l'envoi avec le jeton en écriture, que le navigateur laisse
+le widget lire la réponse (cela dépend des en-têtes d'autorisation entre sites que renvoie
+l'instance Grist), et que les règles d'accès de l'étape 4 laissent une personne ordinaire
+ajouter la pièce jointe et écrire `Avatar`. Jouez [`TESTING.md`](TESTING.md), section 18,
+sur une copie du document avant d'inviter les personnes à ajouter une photo. Si l'envoi ne
+marche pas, rien n'est cassé : le widget affiche une phrase (« … Contactez un
+administrateur si le problème persiste. ») et la photo se pose dans Grist, comme ci-dessus.
+
+Vérifier : une personne qui a une photo la voit à la place de ses initiales sur sa carte,
+un clic l'agrandit, et la console ne montre ni `[LOGOS]` ni `[ENVOI]`.
+
+| Ce que vous voyez | Cause | Remède |
+|---|---|---|
+| Pas de carte « Photo de profil » dans le formulaire | `BDD` n'a pas de colonne `Avatar` (ou son nom diffère) | Ajouter la colonne sous ce nom, puis recharger |
+| Une photo posée dans la cellule, mais la carte garde les initiales | Le fichier n'est pas une image lisible, ou a été supprimé ; ou Grist ne donne pas de jeton de lecture (`[LOGOS] Jeton d'accès…` : alors aucun logo ne s'affiche non plus) | Remplacer le fichier, vérifier l'accès du widget (`full`), recharger |
+| « Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. Contactez un administrateur si le problème persiste. » (ou l'un de ses voisins) à la validation | L'instance Grist ne donne pas de jeton en écriture, refuse la requête du navigateur ou ne répond pas : l'envoi n'a pas pu être essayé dans un vrai Grist | Lire la ligne `[ENVOI]` de la console ; poser la photo dans la cellule ; signaler au mainteneur |
+| « Grist a refusé le fichier : vos droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. » | Une règle d'accès interdit à cette personne d'ajouter une pièce jointe | Revoir l'étape 4 |
+| Des pièces jointes qui ne servent plus s'accumulent | Des photos retirées, remplacées ou jamais utilisées : le widget ne supprime pas de fichier | Les repérer et les supprimer dans Grist |
 
 ## À savoir
 
@@ -393,9 +465,11 @@ de page. Si ce n'est pas le cas, la console dit pourquoi :
   touchent au même champ (nom, visibilité, logo), le second est ramené à la fiche actuelle
   avec sa saisie, sans rien perdre ; sinon les deux modifications se cumulent, y compris
   les responsables nommés par l'un et par l'autre.
-- **Des pièces jointes orphelines** : si un responsable envoie un logo et que l'écriture de la
-  fiche échoue ensuite, que la fiche a changé dans Grist pendant l'envoi, ou que la page est
-  fermée entre l'envoi et l'écriture, le fichier reste dans les pièces jointes du document. Le widget ne sait pas le supprimer.
+- **Des pièces jointes orphelines** : si un responsable envoie un logo (ou une personne sa
+  photo) et que l'écriture de la fiche échoue ensuite, que la fiche a changé dans Grist
+  pendant l'envoi, ou que la page est fermée entre l'envoi et l'écriture, le fichier reste
+  dans les pièces jointes du document ; de même, une photo retirée ou remplacée laisse
+  l'ancien fichier. Le widget ne sait pas supprimer une pièce jointe.
 - **Une adresse sur plusieurs lignes de `BDD`** : le choix de présence s'applique à
   toutes ces lignes (la console le signale). Mieux vaut corriger les doublons.
 - **Une personne connectée avec une autre adresse que celle de `BDD`** n'est pas

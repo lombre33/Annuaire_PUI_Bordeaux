@@ -5,6 +5,8 @@ import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, s
 import { el } from './dom.js';
 import { groupState, menuGroups, selectionCount } from './filters.js';
 import { createLogoImage, sizeLogo } from './branding-ui.js';
+import { createAvatar } from './avatar-ui.js';
+import { avatarIdOf } from './attachments.js';
 
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
@@ -526,14 +528,46 @@ function fillEtablissementEdit(box, etablissementId, contactId, label) {
   box.append(edit);
 }
 
+// La photo que montre la carte : celle que la personne vient de choisir (la carte « après » d'une
+// relecture, `avatarUrl`, voir withAvatarChange dans preview.js), sinon celle que Grist garde.
+const photoOf = contact => (contact.avatarUrl ? { url: contact.avatarUrl } : avatarIdOf(contact.Avatar));
+
+// Le repère de la photo sur la carte « Après » : un anneau vert, ou rouge pour une photo retirée, et
+// la pastille écrite sous la fonction (`marks.avatar` : { before, after }, voir withAvatarChange).
+function markAvatar(avatar, identity, { before, after }) {
+  const gone = after === 'remove';
+  avatar.classList.add(gone ? 'rv-ring-del' : 'rv-ring');
+  const note = el('p', 'rv-note');
+  note.append(pill(gone ? 'photo retirée' : before > 0 ? 'photo modifiée' : 'photo ajoutée', gone));
+  identity.append(note);
+}
+
 // `view` : { rights } pour la grille ('own', 'admin' ou rien), { marks } pour une
 // carte de relecture (voir renderPreviewCard), { logos } de quoi montrer le logo de
 // l'établissement : { attachments, logoFor(contact) } (attachments.js, branding.js) ;
-// sans eux la carte garde la pastille texte.
+// sans eux la carte garde la pastille texte et les initiales (une photo de Grist demande aussi
+// `attachments`).
 function buildCard(template, contact, onToggle, view = {}) {
   const { rights = null, marks = null, logos = null, etabRights = null } = view;
   const card = template.content.cloneNode(true);
-  card.querySelector('.avatar').textContent = initials(contact);
+  const etablissement = logos?.attachments && logos.logoFor?.(contact);
+
+  // Sans photo, les initiales du gabarit ; avec elle, un avatar neuf (photo sous les initiales jusqu'à
+  // son chargement). Dans la grille la photo s'agrandit au clic ; sur une carte de relecture (sans
+  // `onToggle`) rien n'est cliquable.
+  let avatar = card.querySelector('.avatar');
+  const photo = photoOf(contact);
+  if (photo) {
+    const zoom = onToggle
+      ? { name: displayName(contact), detail: [contact.Fonction, etablissement?.name || contact.etablissement_label].filter(Boolean).join(' · ') }
+      : null;
+    const withPhoto = createAvatar({ initials: initials(contact), photo, attachments: logos?.attachments, zoom });
+    avatar.replaceWith(withPhoto);
+    avatar = withPhoto;
+  } else {
+    avatar.textContent = initials(contact);
+  }
+  if (marks?.avatar) markAvatar(avatar, card.querySelector('.identity'), marks.avatar);
 
   const name = card.querySelector('.name');
   if (marks?.texts.name) {
@@ -550,7 +584,6 @@ function buildCard(template, contact, onToggle, view = {}) {
   if (marks?.texts.fonction) showTextChange(fonction, marks.texts.fonction);
   else if (contact.Fonction) reveal(fonction, contact.Fonction);
 
-  const etablissement = logos?.attachments && logos.logoFor?.(contact);
   const badge = card.querySelector('.etablissement-tag');
   fillEtablissement(badge, contact.etablissement_label, onToggle,
     etablissement?.logo ? { attachment: etablissement.logo, name: etablissement.name, attachments: logos.attachments } : null);

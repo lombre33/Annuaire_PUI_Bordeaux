@@ -16,10 +16,12 @@
 // ['L', numéro du fichier].
 //
 // Les logos des établissements et des financeurs sont des dessins inventés
-// (logos-fictifs.mjs), jamais ceux de vraies structures.
+// (logos-fictifs.mjs), jamais ceux de vraies structures ; les photos de profil sont des visages
+// dessinés (portraits-fictifs.mjs), jamais ceux de vraies personnes.
 
 import { BRANDING } from '../../constants.js';
 import { IDS_LOGOS } from './logos-fictifs.mjs';
+import { PREMIER_PORTRAIT } from './portraits-fictifs.mjs';
 
 // `ordreBandeau` : la place de l'établissement fondateur dans le bandeau des logos du bas
 // (colonne ordre_bandeau, GRIST_SETUP.md). Le logo d'un établissement est le dessin de même
@@ -116,6 +118,10 @@ const COMPETENCES = [
 // Ordre de la table ; le widget affiche les cartes par nom de famille (compareContacts, grist-data.js).
 // `visible: false` : contact hors périmètre (perimetre vide).
 // `accepte: false` : la personne n'a pas donné son accord (Accepte_apparaitre).
+// `portrait: n` : la personne a une photo de profil (colonne Avatar de BDD, 1.19.0), le visage de rang n de
+// portraits-fictifs.mjs. Les photos ne sont servies qu'avec `tablesFictives({ photos: true })` (?photos dans
+// la démonstration) : sans elles, la colonne Avatar n'existe pas, comme dans un document où elle n'a pas
+// encore été ajoutée, et toutes les captures d'avant la 1.19.0 restent justes.
 // `admin: true` : administrateur, déclaré dans la table ACL.
 // `responsable: true` : responsable de son établissement (1.17.0), déclaré dans la table ACL : elle
 // ou il modifie la fiche de l'établissement, et d'abord nomme les autres responsables.
@@ -129,28 +135,28 @@ const CONTACTS = [
   },
   {
     prenom: 'Mehdi', nom: 'Bensaïd', fonction: 'Responsable valorisation', etab: 'UDD', tel: '0536490234',
-    role: 'Coordinateur', admin: true,
+    role: 'Coordinateur', admin: true, portrait: 0,
     instances: ['Comité de pilotage'], actions: ['Action 1: Valorisation de la recherche', 'Action 4: Veille et propriété intellectuelle'],
     gt: ['GT Propriété intellectuelle'], communautes: ['Transfert de technologie', 'Deeptech'],
     taches: ['1.1 Animation de réseau', '2.2 Relecture de dossiers'],
     competences: ['Propriété intellectuelle', 'Droit des contrats', 'Partenariats industriels']
   },
   {
-    prenom: 'Élise', nom: 'Marchetti', fonction: 'Juriste en propriété intellectuelle', etab: 'ISD', tel: '0536490356',
+    prenom: 'Élise', nom: 'Marchetti', fonction: 'Juriste en propriété intellectuelle', etab: 'ISD', tel: '0536490356', portrait: 1,
     instances: ['Conseil scientifique'], actions: ['Action 4: Veille et propriété intellectuelle'],
     gt: ['GT Propriété intellectuelle'], communautes: ['Transfert de technologie'], taches: ['2.2 Relecture de dossiers'],
     competences: ['Propriété intellectuelle', 'Droit des contrats']
   },
   {
     prenom: 'Julien', nom: 'Garnier', fonction: 'Chargé de transfert de technologie', etab: 'UDD', tel: '0639980478',
-    role: 'Membre du comité',
+    role: 'Membre du comité', portrait: 2,
     instances: ['Comité stratégique'], actions: ['Action 1: Valorisation de la recherche', 'Action 2: Maturation de projets'],
     communautes: ['Transfert de technologie', 'Deeptech'], taches: ['2.1 Suivi de projets'],
     competences: ['Partenariats industriels', 'Création d\'entreprise']
   },
   {
     prenom: 'Sofia', nom: 'Almeida', fonction: 'Directrice de la recherche clinique', etab: 'CHD', tel: '0536490590',
-    role: 'Membre du comité', responsable: true,
+    role: 'Membre du comité', responsable: true, portrait: 3,
     instances: ['Comité d\'éthique', 'Conseil scientifique'], actions: ['Action 2: Maturation de projets'],
     gt: ['GT Données de santé'], communautes: ['Santé numérique'], taches: ['2.2 Relecture de dossiers'],
     competences: ['Essais cliniques', 'Dispositifs médicaux', 'Open science']
@@ -163,14 +169,14 @@ const CONTACTS = [
   },
   {
     prenom: 'Nadia', nom: 'Kowalski', fonction: 'Chargée de mission entrepreneuriat', etab: 'UDD', tel: '0536490712',
-    role: 'Animation de communauté',
+    role: 'Animation de communauté', portrait: 4,
     actions: ['Action 5: Accompagnement des start-up', 'Action 3: Formation à l\'innovation'], gt: ['GT Formation'],
     communautes: ['Entrepreneuriat étudiant'], taches: ['1.2 Organisation d\'événements', '1.1 Animation de réseau'],
     competences: ['Création d\'entreprise', 'Gestion de projet']
   },
   {
     prenom: 'Thomas', nom: 'Vidal', fonction: 'Responsable partenariats industriels', etab: 'ISD', tel: '0639980834',
-    role: 'Référent établissement',
+    role: 'Référent établissement', portrait: 5,
     instances: ['Comité de pilotage'], actions: ['Action 1: Valorisation de la recherche', 'Action 6: Recherche de financements'],
     gt: ['GT Financement'], communautes: ['Transfert de technologie'], taches: ['1.1 Animation de réseau'],
     competences: ['Partenariats industriels', 'Droit des contrats', 'Financement de l\'innovation']
@@ -298,7 +304,7 @@ function tableDeReference({ corrigee, brute }, libelles) {
 // colonne. Ici Numeric, comme dans le document d'origine (grist_structure.txt) : sans
 // ces tables, la démonstration marcherait aussi mais la console signalerait des types
 // illisibles.
-function metadonneesFictives() {
+function metadonneesFictives({ photos = false } = {}) {
   const colonnesBDD = [
     ['prenom', 'Text'], ['nom', 'Text'], ['email', 'Text'], ['Fonction', 'Text'],
     ['numero_de_telephone', 'Numeric'],
@@ -306,7 +312,8 @@ function metadonneesFictives() {
     ...Object.values(REFERENCES).map(ref => [ref.colonneBDD, `RefList:${ref.table}`]),
     ['Competences', 'RefList:Competences'],
     ['perimetre', 'RefList:REMMAPING_PERIMETRES_COMPETENCES'],
-    ['Accepte_apparaitre', 'Bool']
+    ['Accepte_apparaitre', 'Bool'],
+    ...(photos ? [['Avatar', 'Attachments']] : [])
   ];
   return {
     _grist_Tables: { id: [1, 2], tableId: ['BDD', 'Etablissements'] },
@@ -319,7 +326,8 @@ function metadonneesFictives() {
   };
 }
 
-export function tablesFictives() {
+// `photos` : ajoute la colonne Avatar de BDD (pièces jointes) et la photo de profil des personnes qui en ont une.
+export function tablesFictives({ photos = false } = {}) {
   const idsEtablissements = ids(ETABLISSEMENTS.map(etablissement => etablissement.acronyme));
   const idsReferences = Object.fromEntries(Object.entries(REFERENCES).map(([cle, ref]) => [cle, ids(ref.libelles)]));
   const idsRoles = ids(ROLES.libelles);
@@ -352,6 +360,8 @@ export function tablesFictives() {
     // seuls les établissements et le périmètre décident.
     Accepte_apparaitre: CONTACTS.map(contact => contact.accepte !== false)
   };
+  // Pièces jointes (1.19.0) : ['L', numéro du fichier], ['L'] quand la personne n'a pas de photo.
+  if (photos) bdd.Avatar = CONTACTS.map(contact => (contact.portrait === undefined ? ['L'] : ['L', PREMIER_PORTRAIT + contact.portrait]));
   Object.entries(REFERENCES).forEach(([cle, ref]) => {
     bdd[ref.colonneBDD] = CONTACTS.map(contact => liste(contact[cle], idsReferences[cle]));
   });
@@ -392,13 +402,18 @@ export function tablesFictives() {
       Responsable_de_l_Etablissement: acl.map(ligne => ligne.etablissement),
       admin: acl.map(ligne => ligne.admin)
     },
-    ...metadonneesFictives()
+    ...metadonneesFictives({ photos })
   };
   Object.values(REFERENCES).forEach(ref => {
     tables[ref.table] = tableDeReference(ref, ref.libelles);
   });
   return tables;
 }
+
+// Les personnes de l'annuaire qui ont une photo dans `tablesFictives({ photos: true })`, par nom de famille :
+// les captures de la photo de profil vérifient qu'elles la montrent.
+export const PERSONNES_AVEC_PHOTO = CONTACTS.filter(contact => contact.portrait !== undefined)
+  .map(contact => `${contact.prenom} ${contact.nom}`);
 
 // Nombre de cartes attendues avec ce jeu de données (les captures vérifient
 // qu'elles les affichent bien avant de photographier l'écran).

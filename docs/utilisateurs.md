@@ -9,7 +9,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 - [L'annuaire en bref](#lannuaire-en-bref)
 - [Lexique du PUI](#lexique-du-pui)
 - [Découvrir l'écran](#découvrir-lécran)
-- [Lire une carte](#lire-une-carte)
+- [Lire une carte](#lire-une-carte), dont [La photo de profil](#la-photo-de-profil)
 - [Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)
 - [Rechercher une personne](#rechercher-une-personne)
 - [Filtrer](#filtrer), dont [Domaines et compétences](#domaines-et-compétences) et [Actions et tâches](#actions-et-tâches)
@@ -17,7 +17,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 - [Fondateurs et Partenaires](#fondateurs-et-partenaires)
 - [Réinitialiser](#réinitialiser)
 - [Ma présence : apparaître ou non](#ma-présence--apparaître-ou-non)
-- [Modifier ma fiche](#modifier-ma-fiche), dont [Quand l'enregistrement échoue](#quand-lenregistrement-échoue), [Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique) et [Pour les administrateurs](#pour-les-administrateurs)
+- [Modifier ma fiche](#modifier-ma-fiche), dont [Ma photo de profil](#ma-photo-de-profil), [Quand l'enregistrement échoue](#quand-lenregistrement-échoue), [Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique) et [Pour les administrateurs](#pour-les-administrateurs)
 - [La fiche de mon établissement](#la-fiche-de-mon-établissement), dont [Les responsables](#les-responsables) et [Si l'enregistrement de la fiche échoue](#si-lenregistrement-de-la-fiche-échoue)
 - [Pourquoi une personne n'apparaît-elle pas ?](#pourquoi-une-personne-napparaît-elle-pas-)
 - [Messages du bandeau rouge](#messages-du-bandeau-rouge)
@@ -27,12 +27,12 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 
 L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa promesse : *pas de mauvaise porte, toujours le bon interlocuteur*.
 
-- Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (instances, actions, groupes de travail ou GT, communautés, tâches, compétences, rôle).
+- Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (instances, actions, groupes de travail ou GT, communautés, tâches, compétences, rôle) et, si elle l'a ajoutée, sa **photo de profil** à la place de ses initiales ([La photo de profil](#la-photo-de-profil)).
 - On retrouve quelqu'un par son **nom** ou, grâce aux **filtres**, par ce qu'il fait.
 - L'annuaire porte les **logos** du PUI : celui de chaque établissement sur ses cartes, ceux des financeurs au centre de l'en-tête et ceux des établissements fondateurs dans un bandeau tout en bas ([Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)).
 - L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un grand écran, une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
 - **Chacun décide s'il y figure.** Une personne n'apparaît que si elle a accepté d'apparaître. Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'adresse e-mail de ce compte, un bandeau **Ma présence** vous dit où vous en êtes et vous laisse changer d'avis d'un clic ([Ma présence](#ma-présence--apparaître-ou-non)).
-- **Chacun corrige sa propre fiche.** Quand l'annuaire vous reconnaît, un bouton **✎ Modifier** apparaît sur votre carte et un bouton **Modifier mon profil** dans le bandeau : vous changez votre nom, votre fonction, votre téléphone, votre rôle et vos listes, vous relisez votre carte avant et après, puis vous validez ([Modifier ma fiche](#modifier-ma-fiche)). L'enregistrement est direct : aucun administrateur ne valide et l'annuaire ne tient aucun historique. L'adresse e-mail, l'établissement et le périmètre ne se changent pas sur sa propre fiche : adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist. Les administrateurs, eux, allument un **mode admin** pour modifier la fiche des autres, e-mail et établissement compris.
+- **Chacun corrige sa propre fiche.** Quand l'annuaire vous reconnaît, un bouton **✎ Modifier** apparaît sur votre carte et un bouton **Modifier mon profil** dans le bandeau : vous changez votre nom, votre fonction, votre téléphone, votre rôle, vos listes et votre photo de profil, vous relisez votre carte avant et après, puis vous validez ([Modifier ma fiche](#modifier-ma-fiche)). L'enregistrement est direct : aucun administrateur ne valide et l'annuaire ne tient aucun historique. L'adresse e-mail, l'établissement et le périmètre ne se changent pas sur sa propre fiche : adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist. Les administrateurs, eux, allument un **mode admin** pour modifier la fiche des autres, e-mail et établissement compris.
 - **Chaque établissement tient sa fiche.** Si vous êtes **responsable** de votre établissement (c'est l'administrateur des données qui nomme le premier), un bouton **✎ Modifier** apparaît sous le logo de l'établissement sur ses cartes et un bouton **Mon établissement** dans le bandeau : vous changez son logo, son nom complet, sa visibilité dans l'annuaire et la liste de ses responsables ([La fiche de mon établissement](#la-fiche-de-mon-établissement)). Là aussi, l'enregistrement est direct.
 
 ## Lexique du PUI
@@ -49,6 +49,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Domaine (compétences macro)** | Un regroupement de compétences. Le menu Compétences range les compétences par domaine ([Domaines et compétences](#domaines-et-compétences)) |
 | **Action d'une tâche** | L'action dont une tâche porte le numéro : « 2.1 Suivi de projets » est une tâche de l'« Action 2 ». Le menu Tâches range les tâches par action ([Actions et tâches](#actions-et-tâches)) |
 | **Responsable d'établissement** | Une personne nommée dans la table `ACL` de Grist pour tenir la fiche de son établissement : son logo, son nom complet, sa visibilité dans l'annuaire et la liste des responsables ([La fiche de mon établissement](#la-fiche-de-mon-établissement)) |
+| **Photo de profil** | La photo, facultative, qu'une personne ajoute à sa fiche : elle remplace ses initiales sur sa carte et s'agrandit au clic (colonne `Avatar` de `BDD`, une pièce jointe du document Grist) ([La photo de profil](#la-photo-de-profil)) |
 | **Accord d'apparaître** | Le choix de chaque personne de figurer ou non dans l'annuaire. Sans son accord, une personne n'apparaît pas, même si son établissement a validé son apparition |
 | **Instances** | *À compléter* |
 | **Actions** | *À compléter* |
@@ -79,7 +80,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 ![Une carte de contact avec neuf repères numérotés](images/carte-anatomie.png)
 
-1. **Initiales** de la personne.
+1. **Initiales** de la personne, ou sa **photo de profil** quand elle en a ajouté une : la photo remplace alors les initiales ([La photo de profil](#la-photo-de-profil)). Sur cette capture, la personne n'a pas de photo.
 2. **Prénom et nom** de la personne.
 3. **Fonction**, si elle est renseignée.
 4. **Établissement** (en haut à droite) : son logo, seul, ou sa pastille s'il n'a pas de logo dans Grist ([Les logos](#les-logos-et-le-bandeau-du-bas)). Un clic filtre sur cet établissement.
@@ -92,6 +93,22 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 Sur une carte que vous pouvez modifier, une ligne s'ajoute sous la fonction : la mention **Votre fiche** (sur la vôtre) et le bouton **✎ Modifier** ([Modifier ma fiche](#modifier-ma-fiche)) ; sur la carte d'une autre personne, un administrateur en mode admin lit **✎ Modifier la fiche**. Si vous êtes responsable de l'établissement, un second bouton **✎ Modifier** se lit sous le logo de l'établissement : il ouvre la fiche de l'**établissement**, pas celle de la personne ([La fiche de mon établissement](#la-fiche-de-mon-établissement)).
 
 Une information absente n'est pas remplacée par une ligne vide : elle n'apparaît simplement pas. Les **domaines** de compétences et les **actions des tâches** ne figurent pas sur la carte, qui garde le détail des compétences et des tâches : ils rangent les menus Compétences et Tâches et permettent de filtrer par domaine ou par action (voir [Domaines et compétences](#domaines-et-compétences) et [Actions et tâches](#actions-et-tâches)).
+
+### La photo de profil
+
+Une personne peut ajouter sa **photo de profil** quand elle modifie sa fiche ([Ma photo de profil](#ma-photo-de-profil)). Sur sa carte, la photo remplace alors les initiales ; les cartes des personnes qui n'en ont pas gardent les leurs.
+
+![Les deux premières rangées de cartes de l'annuaire : Sofia Almeida, Mehdi Bensaïd et Julien Garnier ont une photo à la place de leurs initiales ; Romain Delmas, Léa Fontaine et Paul Girard, qui n'en ont pas, gardent leurs initiales](images/photo-profil-cartes.png)
+
+*Avec et sans photo : trois cartes ont une photo de profil, trois gardent leurs initiales. Les visages de cette capture sont des dessins inventés.*
+
+Un clic sur la photo d'une carte l'**agrandit**, avec le nom de la personne, sa fonction et son établissement. La croix, un clic sur la photo ou à côté de la fenêtre, ou la touche **Échap** la referme, et le focus revient sur la photo de la carte.
+
+![La photo de Sofia Almeida agrandie dans une fenêtre : sous la photo, son nom, sa fonction et son établissement ; en haut à droite, la croix qui ferme la fenêtre](images/photo-profil-agrandie.png)
+
+*La photo agrandie, avec sa légende.*
+
+La photo est aussi celle du bandeau [Ma présence](#ma-présence--apparaître-ou-non), de l'en-tête des fenêtres de modification et de la liste des responsables d'un établissement. Au clavier, la photo d'une carte est un bouton : **Tab** pour s'y placer, **Entrée** ou **Espace** pour l'agrandir. Quand la photo ne peut pas être montrée (le fichier a été supprimé dans Grist, n'est pas une image lisible, ou Grist ne donne pas à l'annuaire l'accès aux pièces jointes), ce sont les **initiales** qui s'affichent : l'annuaire reste utilisable. Les photos ne se téléchargent qu'à l'approche de leur carte : comme pour les logos, rechargez la page après un changement de photo fait directement dans Grist.
 
 ## Les logos et le bandeau du bas
 
@@ -262,7 +279,7 @@ Quand votre fiche reste masquée alors que vous avez accepté d'apparaître, le 
 
 ## Modifier ma fiche
 
-Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, votre téléphone, votre rôle dans le PUI et les listes qui forment votre carte (instances, actions, GT, compétences, communautés, tâches). Les modifications **s'appliquent directement** dans Grist : aucun administrateur ne les valide et l'annuaire n'en tient aucun historique ([Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique)). Mais rien n'est écrit avant une **relecture** : une fenêtre vous montre votre carte **Avant** et votre carte **Après**, avec ce qui change repéré, et c'est vous qui cliquez sur « Valider ».
+Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, votre téléphone, votre rôle dans le PUI, les listes qui forment votre carte (instances, actions, GT, compétences, communautés, tâches) et votre photo de profil. Les modifications **s'appliquent directement** dans Grist : aucun administrateur ne les valide et l'annuaire n'en tient aucun historique ([Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique)). Mais rien n'est écrit avant une **relecture** : une fenêtre vous montre votre carte **Avant** et votre carte **Après**, avec ce qui change repéré, et c'est vous qui cliquez sur « Valider ».
 
 ### Où cliquer
 
@@ -281,6 +298,7 @@ Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, votre t
 | Prénom, nom, fonction, téléphone | Oui, en saisissant le texte |
 | Rôle dans le PUI | Oui, dans une liste déroulante (une valeur, ou « Non renseigné ») |
 | Instances, Actions, GT, Compétences, Communautés, Tâches | Oui, en cochant ou en décochant des pastilles. Les compétences sont rangées par domaine et les tâches par action, mais seules les compétences et les tâches se cochent |
+| Photo de profil | Oui, avec la carte « Photo de profil » : ajouter, changer ou retirer (JPG, PNG ou WebP, 2 Mo au plus). La carte n'existe que si le document Grist a la colonne `Avatar` ([Ma photo de profil](#ma-photo-de-profil)) |
 | Adresse e-mail | **Non, pas sur votre propre fiche** : c'est elle qui relie votre compte à votre fiche. Un administrateur la change sur la fiche d'une autre personne, avec le mode admin ([Pour les administrateurs](#pour-les-administrateurs)) ; sinon c'est à l'administrateur des données de la corriger dans Grist |
 | Établissement | **Non, pas sur votre propre fiche** : il décide de qui apparaît dans l'annuaire. Même règle que pour l'adresse e-mail |
 | Périmètre | **Non** : à demander à l'administrateur des données |
@@ -288,12 +306,13 @@ Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, votre t
 
 ### Remplir le formulaire
 
-![Le formulaire « Modifier mon profil » : un bloc d'identité verrouillé en haut, les champs Prénom, Nom, Fonction et Téléphone, la liste Rôle dans le PUI, puis les listes Instances, Actions, GT et Compétences en pastilles à cocher ; en bas, le nombre de champs modifiés et les boutons « Annuler » et « Relire mes modifications »](images/modifier-fiche-formulaire.png)
+![Le formulaire « Modifier mon profil » : un bloc d'identité verrouillé en haut, la carte « Photo de profil » avec le bouton « Ajouter une photo », les champs Prénom, Nom, Fonction et Téléphone, la liste Rôle dans le PUI, puis les listes Instances et Actions en pastilles à cocher ; en bas, le nombre de champs modifiés et les boutons « Annuler » et « Relire mes modifications »](images/modifier-fiche-formulaire.png)
 
-*Le formulaire de modification : l'identité verrouillée, les champs de texte, le rôle et les six listes à cocher (la fenêtre défile pour atteindre les dernières). Le pied de fenêtre compte les champs modifiés.*
+*Le formulaire de modification : l'identité verrouillée, la photo de profil, les champs de texte, le rôle et les six listes à cocher (la fenêtre défile pour atteindre les dernières). Le pied de fenêtre compte les champs modifiés.*
 
-Le formulaire s'ouvre avec les valeurs actuelles de la fiche. Sous le titre, une phrase rappelle ce qui va se passer : « Vous relisez vos modifications avant de les valider : elles s’appliquent ensuite tout de suite à votre fiche. » En haut, un bloc rappelle qui vous êtes (initiales, nom, adresse, et à droite l'établissement : son logo, ou sa pastille (son sigle) quand il n'a pas de logo ou que son fichier ne se charge pas) et ce qui est verrouillé : « Verrouillé : l’e-mail et l’établissement sont liés à votre compte. Pour les corriger, contactez un administrateur. » (Un administrateur qui ouvre sa propre fiche lit « Verrouillé sur votre propre fiche : l’e-mail et l’établissement sont liés à votre compte. ») Dessous :
+Le formulaire s'ouvre avec les valeurs actuelles de la fiche. Sous le titre, une phrase rappelle ce qui va se passer : « Vous relisez vos modifications avant de les valider : elles s’appliquent ensuite tout de suite à votre fiche. » En haut, un bloc rappelle qui vous êtes (photo ou initiales, nom, adresse, et à droite l'établissement : son logo, ou sa pastille (son sigle) quand il n'a pas de logo ou que son fichier ne se charge pas) et ce qui est verrouillé : « Verrouillé : l’e-mail et l’établissement sont liés à votre compte. Pour les corriger, contactez un administrateur. » (Un administrateur qui ouvre sa propre fiche lit « Verrouillé sur votre propre fiche : l’e-mail et l’établissement sont liés à votre compte. ») Dessous :
 
+- **Photo de profil** : votre photo actuelle (ou vos initiales) et les boutons pour la changer, quand le document Grist a une colonne `Avatar` ([Ma photo de profil](#ma-photo-de-profil)).
 - **Prénom, Nom, Fonction, Téléphone** : des zones de texte.
 - **Rôle dans le PUI** : une liste déroulante.
 - **Instances, Actions, GT, Compétences, Communautés, Tâches** : toutes les valeurs que Grist propose, en pastilles. Un clic coche ou décoche une pastille, et chaque liste dit combien de valeurs sont sélectionnées. Au-delà de douze valeurs, une zone de recherche aide à retrouver une pastille.
@@ -316,6 +335,50 @@ Un champ refusé est signalé sous le champ :
 | « Indiquez au moins un prénom ou un nom. » | Le prénom et le nom seraient tous deux vides (le message s'affiche sous le ou les champs que vous avez vidés) |
 
 En bas de la fenêtre, un résumé dit où vous en êtes : « Aucune modification », le nombre de champs modifiés (par exemple : 2 champs modifiés) ou ce qu'il faut corriger : « Indiquez au moins un prénom ou un nom », « Corrigez le numéro de téléphone » ou « Corrigez les champs signalés ». Le bouton **Relire mes modifications** reste grisé tant qu'il n'y a rien à relire ou qu'un champ est refusé.
+
+### Ma photo de profil
+
+Quand le document Grist a une colonne `Avatar` dans `BDD` (c'est l'administrateur des données qui l'ajoute : [`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 6), le formulaire a une carte **Photo de profil**, sous le bloc d'identité. Sans cette colonne, la carte n'existe pas et rien d'autre ne change : les cartes gardent les initiales. La photo est **facultative** : personne n'est obligé d'en ajouter une. Le formulaire de « Créer ma fiche » (pour une personne qui n'a pas encore de fiche) n'a pas cette carte : la photo s'ajoute ensuite, depuis « Modifier mon profil ».
+
+![Le formulaire « Modifier mon profil » après le choix d'une photo : la carte « Photo de profil » montre l'aperçu de la nouvelle photo, avec les boutons « Changer la photo » et « Retirer la photo » ; le pied de la fenêtre dit « 1 champ modifié »](images/photo-profil-formulaire.png)
+
+*La carte « Photo de profil » après le choix d'une photo : l'aperçu la montre à la place des initiales, et le pied de la fenêtre la compte comme un champ modifié. Le visage est un dessin inventé.*
+
+- **Ajouter une photo** (ou **Changer la photo** si vous en avez déjà une) ouvre le choix d'un fichier : JPG, PNG ou WebP, 2 Mo au plus. L'aperçu montre aussitôt la photo choisie, pendant que la fenêtre indique « Préparation de l’image… » ; **rien n'est envoyé** à Grist à ce stade.
+- **Retirer la photo** n'est proposé que si vous avez une photo (la vôtre, ou celle que vous venez de choisir) ; la carte reprendra vos initiales. Choisir une photo puis la retirer, quand vous n'en aviez pas, ne change rien.
+- **Ce que votre navigateur fait de l'image.** Il ne l'envoie **jamais telle quelle** : il la lit, en découpe un **carré au centre**, le ramène à 256 pixels de côté au plus (une petite photo n'est pas agrandie) et en fait un JPEG. Une photo de téléphone est remise à l'endroit ; les informations cachées dans le fichier (lieu, date, modèle de l'appareil) ne partent pas, et un fichier piégé ne peut rien exécuter. Choisissez donc une photo où votre visage est au centre : c'est la partie qui est gardée.
+- **Quand l'envoi a lieu.** Seulement quand vous cliquez sur « Valider », après la relecture : l'annuaire envoie d'abord la photo à Grist (dans les pièces jointes du document), puis écrit votre fiche, photo comprise, en une seule action. Retirer la photo n'envoie rien.
+
+Le fichier est contrôlé dès que vous le choisissez, avant tout envoi. Le message s'affiche sous les boutons de la carte et rien n'est envoyé :
+
+| Message | Pourquoi |
+|---|---|
+| « Ce fichier n’est pas une image acceptée : choisissez un fichier JPG, PNG ou WebP. » | Le format n'est pas accepté (un PDF, un GIF, un SVG…) |
+| « Cette image pèse 2,4 Mo : choisissez-en une de 2 Mo au plus. » | Le fichier dépasse 2 Mo (le poids affiché est celui du fichier choisi) |
+| « Ce fichier est vide : choisissez-en un autre. » | Le fichier ne contient rien |
+| « Cette image n’a pas pu être lue : choisissez un autre fichier. » | Le navigateur ne sait pas la lire (fichier abîmé) |
+
+**Dans la relecture,** la photo est repérée comme le reste. Sur la carte « Après », un **anneau vert** entoure la photo et la pastille **photo ajoutée** (ou **photo modifiée** si vous en aviez déjà une) se lit sous la fonction ; une photo retirée est entourée d'un anneau rouge, avec la pastille **photo retirée**. Dans le « Détail des changements », la ligne **Photo de profil** montre la photo actuelle (ou « aucune photo »), une flèche, puis la nouvelle photo (ou « photo retirée ») ; un clic sur une miniature l'agrandit.
+
+![La relecture d'une photo ajoutée : sur la carte « Après », la photo de Camille Rousseau est entourée d'un anneau vert, avec la pastille « photo ajoutée » sous sa fonction, alors que la carte « Avant » garde ses initiales ; dessous, le « Détail des changements » montre « aucune photo », une flèche, puis la nouvelle photo](images/photo-profil-relecture.png)
+
+*La relecture d'une photo ajoutée : l'anneau vert et la pastille sur la carte « Après », et la ligne « Photo de profil » du détail.*
+
+**Si l'envoi de la photo échoue.** Il a lieu au clic sur « Valider », avant l'écriture de la fiche. S'il échoue, **la fiche n'est pas modifiée**, la relecture reste ouverte avec votre brouillon et un message dit quoi faire :
+
+| Message | Ce que cela veut dire |
+|---|---|
+| « Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. Contactez un administrateur si le problème persiste. » | Grist a refusé de donner à l'annuaire le droit d'envoyer un fichier |
+| « L’envoi du fichier à Grist a échoué : le navigateur n’a pas pu joindre le serveur, ou l’a refusé. Contactez un administrateur si le problème persiste. » | Panne de réseau, ou serveur qui refuse la requête de l'annuaire |
+| « Grist n’a pas répondu à temps à l’envoi du fichier. Réessayez ; contactez un administrateur si le problème persiste. » | Le serveur n'a pas répondu en 30 secondes |
+| « Grist a refusé le fichier : vos droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. » | Votre compte ne peut pas ajouter de pièce jointe |
+| « Grist a refusé le fichier : il est trop volumineux. » | Le serveur refuse la taille du fichier |
+
+Deux messages voisins, « Grist n’a pas confirmé l’envoi du fichier. Réessayez ; contactez un administrateur si le problème persiste. » (la réponse de Grist est illisible) et un refus qui cite le numéro d'erreur de Grist, disent la même chose. Dans tous ces cas, l'administrateur des données peut déposer la photo directement dans la cellule `Avatar` de votre fiche, dans Grist. Cas rare : « La photo choisie n'est plus disponible : choisissez-la de nouveau. » signifie que la page a perdu l'image choisie ; choisissez-la une seconde fois.
+
+**Si le fichier est envoyé mais que la fiche n'est pas écrite** (une règle d'accès refuse l'écriture, ou quelqu'un a modifié la fiche pendant l'envoi), le message le dit en plus : « Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir. » Ce fichier reste dans Grist sans qu'aucune fiche l'utilise : l'administrateur des données peut le supprimer.
+
+**Retirer ou changer sa photo ne supprime pas l'ancien fichier.** La fiche ne l'utilise plus, la carte montre les initiales (ou la nouvelle photo), mais l'ancien fichier reste dans les pièces jointes du document Grist, lisible par toute personne qui y a accès, tant que l'administrateur des données ne l'y supprime pas. Si vous voulez que votre photo disparaisse vraiment, demandez-le-lui (voir [sécurité](securite.md#données-personnelles)).
 
 ### Relire avant d'enregistrer
 
@@ -361,7 +424,7 @@ L'annuaire relit la fiche dans Grist à deux moments : quand vous cliquez sur «
 
 ### Quand l'enregistrement échoue
 
-Un échec n'est jamais muet : un message apparaît en haut de la fenêtre. Pour les neuf premiers messages du tableau, **rien n'a été modifié** et votre brouillon reste dans la fenêtre : vous pouvez réessayer, ou cliquer sur « Retour ». Pour les deux derniers, l'enregistrement a bien eu lieu : la fenêtre reste alors ouverte sur l'écran **Fiche enregistrée** (« Vos modifications sont enregistrées », ou « La fiche de … est enregistrée » pour la fiche d'une autre personne, puis « Elles s'appliquent tout de suite dans Grist, sans validation. » et la liste **Ce qui a changé**), sans le message de confirmation, avec un bouton « Fermer ».
+Un échec n'est jamais muet : un message apparaît en haut de la fenêtre. Les échecs propres à la photo (fichier refusé, envoi impossible) sont décrits dans [Ma photo de profil](#ma-photo-de-profil). Pour les neuf premiers messages du tableau, **rien n'a été modifié** et votre brouillon reste dans la fenêtre : vous pouvez réessayer, ou cliquer sur « Retour ». Pour les deux derniers, l'enregistrement a bien eu lieu : la fenêtre reste alors ouverte sur l'écran **Fiche enregistrée** (« Vos modifications sont enregistrées », ou « La fiche de … est enregistrée » pour la fiche d'une autre personne, puis « Elles s'appliquent tout de suite dans Grist, sans validation. » et la liste **Ce qui a changé**), sans le message de confirmation, avec un bouton « Fermer ».
 
 | Message | Ce que cela veut dire | Que faire |
 |---|---|---|
@@ -403,6 +466,8 @@ Sur la fiche d'une autre personne, la fenêtre s'intitule « Modifier la fiche d
 
 - **E-mail.** C'est l'adresse qui relie la fiche au compte Grist de la personne : elle doit être une adresse valide, qu'aucune autre fiche ne porte déjà. Sous le champ, le message dit « Indiquez une adresse e-mail valide. » ou « Cette adresse est déjà utilisée par … » : le nom de la personne quand sa fiche figure dans l'annuaire, « une autre fiche » sinon (le nom d'une fiche masquée ne se dévoile pas) ; le pied de la fenêtre dit alors « Corrigez l’adresse e-mail ». La relecture prévient d'une conséquence : « L’adresse change dans BDD, pas dans la table ACL : si cette personne est administratrice ou responsable d’un établissement, ses droits restent attachés à son ancienne adresse. »
 - **Établissement.** Une liste de tous les établissements, par leur nom complet, qu'ils aient validé leur présence ou non. Une personne a toujours un établissement : la liste n'a pas d'option vide, sauf si la fiche n'en avait pas encore. Si l'établissement choisi n'a pas validé sa présence, une mise en garde se lit sous le champ (« Cet établissement n’a pas validé sa présence : la fiche ne sera pas visible dans l’annuaire. ») et la relecture le redit (« Son établissement n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire. », où « Son établissement » est remplacé par le nom de l'établissement) : après « Valider », la carte quitte l'annuaire.
+
+La carte **Photo de profil** est la même que sur sa propre fiche : un administrateur ajoute, remplace ou retire la photo d'une autre personne, après la même relecture ([Ma photo de profil](#ma-photo-de-profil)).
 
 Pour la fiche d'une autre personne, la relecture dit aussi quand la fiche ne figure pas dans l'annuaire, par exemple, après le choix d'un établissement qui n'est ni fondateur ni partenaire : « Cette fiche reste masquée de l'annuaire : son établissement n'est ni fondateur ni partenaire. »
 
@@ -447,7 +512,7 @@ Ce que votre navigateur fait de l'image : il ne l'envoie **jamais telle quelle**
 - **Nommer.** Choisissez une personne dans la liste déroulante, ou saisissez une adresse e-mail, puis cliquez sur **Nommer** (ou, dans le champ d'adresse, appuyez sur Entrée). La liste ne propose que les personnes de l'établissement **qui apparaissent dans l'annuaire** ; pour toute autre personne, saisissez son adresse. Nommer quelqu'un responsable ne le rend pas administrateur.
 - **Retirer.** Le bouton **Retirer** barre une personne déjà responsable et la marque « retiré » ; **Rétablir** annule. Sur une personne que vous venez d'ajouter (« ajouté »), **Retirer** la fait simplement disparaître de la liste. Un établissement garde **toujours au moins un responsable** : le retrait du dernier est refusé (« Un établissement doit garder au moins un responsable. »).
 - **Vous retirer vous-même** est possible, avec un avertissement : une fois enregistré, vous ne pourrez plus modifier cette fiche (« Vous retirez votre propre accès : une fois enregistré, vous ne pourrez plus modifier cette fiche. »).
-- **Qui est qui.** La liste donne le nom des personnes dont la fiche figure dans l'annuaire. Pour une adresse dont la fiche n'y figure pas, elle écrit « Fiche masquée de l’annuaire » (une fiche existe pour cette adresse, mais elle n'apparaît pas, quelle qu'en soit la raison) ; si aucune fiche ne porte l'adresse, « Adresse sans fiche dans l’annuaire ». L'annuaire ne dévoile pas le nom d'une personne qu'il n'affiche pas.
+- **Qui est qui.** La liste donne le nom, et la photo ou les initiales, des personnes dont la fiche figure dans l'annuaire. Pour une adresse dont la fiche n'y figure pas, elle écrit « Fiche masquée de l’annuaire » (une fiche existe pour cette adresse, mais elle n'apparaît pas, quelle qu'en soit la raison) ; si aucune fiche ne porte l'adresse, « Adresse sans fiche dans l’annuaire ». L'annuaire ne dévoile pas le nom d'une personne qu'il n'affiche pas.
 
 ### Enregistrer
 
@@ -560,11 +625,23 @@ Le bandeau ne signale pas « aucun résultat pour ma recherche » : c'est le rô
 
 **Puis-je modifier mes informations ?**
 
-Oui, vos informations personnelles : votre nom, votre fonction, votre téléphone, votre rôle et vos listes (instances, actions, GT, compétences, communautés, tâches). Cliquez sur **✎ Modifier** sur votre carte, ou sur **Modifier mon profil** dans le bandeau : vous relisez votre carte avant et après, puis vous validez, et c'est enregistré tout de suite ([Modifier ma fiche](#modifier-ma-fiche)). Décider d'apparaître ou non se fait avec l'interrupteur de [Ma présence](#ma-présence--apparaître-ou-non). L'adresse e-mail et l'établissement sont modifiés par un administrateur (depuis l'annuaire, avec le mode admin, ou dans Grist) ; le périmètre ne se change que dans Grist, par l'administrateur des données. Aucun administrateur ne valide vos modifications et l'annuaire n'en garde aucun historique.
+Oui, vos informations personnelles : votre nom, votre fonction, votre téléphone, votre rôle, vos listes (instances, actions, GT, compétences, communautés, tâches) et votre photo de profil. Cliquez sur **✎ Modifier** sur votre carte, ou sur **Modifier mon profil** dans le bandeau : vous relisez votre carte avant et après, puis vous validez, et c'est enregistré tout de suite ([Modifier ma fiche](#modifier-ma-fiche)). Décider d'apparaître ou non se fait avec l'interrupteur de [Ma présence](#ma-présence--apparaître-ou-non). L'adresse e-mail et l'établissement sont modifiés par un administrateur (depuis l'annuaire, avec le mode admin, ou dans Grist) ; le périmètre ne se change que dans Grist, par l'administrateur des données. Aucun administrateur ne valide vos modifications et l'annuaire n'en garde aucun historique.
 
 **Pourquoi n'ai-je pas de bouton Modifier ?**
 
 Le bouton **✎ Modifier** d'une carte n'apparaît que sur les cartes que vous avez le droit de modifier : la vôtre, ou toutes les cartes affichées si vous êtes administrateur et que vous avez allumé le **mode admin** (le bouton se lit alors « ✎ Modifier la fiche » sur les cartes des autres). Le bouton **✎ Modifier** sous le logo d'un établissement, lui, n'est proposé qu'aux responsables de cet établissement ([La fiche de mon établissement](#la-fiche-de-mon-établissement)). Vous n'avez donc aucun bouton quand l'annuaire ne peut pas vous reconnaître : vous n'êtes pas connecté à Grist, votre compte ne peut que consulter le document (rôle Lecteur) ou l'annuaire n'a pas été réglé pour cela. Si l'adresse de votre compte ne figure sur aucune fiche, vous n'avez pas de bouton de fiche personnelle (un responsable garde ceux de son établissement). Si plusieurs fiches portent votre adresse, le bandeau ne propose pas **Modifier mon profil**, mais chaque carte garde son bouton. Si votre carte n'apparaît pas dans l'annuaire, le bouton du bandeau reste le seul moyen d'ouvrir votre fiche. Voir [Où cliquer](#où-cliquer) et [Pas de bandeau ?](#ma-présence--apparaître-ou-non).
+
+**Comment ajouter ma photo ?**
+
+Ouvrez votre fiche (**✎ Modifier** sur votre carte, ou **Modifier mon profil** dans le bandeau), puis, dans la carte **Photo de profil**, cliquez sur **Ajouter une photo** et choisissez un fichier JPG, PNG ou WebP de 2 Mo au plus. Relisez, puis validez : la photo remplace vos initiales sur votre carte ([Ma photo de profil](#ma-photo-de-profil)).
+
+**Pourquoi n'ai-je pas de carte « Photo de profil », ou ma photo ne s'affiche-t-elle pas ?**
+
+Sans carte « Photo de profil » dans votre formulaire, le document Grist n'a pas la colonne `Avatar` : prévenez l'administrateur des données ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 6). Si la photo est enregistrée mais que votre carte montre toujours vos initiales, c'est que le fichier n'a pas pu être lu (supprimé, abîmé) ou que Grist ne donne pas à l'annuaire l'accès aux pièces jointes (alors aucun logo ne s'affiche non plus) ; rechargez la page, puis prévenez l'administrateur des données.
+
+**Ma photo est-elle visible de tous ? Puis-je la faire effacer ?**
+
+Elle est visible comme le reste de votre carte : par toute personne qui ouvre l'annuaire, tant que votre fiche apparaît. Dans le document Grist, c'est une pièce jointe que peut télécharger toute personne qui y a accès. **Retirer la photo** l'enlève de votre carte, mais **ne supprime pas le fichier** : pour qu'il soit effacé, demandez-le à l'administrateur des données ([sécurité](securite.md#données-personnelles)).
 
 **Qui peut modifier la fiche de mon établissement ?**
 
@@ -580,7 +657,7 @@ Les administrateurs, oui : avec le mode admin allumé, ils peuvent modifier les 
 
 **D'où viennent les informations ?**
 
-D'un document Grist, qui sert de base de données à l'annuaire, logos compris : ce sont des fichiers joints à ce document, que votre navigateur télécharge chez Grist avec une autorisation de lecture qui expire en quelques minutes ([sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes)). L'annuaire n'enregistre rien dans votre navigateur, hormis ce que celui-ci garde de lui-même des images affichées. Dans le document Grist, il n'écrit que dans quatre cas : à l'ouverture (et de nouveau après un changement de responsables), une ligne de service qui sert à vous reconnaître (ajoutée puis supprimée aussitôt) ; votre choix d'apparaître ou non, quand vous cliquez sur l'interrupteur ; une fiche, quand vous cliquez sur « Valider » après une relecture : la vôtre, ou celle d'une autre personne si vous êtes administrateur et avez allumé le mode admin ; la fiche de votre établissement, si vous en êtes responsable et que vous cliquez sur « Enregistrer » (avec, pour un nouveau logo, un fichier envoyé à Grist, qui devient une pièce jointe du document).
+D'un document Grist, qui sert de base de données à l'annuaire, logos et photos de profil compris : ce sont des fichiers joints à ce document, que votre navigateur télécharge chez Grist avec une autorisation de lecture qui expire en quelques minutes ([sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes)). L'annuaire n'enregistre rien dans votre navigateur, hormis ce que celui-ci garde de lui-même des images affichées. Dans le document Grist, il n'écrit que dans quatre cas : à l'ouverture (et de nouveau après un changement de responsables), une ligne de service qui sert à vous reconnaître (ajoutée puis supprimée aussitôt) ; votre choix d'apparaître ou non, quand vous cliquez sur l'interrupteur ; une fiche, quand vous cliquez sur « Valider » après une relecture : la vôtre, ou celle d'une autre personne si vous êtes administrateur et avez allumé le mode admin (avec, pour une nouvelle photo, un fichier envoyé à Grist, qui devient une pièce jointe du document) ; la fiche de votre établissement, si vous en êtes responsable et que vous cliquez sur « Enregistrer » (avec, pour un nouveau logo, un fichier envoyé à Grist, qui devient une pièce jointe du document).
 
 **J'ai changé une information dans Grist et je ne la vois pas.**
 
@@ -604,7 +681,7 @@ Oui : l'annuaire s'adapte à la largeur de la zone que Grist lui donne. Sur un p
 
 **Puis-je utiliser l'annuaire au clavier, ou avec un lecteur d'écran ?**
 
-Oui, en grande partie. La touche **Tab** passe d'un contrôle au suivant (l'interrupteur de « Ma présence », la recherche, les boutons de filtre, Fondateurs et Partenaires, Réinitialiser, puis les étiquettes et les boutons de chaque carte) et **Maj+Tab** revient en arrière ; **Entrée** ou **Espace** active le contrôle, y compris le bouton d'un filtre, qui ouvre ou referme son menu. Un **anneau violet** entoure le contrôle sur lequel on se trouve. Le champ de recherche est annoncé « Rechercher par nom ou prénom ». L'interrupteur de « Ma présence » garde le focus pendant et après l'enregistrement et le résultat est annoncé ; il reste lisible en mode contraste élevé et sans animation si votre système demande de les réduire. Le texte des cartes fait 12 px au moins et les étiquettes 24 px de haut, pour se lire et se viser plus facilement à la souris. Ces points sont vérifiés par des tests automatiques dans un navigateur de bureau, pas encore avec un lecteur d'écran réel. Deux limites connues : la touche Échap ne referme pas encore un menu de filtre (cliquez ailleurs, ou appuyez de nouveau sur son bouton), et un lecteur d'écran relit toute la liste des cartes à chaque changement de recherche. Signalez à l'administrateur des données ce qui vous gênerait.
+Oui, en grande partie. La touche **Tab** passe d'un contrôle au suivant (l'interrupteur de « Ma présence », la recherche, les boutons de filtre, Fondateurs et Partenaires, Réinitialiser, puis, pour chaque carte, la photo quand il y en a une, les étiquettes et les boutons) et **Maj+Tab** revient en arrière ; **Entrée** ou **Espace** active le contrôle, y compris le bouton d'un filtre, qui ouvre ou referme son menu. Un **anneau violet** entoure le contrôle sur lequel on se trouve. Le champ de recherche est annoncé « Rechercher par nom ou prénom ». L'interrupteur de « Ma présence » garde le focus pendant et après l'enregistrement et le résultat est annoncé ; il reste lisible en mode contraste élevé et sans animation si votre système demande de les réduire. Le texte des cartes fait 12 px au moins et les étiquettes 24 px de haut, pour se lire et se viser plus facilement à la souris. Ces points sont vérifiés par des tests automatiques dans un navigateur de bureau, pas encore avec un lecteur d'écran réel. Deux limites connues : la touche Échap ne referme pas encore un menu de filtre (cliquez ailleurs, ou appuyez de nouveau sur son bouton), et un lecteur d'écran relit toute la liste des cartes à chaque changement de recherche. Signalez à l'administrateur des données ce qui vous gênerait.
 
 **Mes coordonnées sont-elles visibles par tout le monde ?**
 

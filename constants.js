@@ -38,15 +38,20 @@ export const ETABLISSEMENT_COLUMNS = { name: 'nom_complet', visible: 'ok_pour_ap
 export const ACL_TABLE = 'ACL';
 export const ACL_COLUMNS = { email: 'email', etablissement: 'Responsable_de_l_Etablissement', admin: 'admin' };
 
-// Les images que le widget envoie à Grist (le logo d'un établissement, depuis 1.17.0). Le fichier
-// choisi n'est jamais envoyé tel quel : le navigateur le décode puis le redessine (image-prep.js),
-// ce qui écarte tout contenu actif (un SVG qui porte un script) et les métadonnées de l'image.
+// Les images que le widget envoie à Grist (le logo d'un établissement depuis 1.17.0, la photo de
+// profil d'une personne depuis 1.19.0). Le fichier choisi n'est jamais envoyé tel quel : le navigateur
+// le décode puis le redessine (image-prep.js), ce qui écarte tout contenu actif (un SVG qui porte un
+// script) et les métadonnées de l'image (position GPS d'une photo comprise).
 //   types      les formats acceptés
 //   maxBytes   la taille du fichier choisi, avant qu'il soit redessiné
-//   maxSide    le plus grand côté de l'image envoyée, en pixels (un logo plus petit n'est pas agrandi,
-//              sauf un SVG, qui se dessine à cette taille)
+//   maxSide    le plus grand côté de l'image envoyée, en pixels (une image plus petite n'est pas
+//              agrandie, sauf un SVG, qui se dessine à cette taille)
+//   square     recadrer au centre en carré (la photo d'une personne), sinon garder les proportions
+//   output     le format de l'image envoyée, et `name` le nom du fichier
+//   quality    la qualité du JPEG (0 à 1), seulement pour 'image/jpeg'
 export const IMAGE_RULES = {
-  logo: { types: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'], maxBytes: 1024 * 1024, maxSide: 480 }
+  logo: { types: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'], maxBytes: 1024 * 1024, maxSide: 480, output: 'image/png', name: 'logo.png' },
+  avatar: { types: ['image/jpeg', 'image/png', 'image/webp'], maxBytes: 2 * 1024 * 1024, maxSide: 256, square: true, output: 'image/jpeg', quality: 0.85, name: 'photo-de-profil.jpg' }
 };
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
@@ -181,10 +186,13 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 // elle n'en a pas encore, et sans lui la fiche ne pourrait jamais s'afficher.
 //   key       colonne de BDD
 //   kind      'text', 'email' (une adresse), 'phone' (numéro français), 'reference'
-//             (une valeur d'une table de référence) ou 'list' (plusieurs)
+//             (une valeur d'une table de référence), 'list' (plusieurs) ou 'image' (la photo de
+//             profil : une pièce jointe, envoyée à Grist par upload.js)
 //   category  catégorie de CATEGORIES dont viennent les valeurs proposées
 //   admin     réservé à un administrateur sur la fiche d'une autre personne
 //   atCreation  proposé aussi à la personne qui crée sa fiche
+//   afterCreation  proposé seulement une fois la fiche créée (la photo : on l'ajoute ensuite, depuis
+//             « Modifier mon profil »)
 //   optional  une adresse facultative (`email_affiche`) : on peut la vider, et plusieurs fiches
 //             peuvent la porter, contrairement à `email`
 //   labelsFrom  la table de libellés à proposer, quand ce n'est pas celle de la catégorie
@@ -192,6 +200,7 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 const LIST_FIELD_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches'];
 
 export const PROFILE_FIELDS = [
+  { key: 'Avatar', label: 'Photo de profil', kind: 'image', afterCreation: true },
   { key: 'prenom', label: 'Prénom', kind: 'text' },
   { key: 'nom', label: 'Nom', kind: 'text' },
   { key: 'email', label: 'E-mail', kind: 'email', admin: true },
@@ -209,4 +218,5 @@ export const PROFILE_FIELDS = [
 // fermé par défaut), ou seulement l'établissement quand la personne crée sa propre fiche
 // (`creating` vaut exactement true ; son e-mail est celui de son compte, il ne se saisit pas).
 export const fieldsFor = (admin, creating = false) =>
-  PROFILE_FIELDS.filter(field => admin === true || !field.admin || (creating === true && field.atCreation === true));
+  PROFILE_FIELDS.filter(field => (admin === true || !field.admin || (creating === true && field.atCreation === true))
+    && !(creating === true && field.afterCreation === true));

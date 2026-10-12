@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { diffContacts, hasMarks, previewOf } from '../preview.js';
+import { diffContacts, hasMarks, previewOf, withAvatarChange } from '../preview.js';
 import { TAG_GROUPS } from '../constants.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
@@ -179,4 +179,43 @@ test('previewOf shows the card after with the new address and the flags of the n
     etab: { before: 'UBM', after: 'CHU' },
     email: { before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@chu-bordeaux.fr' }
   });
+});
+
+// ===== La photo de profil sur la carte « après » =====
+
+test('hasMarks counts a change of photo, which marks neither a text nor a tag', () => {
+  assert.equal(hasMarks({ texts: {}, tags: {}, avatar: { before: 0, after: 'replace' } }), true);
+  assert.equal(hasMarks({ texts: {}, tags: {}, avatar: { before: 501, after: 'remove' } }), true);
+  assert.equal(hasMarks({ texts: {}, tags: {} }), false);
+});
+
+test('withAvatarChange shows a new photo on the card after by its local address, and marks it', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  const preview = previewOf({ ...row(1), Avatar: ['L', 501] }, { Fonction: 'Cheffe' }, referenceMaps, etabFlags);
+  const { before, after, marks } = withAvatarChange(preview, { action: 'replace', avant: 501 }, { url: 'blob:http://widget/1', blob: new Blob(['x']) });
+  assert.equal(after.avatarUrl, 'blob:http://widget/1');
+  assert.equal(after.Fonction, 'Cheffe', 'le reste de la carte « après » est conservé');
+  assert.equal(before.avatarUrl, undefined, 'la carte « avant » montre la photo de Grist, pas une image locale');
+  assert.deepEqual(marks.avatar, { before: 501, after: 'replace' });
+  assert.deepEqual(marks.texts, { fonction: { before: 'Pharmacienne', after: 'Cheffe' } }, 'les marques des autres champs restent');
+  assert.equal(hasMarks(marks), true);
+});
+
+test('withAvatarChange removes the photo from the card after: only the initials are left', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  const preview = previewOf({ ...row(1), Avatar: ['L', 501] }, {}, referenceMaps, etabFlags);
+  assert.deepEqual(preview.after.Avatar, ['L', 501]);
+  const { after, marks } = withAvatarChange(preview, { action: 'remove', avant: 501 }, 0);
+  assert.deepEqual(after.Avatar, ['L']);
+  assert.equal(after.avatarUrl, undefined);
+  assert.deepEqual(marks, { texts: {}, tags: {}, avatar: { before: 501, after: 'remove' } });
+});
+
+test('withAvatarChange never takes an address that the page did not make itself, and never changes what it is given', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  const preview = previewOf(row(1), {}, referenceMaps, etabFlags);
+  const snapshot = structuredClone(preview);
+  assert.equal(withAvatarChange(preview, { action: 'replace', avant: 0 }, undefined).after.avatarUrl, '', 'sans image : pas d\'adresse');
+  assert.equal(withAvatarChange(preview, { action: 'replace', avant: 0 }, { url: 42 }).after.avatarUrl, '42', 'toujours une chaîne');
+  assert.deepEqual(preview, snapshot);
 });

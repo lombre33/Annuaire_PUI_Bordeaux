@@ -1,4 +1,4 @@
-# Version 1.18.0 — « Créer ma fiche » et e-mail affiché (voir CHANGELOG.md)
+# Version 1.19.0 — Photo de profil (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -30,4 +30,8 @@ Depuis la 1.18.0, une personne que Grist reconnaît mais qui n'a pas de ligne da
 (bouton « Créer ma fiche » : une ligne ajoutée à `BDD`, jamais une table ; elle choisit son établissement, son e-mail
 est celui de son compte) et choisir une adresse e-mail à afficher sur sa carte à la place de celle de son compte
 (colonne facultative `email_affiche`, vidée elle revient à l'adresse du compte).
-808 tests (dont 285 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.19.0, une personne ajoute, change ou retire sa **photo de profil** (colonne `Avatar` de `BDD`, facultative,
+étape 6 de `GRIST_SETUP.md`) : elle remplace les initiales sur la carte, s'agrandit au clic, passe par la relecture avant et après,
+et le widget l'envoie lui-même à Grist, redessinée en carré de 256 px (JPEG, sans métadonnées ; envoi et règles d'accès non
+essayés dans un vrai Grist).
+899 tests (dont 322 dans un vrai navigateur, optionnels sans Playwright).

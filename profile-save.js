@@ -11,19 +11,22 @@
 //     la personne relit d'abord ce qui s'y trouve (signatureOf) ;
 //   - l'écriture est une seule action Grist, donc atomique.
 
+import { avatarIdOf } from './attachments.js';
 import { MAIN_TABLE, PROFILE_FIELDS } from './constants.js';
 import { describeVisibility, formatPhone, normalizeEmail, safeValues, tableToRows, text } from './grist-data.js';
 import { classifyWriteError } from './presence.js';
 import { describeChanges, diffProfile, rebaseChanges } from './profile.js';
-import { previewOf } from './preview.js';
+import { previewOf, withAvatarChange } from './preview.js';
 import { readColumnTypes } from './schema.js';
 
 // Erreur dont le message est une phrase française destinée à la personne ; l'erreur
 // d'origine reste dans `cause` et dans la console.
+// `leftover` : l'identifiant d'une photo déjà envoyée à Grist que l'écriture n'a pas utilisée.
 export class ProfileSaveError extends Error {
-  constructor(message, cause) {
+  constructor(message, cause, { leftover = null } = {}) {
     super(message, { cause });
     this.name = 'ProfileSaveError';
+    this.leftover = leftover;
   }
 }
 
@@ -45,6 +48,12 @@ export function buildRowUpdate(champs, row, columnTypes = {}) {
     const change = champs[field.key];
     if (!change) continue;
     if (!(field.key in row)) return { error: `${field.label} : la colonne ${field.key} n'existe pas dans ${MAIN_TABLE}` };
+    if (field.kind === 'image') {
+      // La photo s'écrit après son envoi à Grist (saveProfile) : son identifiant n'existe pas encore.
+      const type = columnTypes[field.key];
+      if (type && type !== 'Attachments') return { error: `${field.label} : la colonne ${field.key} n'est pas une colonne de pièces jointes` };
+      continue;
+    }
     if (field.kind === 'text' || field.kind === 'email') {
       values[field.key] = change.apres;
     } else if (field.kind === 'phone') {
@@ -84,8 +93,12 @@ const FAILURES = {
   denied: 'Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche. Contactez un administrateur.',
   emailTaken: 'Cette adresse e-mail est maintenant celle d\'une autre fiche : rien n\'a été modifié. Revenez à la fiche et choisissez-en une autre.',
   formula: 'Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md.',
-  other: 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.'
+  other: 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
+  noFile: 'La photo choisie n\'est plus disponible : choisissez-la de nouveau.'
 };
+
+// Le conseil donné à qui n'a pas pu envoyer sa photo à Grist (upload.js).
+export const PHOTO_UPLOAD_HINT = 'Contactez un administrateur si le problème persiste.';
 
 // Les lignes de BDD telles qu'elles sont maintenant dans Grist, et celle dont l'identifiant
 // est `rowId` : { row, rows }. Lève une ProfileSaveError.
@@ -141,11 +154,13 @@ export async function prepareReview(docApi, row, draft, { referenceMaps, etabFla
   const columnTypes = await readColumnTypes(docApi, MAIN_TABLE, { log });
   const built = buildRowUpdate(rebased, fresh, columnTypes);
   if (built.error) throw new ProfileSaveError(`Ces modifications ne peuvent pas être enregistrées : ${built.error}.`);
-  const { before, after, marks } = previewOf(fresh, built.values, referenceMaps, etabFlags);
+  const preview = previewOf(fresh, built.values, referenceMaps, etabFlags);
+  const { before, after, marks } = rebased.Avatar ? withAvatarChange(preview, rebased.Avatar, draft.Avatar) : preview;
   return {
     rowId: row.id,
     admin,
     champs: rebased,
+    file: rebased.Avatar?.action === 'replace' ? draft.Avatar : null,
     lines: describeChanges(rebased),
     signature: signatureOf(fresh, Object.keys(rebased)),
     columnTypes,
@@ -160,37 +175,80 @@ export async function prepareReview(docApi, row, draft, { referenceMaps, etabFla
 }
 
 // Après l'écriture : les champs de la relecture que la fiche `saved` (relue dans Grist)
-// n'a pas gardés, par leur libellé. Vide quand Grist a tout retenu.
-export function unsavedLabels(review, saved, referenceMaps) {
+// n'a pas gardés, par leur libellé. Vide quand Grist a tout retenu. `attachmentId` : la photo
+// que saveProfile() vient d'envoyer, si elle était remplacée.
+export function unsavedLabels(review, saved, referenceMaps, { attachmentId = null } = {}) {
+  const { Avatar: photo, ...others } = review.champs;
   const who = { admin: review.admin === true, creating: review.creating === true };
-  return describeChanges(rebaseChanges(review.champs, saved, referenceMaps, who).champs).map(line => line.label);
+  const labels = describeChanges(rebaseChanges(others, saved, referenceMaps, who).champs).map(line => line.label);
+  if (photo) {
+    const now = avatarIdOf(saved.Avatar);
+    const kept = photo.action === 'replace' ? attachmentId !== null && now === attachmentId : now === 0;
+    if (!kept) labels.unshift(PROFILE_FIELDS.find(field => field.key === 'Avatar').label);
+  }
+  return labels;
 }
 
-// Écrit les changements d'une relecture (prepareReview). Renvoie { status: 'saved',
-// values } ou { status: 'changed', row } : la fiche a changé dans Grist depuis la
+// Écrit les changements d'une relecture (prepareReview). Renvoie { status: 'saved', values,
+// attachmentId } ou { status: 'changed', row, leftover } : la fiche a changé dans Grist depuis la
 // relecture, rien n'a été écrit et `row` est son état actuel. Lève une ProfileSaveError.
-export async function saveProfile(docApi, review, { log = console } = {}) {
+// `upload(file)` envoie la nouvelle photo à Grist et renvoie l'identifiant de la pièce jointe
+// (upload.js) ; il n'est appelé que si la photo est remplacée, et APRÈS les vérifications. Une photo
+// envoyée mais pas utilisée (la fiche a changé, ou l'écriture est refusée) reste dans les pièces
+// jointes du document : `leftover` en donne l'identifiant.
+export async function saveProfile(docApi, review, { upload, log = console } = {}) {
   const keys = Object.keys(review.champs);
   if (keys.length === 0) throw new ProfileSaveError('Aucun changement à enregistrer.');
   // Fermé par défaut : l'e-mail et l'établissement ne s'écrivent que pour un administrateur.
   if (review.admin !== true && PROFILE_FIELDS.some(field => field.admin && keys.includes(field.key))) {
     throw new ProfileSaveError('Ces modifications ne peuvent pas être enregistrées : l\'e-mail et l\'établissement sont réservés à un administrateur.');
   }
-  const { row, rows } = await readFiche(docApi, review.rowId, log);
-  if (signatureOf(row, keys) !== review.signature) return { status: 'changed', row };
-  if (review.champs.email && emailTakenBy(rows, review.rowId)(review.champs.email.apres)) {
-    throw new ProfileSaveError(FAILURES.emailTaken);
+  const replacing = review.champs.Avatar?.action === 'replace';
+  if (replacing && (!review.file || typeof upload !== 'function')) throw new ProfileSaveError(FAILURES.noFile);
+
+  // La fiche telle qu'elle est maintenant : { row } si elle est comme à la relecture, { changed: row }
+  // si quelqu'un l'a modifiée depuis. Lève une ProfileSaveError (adresse prise entre-temps).
+  const inspect = async () => {
+    const { row, rows } = await readFiche(docApi, review.rowId, log);
+    if (signatureOf(row, keys) !== review.signature) return { changed: row };
+    if (review.champs.email && emailTakenBy(rows, review.rowId)(review.champs.email.apres)) throw new ProfileSaveError(FAILURES.emailTaken);
+    return { row };
+  };
+
+  let current = await inspect();
+  if (current.changed) return { status: 'changed', row: current.changed };
+
+  let attachmentId = null;
+  if (replacing) {
+    try {
+      attachmentId = await upload(review.file);
+    } catch (error) {
+      if (error?.name === 'UploadError') throw new ProfileSaveError(error.message, error);
+      log.error('[PROFIL] envoi de la photo impossible :', error);
+      throw new ProfileSaveError(FAILURES.other, error);
+    }
+    // L'envoi prend du temps : la fiche a pu bouger, on relit avant d'écrire.
+    try {
+      current = await inspect();
+    } catch (error) {
+      if (error instanceof ProfileSaveError) error.leftover = attachmentId;
+      throw error;
+    }
+    if (current.changed) return { status: 'changed', row: current.changed, leftover: attachmentId };
   }
 
-  const built = buildRowUpdate(review.champs, row, review.columnTypes);
-  if (built.error) throw new ProfileSaveError(`Ces modifications ne peuvent pas être enregistrées : ${built.error}.`);
+  const built = buildRowUpdate(review.champs, current.row, review.columnTypes);
+  if (built.error) throw new ProfileSaveError(`Ces modifications ne peuvent pas être enregistrées : ${built.error}.`, null, { leftover: attachmentId });
+  const values = { ...built.values };
+  if (replacing) values.Avatar = ['L', attachmentId];
+  else if (review.champs.Avatar) values.Avatar = ['L'];
   try {
-    await docApi.applyUserActions([['UpdateRecord', MAIN_TABLE, review.rowId, built.values]]);
+    await docApi.applyUserActions([['UpdateRecord', MAIN_TABLE, review.rowId, values]]);
   } catch (error) {
     log.error('[PROFIL] écriture impossible :', error);
-    throw new ProfileSaveError(FAILURES[classifyWriteError(error)], error);
+    throw new ProfileSaveError(FAILURES[classifyWriteError(error)], error, { leftover: attachmentId });
   }
-  return { status: 'saved', values: built.values };
+  return { status: 'saved', values, attachmentId };
 }
 
 // ===== Créer la fiche de la personne connectée =====

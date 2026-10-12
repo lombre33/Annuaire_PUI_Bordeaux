@@ -7,6 +7,7 @@
 // Ainsi une valeur que le formulaire ne montre pas (une ligne de référence sans
 // libellé) n'est jamais perdue, et ce qu'un autre a changé entre-temps non plus.
 
+import { avatarIdOf } from './attachments.js';
 import { CATEGORIES, PROFILE_FIELDS, fieldsFor } from './constants.js';
 import { compareLabels, formatPhone, normalizeEmail, refId, safeValues, text } from './grist-data.js';
 
@@ -30,6 +31,11 @@ const EMAIL_SHAPE = /^[^\s@,;:<>()"\\?#&%]+@[^\s@,;:<>()"\\?#&%]+\.[^\s@,;:<>()"
 
 // Vrai si `value` (déjà nettoyé, en minuscules) a la forme d'une adresse e-mail simple.
 export const isEmailAddress = value => EMAIL_SHAPE.test(value);
+
+// Vrai pour une photo que le formulaire vient de préparer (image-prep.js) : { blob, name, ... } avec un
+// fichier non vide. Le brouillon d'une photo vaut cet objet (nouvelle photo), 0 (la retirer) ou
+// l'identifiant de la photo actuelle (rien ne change).
+const isPreparedImage = value => Boolean(value) && typeof value === 'object' && Number.isFinite(value.blob?.size) && value.blob.size > 0;
 
 // ===== Qui peut modifier quelle fiche =====
 
@@ -118,11 +124,12 @@ export function frenchPhoneDigits(input) {
 const BLANK_CELL = { text: '', email: '', phone: '', reference: 0 };
 
 // La fiche vide d'une personne qui n'en a pas : une cellule vide, de la forme qu'elle a dans Grist,
-// pour chaque colonne de BDD (`columns`) que le formulaire sait remplir, et l'adresse de son compte
-// (`email`). Le formulaire et la comparaison la traitent comme n'importe quelle fiche.
+// pour chaque colonne de BDD (`columns`) que le formulaire sait remplir à la création (pas la photo :
+// elle s'ajoute ensuite), et l'adresse de son compte (`email`). Le formulaire et la comparaison la
+// traitent comme n'importe quelle fiche.
 export function blankFiche(columns, email = '') {
   const row = { id: 0 };
-  PROFILE_FIELDS.filter(field => columns.includes(field.key)).forEach(field => {
+  PROFILE_FIELDS.filter(field => columns.includes(field.key) && field.afterCreation !== true).forEach(field => {
     row[field.key] = field.kind === 'list' ? ['L'] : BLANK_CELL[field.kind];
   });
   return { ...row, email };
@@ -178,6 +185,7 @@ export function profileFormModel(row, referenceMaps, { admin = false, creating =
       ...(field.optional && { optional: true })
     };
     if (field.kind === 'text' || field.kind === 'email') return { ...base, value: text(row[field.key]) };
+    if (field.kind === 'image') return { ...base, value: avatarIdOf(row[field.key]) };
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
     const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps);
     if (field.kind === 'reference') return { ...base, options, value: refId(row[field.key]) || 0 };
@@ -203,7 +211,8 @@ function sameSet(a, b) {
 // Compare le brouillon de la personne à sa fiche. `draft` : { colonne → valeur } ;
 // une colonne absente n'est pas touchée. Un texte et un numéro sont des chaînes,
 // une référence est un identifiant entier (0 : aucune), une liste un tableau
-// d'identifiants entiers ; tout autre type est refusé. Renvoie { champs, errors,
+// d'identifiants entiers, une photo l'identifiant actuel (rien ne change), 0 (la retirer)
+// ou l'image préparée par image-prep.js (la remplacer) ; tout autre type est refusé. Renvoie { champs, errors,
 // fieldErrors } : `champs` ne contient que ce qui change (voir rebaseChanges et
 // buildRowUpdate pour son usage) ; `errors` dit pourquoi le brouillon est refusé (une
 // phrase par défaut), `fieldErrors` la même chose champ par champ (colonne → message),
@@ -227,6 +236,17 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, creating
   fields.forEach(field => {
     if (!(field.key in draft) || !(field.key in row)) return;
     const input = draft[field.key];
+
+    // La photo : l'identifiant actuel (ou 0 sans photo) ne change rien ; 0 la retire ; un objet
+    // préparé par image-prep.js la remplace (le fichier part à l'enregistrement, voir profile-save.js).
+    if (field.kind === 'image') {
+      const before = avatarIdOf(row[field.key]);
+      if (input === before || (input === 0 && before === 0)) return;
+      if (input === 0) champs[field.key] = { action: 'remove', avant: before };
+      else if (isPreparedImage(input)) champs[field.key] = { action: 'replace', avant: before };
+      else fail(field, 'Valeur illisible.');
+      return;
+    }
 
     if (field.kind === 'email') {
       const before = text(row[field.key]);
@@ -332,6 +352,16 @@ export function rebaseChanges(champs, row, referenceMaps, { admin = false, creat
   fieldsFor(admin, creating).filter(field => champs[field.key]).forEach(field => {
     const change = champs[field.key];
 
+    // La photo : retirer une photo déjà absente ne change rien ; sinon l'action reste, calculée à
+    // partir de la photo actuelle. Une photo changée dans Grist depuis l'ouverture est signalée.
+    if (field.kind === 'image') {
+      const current = avatarIdOf(row[field.key]);
+      if (change.action === 'remove' && current === 0) return;
+      if (current !== change.avant) moved.push(field.label);
+      rebased[field.key] = { action: change.action, avant: current };
+      return;
+    }
+
     if (field.kind === 'text' || field.kind === 'email') {
       const current = text(row[field.key]);
       if (current === change.apres) return;
@@ -368,12 +398,15 @@ export function rebaseChanges(champs, row, referenceMaps, { admin = false, creat
 // Une ligne par champ modifié : le champ, ce qu'il valait, ce qu'il vaudra. `champs` a
 // la forme de diffProfile(), dans l'ordre du formulaire.
 //   texte, téléphone, référence   { key, label, kind, before, after }
+//   photo                         { key, label, kind: 'image', before, after } : `before`, l'identifiant de
+//                                 la photo actuelle (0 : aucune) ; `after`, 'replace' ou 'remove'
 //   liste                         { key, label, kind, added, removed } (des libellés)
 export function describeChanges(champs) {
   const label = entry => entry.label || `n° ${entry.id}`;
   return PROFILE_FIELDS.filter(field => champs[field.key]).map(field => {
     const change = champs[field.key];
     const base = { key: field.key, label: field.label, kind: field.kind };
+    if (field.kind === 'image') return { ...base, before: change.avant, after: change.action };
     if (field.kind === 'list') return { ...base, added: change.ajout.map(label), removed: change.retrait.map(label) };
     if (field.kind === 'reference') return { ...base, before: change.avant.label, after: change.apres.label };
     if (field.kind === 'phone') return { ...base, before: formatPhone(change.avant), after: formatPhone(change.apres) };

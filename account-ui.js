@@ -4,6 +4,7 @@
 // le « mode admin ». DOM seulement ; presence.js décrit la situation et décide du message.
 
 import { PRESENCE_ANNOUNCE_MS } from './constants.js';
+import { fillAvatar } from './avatar-ui.js';
 
 const noop = () => {};
 
@@ -11,8 +12,9 @@ const noop = () => {};
 // personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
 // par le bouton « Modifier mon profil », `onCreate` par « Créer ma fiche » (un compte qui n'a pas
 // de fiche). `onEtab` : appelé par le bouton « Mon établissement ».
-// `onAdminMode` : appelé par le bouton « Mode admin ».
-export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noop, onEtab = noop, onAdminMode = noop }) {
+// `onAdminMode` : appelé par le bouton « Mode admin ». `attachments` (attachments.js) : de quoi
+// montrer la photo de profil de la personne à la place de ses initiales.
+export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noop, onEtab = noop, onAdminMode = noop, attachments = null }) {
   const part = selector => root.querySelector(selector);
   const avatar = part('.account-avatar');
   const name = part('.account-name');
@@ -24,6 +26,16 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
   const adminButton = part('.account-admin');
   const actions = part('.account-actions');
   const status = part('.account-status');
+
+  // L'avatar n'est refait que si les initiales ou la photo changent : la rafraîchir à chaque lecture
+  // de Grist la ferait clignoter, et une photo qui ne se charge pas serait redemandée à chaque fois.
+  let shownAvatar = '';
+  function paintAvatar({ initials, photo = 0 }) {
+    const key = `${initials}|${photo}`;
+    if (key === shownAvatar) return;
+    shownAvatar = key;
+    fillAvatar(avatar, { initials, photo, attachments });
+  }
 
   // Dans l'en-tête compact, l'interrupteur et « Modifier mon profil » occupent la deuxième
   // rangée ; « Mode admin », sinon « Mon établissement », prend le coin de la première, à droite du
@@ -62,10 +74,11 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
   adminButton.addEventListener('click', () => onAdminMode());
 
   return {
-    // `view` : { name, initials, accepted, tone, message } (voir describePresence) et,
-    // pour un compte qui n'a pas de fiche, `switchable: false` (pas d'interrupteur à montrer).
+    // `view` : { name, initials, photo, accepted, tone, message } (voir describePresence ; `photo` :
+    // l'identifiant de la photo de profil dans Grist, 0 sans photo) et, pour un compte qui n'a pas de
+    // fiche, `switchable: false` (pas d'interrupteur à montrer).
     show(view) {
-      avatar.textContent = view.initials;
+      paintAvatar(view);
       name.textContent = view.name;
       detail.textContent = view.message;
       detail.dataset.tone = view.tone;

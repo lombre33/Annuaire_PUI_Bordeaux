@@ -6,7 +6,8 @@ import {
 import { profileFormModel, draftOf, blankFiche } from '../profile.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
-import { sampleTables, withIdentity, withSchema, withShownEmail, ANA_EMAIL, NEW_EMAIL } from './fixtures.mjs';
+import { UploadError } from '../upload.js';
+import { sampleTables, withAvatars, withIdentity, withSchema, withShownEmail, ANA_EMAIL, NEW_EMAIL } from './fixtures.mjs';
 
 // ===== profile-save : relire, vérifier, écrire une fiche modifiée =====
 
@@ -530,6 +531,288 @@ test('unsavedLabels notices an e-mail or an établissement that Grist did not ke
   const saved = tableToRows(w.tables.BDD).find(candidate => candidate.id === 2);
   assert.deepEqual(unsavedLabels(next, saved, w.referenceMaps), []);
   assert.deepEqual(unsavedLabels(next, { ...saved, Etablissement: 4 }, w.referenceMaps), ['Établissement']);
+});
+
+// ===== La photo de profil (colonne Avatar de BDD, pièce jointe) =====
+
+// Ana a la photo 501, Bob la 502, Hostile le fichier 998 ; Dan (4), Hugo (10) et les autres n'en ont pas.
+const avatarWorld = (options = {}) => world({ tables: withSchema(withIdentity(withAvatars())), ...options });
+
+// Une photo que le formulaire vient de préparer (image-prep.js), telle que le brouillon la porte.
+const photo = () => ({ blob: new Blob(['jpeg']), name: 'photo-de-profil.jpg', width: 256, height: 256, url: 'blob:http://widget/photo-1' });
+
+// L'envoi simulé de upload.js : garde ce qu'on lui donne et ce que Grist avait déjà reçu à ce moment-là
+// (`writesBefore`), rend l'identifiant 2000 ou échoue avec `fail`. `during` : ce qui arrive dans
+// le document pendant l'envoi (quelqu'un d'autre modifie la fiche).
+function uploader(w, { id = 2000, fail = null, during = null } = {}) {
+  const sent = [];
+  const upload = async file => {
+    sent.push({ file, writesBefore: writes(w).length });
+    during?.();
+    if (fail) throw fail;
+    return id;
+  };
+  return { upload, sent };
+}
+
+test('buildRowUpdate leaves the photo for after its upload, and refuses a column that is not a column of attachments', async () => {
+  const w = await avatarWorld();
+  const change = { Avatar: { action: 'replace', avant: 501 } };
+  assert.deepEqual(buildRowUpdate(change, w.row(1), { Avatar: 'Attachments' }), { values: {} }, 'son identifiant n\'existe pas encore');
+  assert.deepEqual(buildRowUpdate(change, w.row(1), {}), { values: {} }, 'type inconnu : on suit la cellule');
+  assert.deepEqual(buildRowUpdate({ Avatar: { action: 'remove', avant: 501 }, Fonction: { avant: 'Pharmacienne', apres: 'Cheffe' } }, w.row(1), { Avatar: 'Attachments' }).values,
+    { Fonction: 'Cheffe' }, 'la photo n\'est jamais dans les valeurs de buildRowUpdate');
+  assert.match(buildRowUpdate(change, w.row(1), { Avatar: 'Text' }).error, /Photo de profil : la colonne Avatar n'est pas une colonne de pièces jointes/);
+  const { Avatar: _omitted, ...withoutAvatar } = w.row(1);
+  assert.match(buildRowUpdate(change, withoutAvatar, { Avatar: 'Attachments' }).error, /Photo de profil : la colonne Avatar n'existe pas dans BDD/);
+});
+
+test('prepareReview of a new photo keeps the file for the upload, shows it on the card after and marks it', async () => {
+  const w = await avatarWorld();
+  const chosen = photo();
+  const next = await review(w, 1, { Avatar: chosen });
+  assert.deepEqual(next.champs, { Avatar: { action: 'replace', avant: 501 } });
+  assert.equal(next.file, chosen, 'le fichier part tel quel à l\'enregistrement');
+  assert.equal(next.before.Avatar.at(-1), 501);
+  assert.equal(next.before.avatarUrl, undefined);
+  assert.equal(next.after.avatarUrl, 'blob:http://widget/photo-1', 'la carte « après » montre l\'image préparée, pas encore dans Grist');
+  assert.deepEqual(next.marks.avatar, { before: 501, after: 'replace' });
+  assert.deepEqual(next.lines, [{ key: 'Avatar', label: 'Photo de profil', kind: 'image', before: 501, after: 'replace' }]);
+  assert.equal(next.notice, '');
+  assert.equal(next.columnTypes.Avatar, 'Attachments');
+  assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien');
+  assert.equal(w.tables.BDD.Avatar[0].at(-1), 501);
+});
+
+test('prepareReview of a first photo and of a removal: the card after has the new photo, or only the initials', async () => {
+  const w = await avatarWorld();
+  const first = await review(w, 9, { Avatar: photo() });
+  assert.deepEqual(first.champs, { Avatar: { action: 'replace', avant: 0 } });
+  assert.deepEqual(first.marks.avatar, { before: 0, after: 'replace' });
+  assert.equal(first.after.avatarUrl, 'blob:http://widget/photo-1');
+
+  const removal = await review(w, 1, { Avatar: 0 });
+  assert.deepEqual(removal.champs, { Avatar: { action: 'remove', avant: 501 } });
+  assert.equal(removal.file, null, 'rien à envoyer pour retirer une photo');
+  assert.deepEqual(removal.after.Avatar, ['L'], 'la carte « après » n\'a plus que les initiales');
+  assert.equal(removal.after.avatarUrl, undefined);
+  assert.deepEqual(removal.marks.avatar, { before: 501, after: 'remove' });
+  assert.deepEqual(removal.lines.map(line => [line.key, line.before, line.after]), [['Avatar', 501, 'remove']]);
+});
+
+test('prepareReview refuses a photo that is not the one of the form: another attachment, a missing file, nothing to remove', async () => {
+  const w = await avatarWorld();
+  for (const [id, input] of [[1, 502], [1, { url: 'blob:x' }], [1, { blob: new Blob([]), name: 'x.jpg' }], [9, 502], [9, 0], [1, 501]]) {
+    await assert.rejects(review(w, id, { Avatar: input }), error => error instanceof ProfileSaveError && /rien à relire/.test(error.message),
+      `${id} : ${JSON.stringify(input)}`);
+  }
+  assert.deepEqual(writes(w), []);
+});
+
+test('prepareReview names the photo in the notice when somebody else changed it since the form was opened', async () => {
+  const w = await avatarWorld();
+  const { row, draft } = w.form(1);
+  w.tables.BDD.Avatar[0] = ['L', 502];
+  const next = await prepareReview(w.docApi, row, { ...draft, Avatar: photo() }, w.context);
+  assert.deepEqual(next.champs.Avatar, { action: 'replace', avant: 502 }, 'la photo d\'aujourd\'hui');
+  assert.deepEqual(next.marks.avatar, { before: 502, after: 'replace' });
+  assert.match(next.notice, /ont changé dans Grist depuis l'ouverture de la fenêtre : Photo de profil\./);
+  // Retirée par quelqu'un d'autre : il n'y a plus rien à retirer.
+  const gone = await avatarWorld();
+  const form = gone.form(1);
+  gone.tables.BDD.Avatar[0] = ['L'];
+  await assert.rejects(prepareReview(gone.docApi, form.row, { ...form.draft, Avatar: 0 }, gone.context), /déjà dans la fiche/);
+});
+
+test('prepareReview refuses a photo when the Avatar column is not a column of attachments, or does not exist', async () => {
+  const tables = withSchema(withIdentity(withAvatars()));
+  const column = tables._grist_Tables_column.colId.indexOf('Avatar');
+  tables._grist_Tables_column.type[column] = 'Text';
+  const text = await world({ tables });
+  await assert.rejects(review(text, 1, { Avatar: photo() }),
+    error => error instanceof ProfileSaveError && /Photo de profil : la colonne Avatar n'est pas une colonne de pièces jointes/.test(error.message));
+
+  const plain = await world();
+  const { row, draft } = plain.form(1);
+  assert.equal('Avatar' in draft, false, 'sans colonne, le formulaire n\'offre pas de photo');
+  await assert.rejects(prepareReview(plain.docApi, row, { ...draft, Avatar: photo() }, plain.context),
+    error => error instanceof ProfileSaveError && /rien à relire/.test(error.message), 'seule la photo : rien à relire');
+  const beside = await prepareReview(plain.docApi, row, { ...draft, Avatar: photo(), Fonction: 'Cheffe' }, plain.context);
+  assert.deepEqual(Object.keys(beside.champs), ['Fonction'], 'le reste du brouillon passe : seule la photo est écartée');
+  assert.equal(beside.file, null);
+});
+
+test('saveProfile uploads the photo AFTER its checks and writes its attachment in the same UpdateRecord as the other columns', async () => {
+  const w = await avatarWorld();
+  const next = await review(w, 1, { Avatar: photo(), Fonction: 'Cheffe de service' });
+  const { upload, sent } = uploader(w);
+  const result = await saveProfile(w.docApi, next, { upload, log: quiet });
+  assert.equal(result.status, 'saved');
+  assert.equal(result.attachmentId, 2000);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].file, next.file, 'le fichier de la relecture, tel quel');
+  assert.equal(sent[0].writesBefore, 0, 'rien n\'est écrit avant l\'envoi');
+  assert.deepEqual(writes(w), [{
+    action: 'UpdateRecord', table: 'BDD', rowId: 1, ok: true,
+    values: { Fonction: 'Cheffe de service', Avatar: ['L', 2000] }
+  }]);
+  assert.deepEqual(w.tables.BDD.Avatar[0], ['L', 2000]);
+  assert.equal(w.tables.BDD.Avatar[1].at(-1), 502, 'la photo d\'une autre fiche n\'est pas touchée');
+  assert.deepEqual(unsavedLabels(next, tableToRows(w.tables.BDD)[0], w.referenceMaps, { attachmentId: result.attachmentId }), []);
+});
+
+test('saveProfile removes a photo with an empty list, without uploading anything', async () => {
+  const w = await avatarWorld();
+  const next = await review(w, 1, { Avatar: 0 });
+  const { upload, sent } = uploader(w);
+  const result = await saveProfile(w.docApi, next, { upload, log: quiet });
+  assert.equal(result.status, 'saved');
+  assert.equal(result.attachmentId, null);
+  assert.deepEqual(sent, []);
+  assert.deepEqual(writes(w).map(call => call.values), [{ Avatar: ['L'] }]);
+  assert.deepEqual(w.tables.BDD.Avatar[0], ['L']);
+  // Sans fonction d'envoi, retirer une photo marche aussi : il n'y a rien à envoyer.
+  const again = await avatarWorld();
+  assert.equal((await saveProfile(again.docApi, await review(again, 2, { Avatar: 0 }), { log: quiet })).status, 'saved');
+});
+
+test('saveProfile writes a first photo on a fiche that had none', async () => {
+  const w = await avatarWorld();
+  const result = await saveProfile(w.docApi, await review(w, 9, { Avatar: photo() }), { upload: uploader(w).upload, log: quiet });
+  assert.equal(result.status, 'saved');
+  assert.deepEqual(w.tables.BDD.Avatar[w.tables.BDD.id.indexOf(9)], ['L', 2000]);
+  // Hugo : une cellule null, comme Grist en donne pour une pièce jointe jamais remplie.
+  const hugo = await avatarWorld();
+  await saveProfile(hugo.docApi, await review(hugo, 10, { Avatar: photo() }), { upload: uploader(hugo).upload, log: quiet });
+  assert.deepEqual(hugo.tables.BDD.Avatar[hugo.tables.BDD.id.indexOf(10)], ['L', 2000]);
+});
+
+test('saveProfile asks for the photo again when there is no file or no way to send it, before reading or writing anything', async () => {
+  const w = await avatarWorld();
+  const next = await review(w, 1, { Avatar: photo() });
+  const calls = w.calls.length;
+  for (const options of [{ log: quiet }, { upload: 'oui', log: quiet }]) {
+    await assert.rejects(saveProfile(w.docApi, next, options),
+      error => error instanceof ProfileSaveError && error.message === 'La photo choisie n\'est plus disponible : choisissez-la de nouveau.' && error.leftover === null);
+  }
+  await assert.rejects(saveProfile(w.docApi, { ...next, file: null }, { upload: uploader(w).upload, log: quiet }), /choisissez-la de nouveau/);
+  assert.equal(w.calls.length, calls, 'rien n\'a été lu ni écrit');
+});
+
+test('saveProfile uploads nothing when the fiche already changed since the review', async () => {
+  const w = await avatarWorld();
+  const next = await review(w, 1, { Avatar: photo() });
+  w.tables.BDD.Avatar[0] = ['L', 777]; // quelqu'un d'autre a changé la photo après la relecture
+  const { upload, sent } = uploader(w);
+  const result = await saveProfile(w.docApi, next, { upload, log: quiet });
+  assert.equal(result.status, 'changed');
+  assert.equal(result.leftover, undefined, 'rien n\'a été envoyé : rien ne traîne');
+  assert.deepEqual(sent, []);
+  assert.deepEqual(writes(w), []);
+});
+
+test('saveProfile writes nothing when the fiche changed during the upload, and names the file that stays in Grist', async () => {
+  const w = await avatarWorld();
+  const next = await review(w, 1, { Avatar: photo(), Fonction: 'Cheffe' });
+  const { upload } = uploader(w, { during: () => { w.tables.BDD.Fonction[0] = 'Directrice'; } });
+  const result = await saveProfile(w.docApi, next, { upload, log: quiet });
+  assert.equal(result.status, 'changed');
+  assert.equal(result.leftover, 2000, 'la photo est dans les pièces jointes du document mais la fiche ne l\'utilise pas');
+  assert.equal(result.row.Fonction, 'Directrice');
+  assert.deepEqual(writes(w), []);
+  assert.deepEqual(w.tables.BDD.Avatar[0], ['L', 501]);
+});
+
+test('saveProfile reports the leftover file when the fiche is gone, or the address taken, during the upload', async () => {
+  const gone = await avatarWorld();
+  const next = await review(gone, 1, { Avatar: photo() });
+  const sentGone = uploader(gone, { during: () => Object.keys(gone.tables.BDD).forEach(column => gone.tables.BDD[column].shift()) });
+  await assert.rejects(saveProfile(gone.docApi, next, { upload: sentGone.upload, log: quiet }),
+    error => error instanceof ProfileSaveError && /n'existe plus dans Grist/.test(error.message) && error.leftover === 2000);
+
+  const taken = await avatarWorld();
+  const mail = await review(taken, 2, { email: 'convoite@exemple.fr', Avatar: photo() }, { admin: true });
+  const sentTaken = uploader(taken, { during: () => { taken.tables.BDD.email[3] = 'convoite@exemple.fr'; } });
+  await assert.rejects(saveProfile(taken.docApi, mail, { upload: sentTaken.upload, log: quiet }),
+    error => error instanceof ProfileSaveError && /Cette adresse e-mail est maintenant celle d'une autre fiche/.test(error.message) && error.leftover === 2000);
+  assert.deepEqual(writes(taken), []);
+});
+
+test('saveProfile gives the message of an upload that failed, writes nothing and leaves nothing behind', async () => {
+  const w = await avatarWorld();
+  const next = await review(w, 1, { Avatar: photo(), Fonction: 'Cheffe' });
+  const { upload } = uploader(w, { fail: new UploadError('Grist a refusé la photo : vos droits ne permettent pas d\'ajouter des pièces jointes. Contactez un administrateur si le problème persiste.') });
+  await assert.rejects(saveProfile(w.docApi, next, { upload, log: quiet }), error => {
+    assert.ok(error instanceof ProfileSaveError);
+    assert.match(error.message, /^Grist a refusé la photo : vos droits ne permettent pas d'ajouter des pièces jointes\. Contactez un administrateur/);
+    assert.ok(error.cause instanceof UploadError, 'l\'erreur d\'origine est gardée');
+    assert.equal(error.leftover, null);
+    return true;
+  });
+  assert.deepEqual(writes(w), [], 'ni la photo ni le reste de la fiche ne sont écrits');
+  assert.equal(w.tables.BDD.Fonction[0], 'Pharmacienne');
+});
+
+test('saveProfile says what it can of any other upload failure, logs the cause, and never the raw message', async () => {
+  const w = await avatarWorld();
+  const next = await review(w, 1, { Avatar: photo() });
+  const { lines, log } = logged();
+  const { upload } = uploader(w, { fail: new Error('boom 500 pour ana.martin@chu-bordeaux.fr') });
+  await assert.rejects(saveProfile(w.docApi, next, { upload, log }), error => {
+    assert.match(error.message, /^La modification n'a pas pu être enregistrée\. Réessayez/);
+    assert.doesNotMatch(error.message, /boom/);
+    return true;
+  });
+  assert.match(lines.error[0], /^\[PROFIL\] envoi de la photo impossible/);
+  assert.deepEqual(writes(w), []);
+});
+
+test('saveProfile keeps the uploaded file in the error when the write is refused, so the page can say it stays in Grist', async () => {
+  for (const options of [{ denyWrites: ['BDD'] }, { denyRows: { BDD: [1] } }]) {
+    const w = await avatarWorld(options);
+    const next = await review(w, 1, { Avatar: photo() });
+    const { upload } = uploader(w);
+    const { lines, log } = logged();
+    await assert.rejects(saveProfile(w.docApi, next, { upload, log }), error => {
+      assert.ok(error instanceof ProfileSaveError);
+      assert.match(error.message, /^Grist a refusé la modification/);
+      assert.equal(error.leftover, 2000);
+      return true;
+    });
+    assert.deepEqual(w.tables.BDD.Avatar[0], ['L', 501]);
+    assert.match(lines.error[0], /^\[PROFIL\] écriture impossible/);
+    assert.ok(!JSON.stringify(lines).includes('@'), 'aucune adresse dans la console');
+  }
+});
+
+test('saveProfile also refuses, after the upload, a review whose column cannot take a photo, and names the leftover file', async () => {
+  const w = await avatarWorld();
+  const next = await review(w, 1, { Avatar: photo() });
+  await assert.rejects(saveProfile(w.docApi, { ...next, columnTypes: { Avatar: 'Text' } }, { upload: uploader(w).upload, log: quiet }),
+    error => error instanceof ProfileSaveError && /n'est pas une colonne de pièces jointes/.test(error.message) && error.leftover === 2000);
+  assert.deepEqual(writes(w), []);
+});
+
+test('an administrator replaces or removes the photo of someone else, on that fiche only', async () => {
+  const w = await avatarWorld({ user: { email: 'admin@chu-bordeaux.fr' } });
+  await saveProfile(w.docApi, await review(w, 2, { Avatar: photo() }, { admin: true }), { upload: uploader(w).upload, log: quiet });
+  await saveProfile(w.docApi, await review(w, 1, { Avatar: 0 }, { admin: true }), { log: quiet });
+  assert.deepEqual(writes(w).map(call => [call.rowId, call.values]), [[2, { Avatar: ['L', 2000] }], [1, { Avatar: ['L'] }]]);
+});
+
+test('unsavedLabels notices a photo that Grist did not keep, or kept under another attachment', async () => {
+  const w = await avatarWorld();
+  const replacing = await review(w, 1, { Avatar: photo(), Fonction: 'Cheffe' });
+  assert.deepEqual(unsavedLabels(replacing, w.row(1), w.referenceMaps, { attachmentId: 2000 }), ['Photo de profil', 'Fonction']);
+  const saved = { ...w.row(1), Fonction: 'Cheffe', Avatar: ['L', 2000] };
+  assert.deepEqual(unsavedLabels(replacing, saved, w.referenceMaps, { attachmentId: 2000 }), []);
+  assert.deepEqual(unsavedLabels(replacing, { ...saved, Avatar: ['L', 501] }, w.referenceMaps, { attachmentId: 2000 }), ['Photo de profil']);
+  assert.deepEqual(unsavedLabels(replacing, saved, w.referenceMaps), ['Photo de profil'], 'sans identifiant envoyé, la photo n\'est pas enregistrée');
+
+  const removing = await review(w, 1, { Avatar: 0 });
+  assert.deepEqual(unsavedLabels(removing, w.row(1), w.referenceMaps), ['Photo de profil'], 'Grist a gardé la photo');
+  assert.deepEqual(unsavedLabels(removing, { ...w.row(1), Avatar: ['L'] }, w.referenceMaps), []);
+  assert.deepEqual(unsavedLabels(removing, { ...w.row(1), Avatar: null }, w.referenceMaps), [], 'une cellule vide : la photo est retirée');
 });
 
 // ===== Créer la fiche de la personne connectée =====

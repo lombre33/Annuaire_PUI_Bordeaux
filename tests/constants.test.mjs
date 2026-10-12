@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CATEGORIES, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE } from '../constants.js';
+import { CATEGORIES, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE, PROFILE_FIELDS, fieldsFor } from '../constants.js';
 
 test('FILTERS lists the 7 filter buttons in display order: a grouping has no button of its own, it is the groups of the menu it arranges', () => {
   assert.deepEqual(FILTERS.map(f => f.key), ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement']);
@@ -123,4 +123,18 @@ test('LIST_CATEGORIES maps each ReferenceList column of BDD to its own reference
     { key: 'macroTaches', column: 'Taches', table: 'Taches', groups: 'taches' },
     { key: 'instances', column: 'Instances', table: 'INSTANCES' }
   ]);
+});
+
+test('the profile starts with the photo, which anybody edits on their own fiche, like the other columns of the person', () => {
+  assert.deepEqual(PROFILE_FIELDS[0], { key: 'Avatar', label: 'Photo de profil', kind: 'image', afterCreation: true });
+  assert.equal(PROFILE_FIELDS.filter(field => field.kind === 'image').length, 1);
+  assert.ok(!PROFILE_FIELDS[0].admin, 'la photo n\'est pas réservée à un administrateur');
+});
+
+test('the photo is offered on a fiche that exists, to its owner and to an administrator, and not on a fiche that is being created', () => {
+  const keys = (...options) => fieldsFor(...options).map(field => field.key);
+  assert.ok(keys(false).includes('Avatar'), 'sa propre fiche');
+  assert.ok(keys(true).includes('Avatar'), 'la fiche d\'une autre personne, par un administrateur');
+  assert.ok(!keys(false, true).includes('Avatar'), 'la création : la photo s\'ajoute ensuite, depuis « Modifier mon profil »');
+  assert.ok(keys(false, true).includes('Etablissement'), 'la création choisit toujours l\'établissement');
 });

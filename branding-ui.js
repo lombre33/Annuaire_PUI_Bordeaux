@@ -10,7 +10,7 @@ import { logoSize } from './branding.js';
 // alternatif qui clignote). Quand Grist ne donne pas le fichier (pas de jeton, fichier
 // supprimé ou illisible), `onFail` remplace le logo par le nom, une seule fois. Une
 // image en erreur est d'abord retentée avec un jeton renouvelé : il a pu expirer
-// pendant que la page restait ouverte.
+// pendant que la page restait ouverte. Les photos de profil (avatar-ui.js) passent par ici aussi.
 //   eager   charger tout de suite (les logos de l'en-tête et du pied de page) ; sinon
 //           l'image attend d'approcher de l'écran, comme celles des cartes
 //   onLoad  appelé avec l'image dès qu'elle est chargée, avant qu'elle ne devienne visible

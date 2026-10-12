@@ -5,6 +5,7 @@
 // Le fichier N est un SVG dont les proportions dépendent de N (de 60 x 30 à 180 x 50),
 // pour que les logos aient des formes différentes comme les vrais. Des fichiers
 // particuliers simulent les cas limites :
+//   PORTRAIT_FIRST à +99  des photos de profil (256 x 256), de couleur différente selon le numéro
 //   TALL_FILE      un logo en hauteur (40 x 120)
 //   WIDE_FILE      une bannière très large (300 x 30)
 //   UNSIZED_FILE   un SVG qui n'a qu'un viewBox, sans width ni height (100 x 50)
@@ -12,7 +13,7 @@
 //   BROKEN_FILE    le serveur répond 200 mais le contenu n'est pas une image
 //
 // Il reçoit aussi les envois de fichiers (POST <adresse>/attachments?auth=<jeton>, le logo d'un
-// établissement) : le fichier est gardé, reçoit l'identifiant suivant (à partir de FIRST_UPLOAD_ID)
+// établissement, la photo de profil d'une personne) : le fichier est gardé, reçoit l'identifiant suivant (à partir de FIRST_UPLOAD_ID)
 // et se télécharge ensuite comme les autres. `upload` règle la réponse du serveur :
 //   mode   'ok' (défaut), 'denied' (403), 'too-large' (413), 'error' (500), 'bad-answer' (200 sans
 //          identifiant), 'unreachable' (la connexion échoue)
@@ -21,6 +22,7 @@
 //   delay  millisecondes d'attente avant de répondre
 
 import { FAKE_ATTACHMENTS_URL } from './fake-grist.js';
+import { visageSvg } from '../../docs/demo/portraits-fictifs.mjs';
 
 export const FIRST_UPLOAD_ID = 2000;
 export const MISSING_FILE = 999;
@@ -28,6 +30,9 @@ export const BROKEN_FILE = 998;
 export const TALL_FILE = 997;
 export const WIDE_FILE = 996;
 export const UNSIZED_FILE = 995;
+// Les photos de profil des tests : les fichiers 500 à 599 sont des portraits carrés.
+export const PORTRAIT_FIRST = 500;
+const isPortrait = id => id >= PORTRAIT_FIRST && id < PORTRAIT_FIRST + 100;
 
 const SPECIAL_SIZES = {
   [TALL_FILE]: { width: 40, height: 120 },
@@ -47,6 +52,9 @@ function logoSvg(id) {
     + `<rect width="${width}" height="${height}" rx="6" fill="hsl(${(id * 47) % 360} 55% 45%)"/>`
     + `<text x="50%" y="55%" fill="#fff" font-family="sans-serif" font-size="14" text-anchor="middle">${id}</text></svg>`;
 }
+
+// Les visages sont ceux de la démonstration (docs/demo/portraits-fictifs.mjs) : de simples dessins.
+const portraitSvg = id => visageSvg(id - PORTRAIT_FIRST);
 
 const ORIGIN = new URL(FAKE_ATTACHMENTS_URL).origin;
 const PATH = new URL(FAKE_ATTACHMENTS_URL).pathname;
@@ -90,6 +98,7 @@ export async function routeAttachments(context) {
     if (id === BROKEN_FILE) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: 'ceci n\'est pas une image' });
     const stored = record.stored[id];
     if (stored) return route.fulfill({ status: 200, contentType: stored.contentType, body: stored.bytes });
+    if (isPortrait(id)) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: portraitSvg(id) });
     return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: logoSvg(id) });
   });
 

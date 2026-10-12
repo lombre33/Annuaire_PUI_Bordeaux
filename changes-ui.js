@@ -1,6 +1,7 @@
 // La liste des changements d'une fiche, sous les deux cartes de la relecture : une
 // ligne par champ, l'ancienne valeur barrée puis la nouvelle, ou les valeurs ajoutées
-// et retirées d'une liste. DOM seulement ; `lines` vient de describeChanges() (profile.js).
+// et retirées d'une liste, ou la photo avant et après. DOM seulement ; `lines` vient de
+// describeChanges() (profile.js).
 
 import { CATEGORIES, PROFILE_FIELDS } from './constants.js';
 import { el } from './dom.js';
@@ -18,7 +19,19 @@ function listChange(kind, sign, spoken, label) {
   return chip;
 }
 
-export function renderChangeList(lines) {
+// La photo de profil se lit en images : la photo actuelle puis la nouvelle (ou un mot quand il n'y en a
+// pas). `thumb(côté, ligne)` donne la miniature de 'before' ou 'after' (un bouton qui l'agrandit), ou null.
+function photoValues(line, thumb) {
+  const none = text => el('span', 'none', text);
+  return [
+    thumb?.('before', line) ?? none(line.before > 0 ? 'photo actuelle' : 'aucune photo'),
+    el('span', '', '→'),
+    thumb?.('after', line) ?? none(line.after === 'remove' ? 'photo retirée' : 'nouvelle photo')
+  ];
+}
+
+// `thumb` (facultatif) : voir photoValues. Sans lui, la ligne de la photo ne dit que des mots.
+export function renderChangeList(lines, thumb = null) {
   const list = el('ul', 'diff');
   lines.forEach(line => {
     const row = el('li', 'diff-row');
@@ -30,6 +43,8 @@ export function renderChangeList(lines) {
     if (line.kind === 'list') {
       line.added.forEach(label => value.append(listChange('add', '+', 'ajouté', label)));
       line.removed.forEach(label => value.append(listChange('del', '−', 'retiré', label)));
+    } else if (line.kind === 'image') {
+      value.append(...photoValues(line, thumb));
     } else {
       value.append(
         line.before ? el('del', '', line.before) : el('span', 'none', 'non renseigné'),
