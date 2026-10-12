@@ -4,7 +4,7 @@ Cette page explique comment le widget est construit et comment le modifier sans 
 
 Pages liées : [README](../README.md) (présentation et installation), [guide utilisateur](utilisateurs.md), [sécurité](securite.md), [maintenance](maintenance.md).
 
-> **Cette page décrit la version 1.9.0** : le widget lit la table `BDD` (1.8.0) et propose le filtre « Domaines » (1.9.0). D'autres évolutions vont encore en modifier une partie (consentement individuel, identité de la personne connectée, édition de fiche). Elles sont résumées dans [Chantiers en cours](#chantiers-en-cours) et la page sera mise à jour à chaque fusion.
+> **Cette page décrit la version 1.9.1** : le widget lit la table `BDD` (1.8.0), propose le filtre « Domaines » (1.9.0) et s'adapte à la largeur de son cadre (1.9.1). D'autres évolutions vont encore en modifier une partie (consentement individuel, identité de la personne connectée, édition de fiche). Elles sont résumées dans [Chantiers en cours](#chantiers-en-cours) et la page sera mise à jour à chaque fusion.
 
 ## Sommaire
 
@@ -56,7 +56,7 @@ flowchart LR
 | `grist-plugin-api.js` | API de widget de Grist. `index.html` la charge depuis `docs.getgrist.com`, sans version figée | `index.html` |
 | GitHub Actions | Exécute `node --test` à chaque pull request et à chaque push sur `main` | `.github/workflows/tests.yml` |
 
-Ce que le widget fait, dans la version 1.9.0 :
+Ce que le widget fait, dans la version 1.9.1 :
 
 - il **lit** les tables du document Grist (neuf lectures `fetchTable` par chargement) ;
 - il n'**écrit** rien dans Grist, ne stocke rien dans le navigateur et n'émet lui-même aucune requête réseau ;
@@ -201,7 +201,7 @@ flowchart TD
 À savoir :
 
 - Parmi les sept étapes du schéma, les cinq premières sont appliquées une fois par chargement, dans `loadDirectory()`. Les deux dernières le sont à chaque action de l'utilisateur, dans `main.js` : `refreshCards()` appelle `filterContacts()` sur la liste des contacts éligibles.
-- Un établissement « autres » n'est jamais affiché : aucune branche du code ne le rend éligible.
+- Un établissement « autres » (une structure extérieure au PUI qui a collaboré à certaines tâches, à la différence des établissements fondateurs et des partenaires) n'est jamais affiché : aucune branche du code ne le rend éligible.
 - Un établissement inconnu (`Etablissement` vide, ou sans ligne correspondante dans `Etablissements`) n'a aucun indicateur : le contact est exclu plutôt qu'affiché sans validation.
 - La Référence `Etablissement` désigne une ligne par son identifiant : deux lignes de même acronyme ne se mélangent pas. Seul le repli par libellé, quand Grist envoie la Référence déjà résolue en texte, ne peut pas les départager : `etablissementFlagsFromRows()` retient alors le statut le plus strict (vrai seulement s'il l'est partout) et signale le libellé dans `conflicts` : les contacts de ce libellé sont masqués si ce statut ne les rend plus éligibles.
 - Par défaut, l'interrupteur Fondateurs est actif et Partenaires ne l'est pas (`state.scope` dans `main.js`, changement de la version 1.7.0). « Réinitialiser » ne les modifie pas. Si les deux sont désactivés, aucune carte ne s'affiche.
@@ -225,7 +225,7 @@ flowchart TD
 - Les tags d'une catégorie filtrable sont des `<button>` ; ceux de « Rôle PUI » sont des `<span>` non cliquables (`buildTag()`).
 - `createFilterUI()` construit tous les menus (`buildFilter()` → `buildFilterMenu()` → `buildOption()`). Chaque option porte sa valeur dans `data-value` : le texte affiché n'est pas la source. Un bouton de filtre peut porter une infobulle (`hint` dans `CATEGORIES`, utilisée par « Domaines »).
 - `updateFilterUI()` met à jour **un seul menu** (cases, ordre, compteur du bouton) après un clic sur une case, un tag de carte ou un badge d'établissement ; `updateFilterCounts()` rafraîchit les compteurs de tous les menus. Aucun des deux ne reconstruit les menus : cela fermerait un menu ouvert et effacerait la saisie en cours dans sa recherche interne. Les menus ne sont reconstruits (`rebuildFilterUI()`) que par « Réinitialiser », précisément pour vider ces champs, et quand un rechargement apporte des libellés différents.
-- Mise en page : une grille de trois colonnes (`.cards-grid`), `max-width: 1480px` pour `.widget-shell` et `min-width: 980px` sur `body`. Le widget est conçu pour un écran de PC, sans version mobile ([`specs.md`](../specs.md)).
+- Mise en page : le widget s'adapte à la largeur de son cadre Grist, sans largeur minimale (`.widget-shell` garde `max-width: 1480px`). Les seuils de `style.css` sont ceux du cadre, pas de l'écran : sous 1400px les filtres passent sous la recherche, sous 840px les cartes se mettent sur deux colonnes, sous 600px sur une seule avec une barre d'outils empilée et un texte plus grand. Un écran tactile (`pointer: coarse`) reçoit en plus des cibles d'au moins 28px et des champs à 16px, et le survol n'y reste pas collé (`hover: none`). À partir de 1400px, la mise en page est celle de départ. `keepMenuInView()` (`render.js`) décale un menu de filtre qui sortirait du cadre à droite. Tests : `tests/responsive.test.mjs` ; protocole manuel : [`TESTING.md`](../TESTING.md), section 12 ; exigence : [`specs.md`](../specs.md).
 
 ## Fiabilité : que se passe-t-il en cas de panne ?
 
@@ -271,13 +271,14 @@ npx playwright install chromium         # ou CHROMIUM_PATH=/chemin/vers/chromium
 | `tests/constants.test.mjs` | Cohérence de la taxonomie, table principale `BDD`, libellé corrigé avant le libellé brut |
 | `tests/rules.test.mjs` | Règle du projet : aucun fichier de code ne cite la colonne `nom_de_domaine` |
 | `tests/e2e.test.mjs` | Le vrai `index.html` dans Chromium avec une API Grist simulée : cartes, badge d'établissement, filtres, compteurs, interrupteurs, pannes |
+| `tests/responsive.test.mjs` | Le même `index.html` de 280 à 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs`) : pas de défilement horizontal, texte contenu dans les cartes, colonnes, barre d'outils, menus de filtres dans le cadre, cibles tactiles, tailles de texte |
 | `tests/docs.test.mjs` | La documentation ne se périme pas : liens, noms de fonctions cités, jeu de données fictif |
 
 - **Version de Node.** Le dépôt n'a pas de `package.json` : Node ne reconnaît les modules ES écrits en `.js` que grâce à la détection automatique de la syntaxe, activée par défaut depuis Node 20.19 et 22.7. En dessous (Node 18, 21, 22.6…), les tests échouent avec « Named export … not found » : c'est l'environnement qui est en cause, pas le code. Le serveur de démonstration, en `.mjs`, démarre dès Node 18.
-- Les tests unitaires n'ont aucune dépendance. `tests/e2e.test.mjs` a besoin de Playwright et de Chromium ; sans eux ses scénarios sont ignorés et `node --test` reste vert. La CI définit `REQUIRE_E2E=1` : un navigateur absent y est un échec, pas un « tout vert » sur des tests ignorés.
+- Les tests unitaires n'ont aucune dépendance. `tests/e2e.test.mjs` et `tests/responsive.test.mjs` ont besoin de Playwright et de Chromium ; sans eux leurs scénarios sont ignorés et `node --test` reste vert. La CI définit `REQUIRE_E2E=1` : un navigateur absent y est un échec, pas un « tout vert » sur des tests ignorés.
 - Le test navigateur est isolé du réseau : seuls le serveur local et l'API Grist simulée répondent, tout le reste est bloqué.
 - Limite assumée : l'API Grist est simulée, avec des données aux encodages observés en production. Ces tests garantissent que le vrai `main.js` et le vrai `render.js` réagissent correctement à ces encodages et à ces pannes ; ils ne garantissent pas que Grist les envoie toujours. D'où le protocole manuel de [`TESTING.md`](../TESTING.md), à jouer dans un vrai document avant un déploiement qui touche `main.js`, `render.js`, `index.html` ou `style.css`.
-- Chaque correction s'accompagne d'un test de non-régression, dans le fichier du module concerné. Une fonction ajoutée à `grist-data.js` ou `filters.js` a son test ; un changement d'affichage adapte ou ajoute un scénario de `tests/e2e.test.mjs`.
+- Chaque correction s'accompagne d'un test de non-régression, dans le fichier du module concerné. Une fonction ajoutée à `grist-data.js` ou `filters.js` a son test ; un changement d'affichage adapte ou ajoute un scénario de `tests/e2e.test.mjs`, et un changement de mise en page (`style.css`) un scénario de `tests/responsive.test.mjs`.
 
 ## Données et captures de démonstration
 
@@ -349,14 +350,15 @@ Règles :
 
 ## Chantiers en cours
 
-Au 12 octobre 2026, `main` est en version 1.9.0. Cette documentation décrit `main` et sera mise à jour à chaque fusion.
+Au 12 octobre 2026, `main` est en version 1.9.1. Cette documentation décrit `main` et sera mise à jour à chaque fusion.
 
 **Déjà fusionné**
 
 1. **Nouvelle structure Grist** (1.8.0) : la table principale est `BDD`, avec des références directes (établissement, compétences, instances, actions…) et des tables de référence renommées. Le [CHANGELOG](../CHANGELOG.md) liste chaque changement.
 2. **Filtre « Domaines »** (1.9.0) : la recherche par compétences macro, décrite dans [Filtres, compteurs et recherche](#filtres-compteurs-et-recherche).
+3. **Mise en page adaptative** (1.9.1) : le widget s'adapte à la largeur de son cadre, d'un téléphone à un grand écran, comme le décrit [Rendu des cartes et des menus](#rendu-des-cartes-et-des-menus).
 
 **À venir**
 
-3. **Consentement individuel** (1.10.0) : seules les personnes dont `BDD.Accepte_apparaitre` est coché apparaîtraient, en plus de la validation de leur établissement. La colonne deviendrait obligatoire et un annuaire vide serait expliqué par le bandeau. Les [règles d'affichage](#règles-daffichage), le guide utilisateur et la page de maintenance changeront en conséquence.
-4. **Édition de fiche par la personne connectée** : identité de la personne connectée, interrupteur de présence, modale d'édition de sa fiche, demandes de modification validées par un administrateur. Le widget ne sera plus en lecture seule : ce changement modifie le modèle de sécurité décrit dans [sécurité](securite.md), et un guide de configuration côté Grist accompagnera ce chantier.
+4. **Consentement individuel** (1.10.0) : seules les personnes dont `BDD.Accepte_apparaitre` est coché apparaîtraient, en plus de la validation de leur établissement. La colonne deviendrait obligatoire et un annuaire vide serait expliqué par le bandeau. Les [règles d'affichage](#règles-daffichage), le guide utilisateur et la page de maintenance changeront en conséquence.
+5. **Édition de fiche par la personne connectée** : identité de la personne connectée, interrupteur de présence, modale d'édition de sa fiche. Les modifications s'appliqueront directement : aucune validation par un administrateur n'est prévue. Le widget ne sera plus en lecture seule : ce changement modifie le modèle de sécurité décrit dans [sécurité](securite.md), et un guide de configuration côté Grist accompagnera ce chantier.

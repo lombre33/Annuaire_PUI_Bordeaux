@@ -17,7 +17,7 @@ import { startDemoServer } from './serveur-demo.mjs';
 import { CARTES_ATTENDUES } from './donnees-fictives.mjs';
 
 const DOSSIER_IMAGES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'images');
-const LARGEUR = 1440; // le widget exige au moins 980 px (style.css) ; il est conçu pour un écran de PC
+const LARGEUR = 1440; // un écran de PC : à partir de 1400 px, la mise en page est celle de départ (style.css)
 const HAUTEUR_FENETRE = 2200; // grande : chaque capture est rognée sur ce qui l'intéresse (voir `zone`)
 const FACTEUR_ECHELLE = 1.5; // captures nettes sur écran à haute densité sans alourdir le dépôt
 const MARGE = 28; // espace gardé sous l'élément qui borne la capture
