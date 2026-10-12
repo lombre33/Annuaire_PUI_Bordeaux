@@ -49,6 +49,8 @@ L'annuaire affiche les accompagnateurs de l'innovation du PUI sous forme de **ca
 
 <p align="center"><img src="docs/images/ma-presence.png" alt="Bandeau « Ma présence » : la personne connectée voit qu'elle apparaît dans l'annuaire et peut se retirer d'un clic" width="100%"><br><sub><b>Ma présence</b> : la personne connectée choisit d'apparaître ou non (<a href="docs/utilisateurs.md#ma-présence--apparaître-ou-non">guide utilisateur</a>).</sub></p>
 
+<p align="center"><img src="docs/images/modifier-fiche-relecture.png" alt="Fenêtre « Relire vos modifications » : la carte « Avant » à côté de la carte « Après », où la fonction modifiée, un tag ajouté et un tag retiré sont repérés, puis la liste « Ce qui change » et les boutons « Retour » et « Valider »" width="100%"><br><sub><b>Modifier sa fiche</b> : une relecture de la carte avant et après, puis l'enregistrement direct, sans validation (<a href="docs/utilisateurs.md#modifier-ma-fiche">guide utilisateur</a>).</sub></p>
+
 ## Installer dans Grist
 
 Prérequis : un document Grist qui contient les tables décrites dans [`grist_structure.txt`](grist_structure.txt), avec exactement ces noms de tables et de colonnes. La colonne `Accepte_apparaitre` de `BDD` (une case à cocher) est obligatoire : sans elle, le widget affiche une erreur plutôt que l'annuaire de tout le monde.
@@ -96,7 +98,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 
 | Pour… | Lire |
 |---|---|
-| **Utiliser l'annuaire** : rechercher, filtrer, comprendre un message, vocabulaire du PUI | [Guide utilisateur](docs/utilisateurs.md) |
+| **Utiliser l'annuaire** : rechercher, filtrer, modifier sa fiche, comprendre un message, vocabulaire du PUI | [Guide utilisateur](docs/utilisateurs.md) |
 | **Comprendre et modifier le code** : architecture, chargement des données, règles, tests, recettes | [Documentation développeur](docs/developpeurs.md) |
 | **Régler le document Grist** : colonne de consentement, table-sonde, administrateurs, règles d'accès | [`GRIST_SETUP.md`](GRIST_SETUP.md) |
 | **Évaluer les risques** : accès demandé à Grist, écritures, données personnelles, recommandations | [Sécurité et confidentialité](docs/securite.md) |

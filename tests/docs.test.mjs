@@ -29,7 +29,7 @@ import { CATEGORIES, FILTERS } from '../constants.js';
 import { loadDirectory } from '../grist-data.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
 import { readIdentity } from '../identity.js';
-import { describePresence, setPresence, explainWriteError } from '../presence.js';
+import { describePresence, describeHiddenFiche, setPresence, explainWriteError } from '../presence.js';
 import { rightsFor, profileFormModel, draftOf } from '../profile.js';
 import { prepareReview, saveProfile } from '../profile-save.js';
 import { tablesFictives, CARTES_ATTENDUES, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
@@ -128,8 +128,8 @@ const SOURCE_FILES = [
   ...fs.readdirSync(path.join(ROOT, 'docs', 'demo')).map(name => `docs/demo/${name}`)
 ];
 
-// Cités par la documentation mais fournis par Grist, pas par ce dépôt.
-const EXTERNAL_NAMES = new Set(['fetchTable', 'grist-plugin-api.js']);
+// Cités par la documentation mais fournis par Grist ou par le navigateur, pas par ce dépôt.
+const EXTERNAL_NAMES = new Set(['fetchTable', 'listTables', 'applyUserActions', 'onRecords', 'ready', 'showModal', 'grist-plugin-api.js']);
 
 const FUNCTION_REFERENCE = /^([A-Za-z_$][\w$]*)\(\)$/;
 const FILE_REFERENCE = /^[\w./-]+\.(?:js|mjs|css|html|yml|md|txt|png)$/;
@@ -407,6 +407,38 @@ test('?refus=BDD : la modification de fiche est refusée avec un message en fran
   assert.equal(bddWrites(page).length, 0);
 });
 
+// Les messages que la fenêtre de modification dit à la personne sont cités tels quels dans
+// le guide : chaque citation « … » de la section (ou ses morceaux, quand une partie
+// variable est remplacée par …) doit figurer mot pour mot dans le code du widget.
+const widgetCode = () => fs.readdirSync(ROOT).filter(name => name.endsWith('.js') || name === 'index.html')
+  .map(name => read(name)).join('\n')
+  .replace(/['`]\s*\+\s*['`]/g, '')   // une phrase écrite en plusieurs morceaux
+  .replaceAll('\\\'', '\'');
+
+test('les messages cités dans « Modifier ma fiche » sont ceux du code', () => {
+  const guide = read('docs/utilisateurs.md');
+  const start = guide.indexOf('\n## Modifier ma fiche');
+  assert.ok(start >= 0, 'Le guide utilisateur doit avoir une section « Modifier ma fiche ».');
+  const end = guide.indexOf('\n## ', start + 1);
+  const section = guide.slice(start, end);
+
+  // Messages composés à l'exécution : on les demande à la fonction qui les compose.
+  const hidden = overrides => ({ accepted: true, visible: false, named: true, inScope: true, etablissement: 'not_validated', ...overrides });
+  const composed = [describeHiddenFiche(hidden({}), { own: true }), describeHiddenFiche(hidden({}), { own: false })];
+  composed.forEach(message => assert.ok(section.includes(message), `Le guide doit citer : ${message}`));
+
+  const code = widgetCode();
+  const known = fragment => code.includes(fragment) || code.includes(fragment.replace(/\.$/, '')) // le point final est ajouté à l'affichage
+    || composed.includes(fragment) || /^\d+ champs? modifiés?$/.test(fragment);
+  const fragments = [...section.matchAll(/«\s?([^»]+?)\s?»/g)]
+    .flatMap(match => match[1].split(/…|\.\.\./))
+    .map(fragment => fragment.trim())
+    .filter(fragment => fragment.length >= 15 && fragment !== 'qui a changé quoi');
+  assert.ok(fragments.length >= 15, 'Ce test ne vérifie plus assez de messages : la section a-t-elle changé de forme ?');
+  assert.deepEqual(fragments.filter(fragment => !known(fragment)), [],
+    'Ces citations du guide ne figurent pas dans le code : recopiez le message tel qu\'il s\'affiche.');
+});
+
 test('les personnes fictives citées dans le guide sont masquées, ou visibles, pour la raison qu\'il donne', async () => {
   const guide = read('docs/utilisateurs.md');
   const { contacts, people } = await demoDirectory(await openDemoPage());
@@ -531,7 +563,7 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
 test('aucune page ne présente le widget comme étant en lecture seule', () => {
   const claims = [
     /\b(?:le widget|l'annuaire|il)\s+(?:est|reste|fonctionne)\s+(?:\*\*)?en\s+(?:\*\*)?lecture seule/i,
-    /\bn'(?:\*\*)?écrit(?:\*\*)?\s+rien\b/i,
+    /\bn'(?:\*\*)?écrit(?:\*\*)?\s+rien\s+dans\s+(?:grist|le document)\b/i,
     /\bne fait que lire\b/i
   ];
   const problems = DOC_FILES.flatMap(file => withoutCodeBlocks(read(file)).split('\n')

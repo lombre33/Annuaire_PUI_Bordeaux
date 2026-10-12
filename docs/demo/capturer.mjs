@@ -24,7 +24,7 @@ const FACTEUR_ECHELLE = 1.5; // captures nettes sur écran à haute densité san
 const MARGE = 28; // espace gardé sous l'élément qui borne la capture
 const MARGE_RANGEE = 8; // plus petite que l'écart entre deux rangées de cartes (14 px) : la rangée suivante ne déborde pas sur la capture
 const HAUTEUR_FENETRE_MODIFICATION = 1000; // la fenêtre de modification mesure au plus 900 px (dialogs.css) : elle tient en entier à l'écran
-const MARGE_FENETRE = 24; // fond assombri gardé autour de la fenêtre de modification
+const MARGE_FENETRE = 12; // fond assombri gardé autour de la fenêtre de modification
 
 let chromium;
 try {
