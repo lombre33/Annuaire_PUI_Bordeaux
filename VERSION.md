@@ -21,5 +21,5 @@ l'interrupteur de présence garde le focus pendant l'écriture, annonce sa réus
 a une piste à 3:1 au moins de son fond et reste lisible en contraste élevé (audit UI/UX).
 Depuis la 1.17.0, le responsable d'un établissement (une ligne d'`ACL`) modifie la fiche de son
 établissement (logo, nom complet, visibilité, responsables) ; le widget envoie lui-même le fichier
-du logo à Grist (réglages dans `GRIST_SETUP.md`, non essayés dans un vrai Grist). 787 tests (dont
-271 dans un vrai navigateur, optionnels sans Playwright).
+du logo à Grist (réglages dans `GRIST_SETUP.md`, non essayés dans un vrai Grist). 794 tests (dont
+277 dans un vrai navigateur, optionnels sans Playwright).

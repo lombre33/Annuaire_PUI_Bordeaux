@@ -148,8 +148,8 @@ démonstration a deux responsables fictives (CHD) et un serveur d'envoi de fichi
 
 ### Tests
 
-**787 tests** (dont 271 dans un vrai navigateur, optionnels sans Playwright) contre 643 (dont 221)
-à la sortie de la 1.16.2.
+**794 tests** (dont 277 dans un vrai navigateur, optionnels sans Playwright) contre 652 (dont 227)
+à la sortie de la 1.16.3.
 
 - *Droits* : `etablissementRightsFor()` fermé par défaut (pas d'identité, compte Lecteur, administrateur
   sans établissement) ; `responsableIds()` ; un bouton forcé à la main n'ouvre rien ; la colonne
