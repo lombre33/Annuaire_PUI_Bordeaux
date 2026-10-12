@@ -148,8 +148,8 @@ démonstration a deux responsables fictives (CHD) et un serveur d'envoi de fichi
 
 ### Tests
 
-**692 tests** (dont 234 dans un vrai navigateur, optionnels sans Playwright) contre 555 (dont 187)
-à la sortie de la 1.15.0.
+**787 tests** (dont 271 dans un vrai navigateur, optionnels sans Playwright) contre 643 (dont 221)
+à la sortie de la 1.16.2.
 
 - *Droits* : `etablissementRightsFor()` fermé par défaut (pas d'identité, compte Lecteur, administrateur
   sans établissement) ; `responsableIds()` ; un bouton forcé à la main n'ouvre rien ; la colonne
@@ -172,6 +172,16 @@ démonstration a deux responsables fictives (CHD) et un serveur d'envoi de fichi
 - *Documentation* : les phrases citées par le guide sont celles du code ; la démonstration reçoit
   l'envoi d'un logo et le sert, refuse sans jeton ou au-delà de 2 Mo ; la responsable fictive modifie
   son établissement de bout en bout ; les protections de l'envoi sont vérifiées dans le code.
+
+Contrôle négatif : 42 modifications du code de la fiche d'un établissement ont été essayées une à une
+(droit de modifier, écriture sans droit, détection d'un changement concurrent, ligne d'administrateur,
+vérification après écriture, protections de l'envoi, limites de l'image, démonstration). Les tests en
+ont détecté 34 d'emblée ; les huit autres ont montré des tests manquants (la vérification du logo et de
+la visibilité après l'écriture, une adresse portée par deux cartes, le poids d'un PNG redessiné et la
+limite de pixels d'une image, un bouton forcé à la main, le nom d'une fiche masquée), ajoutés depuis :
+sept sont maintenant détectées. La dernière (le droit de modifier recalculé au moment d'enregistrer, que
+`main.js` vérifie déjà à l'ouverture de la fenêtre) ne peut pas se produire par l'interface : c'est une
+seconde barrière, que l'écriture elle-même (`saveEtablissement()` fermé par défaut) double.
 
 ## 1.16.2 — Pastilles et lien e-mail plus foncés, lisibles (WCAG 1.4.3)
 

@@ -330,6 +330,35 @@ test('saveEtablissement reports what Grist did not keep, or that it could not ch
   assert.equal((await saveEtablissement(docApi, second.plan, { log: quiet })).unsaved, null);
 });
 
+test('saveEtablissement also names the visibility and the logo when Grist did not keep them', async () => {
+  const hidden = world();
+  const { plan } = await prepare(hidden, CHU, draft => { draft.visible = false; });
+  const forgetfulVisibility = { ...hidden.docApi, applyUserActions: async actions => {
+    const answer = await hidden.docApi.applyUserActions(actions);
+    hidden.tables.Etablissements.ok_pour_apparaitre[0] = true;
+    return answer;
+  } };
+  assert.deepEqual((await saveEtablissement(forgetfulVisibility, plan, { log: quiet })).unsaved, ['visibilité']);
+
+  const replaced = world();
+  const second = await prepare(replaced, CHU, draft => { draft.logo = { action: 'replace', file: FILE }; }, { file: FILE });
+  const forgetfulReplacement = { ...replaced.docApi, applyUserActions: async actions => {
+    const answer = await replaced.docApi.applyUserActions(actions);
+    replaced.tables.Etablissements.logo[0] = ['L', 11];
+    return answer;
+  } };
+  assert.deepEqual((await saveEtablissement(forgetfulReplacement, second.plan, { upload: uploader(77), log: quiet })).unsaved, ['logo']);
+
+  const removed = world();
+  const third = await prepare(removed, CHU, draft => { draft.logo = { action: 'remove' }; });
+  const forgetfulRemoval = { ...removed.docApi, applyUserActions: async actions => {
+    const answer = await removed.docApi.applyUserActions(actions);
+    removed.tables.Etablissements.logo[0] = ['L', 11];
+    return answer;
+  } };
+  assert.deepEqual((await saveEtablissement(forgetfulRemoval, third.plan, { log: quiet })).unsaved, ['logo']);
+});
+
 test('saveEtablissement notices a responsable change Grist silently dropped', async () => {
   const w = world();
   const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.fr'); });

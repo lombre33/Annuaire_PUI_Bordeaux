@@ -19,5 +19,5 @@ la recherche trouve « prénom nom » dans n'importe quel ordre, tirets, apostro
 sont assez foncés pour être lus (4,5:1 au moins avec le blanc, audit UI/UX).
 Depuis la 1.17.0, le responsable d'un établissement (une ligne d'`ACL`) modifie la fiche de son
 établissement (logo, nom complet, visibilité, responsables) ; le widget envoie lui-même le fichier
-du logo à Grist (réglages dans `GRIST_SETUP.md`, non essayés dans un vrai Grist). TOTAL tests (dont
-NAVIG dans un vrai navigateur, optionnels sans Playwright).
+du logo à Grist (réglages dans `GRIST_SETUP.md`, non essayés dans un vrai Grist). 787 tests (dont
+271 dans un vrai navigateur, optionnels sans Playwright).

@@ -109,7 +109,7 @@ test('une responsable voit « Modifier » sous le logo des cartes de son établi
     assert.equal(await shortcut(page).getAttribute('aria-haspopup'), 'dialog');
     await page.waitForFunction(() => document.querySelectorAll('.etab-edit').length === 3);
     const owners = await cardButtons(page).evaluateAll(nodes => nodes.map(node => node.closest('.contact-card').querySelector('.name').textContent));
-    assert.deepEqual(owners, ['Ana Martin', `${HOSTILE_FIRST_NAME} Hostile`, 'Hugo Bernard'], 'les cartes du CHU, pas celle de Gina (Bergonié)');
+    assert.deepEqual(owners, ['Hugo Bernard', `${HOSTILE_FIRST_NAME} Hostile`, 'Ana Martin'], 'les cartes du CHU (triées par nom de famille), pas celle de Gina (Bergonié)');
     const first = cardButtons(page).first();
     assert.equal(await first.textContent(), '✎ Modifier');
     assert.equal(await first.getAttribute('aria-label'), 'Modifier l’établissement CHU');
@@ -142,6 +142,26 @@ test('personne d’autre n’a de bouton d’établissement : ni une personne sa
     });
   }
 });
+
+test('un bouton « Modifier » forcé à la main sur la carte d’un établissement dont on n’est pas responsable n’ouvre rien', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => document.querySelectorAll('.etab-edit').length === 3);
+    await page.evaluate(() => {
+      // Ana est responsable du CHU, pas de l’UBM (2) : un bouton posé là par la console ne doit rien ouvrir.
+      const forged = document.createElement('button');
+      forged.className = 'etab-edit';
+      forged.dataset.etabId = '2';
+      forged.dataset.rowId = '1';
+      document.querySelector('#cardsGrid .contact-card').append(forged);
+      forged.click();
+    });
+    await page.waitForTimeout(300);
+    assert.equal(await isOpen(page), false, 'la fenêtre reste fermée');
+    assert.equal(await dlg(page).locator('#etabName').count(), 0, 'et la fiche de l’UBM n’a pas été chargée dans la fenêtre');
+    assert.deepEqual(await writes(page), []);
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
 
 test('un responsable qui n’est pas administrateur trouve ses boutons sur les cartes de son établissement partenaire', { skip }, () =>
   withWidget({ tables: world(), user: BOB_EMAIL }, async ({ page }) => {
@@ -424,6 +444,18 @@ test('on nomme un responsable par son adresse, la ligne est ajoutée à ACL sans
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
+test('nommer l’adresse d’une personne dont la fiche est masquée de l’annuaire ne dévoile pas son nom', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await openFromBar(page);
+    await dlg(page).locator('.es-add input').fill(IRIS_EMAIL);
+    await press(page, 'Nommer').click();
+    const added = rowFor(page, IRIS_EMAIL);
+    assert.equal(await added.locator('.es-resp-name').textContent(), 'Fiche masquée de l’annuaireajouté', 'Iris a refusé d’apparaître : on dit qu’elle existe, pas qui elle est');
+    assert.equal(await added.locator('.avatar').textContent(), '@');
+    assert.ok(!(await dlg(page).textContent()).includes('Iris'), 'son prénom n’est nulle part dans la fenêtre');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
 test('on nomme une personne de l’établissement depuis la liste, son nom s’affiche sans être lu comme du HTML', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await openFromBar(page);
@@ -647,6 +679,51 @@ test('un fichier refusé avant l’envoi (format, poids, contenu illisible) ne c
     assert.equal(await error.isHidden(), true, 'un bon fichier efface le message');
   }));
 
+test('une image aux dimensions démesurées, ou trop lourde une fois redessinée, est refusée avant tout envoi', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    const outcomes = await page.evaluate(async () => {
+      const { prepareImage } = await import('./image-prep.js');
+      const attempt = async (file, rules) => {
+        try {
+          const prepared = await prepareImage(file, rules);
+          return { width: prepared.width, height: prepared.height, type: prepared.blob.type };
+        } catch (error) {
+          return { refused: error.message, kind: error.name };
+        }
+      };
+      const svg = (width, height) => new File([`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"/>`], 'grand.svg', { type: 'image/svg+xml' });
+      // Du bruit : un JPEG de peu d’octets qui, redessiné en PNG, est incompressible.
+      const canvas = document.createElement('canvas');
+      canvas.width = 480;
+      canvas.height = 480;
+      const context = canvas.getContext('2d');
+      const noise = context.createImageData(480, 480);
+      for (let offset = 0; offset < noise.data.length; offset += 65536) {
+        crypto.getRandomValues(noise.data.subarray(offset, Math.min(offset + 65536, noise.data.length)));
+      }
+      for (let i = 3; i < noise.data.length; i += 4) noise.data[i] = 255;
+      context.putImageData(noise, 0, 0);
+      const jpeg = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.3));
+      const heavy = new File([jpeg], 'bruit.jpg', { type: 'image/jpeg' });
+      return {
+        boundary: await attempt(svg(8000, 5000)),
+        tooManyPixels: await attempt(svg(8001, 5000)),
+        enormous: await attempt(svg(20000, 20000)),
+        jpegBytes: jpeg.size,
+        heavyAfterRedraw: await attempt(heavy, { types: ['image/jpeg'], maxBytes: jpeg.size + 1024, maxSide: 480 })
+      };
+    });
+    assert.deepEqual(outcomes.boundary, { width: 480, height: 300, type: 'image/png' }, '40 millions de pixels pile passent, ramenés à 480 px');
+    const huge = { refused: 'Cette image est beaucoup trop grande : choisissez-en une plus petite.', kind: 'ImageError' };
+    assert.deepEqual(outcomes.tooManyPixels, huge, 'un pixel de plus que la limite');
+    assert.deepEqual(outcomes.enormous, huge);
+    assert.match(outcomes.heavyAfterRedraw.refused, /^Une fois redessinée, cette image pèse \d,\d Mo : choisissez-en une plus simple, de \d,\d Mo au plus\.$/,
+      `un JPEG de ${outcomes.jpegBytes} octets devient un PNG plus lourd que la limite : ${JSON.stringify(outcomes.heavyAfterRedraw)}`);
+    assert.deepEqual(await writes(page), []);
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
 test('« Retirer le logo » vide la cellule : les cartes reprennent le sigle', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
     await openFromBar(page);
@@ -847,12 +924,15 @@ test('Échap prévient avant d’abandonner des modifications, le second appui f
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
     await cardButtons(page).first().waitFor();
+    // Les cartes sont triées par nom : la première qui porte un bouton n'est pas forcément celle d'Ana.
+    const rowId = await cardButtons(page).first().getAttribute('data-row-id');
+    const sameButton = `#cardsGrid .etab-edit[data-row-id="${rowId}"]`;
     await cardButtons(page).first().click();
     await nameInput(page).waitFor();
     assert.equal(await page.evaluate(() => document.activeElement.id), 'etabTitle');
     await page.keyboard.press('Escape');
     await closed(page);
-    await focusReturnsTo(page, '#cardsGrid .etab-edit[data-row-id="1"]');
+    await focusReturnsTo(page, sameButton);
 
     await cardButtons(page).first().click();
     await nameInput(page).waitFor();
@@ -867,7 +947,7 @@ test('Échap prévient avant d’abandonner des modifications, le second appui f
     assert.equal(await isOpen(page), true);
     await page.keyboard.press('Escape');
     await closed(page);
-    await focusReturnsTo(page, '#cardsGrid .etab-edit[data-row-id="1"]');
+    await focusReturnsTo(page, sameButton);
     assert.deepEqual(await writes(page), []);
     assert.equal(await page.locator('#toast').isHidden(), true);
   }));

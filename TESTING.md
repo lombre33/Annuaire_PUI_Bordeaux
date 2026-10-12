@@ -150,7 +150,7 @@ carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numé
 et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
 les tâches par action.
 
-`tests/e2e-profile.test.mjs` y ajoute 61 scénarios sur la modification d'une fiche : qui
+`tests/e2e-profile.test.mjs` y ajoute 62 scénarios sur la modification d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
 compte Lecteur, anonyme, adresse inconnue, doublon), le formulaire et ses refus, la
 relecture (carte avant et carte après, ce qui change repéré, rien d'écrit), l'écriture
@@ -163,12 +163,14 @@ texte, un refus de Grist, un changement concurrent, une fiche supprimée, le dou
 rangé sous la fonction, le bandeau « Ma présence » qui ne se chevauche à aucune largeur et
 l'affichage de 280 à 360px.
 
-`tests/e2e-etablissement.test.mjs` y ajoute 45 scénarios sur la fiche d'un établissement :
+`tests/e2e-etablissement.test.mjs` y ajoute 49 scénarios sur la fiche d'un établissement :
 qui voit « ✎ Modifier » sous un logo et « Mon établissement » (responsable, administrateur non
-responsable, compte Lecteur, anonyme, plusieurs établissements, établissement masqué), le contenu de
+responsable, compte Lecteur, anonyme, plusieurs établissements, établissement masqué, bouton forcé à
+la main), le contenu de
 la fenêtre face à la maquette v5, l'enregistrement du nom, de la visibilité, du logo (PNG, JPG, WebP,
 SVG piégé redessiné en PNG, retrait) et des responsables (nommer, retirer, rétablir, dernier
-responsable, retrait de soi-même), les refus avant envoi et les pannes de l'envoi (droits, taille,
+responsable, retrait de soi-même, adresse dont la fiche est masquée), les refus avant envoi (dont les
+dimensions démesurées et le poids d'un PNG redessiné) et les pannes de l'envoi (droits, taille,
 serveur, réponse illisible, jeton refusé), le fichier resté sans servir, le refus de Grist, le conflit
 pendant que la fenêtre est ouverte, Échap, le double clic, le clavier et les noms accessibles, la
 mise en page de 320 à 1280px et l'absence de tout appel réseau autre que l'API simulée.

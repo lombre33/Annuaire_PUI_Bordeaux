@@ -115,6 +115,13 @@ test('peopleOfEtablissement lists, alphabetically and once per address, the peop
   assert.equal(result.includesMe, true);
 });
 
+test('peopleOfEtablissement keeps the first card of an address that two cards share', () => {
+  const contacts = [card('Ana', 'Martin', 'partagee@x.fr', 1), card('Anne', 'Dupont', 'PARTAGEE@x.fr', 1)];
+  assert.deepEqual(peopleOfEtablissement(contacts, 1, '', initialsOf).candidates, [
+    { email: 'partagee@x.fr', name: 'Ana Martin', initials: 'AM' }
+  ]);
+});
+
 test('peopleOfEtablissement does not count the cards of other establishments, nor invent a presence for me', () => {
   const contacts = [card('Bob', 'Durand', 'bob@x.fr', 2), card('Ana', 'Martin', 'ana@x.fr', ['R', 'Etablissements', 1])];
   assert.deepEqual(peopleOfEtablissement(contacts, 2, 'ana@x.fr', initialsOf), {
