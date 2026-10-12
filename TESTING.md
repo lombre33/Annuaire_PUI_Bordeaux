@@ -13,15 +13,23 @@ tests automatisés suffisent à condition d'être complétés pour le changement
 node --test
 ```
 
-Sans dépendance : tests unitaires de `tests/data.test.mjs` — `text`,
-`normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
-`pickLabel`, `labelMapFromRows`, `etablissementFlagsFromRows` (dont les
-doublons), `refId`, `refLabel`, `mailtoHref`, `enrich` (établissement dans ses
-3 encodages, rôle, catégories liste, compétences), `isInScope`,
-`filterContacts`, `createEmptyFilterState`, `pruneStaleFilters`,
-`createRequestSequencer`, `referenceMapsEqual`, et `loadDirectory()` avec un
-faux `docApi` (une lecture par table, tables indispensables illisibles, table
-de référence illisible, colonnes manquantes, annuaire vide expliqué).
+Sans dépendance, un fichier de tests par module :
+
+- `tests/grist-data.test.mjs` — décodage et formats des données Grist : `text`,
+  `normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
+  `pickLabel`, `labelMapFromRows`, `refId`, `refLabel`, `resolveListItem`,
+  `isInScope`, `createRequestSequencer`, `referenceMapsEqual`, `mailtoHref`.
+- `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
+  catégories liste, compétences, indicateurs) et `labelsOf`.
+- `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
+  doublons), `etablissementFlags`, `isEtablissementEligible`,
+  `filterVisibleEstablishments`.
+- `tests/filters.test.mjs` — `filterContacts`, `pruneStaleFilters`,
+  `computeFilterCounts`.
+- `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
+  (une lecture par table, tables indispensables illisibles, table de référence
+  illisible, colonnes manquantes, annuaire vide expliqué).
+- `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`).
 
 Avec Playwright (`npm install --no-save playwright`, puis
 `npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 20
@@ -39,9 +47,9 @@ il ne garantit pas que Grist envoie toujours ces formes — d'où le protocole
 manuel ci-dessous, à jouer dans un vrai document avant déploiement.
 
 Si vous ajoutez une fonction à `grist-data.js` ou `filters.js` : ajoutez son
-test dans `tests/data.test.mjs`. Si vous changez l'affichage, ajoutez ou
-adaptez un scénario de `tests/e2e.test.mjs` — n'attendez pas une revue
-ultérieure.
+test dans le fichier de `tests/` qui correspond à son rôle (liste ci-dessus).
+Si vous changez l'affichage, ajoutez ou adaptez un scénario de
+`tests/e2e.test.mjs` — n'attendez pas une revue ultérieure.
 
 ## Préparation
 

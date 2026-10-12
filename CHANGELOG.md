@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.7.2 — Refactor sans changement de comportement
+
+Relecture « dev senior » de l'audit : le code est réorganisé pour se lire et se
+modifier plus facilement. Aucune règle d'affichage ne change. Vérifié en
+rejouant 25 étapes d'un même scénario (recherche, filtres, interrupteurs,
+pannes de lecture...) sur la 1.7.1 et sur cette version : DOM et captures
+d'écran identiques, hors l'attribut `data-value` ajouté aux options de filtre.
+
+- **Taxonomie unique** : `constants.js` déclare chaque catégorie une seule fois
+  (`CATEGORIES` : libellé, couleur, table et colonne Grist). `FILTERS`,
+  `TAG_GROUPS`, `REFERENCE_TABLES` et `LIST_CATEGORIES` en sont dérivés. Ajouter
+  une catégorie = une entrée (avant : trois listes à garder cohérentes).
+- **Libellés regroupés** : un contact enrichi porte `labels: { clé: [...] }`,
+  lu par `labelsOf(contact, clé)`, au lieu de clés `instances_labels`,
+  `role_labels`... reconstruites par concaténation de chaînes dans trois
+  fichiers (une faute de frappe y faisait disparaître des tags sans erreur).
+- **Fonctions courtes** : `createFilterUI` (80 lignes), `renderCards` (65) et
+  `loadDirectory` (57) sont découpées en étapes nommées ; `filterContacts` en
+  trois prédicats. `setBadge`, `orderedValues`, `isBlank` et `currentCounts`
+  remplacent du code écrit deux ou trois fois.
+- **`pruneStaleFilters()`** renvoie un nouvel état au lieu de modifier son
+  argument : `filters.js` n'a plus d'effet de bord.
+- **Valeur d'une option de filtre** posée dans `data-value` à la création, au
+  lieu d'être relue depuis le texte affiché.
+- **Commentaires** réécrits : ils disent pourquoi le code est ainsi ; l'histoire
+  des bugs est ici et dans les messages de commit.
+- **CSS et HTML** reformatés (une règle ou un élément par ligne). Code mort
+  retiré : six règles `[data-category]`, `.active-chip` et la zone vide
+  `#activeFilters` (son espacement est repris par `.cards-grid`).
+- **Tests** : 82 tests, dont un nouveau pour `labelsOf`. Les tests unitaires
+  sont répartis par module (`tests/grist-data.test.mjs`, `enrich`,
+  `etablissements`, `filters`, `load-directory`, `constants`) au lieu d'un seul
+  fichier de 600 lignes ; leur contenu est inchangé.
+
 ## 1.7.1 — Pannes de lecture Grist visibles, chargement unique, test navigateur
 
 Correctifs issus de l'audit qualité/sécurité. Aucun changement de règle

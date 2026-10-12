@@ -1,7 +1,7 @@
-# Version 1.7.1 — Pannes de lecture Grist visibles, chargement unique, test navigateur (voir CHANGELOG.md)
+# Version 1.7.2 — Refactor sans changement de comportement (voir CHANGELOG.md)
 
-Un échec de lecture Grist ou une colonne manquante affiche désormais un
-bandeau explicite au lieu d'un « 0 contact » silencieux. Les tables sont lues
-une seule fois par chargement, les acronymes d'établissement en double ne
-dépendent plus de leur ordre, et le lien mailto n'est créé que pour une adresse
-simple. 76 tests (dont 20 dans un vrai navigateur, optionnels sans Playwright).
+Le code est réorganisé pour se lire et se modifier plus facilement : taxonomie
+déclarée une seule fois (`constants.js`), libellés d'un contact regroupés dans
+`labels`, fonctions longues découpées, tests répartis par module. L'affichage et
+les règles sont identiques à la 1.7.1. 82 tests (dont 20 dans un vrai
+navigateur, optionnels sans Playwright).

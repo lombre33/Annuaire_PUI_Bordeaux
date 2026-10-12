@@ -1,5 +1,6 @@
-// Point d'entrée — câblage Grist + DOM. Toute la logique métier vit dans
-// grist-data.js / filters.js / render.js et est testée séparément.
+// Point d'entrée : relie l'API Grist et les événements du DOM aux modules
+// grist-data.js (lecture, enrichissement), filters.js (filtrage) et render.js
+// (construction du DOM).
 
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
@@ -8,20 +9,14 @@ import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts } from 
 const state = {
   allContacts: [],
   referenceMaps: {},
-  // Comme referenceMaps, mais la table Etablissements y est restreinte aux
-  // lignes ok_pour_apparaitre (filterVisibleEstablishments()) — sert
-  // uniquement à construire/purger le menu du filtre Établissement, pas à
-  // résoudre le libellé d'un contact (enrich() continue d'utiliser
-  // referenceMaps, non filtré, pour ça).
+  // referenceMaps dont la table Etablissements est restreinte aux lignes
+  // ok_pour_apparaitre : réservé aux menus de filtres, jamais utilisé pour
+  // résoudre le libellé d'un contact.
   filterReferenceMaps: {},
   activeFilters: createEmptyFilterState(),
   searchTerm: '',
-  // Affichage des contacts par statut d'établissement (cf. specs.md) —
-  // Fondateurs coché par défaut, Partenaires décoché. Indépendant de
-  // FILTERS/activeFilters (pas un menu de valeurs, voir filterContacts() dans
-  // filters.js). Volontairement PAS remis à ce défaut par "Réinitialiser"
-  // (cf. bouton reset ci-dessous) : une fois touché par l'utilisateur pendant
-  // la session, son choix est conservé.
+  // Interrupteurs Fondateurs/Partenaires (specs.md), hors de activeFilters :
+  // ce ne sont pas des valeurs de menu. « Réinitialiser » n'y touche pas.
   scope: { fondateur: true, partenaire: false }
 };
 
@@ -42,16 +37,20 @@ function toggleFilter(filterKey, value) {
   const set = state.activeFilters[filterKey];
   if (set.has(value)) set.delete(value);
   else set.add(value);
-  // Que le clic vienne d'une case du menu ou d'une bulle de carte (même
-  // onToggle des deux côtés), le menu du filtre concerné doit refléter la
-  // nouvelle sélection (coché en tête + badge de comptage).
+  // Une case de menu et une bulle de carte appellent ce même toggle : le menu
+  // concerné doit refléter la sélection dans les deux cas.
   updateFilterUI(elements.filtersContainer, filterKey, state.activeFilters);
   refreshCards();
 }
 
+// Chaque option de menu affiche le nombre de cartes qu'elle donnerait si on la
+// cochait, compte tenu des autres filtres actifs : recalculé à chaque changement.
+function currentCounts() {
+  return computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
+}
+
 function rebuildFilterUI() {
-  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter,
-    computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
+  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter, currentCounts());
 }
 
 function refreshCards() {
@@ -59,12 +58,7 @@ function refreshCards() {
   renderCards(elements.grid, elements.template, filtered, toggleFilter);
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
-  // Recalculé à chaque changement (recherche, scope, filtre, reset) : le
-  // nombre affiché à côté de chaque option d'un menu reflète le nombre de
-  // cartes qui matcheraient SI cette option était cochée, compte tenu de tous
-  // les autres filtres actifs déjà — pas seulement de celui-ci isolé.
-  const counts = computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
-  updateFilterCounts(elements.filtersContainer, counts);
+  updateFilterCounts(elements.filtersContainer, currentCounts());
 }
 
 elements.searchInput.addEventListener('input', event => {
@@ -86,12 +80,8 @@ elements.resetFilters.addEventListener('click', () => {
   Object.values(state.activeFilters).forEach(set => set.clear());
   state.searchTerm = '';
   elements.searchInput.value = '';
-  // Ne touche volontairement PAS à state.scope/elements.scopeButtons : les
-  // interrupteurs Fondateurs/Partenaires ne font pas partie de ce que
-  // "Réinitialiser" remet à zéro (cf. demande) — un choix fait pendant la
-  // session (ex: activer Partenaires) survit au clic sur ce bouton.
-  // Reconstruit l'UI des filtres pour vider aussi les champs de recherche
-  // internes à chaque dropdown (pas seulement les cases cochées).
+  // Fondateurs/Partenaires ne sont volontairement pas remis à zéro. Les menus
+  // sont reconstruits pour vider aussi leur champ de recherche interne.
   rebuildFilterUI();
   refreshCards();
 });
@@ -100,17 +90,14 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
 });
 
-// Bandeau d'état : vide = masqué. Sert aux pannes de lecture et aux données à
-// corriger dans Grist, pour qu'un annuaire incomplet ne passe jamais pour un
-// annuaire vide.
+// Bandeau d'état (masqué si `messages` est vide) : un annuaire incomplet ne doit
+// jamais passer pour un annuaire vide.
 function showStatus(messages) {
   elements.statusBanner.textContent = messages.join(' ');
   elements.statusBanner.hidden = messages.length === 0;
 }
 
-// Un échec de lecture Grist ne doit pas se présenter comme « 0 contact » : on
-// l'affiche explicitement. Les cartes déjà affichées (chargement précédent
-// réussi) restent en place.
+// Les cartes déjà affichées (chargement précédent réussi) restent en place.
 function showLoadError(error) {
   const reason = error instanceof DirectoryLoadError ? ` (${error.message})` : '';
   showStatus([`Impossible de charger l'annuaire depuis Grist${reason}. Rechargez la page ; `
@@ -126,45 +113,35 @@ function debounce(fn, wait) {
   };
 }
 
-// Grist peut redéclencher onRecords très souvent (toute édition validée sur
-// n'importe quel champ, par n'importe qui, pendant que le widget est ouvert).
-// Le debounce absorbe les rafales d'éditions rapprochées ; le sequencer (voir
-// grist-data.js) protège en plus contre le cas où deux invocations non
-// absorbées par le debounce se chevauchent quand même et résolvent dans le
-// désordre.
+// onRecords se redéclenche à chaque édition dans Grist. Le debounce absorbe les
+// rafales ; le sequencer écarte le résultat d'une lecture lente quand une plus
+// récente a déjà démarré.
 const recordsSequencer = createRequestSequencer();
 
 window.grist.ready({ requiredAccess: 'full' });
 
-// Applique un annuaire chargé : état, menus de filtres (reconstruits seulement
-// si les libellés ont changé) puis cartes.
 function applyDirectory({ contacts, referenceMaps, etabFlags }) {
-  // Le menu du filtre Établissement ne propose que les établissements
-  // ok_pour_apparaitre ; referenceMaps complet reste utilisé pour résoudre le
-  // libellé affiché sur une carte (enrich()).
   const filterReferenceMaps = {
     ...referenceMaps,
     Etablissements: filterVisibleEstablishments(referenceMaps.Etablissements, etabFlags)
   };
-  // Reconstruire l'UI des filtres est destructif (ferme les menus ouverts, vide
-  // leur champ de recherche) : on ne le fait que si les libellés ont changé.
+  // Reconstruire les menus ferme ceux qui sont ouverts : seulement si les
+  // libellés ont changé.
   const referenceMapsChanged = !referenceMapsEqual(state.filterReferenceMaps, filterReferenceMaps);
   state.referenceMaps = referenceMaps;
   state.filterReferenceMaps = filterReferenceMaps;
 
-  // Une sélection dont le libellé a été renommé/supprimé côté Grist (ou, pour
-  // Établissement, dont ok_pour_apparaitre est passé à false) est purgée
-  // avant de filtrer les cartes.
-  pruneStaleFilters(state.activeFilters, filterReferenceMaps);
+  // Une sélection dont le libellé a disparu côté Grist est purgée avant de filtrer.
+  state.activeFilters = pruneStaleFilters(state.activeFilters, filterReferenceMaps);
 
   state.allContacts = contacts;
   if (referenceMapsChanged) rebuildFilterUI();
   refreshCards();
 }
 
-// onRecords() ne sert qu'à SAVOIR QUAND rafraîchir : son payload par ligne ne
-// contient pas forcément toutes les colonnes d'Annuaire (ex. Etablissement2,
-// colonne formule), alors que fetchTable() renvoie toujours la table complète.
+// onRecords() ne sert qu'à savoir quand rafraîchir : son contenu ne porte pas
+// forcément toutes les colonnes d'Annuaire (Etablissement2 est une formule),
+// alors que fetchTable() renvoie la table complète.
 window.grist.onRecords(debounce(async () => {
   const requestId = recordsSequencer.next();
   try {
