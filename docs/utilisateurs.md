@@ -25,7 +25,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 - Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (instances, actions, groupes de travail ou GT, communautés, tâches, compétences, rôle).
 - On retrouve quelqu'un par son **nom** ou, grâce aux **filtres**, par ce qu'il fait.
-- L'annuaire s'ouvre dans Grist, sur un **écran d'ordinateur** : il n'est pas prévu pour un téléphone.
+- L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un grand écran, une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
 - Il est en **lecture seule** : on n'y modifie rien. Pour corriger ou compléter une information, adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist.
 
 ## Lexique du PUI
@@ -197,7 +197,7 @@ Ils ne s'affichent que s'ils sont renseignés dans Grist.
 
 **Puis-je utiliser l'annuaire sur mon téléphone ?**
 
-Il est conçu pour un écran d'ordinateur (largeur minimale de 980 pixels) : sur un petit écran, la mise en page n'est pas adaptée.
+Oui : l'annuaire s'adapte à la largeur de la zone que Grist lui donne. Sur un petit écran ou dans un panneau étroit, les cartes passent sur une colonne, la recherche et les filtres s'empilent, le texte est plus grand et les boutons sont plus faciles à toucher. Cet affichage a été vérifié dans un navigateur de bureau avec un écran tactile simulé, pas encore sur un téléphone : signalez à l'administrateur des données ce qui s'afficherait mal.
 
 **Mes coordonnées sont-elles visibles par tout le monde ?**
 

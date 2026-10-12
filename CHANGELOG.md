@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.9.1 — Le widget s'adapte à la largeur de son cadre (responsive)
+
+Le widget exigeait 980px de large (`body { min-width: 980px }`, « Pas de responsive »
+dans `specs.md`). Or sa largeur est celle de la section Grist qui le porte : dans un
+panneau étroit, sur une tablette ou un téléphone, la page défilait horizontalement
+(660px de trop à 320px de large), les trois colonnes de cartes ne bougeaient pas, 7
+menus de filtres sur 8 sortaient du cadre à 320px et le badge de l'établissement
+recouvrait la fin du nom (jusqu'à 92px, et encore 52px à 1920px pour les noms les plus longs).
+Mesuré de 320 à 1920px sur 30 contacts aux noms, adresses et tags très longs
+(`tests/fixtures-responsive.mjs`).
+
+À partir de 1400px, la mise en page est celle de la 1.9.0 : sur les 22 contacts
+fictifs de `docs/demo`, 25 captures pleine page (1400, 1440, 1480, 1600 et 1920px ;
+liste, recherche, interrupteur Partenaires, menu ouvert, état vide) et les 10
+captures de la documentation sont identiques au pixel près, tout comme celles du jeu
+chargé de `tests/fixtures-responsive.mjs` une fois ses noms raccourcis. Seuls
+changent les noms qui passaient sous le badge et les textes sans point de coupure.
+
+- **Cartes** : trois colonnes dès 840px, deux de 600 à 839px, une sous 600px (avant :
+  trois colonnes de 240px au moins). Marges de 12px sous 600px, au lieu de 34px.
+- **Barre d'outils** : sous 1400px, la recherche, les interrupteurs
+  Fondateurs/Partenaires et « Réinitialiser » passent sur une première rangée et les
+  filtres prennent toute la largeur dessous (à 1024px : 2 rangées de filtres au lieu
+  de 4). Sous 600px, tout s'empile et s'étire d'un bord à l'autre : la recherche, les
+  filtres, puis les interrupteurs.
+- **Nom et badge de l'établissement** : ils partagent la même rangée de la carte, le
+  nom ne passe plus dessous. Il peut tenir sur deux lignes au lieu d'être coupé par
+  une ellipse ; la fonction garde, dessous, toute la largeur de la carte. Un nom, une
+  fonction, un tag ou une adresse e-mail sans point de coupure revient à la ligne
+  dans sa carte au lieu de la dépasser.
+- **Menus de filtres** : un menu plus large que le cadre (270px) est réduit à sa
+  largeur, et `keepMenuInView()` (`render.js`) décale un menu ouvert vers la gauche
+  juste assez pour qu'il reste dans le cadre. Dans un cadre large, il ne bouge pas :
+  il s'ouvre sous son bouton, comme avant.
+- **Petit écran, écran tactile** : sous 600px ou avec un écran tactile (`pointer:
+  coarse`), le texte des cartes passe de 8,5-10,5px à 10-12px (nom à 15px au lieu de
+  14). Sous 600px, le titre passe de 34 à 28px et le compteur de résultats passe
+  sous lui. Au tactile : tags et badges d'au moins 28px de haut, lien e-mail d'au
+  moins 24px, options de menu de 44px, champs de saisie à 16px (en dessous, iOS zoome
+  sur la page à la saisie) ; le survol ne reste pas « collé » après un appui
+  (`hover: none`).
+- **Tests** : `tests/responsive.test.mjs`, 15 scénarios dans un vrai navigateur, de
+  280 à 1920px, de part et d'autre de chaque seuil et avec des barres de défilement
+  visibles (15px de moins), plus un contrôle du jeu de données (coordonnées
+  fictives). 13 des 15 scénarios échouent sur la 1.9.0 ; les deux autres vérifient
+  la mise en page de bureau, qui ne change pas. Des variantes cassées à la main (une
+  règle de `style.css` ou de `render.js` retirée ou modifiée à la fois) font échouer
+  au moins un scénario, sauf celles sans effet visible ou qui ne changent qu'un
+  espacement ; ce contrôle a fait retirer quatre règles sans effet ou non vérifiables.
+- **Documentation** : `specs.md` (« Pas de responsive » remplacé par l'exigence),
+  `TESTING.md` (section 12 du protocole manuel), README et pages de `docs/` qui
+  disaient « pas de version mobile ».
+- **Limites** : vérifié dans Chromium (écran tactile émulé compris), pas dans Safari,
+  Firefox ni un vrai Grist sur téléphone : voir `TESTING.md`, section 12. Entre 600
+  et 675px de large environ, « Réinitialiser » se retrouve seul sur sa ligne, sous la
+  recherche. Les espacements (marges, hauteurs de boutons, arrondis) ne sont pas
+  contrôlés par les tests.
+
 ## 1.9.0 — Filtre « Domaines » : la recherche par compétences macro
 
 Le document Grist regroupe désormais les compétences par domaine
