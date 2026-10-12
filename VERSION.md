@@ -1,4 +1,4 @@
-# Version 1.16.3 — Interrupteur de présence accessible (voir CHANGELOG.md)
+# Version 1.17.0 — La fiche d'un établissement, modifiée par son responsable (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -19,4 +19,7 @@ la recherche trouve « prénom nom » dans n'importe quel ordre, tirets, apostro
 sont assez foncés pour être lus (4,5:1 au moins avec le blanc, audit UI/UX). Depuis la 1.16.3,
 l'interrupteur de présence garde le focus pendant l'écriture, annonce sa réussite aux lecteurs d'écran,
 a une piste à 3:1 au moins de son fond et reste lisible en contraste élevé (audit UI/UX).
-652 tests (dont 227 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.17.0, le responsable d'un établissement (une ligne d'`ACL`) modifie la fiche de son
+établissement (logo, nom complet, visibilité, responsables) ; le widget envoie lui-même le fichier
+du logo à Grist (réglages dans `GRIST_SETUP.md`, non essayés dans un vrai Grist). 794 tests (dont
+277 dans un vrai navigateur, optionnels sans Playwright).

@@ -116,9 +116,10 @@ export function withTaskActions(tables = sampleTables()) {
   return copy;
 }
 
-// Adresses de personnes de l'exemple. Ana figure dans BDD et dans ACL (administratrice,
-// écrite avec des majuscules dans ACL) ; ADMIN_EMAIL est administrateur sans ligne
-// dans BDD ; Iris a refusé d'apparaître ; Bob est partenaire (UBM).
+// Adresses de personnes de l'exemple. Ana figure dans BDD et dans ACL (administratrice et
+// responsable du CHU, écrite avec des majuscules dans ACL) ; ADMIN_EMAIL est administrateur sans
+// ligne dans BDD ; Iris a refusé d'apparaître ; Bob est partenaire (UBM) et responsable de son
+// établissement.
 export const ANA_EMAIL = 'ana.martin@chu-bordeaux.fr';
 export const BOB_EMAIL = 'bob@u-bordeaux-montaigne.fr';
 export const IRIS_EMAIL = 'iris@chu-bordeaux.fr';
@@ -134,7 +135,7 @@ export function withIdentity(tables = sampleTables()) {
     Responsable_de_l_Etablissement: [1, 0, 2],
     admin: [true, true, false]
   };
-  copy.Annuaire_Sonde = { id: [], Email: [], Admin: [] };
+  copy.Annuaire_Sonde = { id: [], Email: [], Admin: [], Responsable_de: [] };
   return copy;
 }
 
