@@ -154,3 +154,41 @@ export async function withWidget(options, run) {
   }
 }
 
+// Le pied d'une fenêtre (`.dlg-foot`) : le résumé n'impose aucune largeur, il partage la ligne des
+// boutons dès que son texte et les boutons tiennent ensemble (comme sur la maquette), et passe au-dessus
+// sinon. On mesure la largeur naturelle du texte et des boutons avec la police du poste, puis on règle
+// la largeur de l'écran juste au-dessus (tout tient : une seule ligne) et juste en dessous (deux lignes) :
+// le contrôle ne dépend donc pas de la police. `selector` : la fenêtre (« #etabDialog »).
+export async function assertFooterWraps(page, selector, { height = 844 } = {}) {
+  const natural = await page.evaluate(dialog => {
+    const foot = document.querySelector(`${dialog} .dlg-foot`);
+    const range = document.createRange();
+    range.selectNodeContents(foot.querySelector('.dlg-summary'));
+    const style = getComputedStyle(foot);
+    return {
+      text: range.getBoundingClientRect().width,
+      actions: foot.querySelector('.dlg-actions').getBoundingClientRect().width,
+      gap: parseFloat(style.columnGap) || 0,
+      padding: parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+    };
+  }, selector);
+  const together = Math.ceil(natural.padding + natural.text + natural.gap + natural.actions);
+  assert.ok(together + 2 <= 560, `${selector} : le résumé et les boutons (${together} px) tiennent dans une fenêtre pleine largeur`);
+  const rows = async width => {
+    await page.setViewportSize({ width, height });
+    return page.evaluate(dialog => {
+      const foot = document.querySelector(`${dialog} .dlg-foot`);
+      const summary = foot.querySelector('.dlg-summary').getBoundingClientRect();
+      const actions = foot.querySelector('.dlg-actions').getBoundingClientRect();
+      return { summaryMiddle: summary.top + summary.height / 2, summaryBottom: summary.bottom, actionsTop: actions.top, actionsBottom: actions.bottom };
+    }, selector);
+  };
+
+  const fits = await rows(Math.max(320, together + 2));
+  assert.ok(fits.summaryMiddle >= fits.actionsTop && fits.summaryMiddle <= fits.actionsBottom,
+    `${selector} : à ${together + 2} px, le résumé est sur la ligne des boutons`);
+  if (together - 30 >= 320) {
+    const wraps = await rows(together - 30);
+    assert.ok(wraps.summaryBottom <= wraps.actionsTop + 1, `${selector} : à ${together - 30} px, le résumé passe au-dessus des boutons`);
+  }
+}

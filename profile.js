@@ -25,6 +25,9 @@ const SPREADSHEET_FORMULA_START = /^[=+\-@]/;
 // « % » : ce qu'un lien « mailto: » ne saurait pas porter (voir mailtoHref).
 const EMAIL_SHAPE = /^[^\s@,;:<>()"\\?#&%]+@[^\s@,;:<>()"\\?#&%]+\.[^\s@,;:<>()"\\?#&%.]{2,}$/;
 
+// Vrai si `value` (déjà nettoyé, en minuscules) a la forme d'une adresse e-mail simple.
+export const isEmailAddress = value => EMAIL_SHAPE.test(value);
+
 // ===== Qui peut modifier quelle fiche =====
 
 // Renvoie une fonction `row → droit` pour la personne connectée : 'own' (c'est sa

@@ -113,10 +113,12 @@ const COMPETENCES = [
   { libelle: 'Communication scientifique', domaine: '' }
 ];
 
-// Ordre d'affichage = ordre de la table (le widget ne trie pas les cartes).
+// Ordre de la table ; le widget affiche les cartes par nom de famille (compareContacts, grist-data.js).
 // `visible: false` : contact hors périmètre (perimetre vide).
 // `accepte: false` : la personne n'a pas donné son accord (Accepte_apparaitre).
 // `admin: true` : administrateur, déclaré dans la table ACL.
+// `responsable: true` : responsable de son établissement (1.17.0), déclaré dans la table ACL : elle
+// ou il modifie la fiche de l'établissement, et d'abord nomme les autres responsables.
 const CONTACTS = [
   {
     prenom: 'Camille', nom: 'Rousseau', fonction: 'Cheffe de projet innovation', etab: 'CHD', tel: '0536490112',
@@ -148,7 +150,7 @@ const CONTACTS = [
   },
   {
     prenom: 'Sofia', nom: 'Almeida', fonction: 'Directrice de la recherche clinique', etab: 'CHD', tel: '0536490590',
-    role: 'Membre du comité',
+    role: 'Membre du comité', responsable: true,
     instances: ['Comité d\'éthique', 'Conseil scientifique'], actions: ['Action 2: Maturation de projets'],
     gt: ['GT Données de santé'], communautes: ['Santé numérique'], taches: ['2.2 Relecture de dossiers'],
     competences: ['Essais cliniques', 'Dispositifs médicaux', 'Open science']
@@ -175,6 +177,7 @@ const CONTACTS = [
   },
   {
     prenom: 'Léa', nom: 'Fontaine', fonction: 'Gestionnaire de projets européens', etab: 'CHD', tel: '0536490956',
+    responsable: true,
     actions: ['Action 6: Recherche de financements'], gt: ['GT Financement'], taches: ['2.1 Suivi de projets', '2.2 Relecture de dossiers'],
     competences: ['Financement de l\'innovation', 'Gestion de projet']
   },
@@ -246,7 +249,8 @@ function adresse({ prenom, nom, etab }) {
 
 // Les personnes que la démonstration peut « connecter » (?connecte=adresse) et les
 // captures de « Ma présence » : une qui apparaît, une d'un établissement partenaire,
-// une qui a refusé, une qui a accepté mais reste masquée, un administrateur.
+// une qui a refusé, une qui a accepté mais reste masquée, un administrateur, une responsable
+// d'établissement.
 const adresseDe = (prenom, nom) => {
   const contact = CONTACTS.find(candidat => candidat.prenom === prenom && candidat.nom === nom);
   if (!contact) throw new Error(`Personne inconnue dans les données fictives : ${prenom} ${nom}`);
@@ -257,7 +261,8 @@ export const PERSONNES_DEMO = {
   partenaire: adresseDe('Clara', 'Dubois'),
   refus: adresseDe('Lucas', 'Mercier'),
   masquee: adresseDe('Sarah', 'Colin'),
-  administrateur: adresseDe('Mehdi', 'Bensaïd')
+  administrateur: adresseDe('Mehdi', 'Bensaïd'),
+  responsable: adresseDe('Léa', 'Fontaine')
 };
 
 // Le libellé brut d'un import : sans accents ni majuscules. Seul le libellé
@@ -319,7 +324,10 @@ export function tablesFictives() {
   const idsReferences = Object.fromEntries(Object.entries(REFERENCES).map(([cle, ref]) => [cle, ids(ref.libelles)]));
   const idsRoles = ids(ROLES.libelles);
   const idsCompetences = ids(COMPETENCES.map(competence => competence.libelle));
-  const admins = CONTACTS.filter(contact => contact.admin);
+  const acl = [
+    ...CONTACTS.filter(contact => contact.admin).map(contact => ({ contact, etablissement: 0, admin: true })),
+    ...CONTACTS.filter(contact => contact.responsable).map(contact => ({ contact, etablissement: idsEtablissements[contact.etab], admin: false }))
+  ];
   CONTACTS.forEach(contact => {
     if (contact.etab && !Object.hasOwn(idsEtablissements, contact.etab)) {
       throw new Error(`Établissement inconnu dans les données fictives : « ${contact.etab} »`);
@@ -375,13 +383,14 @@ export function tablesFictives() {
     [ROLES.table]: { id: ROLES.libelles.map((_, index) => index + 1), [ROLES.colonne]: [...ROLES.libelles] },
     // Table-sonde (GRIST_SETUP.md, étape 2) : vide au repos, le widget y ajoute puis y
     // retire une ligne pour savoir qui est connecté.
-    Annuaire_Sonde: { id: [], Email: [], Admin: [] },
-    // Administrateurs (étape 3) : la formule de la sonde la lit, jamais le widget.
+    Annuaire_Sonde: { id: [], Email: [], Admin: [], Responsable_de: [] },
+    // Administrateurs et responsables d'établissement (étape 3) : les formules de la sonde la
+    // lisent ; le widget la lit et y écrit la liste des responsables d'un établissement.
     ACL: {
-      id: admins.map((_, index) => index + 1),
-      email: admins.map(adresse),
-      Responsable_de_l_Etablissement: admins.map(() => 0),
-      admin: admins.map(() => true)
+      id: acl.map((_, index) => index + 1),
+      email: acl.map(ligne => adresse(ligne.contact)),
+      Responsable_de_l_Etablissement: acl.map(ligne => ligne.etablissement),
+      admin: acl.map(ligne => ligne.admin)
     },
     ...metadonneesFictives()
   };

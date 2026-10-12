@@ -9,6 +9,9 @@ export const CONSENT_COLUMN = 'Accepte_apparaitre';
 // Table-sonde qui dit au widget qui est connecté (voir identity.js). Elle appartient
 // au document et se crée à la main : GRIST_SETUP.md donne ses colonnes.
 export const PROBE_TABLE = 'Annuaire_Sonde';
+// Sa colonne facultative `Responsable_de` : les identifiants des établissements dont la personne
+// connectée est responsable (formule de déclenchement, comme `Admin`, d'après la table ACL).
+export const PROBE_RESPONSABLE_COLUMN = 'Responsable_de';
 
 // Habillage : logos des établissements et des financeurs, bandeau des fondateurs.
 // Tout est facultatif (GRIST_SETUP.md) : sans ces colonnes ni cette table, le
@@ -25,6 +28,25 @@ export const BRANDING = {
   funderOrderColumn: 'ordre',
   // Le financeur dont le logo ferme le bandeau du bas.
   roundelFunder: 'France 2030'
+};
+
+// Fiche d'un établissement, modifiée par ses responsables (1.17.0). Le widget y écrit trois
+// colonnes d'Etablissements (le nom complet, la visibilité et le logo) et des lignes d'ACL (une
+// par responsable et par établissement) ; il n'écrit jamais `admin`, ni le sigle, ni le statut.
+export const ETABLISSEMENT_TABLE = 'Etablissements';
+export const ETABLISSEMENT_COLUMNS = { name: 'nom_complet', visible: 'ok_pour_apparaitre', logo: BRANDING.logoColumn };
+export const ACL_TABLE = 'ACL';
+export const ACL_COLUMNS = { email: 'email', etablissement: 'Responsable_de_l_Etablissement', admin: 'admin' };
+
+// Les images que le widget envoie à Grist (le logo d'un établissement, depuis 1.17.0). Le fichier
+// choisi n'est jamais envoyé tel quel : le navigateur le décode puis le redessine (image-prep.js),
+// ce qui écarte tout contenu actif (un SVG qui porte un script) et les métadonnées de l'image.
+//   types      les formats acceptés
+//   maxBytes   la taille du fichier choisi, avant qu'il soit redessiné
+//   maxSide    le plus grand côté de l'image envoyée, en pixels (un logo plus petit n'est pas agrandi,
+//              sauf un SVG, qui se dessine à cette taille)
+export const IMAGE_RULES = {
+  logo: { types: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'], maxBytes: 1024 * 1024, maxSide: 480 }
 };
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de

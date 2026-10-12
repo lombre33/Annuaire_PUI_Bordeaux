@@ -18,6 +18,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 - [Réinitialiser](#réinitialiser)
 - [Ma présence : apparaître ou non](#ma-présence--apparaître-ou-non)
 - [Modifier ma fiche](#modifier-ma-fiche), dont [Quand l'enregistrement échoue](#quand-lenregistrement-échoue), [Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique) et [Pour les administrateurs](#pour-les-administrateurs)
+- [La fiche de mon établissement](#la-fiche-de-mon-établissement), dont [Les responsables](#les-responsables) et [Si l'enregistrement de la fiche échoue](#si-lenregistrement-de-la-fiche-échoue)
 - [Pourquoi une personne n'apparaît-elle pas ?](#pourquoi-une-personne-napparaît-elle-pas-)
 - [Messages du bandeau rouge](#messages-du-bandeau-rouge)
 - [Questions fréquentes](#questions-fréquentes)
@@ -32,6 +33,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 - L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un grand écran, une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
 - **Chacun décide s'il y figure.** Une personne n'apparaît que si elle a accepté d'apparaître. Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'adresse e-mail de ce compte, un bandeau **Ma présence** vous dit où vous en êtes et vous laisse changer d'avis d'un clic ([Ma présence](#ma-présence--apparaître-ou-non)).
 - **Chacun corrige sa propre fiche.** Quand l'annuaire vous reconnaît, un bouton **✎ Modifier** apparaît sur votre carte et un bouton **Modifier mon profil** dans le bandeau : vous changez votre nom, votre fonction, votre téléphone, votre rôle et vos listes, vous relisez votre carte avant et après, puis vous validez ([Modifier ma fiche](#modifier-ma-fiche)). L'enregistrement est direct : aucun administrateur ne valide et l'annuaire ne tient aucun historique. L'adresse e-mail, l'établissement et le périmètre ne se changent pas sur sa propre fiche : adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist. Les administrateurs, eux, allument un **mode admin** pour modifier la fiche des autres, e-mail et établissement compris.
+- **Chaque établissement tient sa fiche.** Si vous êtes **responsable** de votre établissement (c'est l'administrateur des données qui nomme le premier), un bouton **✎ Modifier** apparaît sous le logo de l'établissement sur ses cartes et un bouton **Mon établissement** dans le bandeau : vous changez son logo, son nom complet, sa visibilité dans l'annuaire et la liste de ses responsables ([La fiche de mon établissement](#la-fiche-de-mon-établissement)). Là aussi, l'enregistrement est direct.
 
 ## Lexique du PUI
 
@@ -46,6 +48,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Structure « autres »** | Une structure extérieure au PUI, qui a collaboré à certaines tâches. Son statut est « autres » : ses contacts n'apparaissent pas dans l'annuaire |
 | **Domaine (compétences macro)** | Un regroupement de compétences. Le menu Compétences range les compétences par domaine ([Domaines et compétences](#domaines-et-compétences)) |
 | **Action d'une tâche** | L'action dont une tâche porte le numéro : « 2.1 Suivi de projets » est une tâche de l'« Action 2 ». Le menu Tâches range les tâches par action ([Actions et tâches](#actions-et-tâches)) |
+| **Responsable d'établissement** | Une personne nommée dans la table `ACL` de Grist pour tenir la fiche de son établissement : son logo, son nom complet, sa visibilité dans l'annuaire et la liste des responsables ([La fiche de mon établissement](#la-fiche-de-mon-établissement)) |
 | **Accord d'apparaître** | Le choix de chaque personne de figurer ou non dans l'annuaire. Sans son accord, une personne n'apparaît pas, même si son établissement a validé son apparition |
 | **Instances** | *À compléter* |
 | **Actions** | *À compléter* |
@@ -62,7 +65,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 |---|---|
 | **Titre et compteur** (en haut à gauche, « PUI Bordeaux » et « 14 contacts ») | Le compteur indique combien de cartes sont affichées avec la recherche et les filtres actuels |
 | **Financeurs** (au centre de l'en-tête) | La phrase de financement et les logos des financeurs ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
-| **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)). Les administrateurs y trouvent aussi le bouton **Mode admin** ([Pour les administrateurs](#pour-les-administrateurs)). Si aucune fiche ne porte l'adresse de votre compte, il le dit et n'a ni interrupteur ni bouton « Modifier mon profil » |
+| **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)). Les responsables d'un établissement y trouvent aussi le bouton **Mon établissement** ([La fiche de mon établissement](#la-fiche-de-mon-établissement)), les administrateurs le bouton **Mode admin** ([Pour les administrateurs](#pour-les-administrateurs)). Si aucune fiche ne porte l'adresse de votre compte, il le dit et n'a ni interrupteur ni bouton « Modifier mon profil » |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
 | **Actions, Tâches, Communautés, GT, Compétences, Instances, Établissement** | Sept filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine, et le menu **Tâches** par action |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
@@ -70,6 +73,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Cartes** | Une carte par personne, trois par ligne, triées par nom de famille puis par prénom (ordre alphabétique) |
 | **Bandeau des fondateurs** (tout en bas de la page, sous les cartes) | Les logos des établissements fondateurs, le rond « France 2030 » et la phrase de financement ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Bouton « ✎ Modifier »** et mention **« Votre fiche »** (sous la fonction d'une carte, seulement si vous pouvez modifier cette fiche ; un administrateur en mode admin lit « ✎ Modifier la fiche » sur les cartes des autres) | Ouvre le formulaire de modification de la fiche ([Modifier ma fiche](#modifier-ma-fiche)). La capture ci-dessus est celle d'un annuaire consulté sans être reconnu : elle n'a ni bandeau ni bouton |
+| **Bouton « ✎ Modifier »** sous le logo de l'établissement (seulement si vous êtes responsable de cet établissement) | Ouvre la fiche de l'**établissement** : logo, nom complet, visibilité, responsables ([La fiche de mon établissement](#la-fiche-de-mon-établissement)) |
 
 ## Lire une carte
 
@@ -100,6 +104,8 @@ Le PUI est le consortium de tous ses établissements fondateurs : il n'a pas d'i
 ![Le bandeau du bas : les logos des établissements fondateurs sur une ligne, le rond « 2030 » à droite et, dessous, la phrase « Le Pôle universitaire d'innovation Bordeaux est un projet financé par l'État dans le cadre de France 2030 »](images/bandeau-fondateurs.png)
 
 Les logos de toutes ces captures sont **inventés**, comme le reste du jeu de démonstration.
+
+**Qui change un logo ?** Les logos sont des fichiers du document Grist. Le **responsable** d'un établissement remplace ou retire le logo de son établissement depuis sa fiche ([La fiche de mon établissement](#la-fiche-de-mon-établissement)) ; les logos des financeurs et l'ordre du bandeau du bas se règlent dans Grist, par l'administrateur des données.
 
 **Quand un logo manque.** Le nom prend sa place : l'acronyme dans la pastille des cartes, le nom de la structure dans le bandeau du bas et chez les financeurs. L'annuaire reste utilisable. Cela arrive quand le fichier n'a pas été ajouté dans Grist, quand il a été supprimé ou n'est pas une image lisible, ou quand Grist ne donne pas accès aux pièces jointes : ce dernier cas touche **tous** les logos à la fois.
 
@@ -405,7 +411,98 @@ Ce que cela implique, et pourquoi rester prudent :
 - La modification s'applique tout de suite à la fiche d'une autre personne, sans qu'elle soit prévenue et sans qu'aucun autre administrateur la valide.
 - Le widget ne garde aucun historique : lisez la carte « Avant » et le « Détail des changements » avant de cliquer sur « Valider ».
 - Un administrateur ne modifie **pas** les fiches masquées de l'annuaire (elles n'ont pas de carte, donc pas de bouton), ni le périmètre d'une fiche, ni le choix d'apparaître d'une personne : cela se fait dans Grist. Sur sa propre fiche, même avec le mode admin, l'e-mail et l'établissement restent verrouillés : un administrateur ne se coupe pas de son propre compte par mégarde.
+- Le mode admin ne concerne que les fiches de **personnes**. La fiche d'un établissement (logo, nom, visibilité, responsables) est tenue par ses responsables ([La fiche de mon établissement](#la-fiche-de-mon-établissement)) ; un administrateur la modifie dans Grist, ou en étant nommé responsable.
 - Le mode admin n'est qu'un verrou d'interface. Ce qu'un administrateur peut réellement écrire dans le document est décidé par les règles d'accès de Grist ([`GRIST_SETUP.md`](../GRIST_SETUP.md)).
+
+## La fiche de mon établissement
+
+Chaque établissement a une **fiche** : son logo, son nom complet, le fait d'être visible dans l'annuaire et la liste de ses **responsables**. Si vous avez été nommé **responsable** de votre établissement, vous la modifiez vous-même, dans l'annuaire, sans passer par un administrateur. Comme pour votre fiche personnelle, les modifications **s'appliquent directement** dans Grist : personne ne les valide et l'annuaire n'en tient aucun historique ([Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique)). Contrairement à votre fiche personnelle, il n'y a pas de fenêtre de relecture « Avant / Après » : le bas de la fenêtre résume ce qui va changer, et le bouton **Enregistrer** écrit.
+
+### Qui peut le faire, et où cliquer
+
+Seul un **responsable** de l'établissement le peut. C'est l'administrateur des données qui nomme le premier responsable dans Grist (une ligne de la table `ACL` : votre adresse et votre établissement) ; un responsable peut ensuite en nommer d'autres depuis la fiche. Être administrateur ne suffit pas : il faut avoir été nommé responsable de l'établissement.
+
+- **Sous le logo.** Chaque carte d'un établissement dont vous êtes responsable porte un bouton **✎ Modifier** sous le logo de l'établissement (ou sous son sigle, quand il n'a pas de logo). Il ouvre la fiche de l'**établissement**, pas celle de la personne de la carte.
+- **Dans le bandeau « Ma présence ».** Le bouton **Mon établissement** ouvre la même fiche. Il est proposé même si votre carte n'apparaît pas dans l'annuaire, et même si l'établissement est masqué de l'annuaire : c'est alors le seul moyen de l'ouvrir. Si vous êtes responsable de plusieurs établissements, une liste vous demande d'abord lequel ouvrir.
+- **Pas de bouton ?** C'est normal si vous n'êtes pas (encore) responsable, si l'annuaire ne peut pas vous reconnaître (voir [Pas de bandeau ?](#ma-présence--apparaître-ou-non)) ou si votre compte ne peut que consulter le document. Une personne nommée responsable voit ses boutons à sa **prochaine ouverture** de l'annuaire.
+
+![La fenêtre « Fiche de l’établissement : CHD » ouverte par Léa Fontaine, responsable : le logo avec les boutons « Remplacer le logo » et « Retirer le logo », le sigle et le statut en lecture seule, le nom complet, la case « Établissement visible dans l’annuaire » cochée, la liste des responsables avec leurs boutons « Retirer » et le bloc pour en nommer un autre ; en bas, « Aucune modification » et les boutons « Annuler » et « Enregistrer » grisé](images/fiche-etablissement.png)
+
+*La fiche d'un établissement, vue par une responsable fictive.*
+
+### Ce que montre la fenêtre
+
+| Zone | Ce qu'on y fait |
+|---|---|
+| **Logo** | « Ajouter un logo » ou « Remplacer le logo » ouvre le choix d'un fichier (PNG, JPG, WebP ou SVG, 1 Mo au plus). L'image choisie s'affiche aussitôt à la place du logo, **sans rien envoyer** : l'envoi n'a lieu qu'à « Enregistrer ». « Retirer le logo » le supprime de la fiche : les cartes retrouvent le sigle de l'établissement |
+| **Sigle** et **Statut** | Pour information seulement. Le sigle sert de filtre sur les cartes ; le statut (fondateur, partenaire…) est réglé par l'équipe du PUI |
+| **Nom complet** | Une zone de texte. Un nom vide est refusé |
+| **Établissement visible dans l'annuaire** | Décochée, **aucune fiche de cet établissement n'apparaît**, même celles des personnes qui ont accepté d'apparaître. Un avis dit combien de fiches vont disparaître, la vôtre comprise le cas échéant |
+| **Responsables de l'établissement** | Les personnes qui peuvent modifier cette fiche et en nommer d'autres. **Retirer** ou **Rétablir** (tant que ce n'est pas enregistré), **Nommer** une personne choisie dans la liste ou une adresse e-mail saisie |
+
+Ce que votre navigateur fait de l'image : il ne l'envoie **jamais telle quelle**. Il la lit, la redessine (480 pixels de large au plus) et en fait un PNG. Un fichier piégé (un SVG qui contiendrait du code) ne peut donc rien exécuter, et les informations cachées dans une photo (lieu, appareil) ne partent pas.
+
+### Les responsables
+
+- **Nommer.** Choisissez une personne dans la liste déroulante, ou saisissez une adresse e-mail, puis cliquez sur **Nommer** (ou, dans le champ d'adresse, appuyez sur Entrée). La liste ne propose que les personnes de l'établissement **qui apparaissent dans l'annuaire** ; pour toute autre personne, saisissez son adresse. Nommer quelqu'un responsable ne le rend pas administrateur.
+- **Retirer.** Le bouton **Retirer** barre la personne et la marque « retiré » ; **Rétablir** annule. Un établissement garde **toujours au moins un responsable** : le retrait du dernier est refusé (« Un établissement doit garder au moins un responsable. »).
+- **Vous retirer vous-même** est possible, avec un avertissement : une fois enregistré, vous ne pourrez plus modifier cette fiche (« Vous retirez votre propre accès : une fois enregistré, vous ne pourrez plus modifier cette fiche. »).
+- **Qui est qui.** La liste donne le nom des personnes dont la fiche figure dans l'annuaire. Pour une adresse dont la fiche n'y figure pas, elle écrit « Fiche masquée de l’annuaire » (la personne existe, mais elle n'apparaît pas) ou « Adresse sans fiche dans l’annuaire » : l'annuaire ne dévoile pas le nom d'une personne qui a choisi de ne pas y figurer.
+
+### Enregistrer
+
+En bas de la fenêtre, un résumé dit où vous en êtes : « Aucune modification », « 2 modifications : nom, visibilité », « Corrigez le nom » ou « Gardez au moins un responsable ». Le bouton **Enregistrer** reste grisé tant qu'il n'y a rien à enregistrer ou qu'un champ est refusé.
+
+Un clic écrit **tout en une fois** : le logo (s'il y en a un nouveau), le nom, la visibilité et la liste des responsables. Si Grist refuse un des changements, aucun n'est appliqué. Pendant l'enregistrement, le bouton indique « Enregistrement… » et la fenêtre ne se ferme pas ; un double clic n'écrit qu'une fois. L'annuaire est ensuite relu, la fenêtre se ferme et un message est posé en bas de l'écran : « La fiche de CHD est enregistrée. » (avec le sigle de l'établissement). Les cartes sont à jour : le nouveau logo, ou le nouveau nom, sans recharger la page.
+
+- **Annuler** et la croix **✕** ferment la fenêtre sans rien enregistrer.
+- **Échap** prévient avant d'abandonner : avec des modifications, un premier appui affiche « Des modifications ne sont pas enregistrées. Appuyez encore sur Échap pour les abandonner. » et un second ferme. Pendant l'enregistrement, Échap ne ferme rien.
+- **Si la visibilité change**, les cartes de l'établissement apparaissent ou disparaissent aussitôt. Si vous masquez votre propre établissement, **Mon établissement** reste là pour le rouvrir.
+
+### Si quelqu'un modifie la même fiche entre-temps
+
+Deux responsables peuvent ouvrir la fiche en même temps. L'annuaire la relit juste avant d'écrire :
+
+- **Des champs différents** (l'un change le nom, l'autre la visibilité) : les deux modifications sont conservées. Les responsables nommés par l'un et par l'autre le sont aussi.
+- **Le même champ** (le nom, la visibilité ou le logo a changé dans Grist depuis l'ouverture de la fenêtre) : **rien n'est écrit**. La fenêtre reprend la fiche telle qu'elle est maintenant, garde ce que vous avez saisi et le dit : « La fiche a changé dans Grist pendant que la fenêtre était ouverte (… ). Ce que vous avez saisi est conservé : relisez-le, puis enregistrez à nouveau. » (le champ concerné à la place des points de suspension). Relisez, puis cliquez de nouveau sur **Enregistrer**.
+
+### Si l'enregistrement de la fiche échoue
+
+Un échec n'est jamais muet : un message s'affiche en haut de la fenêtre, qui reste ouverte avec votre saisie. Sauf mention contraire, **rien n'a été modifié**.
+
+| Message | Ce que cela veut dire | Que faire |
+|---|---|---|
+| « La fiche de l’établissement n’a pas pu être relue dans Grist : rien n’a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Grist n'a pas répondu à la lecture de la fiche | Réessayez ; si cela persiste, prévenez l'administrateur des données |
+| « Cet établissement n’existe plus dans Grist : rien n’a été modifié. » | La ligne de l'établissement a été supprimée pendant que vous la modifiiez | Fermez la fenêtre, rechargez la page, prévenez l'administrateur des données |
+| « Cette modification ne peut pas être enregistrée : vous n’êtes pas responsable de cet établissement. » | Vous n'êtes plus (ou pas) responsable de cet établissement | Contactez un autre responsable ou l'administrateur des données |
+| « Grist a refusé la modification : vos droits ne permettent pas de changer cet établissement ou la liste de ses responsables. Contactez un administrateur. » | Une règle d'accès de Grist refuse l'écriture | Contactez l'administrateur des données |
+| « Une colonne de l’établissement est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md. » | Un réglage du document Grist est à revoir | Prévenez l'administrateur des données |
+| « Ces modifications sont déjà dans la fiche de l’établissement : il n’y a rien à enregistrer. » | Quelqu'un a déjà enregistré les mêmes valeurs | Rien à faire : fermez la fenêtre |
+| « La modification n’a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Une panne passagère, ou un réglage à revoir | Réessayez ; si cela persiste, prévenez l'administrateur des données |
+| « L'opération n'a pas pu aboutir. Le détail est dans la console du navigateur. » | Une erreur inattendue | Réessayez ; si cela persiste, prévenez l'administrateur des données |
+| « Grist n’a pas gardé tout ce qui était demandé (…). Vérifiez la fiche dans Grist ou contactez un administrateur. » | L'écriture a abouti, mais, en relisant la fiche, l'annuaire constate que Grist n'a pas retenu certains champs (nommés entre parenthèses). La fenêtre reste ouverte sur « Fiche enregistrée » | Vérifiez la fiche dans Grist ; prévenez l'administrateur des données |
+| « Les modifications sont enregistrées, mais l’annuaire n’a pas pu être rechargé. Rechargez la page pour les voir. » | Vos modifications sont bien enregistrées ; l'annuaire n'a simplement pas pu se relire | Rechargez la page |
+
+**Le logo.** Le fichier est contrôlé dès que vous le choisissez, avant tout envoi. Le message s'affiche sous le logo et rien n'est envoyé :
+
+| Message | Pourquoi |
+|---|---|
+| « Ce fichier n’est pas une image acceptée : choisissez un fichier PNG, JPG, WebP ou SVG. » | Le format n'est pas accepté (un PDF, un GIF…) |
+| « Cette image pèse 1,4 Mo : choisissez-en une de 1 Mo au plus. » | Le fichier dépasse 1 Mo (le poids affiché est celui du fichier choisi) |
+| « Ce fichier est vide : choisissez-en un autre. » | Le fichier ne contient rien |
+| « Cette image n’a pas pu être lue : choisissez un autre fichier. » | Le navigateur ne sait pas la lire (fichier abîmé) |
+
+L'**envoi** du fichier à Grist se fait au clic sur « Enregistrer », avant l'écriture de la fiche. S'il échoue, la fiche n'est pas modifiée et un message dit quoi faire :
+
+| Message | Ce que cela veut dire |
+|---|---|
+| « Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. Déposez le fichier directement dans Grist (voir GRIST_SETUP.md). » | Grist a refusé de donner à l'annuaire le droit d'envoyer un fichier |
+| « L’envoi du fichier à Grist a échoué : le navigateur n’a pas pu joindre le serveur, ou l’a refusé. Déposez le fichier directement dans Grist (voir GRIST_SETUP.md). » | Panne de réseau, ou serveur qui refuse la requête de l'annuaire |
+| « Grist n’a pas répondu à temps à l’envoi du fichier. Réessayez ; déposez le fichier directement dans Grist (voir GRIST_SETUP.md). » | Le serveur n'a pas répondu en 30 secondes |
+| « Grist a refusé le fichier : vos droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. » | Votre compte ne peut pas ajouter de pièce jointe |
+| « Grist a refusé le fichier : il est trop volumineux. » | Le serveur refuse la taille du fichier |
+
+Dans tous ces cas, le logo se change aussi directement dans Grist (colonne `logo` de la table `Etablissements`) : prévenez l'administrateur des données. Si l'envoi a réussi mais que l'écriture de la fiche est ensuite refusée, un message le précise : « Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir. » Le fichier reste alors dans le document, sans qu'aucune fiche ne l'utilise : l'administrateur des données peut le supprimer.
 
 ## Pourquoi une personne n'apparaît-elle pas ?
 
@@ -466,7 +563,15 @@ Oui, vos informations personnelles : votre nom, votre fonction, votre téléphon
 
 **Pourquoi n'ai-je pas de bouton Modifier ?**
 
-Le bouton **✎ Modifier** n'apparaît que sur les cartes que vous avez le droit de modifier : la vôtre, ou toutes les cartes affichées si vous êtes administrateur et que vous avez allumé le **mode admin** (le bouton se lit alors « ✎ Modifier la fiche » sur les cartes des autres). Vous n'en avez donc aucun quand l'annuaire ne peut pas vous reconnaître : vous n'êtes pas connecté à Grist, votre compte ne peut que consulter le document (rôle Lecteur), l'annuaire n'a pas été réglé pour cela, ou l'adresse de votre compte ne figure sur aucune fiche. Si plusieurs fiches portent votre adresse, le bandeau ne propose pas **Modifier mon profil**, mais chaque carte garde son bouton. Si votre carte n'apparaît pas dans l'annuaire, le bouton du bandeau reste le seul moyen d'ouvrir votre fiche. Voir [Où cliquer](#où-cliquer) et [Pas de bandeau ?](#ma-présence--apparaître-ou-non).
+Le bouton **✎ Modifier** d'une carte n'apparaît que sur les cartes que vous avez le droit de modifier : la vôtre, ou toutes les cartes affichées si vous êtes administrateur et que vous avez allumé le **mode admin** (le bouton se lit alors « ✎ Modifier la fiche » sur les cartes des autres). Le bouton **✎ Modifier** sous le logo d'un établissement, lui, n'est proposé qu'aux responsables de cet établissement ([La fiche de mon établissement](#la-fiche-de-mon-établissement)). Vous n'en avez donc aucun quand l'annuaire ne peut pas vous reconnaître : vous n'êtes pas connecté à Grist, votre compte ne peut que consulter le document (rôle Lecteur), l'annuaire n'a pas été réglé pour cela, ou l'adresse de votre compte ne figure sur aucune fiche. Si plusieurs fiches portent votre adresse, le bandeau ne propose pas **Modifier mon profil**, mais chaque carte garde son bouton. Si votre carte n'apparaît pas dans l'annuaire, le bouton du bandeau reste le seul moyen d'ouvrir votre fiche. Voir [Où cliquer](#où-cliquer) et [Pas de bandeau ?](#ma-présence--apparaître-ou-non).
+
+**Qui peut modifier la fiche de mon établissement ?**
+
+Ses responsables, et eux seuls : les personnes nommées pour cela dans la table `ACL` du document Grist, avec l'adresse de leur compte. Un administrateur ne le peut pas depuis l'annuaire, sauf s'il est aussi nommé responsable ; il peut en revanche la modifier directement dans Grist, comme le reste du document. Pour devenir responsable, demandez à un responsable de votre établissement de vous nommer, ou à l'administrateur des données.
+
+**Pourquoi le logo de mon établissement n'a-t-il pas changé ?**
+
+Si l'envoi ou l'enregistrement a échoué, un message l'a dit dans la fenêtre ([Si l'enregistrement de la fiche échoue](#si-lenregistrement-de-la-fiche-échoue)). Sinon, rechargez la page : les logos sont des images que le navigateur peut avoir gardées. Si le problème persiste, prévenez l'administrateur des données, qui peut aussi changer le logo directement dans Grist.
 
 **Quelqu'un d'autre peut-il changer ma fiche ?**
 
@@ -474,7 +579,7 @@ Les administrateurs, oui : avec le mode admin allumé, ils peuvent modifier les 
 
 **D'où viennent les informations ?**
 
-D'un document Grist, qui sert de base de données à l'annuaire, logos compris : ce sont des fichiers joints à ce document, que votre navigateur télécharge chez Grist avec une autorisation de lecture qui expire en quelques minutes ([sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes)). L'annuaire n'enregistre rien dans votre navigateur, hormis ce que celui-ci garde de lui-même des images affichées. Dans le document Grist, il n'écrit que dans trois cas : à l'ouverture, une ligne de service qui sert à vous reconnaître (ajoutée puis supprimée aussitôt) ; votre choix d'apparaître ou non, quand vous cliquez sur l'interrupteur ; une fiche, quand vous cliquez sur « Valider » après une relecture : la vôtre, ou celle d'une autre personne si vous êtes administrateur et avez allumé le mode admin.
+D'un document Grist, qui sert de base de données à l'annuaire, logos compris : ce sont des fichiers joints à ce document, que votre navigateur télécharge chez Grist avec une autorisation de lecture qui expire en quelques minutes ([sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes)). L'annuaire n'enregistre rien dans votre navigateur, hormis ce que celui-ci garde de lui-même des images affichées. Dans le document Grist, il n'écrit que dans quatre cas : à l'ouverture, une ligne de service qui sert à vous reconnaître (ajoutée puis supprimée aussitôt) ; votre choix d'apparaître ou non, quand vous cliquez sur l'interrupteur ; une fiche, quand vous cliquez sur « Valider » après une relecture : la vôtre, ou celle d'une autre personne si vous êtes administrateur et avez allumé le mode admin ; la fiche de votre établissement, si vous en êtes responsable et que vous cliquez sur « Enregistrer » (avec, pour un nouveau logo, un fichier envoyé à Grist, qui devient une pièce jointe du document).
 
 **J'ai changé une information dans Grist et je ne la vois pas.**
 
@@ -486,7 +591,7 @@ Ils ne s'affichent que s'ils sont renseignés dans Grist.
 
 **Pourquoi vois-je le nom d'un établissement au lieu de son logo ?**
 
-Parce que Grist n'a pas de logo lisible pour cet établissement (fichier absent, supprimé ou qui n'est pas une image), ou parce que Grist n'a pas donné à l'annuaire l'accès aux pièces jointes : ce dernier cas touche tous les logos à la fois. L'annuaire fonctionne normalement, avec les noms. Prévenez l'administrateur des données : un logo se remplace dans la colonne `logo` de la table `Etablissements` ([Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)).
+Parce que Grist n'a pas de logo lisible pour cet établissement (fichier absent, supprimé ou qui n'est pas une image), ou parce que Grist n'a pas donné à l'annuaire l'accès aux pièces jointes : ce dernier cas touche tous les logos à la fois. L'annuaire fonctionne normalement, avec les noms. Prévenez l'administrateur des données : un logo se remplace dans la colonne `logo` de la table `Etablissements`, ou par un responsable de l'établissement depuis sa fiche ([La fiche de mon établissement](#la-fiche-de-mon-établissement) ; [Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)).
 
 **Pourquoi un établissement fondateur ne figure-t-il pas dans le bandeau du bas ?**
 

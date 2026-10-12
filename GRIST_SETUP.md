@@ -7,16 +7,19 @@ la faire et comment vérifier qu'elle a marché.
 | Étape | Quoi | Sans elle |
 |---|---|---|
 | 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** | l'interrupteur « Ma présence » ou l'enregistrement d'une fiche échoue, avec un message qui renvoie ici |
-| 2 | Table `Annuaire_Sonde` (qui est connecté ?) | personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change |
-| 3 | Case `admin` cochée dans `ACL` pour les administrateurs | personne n'est administrateur |
-| 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation |
-| 5 | Les logos : colonnes `logo` et `ordre_bandeau` dans `Etablissements`, table `Financeurs` (facultatif) | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas, pas de financeurs en tête de page ; rien d'autre ne change |
+| 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement | personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
+| 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
+| 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, et depuis la 1.17.0 une fiche d'établissement aussi |
+| 5 | Les logos : colonnes `logo` et `ordre_bandeau` dans `Etablissements`, table `Financeurs` (facultatif) ; le remplacement d'un logo depuis le widget en dépend | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas, pas de financeurs en tête de page ; rien d'autre ne change |
 
 Le widget ne crée ni ne modifie jamais la structure du document (table, colonne,
 règle d'accès) : tout ce qui est ci-dessous se fait à la main, une fois. Il n'écrit que
-des lignes : celle de la personne connectée dans `BDD` (son choix de présence, sa fiche)
-ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), et la
-ligne passagère d'`Annuaire_Sonde`. Les logos (étape 5) ne sont que lus.
+des lignes et des cellules : celle de la personne connectée dans `BDD` (son choix de présence, sa
+fiche) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
+passagère d'`Annuaire_Sonde` et, pour un responsable d'établissement, la ligne de son établissement
+dans `Etablissements` (nom complet, visibilité, logo) et les lignes d'`ACL` de ses responsables.
+Quand un responsable remplace le logo, il ajoute aussi une **pièce jointe** au document. Les logos
+affichés (étape 5) sont lus.
 
 ## 1. Les colonnes que le widget écrit : des colonnes de données
 
@@ -44,6 +47,12 @@ la colonne (il lit son type dans les métadonnées du document).
 3. Pour `Accepte_apparaitre`, type **Case à cocher** ; cochez la case des personnes
    qui ont déjà donné leur accord. Une case vide ou décochée masque la personne.
 
+Depuis la 1.17.0, le widget écrit aussi, quand un responsable enregistre la fiche de
+son établissement, dans trois colonnes d'`Etablissements` (`nom_complet`,
+`ok_pour_apparaitre` et `logo`) et dans deux colonnes d'`ACL` (`email` et
+`Responsable_de_l_Etablissement`) : ce sont aussi des colonnes de **données**. Il n'écrit
+jamais `admin`, ni le sigle, ni les cases `fondateur`, `partenaire` et `autres`.
+
 Une colonne créée vide par Grist se convertit d'elle-même à la première saisie. Un
 export de structure la montre alors comme une colonne à formule `return False` tant
 que personne n'a rien saisi : c'est normal, et c'est pour cela que cette étape existe.
@@ -63,7 +72,9 @@ de déclenchement** `user.Email`. Grist la calcule à la création d'une ligne, 
 l'identité de qui l'a créée. Le widget, à chaque chargement, ajoute une ligne, la
 relit puis la supprime. La table est vide au repos.
 
-Le nom de la table et des colonnes est exact : `Annuaire_Sonde`, `Email`, `Admin`.
+Le nom de la table et des colonnes est exact : `Annuaire_Sonde`, `Email`, `Admin` et,
+pour la fiche d'un établissement (1.17.0), `Responsable_de` (facultative : sans elle,
+tout le reste fonctionne et personne ne modifie de fiche d'établissement).
 
 **À la main**
 
@@ -83,6 +94,22 @@ Le nom de la table et des colonnes est exact : `Annuaire_Sonde`, `Email`, `Admin
    `Admin` n'est vrai que si l'adresse de la personne figure dans `ACL` avec `admin`
    coché, sans tenir compte des majuscules ni des espaces. Le widget ne croit jamais
    ce que le navigateur prétend : il lit cette valeur, calculée par Grist.
+4. Colonne `Responsable_de` (facultative), type **Texte**, mêmes réglages, avec la
+   formule suivante :
+
+   ```python
+   mail = (user.Email or "").strip().lower()
+   ids = sorted({r.Responsable_de_l_Etablissement.id for r in ACL.all
+                 if mail and (r.email or "").strip().lower() == mail and r.Responsable_de_l_Etablissement})
+   return ",".join(str(i) for i in ids)
+   ```
+
+   Elle renvoie les identifiants des établissements dont la personne est responsable
+   (« 3 » ou « 3,7 »), d'après les lignes d'`ACL` qui portent son adresse **et** un
+   établissement ; la valeur est vide pour tout autre compte. Le widget n'en garde que les
+   entiers positifs. Cette formule n'a pas été essayée dans un vrai Grist : vérifiez
+   la valeur de la colonne dans la table `Annuaire_Sonde` en y laissant une ligne le temps
+   d'un essai (créez-la vous-même dans Grist avec votre compte).
 
 **Avec votre widget « Structure de table Grist »** (onglet Import, mode « Nouvelle
 table », cocher **Formules** dans « Éléments à importer ») : collez
@@ -102,20 +129,29 @@ class Annuaire_Sonde:
     mail = (user.Email or "").strip().lower()
     return bool(mail) and any(bool(r.admin) for r in ACL.all if (r.email or "").strip().lower() == mail)
   Admin = grist.Bool()
+
+  def _default_Responsable_de(rec, table, value, user):
+    mail = (user.Email or "").strip().lower()
+    ids = sorted({r.Responsable_de_l_Etablissement.id for r in ACL.all
+                  if mail and (r.email or "").strip().lower() == mail and r.Responsable_de_l_Etablissement})
+    return ",".join(str(i) for i in ids)
+  Responsable_de = grist.Text()
 ```
 
 Vérifier : ouvrez le widget avec un compte qui peut modifier le document et dont
 l'adresse figure dans la colonne `email` de `BDD`, console du navigateur ouverte. Vous
-devez voir `[IDENTITE] personne identifiée (administrateur : oui|non)` (jamais
-l'adresse elle-même), la zone « Ma présence » à droite de l'en-tête (sous le titre sur
-un écran étroit), un bouton « Modifier » sur la carte de la personne, et la table
-`Annuaire_Sonde` vide.
+devez voir `[IDENTITE] personne identifiée (administrateur : oui|non, responsable de N
+établissement(s))` (jamais l'adresse elle-même), la zone « Ma présence » à droite de
+l'en-tête (sous le titre sur un écran étroit), un bouton « Modifier » sur la carte de la
+personne, et la table `Annuaire_Sonde` vide. Pour un compte désigné responsable dans
+`ACL` (étape 3), le bandeau porte aussi « Mon établissement ».
 
 Si le bandeau manque ou ne propose pas de fiche, la console dit pourquoi :
 
 | Ligne `[IDENTITE]` | Cause | Remède |
 |---|---|---|
 | `table « Annuaire_Sonde » introuvable` | la table n'existe pas, ou son identifiant diffère | étape 2 |
+| `la sonde n'a pas de colonne « Responsable_de » : pas de fiche d'établissement` | la colonne facultative n'existe pas : personne ne peut modifier de fiche d'établissement | colonne `Responsable_de`, étape 2 (point 4) |
 | `la formule user.Email de Annuaire_Sonde n'a renvoyé aucune adresse` | la formule n'est pas une formule de déclenchement, ou le compte est anonyme | reprendre la colonne `Email` |
 | `lecture impossible : …` | Grist a refusé l'écriture ou la lecture (règle d'accès) | étape 4 |
 | `Aucune ligne de BDD ne porte l'adresse…` | la personne est connectée mais son adresse n'est pas dans `BDD.email` : le bandeau dit « Compte absent de l'annuaire » | corriger l'adresse dans `BDD` |
@@ -127,7 +163,9 @@ Un compte **Lecteur** n'a ni bandeau ni ligne dans la console : le widget n'essa
 ## 3. Les administrateurs dans `ACL`
 
 La table `ACL` a trois colonnes : `email`, `Responsable_de_l_Etablissement` et
-`admin`. Seule `admin` sert pour l'instant. Cochez-la pour chaque administrateur : il
+`admin`.
+
+**Les administrateurs** (`admin`). Cochez la case pour chaque administrateur : il
 voit, dans le bandeau « Ma présence », un bouton **Mode admin** (éteint à chaque
 ouverture). Une fois allumé, un bouton « Modifier la fiche » apparaît sur toutes les
 cartes affichées et il peut corriger la fiche de n'importe qui, **adresse e-mail et
@@ -135,13 +173,28 @@ cartes affichées et il peut corriger la fiche de n'importe qui, **adresse e-mai
 la colonne est une colonne à formule, convertissez-la d'abord en colonne de données :
 on ne coche pas les cases d'une colonne à formule.
 
+**Les responsables d'établissement** (`Responsable_de_l_Etablissement`, 1.17.0). Une
+ligne par personne et par établissement : l'adresse dans `email` et l'établissement dans
+`Responsable_de_l_Etablissement` (une Référence vers `Etablissements`). La personne voit,
+dans le bandeau « Ma présence », un bouton **Mon établissement**, et un bouton
+« ✎ Modifier » sous le logo de son établissement sur chacune de ses cartes : elle
+modifie son logo, son nom complet, sa visibilité dans l'annuaire et la liste de ses
+responsables (étapes 4 et 5). Un administrateur n'est pas responsable pour autant : il faut une ligne
+avec un établissement ; une même ligne peut porter `admin` **et** un établissement. Un
+responsable peut nommer d'autres responsables depuis le widget : le premier est à
+nommer dans Grist, sans quoi personne ne peut ouvrir la fiche. Un établissement garde
+toujours au moins un responsable (le widget refuse d'enregistrer le contraire). Le widget
+**n'écrit jamais `admin`** : nommer quelqu'un responsable ne le rend pas administrateur.
+Quand un responsable en retire un autre, la ligne d'`ACL` est supprimée, sauf si elle porte
+`admin` : elle garde alors la case et perd seulement son établissement.
+
 L'adresse de `ACL` est comparée à celle de Grist sans tenir compte des majuscules ni
 des espaces.
 
-**Changer l'e-mail d'une fiche ne change pas `ACL`.** Le widget n'écrit jamais dans
-`ACL` : si la personne dont on change l'adresse est administratrice (ou responsable
-d'un établissement), ses droits restent attachés à son ancienne adresse. La relecture
-le rappelle à l'administrateur ; c'est à l'administrateur des données de corriger la
+**Changer l'e-mail d'une fiche ne change pas `ACL`.** Le widget ne modifie pas la ligne
+d'`ACL` d'une personne dont un administrateur change l'adresse : si elle est administratrice (ou
+responsable d'un établissement), ses droits restent attachés à son ancienne adresse. La
+relecture le rappelle à l'administrateur ; c'est à l'administrateur des données de corriger la
 ligne d'`ACL` dans Grist.
 
 ## 4. Règles d'accès
@@ -163,7 +216,18 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 | `BDD` : modifier `email`, `Etablissement` | les administrateurs | c'est ce que le widget écrit quand un administrateur, mode admin allumé, change l'adresse ou l'établissement d'une autre personne. `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` décide de qui apparaît |
 | `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais ; il décide de qui apparaît |
 | `BDD` : ajouter ou supprimer une ligne | les administrateurs | le widget ne crée ni ne supprime jamais de fiche |
-| `ACL` | les administrateurs (masquée aux autres) | la formule d'`Annuaire_Sonde` la lit pour son propre compte, sans passer par les droits de la personne |
+| `ACL` : lire les lignes de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce qui affiche la liste des responsables dans la fiche. Si la règle la leur refuse, la fiche s'ouvre sans cette liste et le dit |
+| `ACL` : ajouter, supprimer, modifier `email` et `Responsable_de_l_Etablissement` d'une ligne de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce que le widget écrit quand un responsable nomme ou retire un responsable. **`admin` : les administrateurs seulement** (le widget ne l'écrit jamais ; sans cette règle, un responsable pourrait se donner le droit d'administrateur depuis la console) |
+| `Etablissements` : modifier `nom_complet`, `ok_pour_apparaitre` et `logo` d'**une ligne** | les responsables de cette ligne, et les administrateurs | c'est ce que le widget écrit pour la fiche d'un établissement. `ok_pour_apparaitre` décide de qui apparaît ; `acronyme`, `fondateur`, `partenaire` et `autres` : l'équipe du PUI seulement, le widget ne les écrit pas |
+| Ajouter une pièce jointe au document | les responsables (et les administrateurs) | c'est ce que fait l'envoi du logo. Un compte au rôle **Lecteur** du document ne peut rien écrire, pas même cela |
+| `ACL` : lire et modifier les lignes des autres | les administrateurs | la formule d'`Annuaire_Sonde` la lit pour son propre compte, sans passer par les droits de la personne |
+
+Pour « un responsable de cette ligne d'`Etablissements` » (ou de cette ligne d'`ACL`), un
+attribut d'utilisateur qui cherche `user.Email` dans la colonne `email` d'`ACL` ne rend que
+la **première** ligne : pour une personne responsable de plusieurs établissements, une
+condition qui consulte toutes les lignes d'`ACL` de son adresse (par exemple en
+parcourant `ACL.lookupRecords(email=user.Email)`, ou en s'appuyant sur la valeur de la
+colonne `Responsable_de` de la sonde) est plus sûre. À essayer sur une copie.
 
 Pour « la personne dont `email` est la sienne », une condition comme
 `user.Email and rec.email and user.Email.strip().lower() == rec.email.strip().lower()`.
@@ -178,8 +242,10 @@ administrateurs, retirez-le de la deuxième ligne : le champ reste affiché dans
 fenêtre, mais Grist refusera la modification.
 
 Un refus des règles d'accès n'abîme rien : le widget affiche « Grist a refusé la
-modification : vos droits ne permettent pas de changer cette fiche… », la relecture
-reste ouverte, rien n'a été écrit.
+modification : vos droits ne permettent pas de changer cette fiche… » (« … cet
+établissement ou la liste de ses responsables… » pour une fiche d'établissement), la
+fenêtre reste ouverte, rien n'a été écrit : l'enregistrement d'une fiche est une seule
+action Grist, qui passe ou ne passe pas en entier.
 
 ## 5. Les logos (facultatif)
 
@@ -247,7 +313,9 @@ pas de financeurs.
 
 **Ajouter ou changer un logo.** Dans Grist, cliquez la cellule `logo` de l'établissement
 ou du financeur, puis le « + » (ou glissez le fichier). Modifier ces tables ne rafraîchit
-pas le widget tout seul : rechargez la page.
+pas le widget tout seul : rechargez la page. Depuis la 1.17.0, un **responsable
+d'établissement** remplace aussi le logo de son établissement depuis le widget (fiche de
+l'établissement, voir plus bas) ; les logos des financeurs ne se changent que dans Grist.
 
 **Comment le widget les lit.** Il demande à Grist un jeton d'accès **en lecture seule**
 (`getAccessToken`) et affiche chaque logo par une balise `<img>` à l'adresse que Grist
@@ -258,6 +326,24 @@ document (pas d'y écrire), pour quelques minutes, puis le widget en demande un 
 Cet affichage **n'a pas pu être essayé dans un vrai document Grist** (les tests simulent
 la réponse de Grist) : vérifiez-le sur votre document avant de compter dessus
 ([`TESTING.md`](TESTING.md), section 14).
+
+**Remplacer un logo depuis le widget (1.17.0).** Le widget redessine l'image choisie (PNG,
+JPG, WebP ou SVG, 1 Mo au plus) en un PNG de 480 px au plus, puis l'envoie à Grist : il
+demande un jeton d'accès **en écriture**, le temps de cet envoi seul et sans le garder, et
+poste le fichier à l'API du document (`POST …/attachments`) ; il écrit ensuite
+l'identifiant de la pièce jointe dans la cellule `logo`, avec le reste de la fiche, en une
+seule action. L'ancien fichier n'est pas supprimé par le widget ; ce que Grist en fait ensuite
+(conservation pour l'historique, nettoyage des pièces jointes inutilisées) est à constater
+sur votre document. Si l'envoi réussit mais que l'écriture est refusée ensuite, la pièce jointe
+reste dans le document sans servir : le widget le dit, et le nettoyage se fait dans Grist.
+Voir [`docs/securite.md`](docs/securite.md#lenvoi-dun-logo-et-le-jeton-en-écriture). Trois
+points **n'ont pas pu être essayés dans un vrai document Grist** : que Grist accepte l'envoi
+avec ce jeton, que le navigateur laisse le widget lire la réponse (cela dépend des en-têtes
+d'autorisation entre sites que renvoie l'instance Grist), et
+que les règles d'accès de l'étape 4 laissent un responsable faire tout cela
+([`TESTING.md`](TESTING.md), section 17). Si l'envoi ne marche pas, rien n'est cassé : le
+widget affiche une phrase (« Déposez le fichier directement dans Grist ») et le logo se change
+dans Grist, comme avant.
 
 Vérifier : ouvrez le widget, console ouverte. Les logos des établissements apparaissent
 sur les cartes, ceux des financeurs au centre de l'en-tête, ceux des fondateurs en bas
@@ -294,6 +380,13 @@ de page. Si ce n'est pas le cas, la console dit pourquoi :
   garde cette valeur à l'enregistrement ; si la cellule contient autre chose que des
   identifiants de ligne, le widget refuse de la réécrire et le dit : à corriger dans
   Grist.
+- **Deux responsables qui modifient la même fiche d'établissement en même temps** : s'ils
+  touchent au même champ (nom, visibilité, logo), le second est ramené à la fiche actuelle
+  avec sa saisie, sans rien perdre ; sinon les deux modifications se cumulent, y compris
+  les responsables nommés par l'un et par l'autre.
+- **Des pièces jointes orphelines** : si un responsable envoie un logo et que l'écriture de la
+  fiche échoue ensuite, ou qu'il l'annule en cours de route, le fichier reste dans les
+  pièces jointes du document. Le widget ne sait pas le supprimer.
 - **Une adresse sur plusieurs lignes de `BDD`** : le choix de présence s'applique à
   toutes ces lignes (la console le signale). Mieux vaut corriger les doublons.
 - **Une personne connectée avec une autre adresse que celle de `BDD`** n'est pas

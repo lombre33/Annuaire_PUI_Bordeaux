@@ -3,8 +3,9 @@
 //
 //   npm install --no-save playwright      (une fois ; pas une dépendance du projet)
 //   npx playwright install chromium       (ou CHROMIUM_PATH=/chemin/vers/chromium)
-//   node docs/demo/capturer.mjs
-//   node docs/demo/capturer.mjs apercu partenaires      (seulement les captures dont le nom commence ainsi)
+//   node docs/demo/capturer.mjs                          (toutes les captures)
+//   node docs/demo/capturer.mjs apercu partenaires       (seulement les captures dont le nom commence ainsi)
+//   node docs/demo/capturer.mjs --sortie=/tmp/essai      (dans un autre dossier que docs/images)
 //
 // À relancer, puis à committer, après toute modification de l'interface.
 // Chaque capture est précédée d'une vérification (nombre de cartes, logos chargés,
@@ -103,6 +104,7 @@ const CHAMPS_MODIFIES = 1 + BROUILLON.listes.length; // la fonction et les deux 
 
 const echapper = texte => texte.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const fenetre = page => page.locator('#profileDialog');
+const fenetreEtab = page => page.locator('#etabDialog');
 const groupe = (page, titre) =>
   fenetre(page).locator('.grp').filter({ has: page.locator('.grp-title', { hasText: new RegExp(`^${echapper(titre)}$`) }) });
 const pastille = (page, titre, libelle) =>
@@ -225,6 +227,12 @@ const autourDe = (selecteur, marge = MARGE) => async page => {
 // ...ou : la fenêtre de modification d'une fiche, avec un peu du fond assombri autour.
 const autourDeLaFenetre = async page => {
   const boite = await fenetre(page).boundingBox();
+  return { x: boite.x - MARGE_FENETRE, y: boite.y - MARGE_FENETRE, width: boite.width + 2 * MARGE_FENETRE, height: boite.height + 2 * MARGE_FENETRE };
+};
+
+// ...ou : la fiche d'un établissement, cadrée de la même façon.
+const autourDeLaFicheEtab = async page => {
+  const boite = await fenetreEtab(page).boundingBox();
   return { x: boite.x - MARGE_FENETRE, y: boite.y - MARGE_FENETRE, width: boite.width + 2 * MARGE_FENETRE, height: boite.height + 2 * MARGE_FENETRE };
 };
 
@@ -585,12 +593,71 @@ const SCENES = [
       exiger(await fenetre(page).locator('.ident-lock').count() === 0, 'la fenêtre d\'un administrateur ne verrouille rien');
       await page.evaluate(() => document.activeElement.blur());
     }
+  },
+  {
+    // Léa Fontaine, responsable du CHD, ouvre la fiche de son établissement par « Mon établissement » :
+    // le logo qu'elle peut remplacer ou retirer, le sigle et le statut qu'on ne change pas ici, le nom
+    // complet, la case de visibilité, les deux responsables (elle et Sofia Almeida) et le bloc pour en
+    // nommer un autre. Rien n'a changé : « Enregistrer » est grisé.
+    fichier: 'fiche-etablissement.png', requete: `?connecte=${PERSONNES_DEMO.responsable}`,
+    hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFicheEtab,
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      await page.locator('#accountBar .account-etab').waitFor();
+      await page.click('#accountBar .account-etab');
+      await page.waitForFunction(() => document.getElementById('etabDialog').open
+        && document.getElementById('etabTitle').textContent === 'Fiche de l’établissement : CHD'
+        && document.querySelectorAll('#etabDialog .es-resp').length > 0, null, { timeout: 10_000 });
+      // Le logo de l'établissement est chargé (la capture ne montre pas un cadre vide) ; aucun contour de saisie.
+      await page.waitForFunction(() => {
+        const logo = document.querySelector('#etabDialog .es-tile img');
+        return logo !== null && logo.complete && logo.naturalWidth > 0 && getComputedStyle(logo).opacity === '1';
+      }, null, { timeout: 10_000 });
+      await page.evaluate(() => document.activeElement.blur());
+
+      const boutons = await fenetreEtab(page).locator('.es-logo-actions button').allTextContents();
+      exiger(boutons.join('|') === 'Remplacer le logo|Retirer le logo', `les boutons du logo sont « ${boutons.join(' | ')} »`);
+      exiger(await fenetreEtab(page).locator('#etabAcronym').inputValue() === 'CHD' && await fenetreEtab(page).locator('#etabAcronym').evaluate(champ => champ.readOnly),
+        'le sigle n\'est pas affiché en lecture seule');
+      exiger(await fenetreEtab(page).locator('#etabStatus').evaluate(champ => champ.readOnly && champ.value === 'Fondateur du PUI'),
+        'le statut n\'est pas affiché en lecture seule');
+      exiger(await fenetreEtab(page).locator('#etabName').inputValue() === 'Centre Hospitalier de Démonstration', 'le nom complet n\'est pas celui du CHD');
+      exiger(await fenetreEtab(page).locator('#etabVisible').isChecked(), 'la case « Établissement visible dans l\'annuaire » n\'est pas cochée');
+      const responsables = await fenetreEtab(page).locator('.es-resp').evaluateAll(lignes => lignes.map(ligne => ({
+        nom: ligne.querySelector('.es-resp-name').firstChild.textContent, vous: ligne.querySelector('.es-tag-you') !== null,
+        bouton: ligne.querySelector('button').textContent
+      })));
+      exiger(JSON.stringify(responsables) === JSON.stringify([
+        { nom: 'Sofia Almeida', vous: false, bouton: 'Retirer' }, { nom: 'Léa Fontaine', vous: true, bouton: 'Retirer' }
+      ]), `les responsables sont ${JSON.stringify(responsables)}`);
+      exiger(await fenetreEtab(page).locator('.es-add button').textContent() === 'Nommer', 'le bloc pour nommer un responsable manque');
+      exiger(await fenetreEtab(page).locator('.dlg-summary').textContent() === 'Aucune modification', 'le pied ne dit pas « Aucune modification »');
+      exiger(await fenetreEtab(page).getByRole('button', { name: 'Enregistrer', exact: true }).isDisabled(), '« Enregistrer » n\'est pas grisé');
+      exiger(await fenetreEtab(page).getByRole('button', { name: 'Annuler', exact: true }).isEnabled(), '« Annuler » n\'est pas cliquable');
+      // Rien de coupé : la fiche entière tient dans la fenêtre, sans défilement.
+      exiger(await page.evaluate(() => {
+        const corps = document.querySelector('#etabDialog .dlg-body');
+        return corps.scrollHeight - corps.clientHeight <= 1;
+      }), 'la fiche est plus haute que la fenêtre : une partie serait coupée');
+    }
   }
 ];
 
+// Sans argument, toutes les captures sont refaites ; avec des débuts de noms de fichiers, seulement
+// celles dont le nom commence ainsi ; `--sortie=<dossier>` les écrit ailleurs que dans docs/images
+// (pour comparer sans rien écraser).
+const arguments_ = process.argv.slice(2);
+const dossierSortie = path.resolve(arguments_.find(argument => argument.startsWith('--sortie='))?.slice('--sortie='.length) ?? DOSSIER_IMAGES);
+const demandees = arguments_.filter(argument => !argument.startsWith('--'));
+const inconnues = demandees.filter(nom => !SCENES.some(scene => scene.fichier.startsWith(nom)));
+if (inconnues.length > 0) {
+  console.error(`Capture inconnue : ${inconnues.join(', ')}. Captures possibles : ${SCENES.map(scene => scene.fichier).join(', ')}.`);
+  process.exit(1);
+}
+
 const { server, url } = await startDemoServer();
 const navigateur = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
-fs.mkdirSync(DOSSIER_IMAGES, { recursive: true });
+fs.mkdirSync(dossierSortie, { recursive: true });
 
 try {
   const contexte = await navigateur.newContext({
@@ -599,17 +666,13 @@ try {
   // Hermétique : seules les requêtes vers le serveur local passent.
   await contexte.route(adresse => adresse.hostname !== '127.0.0.1', route => route.abort());
 
-  const demandees = process.argv.slice(2);
-  const scenes = demandees.length ? SCENES.filter(scene => demandees.some(nom => scene.fichier.startsWith(nom))) : SCENES;
-  if (scenes.length === 0) throw new Error(`Aucune capture ne s'appelle « ${demandees.join(' », « ')} »`);
-
-  for (const scene of scenes) {
+  for (const scene of SCENES.filter(autre => demandees.length === 0 || demandees.some(nom => autre.fichier.startsWith(nom)))) {
     const page = await contexte.newPage();
     if (scene.hauteur) await page.setViewportSize({ width: LARGEUR, height: scene.hauteur });
     await page.goto(`${url}/${scene.requete ?? ''}`);
     await scene.preparer(page);
     await page.mouse.move(0, 0); // pas de survol parasite sur la capture
-    const fichier = path.join(DOSSIER_IMAGES, scene.fichier);
+    const fichier = path.join(dossierSortie, scene.fichier);
     await page.screenshot({ path: fichier, clip: scene.zone ? await scene.zone(page) : undefined, fullPage: scene.pagePleine });
     await page.close();
     console.log(`${path.relative(process.cwd(), fichier)}  ${(fs.statSync(fichier).size / 1024).toFixed(0)} Ko`);

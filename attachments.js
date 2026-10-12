@@ -29,7 +29,7 @@ export function attachmentIds(cell) {
 // Réponse de docApi.getAccessToken : { token, baseUrl, ttlMsecs }. null si elle est
 // inutilisable (pas de jeton, adresse qui n'est pas une adresse web, adresse déjà
 // munie de paramètres où l'on ne peut pas ajouter un chemin).
-function readTokenInfo(raw) {
+export function readTokenInfo(raw) {
   if (!raw || typeof raw.token !== 'string' || raw.token === '') return null;
   let base;
   try {
