@@ -306,7 +306,12 @@ test('le guide utilisateur cite les autres messages de « Ma présence » : rais
 
   // Messages de main.js, qui ne sont pas exportés : le guide et le code doivent dire la même chose.
   const main = read('main.js');
-  ['Enregistrement…', 'Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.'].forEach(message => {
+  [
+    'Enregistrement…',
+    'Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.',
+    'Modification enregistrée. Vous avez accepté d\'apparaître dans l\'annuaire.',
+    'Modification enregistrée. Vous n\'apparaissez plus dans l\'annuaire.'
+  ].forEach(message => {
     assert.ok(main.includes(message.replaceAll('\'', '\\\'')), `main.js ne dit plus « ${message} » : adaptez le guide utilisateur.`);
     assert.ok(guide.includes(message), `Le guide utilisateur doit citer « ${message} ».`);
   });

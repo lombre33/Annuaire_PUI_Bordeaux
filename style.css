@@ -1106,16 +1106,20 @@ h1 {
 .presence-switch:hover {
   border-color: var(--violet);
 }
-.presence-switch:disabled {
+/* Pendant l'écriture : hors service sans être désactivé, pour garder le focus (account-ui.js). */
+.presence-switch[aria-disabled="true"] {
   cursor: progress;
   opacity: 0.65;
 }
+/* L'état de l'interrupteur ne tient qu'à la piste et au curseur : 3:1 au moins avec leur fond
+   (WCAG 1.4.11). Piste éteinte #7d879c : 3,4:1 sur le fond du bouton, curseur blanc 3,6:1 dessus ;
+   piste allumée #147c72 : 4,8:1 sur le fond du bouton, curseur blanc 5,1:1 dessus. */
 .presence-track {
   position: relative;
   flex: none;
   width: 38px;
   height: 22px;
-  background: #c3c9d8;
+  background: #7d879c;
   border-radius: 999px;
   transition: background 0.15s;
 }
@@ -1131,10 +1135,38 @@ h1 {
   transition: transform 0.15s;
 }
 .presence-switch[aria-checked="true"] .presence-track {
-  background: var(--teal);
+  background: #147c72;
 }
 .presence-switch[aria-checked="true"] .presence-thumb {
   transform: translateX(16px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .presence-track,
+  .presence-thumb {
+    transition: none;
+  }
+}
+/* Couleurs imposées (mode contraste élevé) : la piste et le curseur y prendraient le même fond et
+   l'interrupteur ne montrerait plus son état. On les pose en couleurs système, que le mode respecte. */
+@media (forced-colors: active) {
+  .presence-track {
+    background: Canvas;
+    border: 1px solid ButtonText;
+  }
+  /* La bordure de 1 px rétrécit la piste : le curseur reste centré avec 2 px au lieu de 3. */
+  .presence-thumb {
+    top: 2px;
+    left: 2px;
+    background: ButtonText;
+    box-shadow: none;
+  }
+  .presence-switch[aria-checked="true"] .presence-track {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .presence-switch[aria-checked="true"] .presence-thumb {
+    background: HighlightText;
+  }
 }
 .account-actions {
   display: flex;

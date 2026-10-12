@@ -3,6 +3,8 @@
 // Un responsable d'établissement y trouve le raccourci « Mon établissement », un administrateur
 // le « mode admin ». DOM seulement ; presence.js décrit la situation et décide du message.
 
+import { PRESENCE_ANNOUNCE_MS } from './constants.js';
+
 const noop = () => {};
 
 // `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
@@ -33,8 +35,20 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop,
     root.classList.toggle('no-switch', !withSwitch);
   };
 
+  // Message passager sous le bandeau ('' l'efface) ; `tone` : 'info', 'error' pour un échec, ou
+  // 'done' (invisible, voir announce). Un nouveau message remplace le précédent et son délai.
+  let announceTimer = 0;
+  function setStatus(message, tone = 'info') {
+    clearTimeout(announceTimer);
+    status.textContent = message;
+    status.dataset.tone = tone;
+    status.classList.toggle('sr-only', tone === 'done');
+  }
+
+  // Pendant une écriture le bouton est « hors service » (`aria-disabled`) sans être désactivé :
+  // un bouton désactivé perd le focus, et le clavier repartirait du haut de la page.
   switchButton.addEventListener('click', () => {
-    if (!switchButton.disabled) onToggle();
+    if (switchButton.getAttribute('aria-disabled') !== 'true') onToggle();
   });
   editButton.addEventListener('click', () => onEdit());
   etabButton.addEventListener('click', () => onEtab());
@@ -87,16 +101,21 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop,
     },
 
     // Pendant une écriture l'interrupteur est gelé : un deuxième clic ne doit pas
-    // partir avant que le premier ait abouti.
+    // partir avant que le premier ait abouti. Il garde le focus (voir plus haut).
     setBusy(busy) {
-      switchButton.disabled = busy;
+      if (busy) switchButton.setAttribute('aria-disabled', 'true');
+      else switchButton.removeAttribute('aria-disabled');
       switchButton.setAttribute('aria-busy', String(busy));
     },
 
-    // Message passager sous le bandeau ('' l'efface) ; `tone` 'error' pour un échec.
-    setStatus(message, tone = 'info') {
-      status.textContent = message;
-      status.dataset.tone = tone;
+    setStatus,
+
+    // Le résultat d'une écriture réussie, pour les lecteurs d'écran : la région d'état le
+    // lit, mais il reste invisible, car l'écran dit déjà la même chose (le texte du bandeau
+    // change et l'interrupteur bascule). Il s'efface seul, ou dès le message suivant.
+    announce(message) {
+      setStatus(message, 'done');
+      announceTimer = setTimeout(() => setStatus(''), PRESENCE_ANNOUNCE_MS);
     }
   };
 }

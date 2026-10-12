@@ -358,9 +358,13 @@ async function togglePresence() {
   accountBar.setBusy(true);
   accountBar.setStatus('Enregistrement…');
   try {
-    await setPresence(window.grist.docApi, persons, !persons.every(person => person.status.accepted));
+    const accepted = !persons.every(person => person.status.accepted);
+    await setPresence(window.grist.docApi, persons, accepted);
     const outcome = await reloadDirectory();
-    accountBar.setStatus(outcome === 'failed' ? 'Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.' : '');
+    if (outcome === 'failed') accountBar.setStatus('Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.');
+    else accountBar.announce(accepted
+      ? 'Modification enregistrée. Vous avez accepté d\'apparaître dans l\'annuaire.'
+      : 'Modification enregistrée. Vous n\'apparaissez plus dans l\'annuaire.');
   } catch (error) {
     if (!(error instanceof PresenceError)) console.error('Erreur inattendue pendant le changement de présence:', error);
     accountBar.setStatus(error instanceof PresenceError ? error.message : 'La modification n\'a pas pu être enregistrée.', 'error');

@@ -57,13 +57,15 @@ const attendreCartes = async (page, nombre) => {
 };
 const attendreBandeau = page =>
   page.waitForFunction(() => !document.getElementById('statusBanner').hidden, null, { timeout: 10_000 });
-// Le bandeau « Ma présence » est affiché, dit `extrait` et n'a plus de message
-// passager (« Enregistrement… » après un clic).
+// Le bandeau « Ma présence » est affiché, dit `extrait` et n'a plus de message passager à
+// l'écran (« Enregistrement… » après un clic). L'annonce d'une réussite (data-tone="done") est
+// réservée aux lecteurs d'écran : elle ne se voit pas, donc ne compte pas.
 const attendrePresence = (page, extrait) =>
   page.waitForFunction(attendu => {
     const bandeau = document.getElementById('accountBar');
+    const message = bandeau.querySelector('.account-status');
     return !bandeau.hidden && bandeau.querySelector('.account-detail').textContent.includes(attendu)
-      && bandeau.querySelector('.account-status').textContent === '';
+      && (message.textContent === '' || message.dataset.tone === 'done');
   }, extrait, { timeout: 10_000 });
 const filtre = (page, cle) => page.locator(`.filter[data-filter-key="${cle}"]`);
 const carteDe = (page, nom) => page.locator('.contact-card', { has: page.locator('.name', { hasText: new RegExp(`^${nom}$`) }) });
