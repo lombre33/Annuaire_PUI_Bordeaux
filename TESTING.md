@@ -119,7 +119,7 @@ fermeture de la page ne laisse aucun rejet non traité).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
-`tests/e2e-taches.test.mjs` y ajoute 24 scénarios sur le menu Tâches rangé par action,
+`tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Tâches rangé par action,
 sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
 sept boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
 en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
@@ -152,7 +152,7 @@ tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
 
-`tests/branding-e2e.test.mjs` y ajoute 27 scénarios sur l'habillage, avec des logos servis par
+`tests/branding-e2e.test.mjs` y ajoute 29 scénarios sur l'habillage, avec des logos servis par
 `tests/support/fake-attachments.mjs` : logo seul sur les cartes, pastille texte quand il manque,
 clic et clavier, jeton demandé une seule fois et en lecture seule, financeurs, bandeau des
 fondateurs dans l'ordre, rond « France 2030 », jeton refusé ou méthode absente, fichier
@@ -347,11 +347,11 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       puis recharger : elle change d'action. Une sélection qui portait l'ancien libellé
       est retirée.
 - [ ] La console liste, par identifiant de ligne, les tâches classées sous « Sans
-      action » (`[REFS] Taches : n ligne(s) sans regroupement…`) : les numéroter dans
+      action » (`[REFS] Taches: n ligne(s) sans regroupement…`) : les numéroter dans
       Grist, puis recharger le widget.
 - [ ] Sur une copie du document où **aucune tâche** ne commence par un numéro « n.m »
       (ou aucune action par « Action n »), le menu Tâches reste complet, mais à plat,
-      sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches : aucune
+      sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches: aucune
       ligne n'est rattachée à une action…`).
 - [ ] Dans la fenêtre « Modifier mon profil », la liste des tâches est rangée par action
       elle aussi, et celle des actions reste à plat.
@@ -497,8 +497,9 @@ Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde
       `Accepte_apparaitre` dans Grist ; le recocher la fait revenir. Il n'écrit que
       cette case, sur la ligne de la personne.
 - [ ] Compte **Lecteur** : pas de bandeau, aucune ligne ajoutée à `Annuaire_Sonde`.
-- [ ] Compte connecté dont l'adresse n'est pas dans `BDD` : pas de bandeau, la
-      console l'explique sans citer d'adresse.
+- [ ] Compte connecté dont l'adresse n'est pas dans `BDD` : un bandeau « Compte
+      absent de l'annuaire » sans interrupteur ; la console l'explique sans citer
+      d'adresse.
 - [ ] Règle d'accès qui refuse la modification de `BDD` pour ce compte : l'interrupteur
       affiche « Grist a refusé la modification… » et reste dans son état réel.
 - [ ] Deux comptes dans deux navigateurs, widgets ouverts en même temps : chacun voit
@@ -554,7 +555,7 @@ l'e-mail et de l'établissement sont à la section 16.
       l'adresse ne figure pas dans `BDD` : un bandeau « Compte absent de l'annuaire » sans
       interrupteur de présence ni bouton « Modifier ».
 - [ ] Ouvrir sa fiche : un bloc d'identité (initiales, nom, e-mail, et à droite le logo de
-      l'établissement, ou son nom en pastille s'il n'a pas de logo) et la
+      l'établissement, ou sa pastille s'il n'a pas de logo) et la
       phrase « Verrouillé : l'e-mail et l'établissement sont liés à votre compte… » ; les
       champs contiennent les valeurs de Grist (le téléphone avec son 0 initial et ses
       espaces). La console ne dit pas `[SCHEMA] Types de colonnes illisibles` (sinon le
