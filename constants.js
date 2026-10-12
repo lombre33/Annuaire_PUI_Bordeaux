@@ -47,7 +47,10 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.
-//   label, color  affichage
+//   label, color  affichage. La couleur sert de fond à du texte blanc (les pastilles) et de
+//                 couleur de texte sur blanc (les titres de groupe) : elle garde 4,5:1 au moins
+//                 avec le blanc (WCAG 1.4.3). Pour en changer une, la foncer à teinte constante
+//                 plutôt que d'en choisir une plus claire ; tests/accessibility.test.mjs le vérifie
 //   table, field  table de référence et colonne de libellé (`field` peut lister
 //                 plusieurs colonnes, essayées dans l'ordre : le libellé
 //                 corrigé d'abord, le libellé brut de l'import en repli)
@@ -76,13 +79,13 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 // Les libellés lus de Grist sont rangés par clé de catégorie (referenceMaps),
 // pas par table : deux catégories peuvent lire la même table.
 export const CATEGORIES = {
-  actions: { label: 'Actions', color: '#f28a54', table: 'Actions', field: ['Actions_corrigees', 'Actions'], column: 'Actions' },
+  actions: { label: 'Actions', color: '#c84e0f', table: 'Actions', field: ['Actions_corrigees', 'Actions'], column: 'Actions' },
   taches: {
-    label: 'Tâches', color: '#ff9800', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
+    label: 'Tâches', color: '#a96500', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
     grouping: 'macroTaches'
   },
-  communautes: { label: 'Communautés', color: '#d85b9d', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], column: 'Communautes' },
-  gt: { label: 'GT', color: '#1ba99a', table: 'GT', field: ['GT_corrige', 'GT'], column: 'GT' },
+  communautes: { label: 'Communautés', color: '#cf3788', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], column: 'Communautes' },
+  gt: { label: 'GT', color: '#158378', table: 'GT', field: ['GT_corrige', 'GT'], column: 'GT' },
   competences: {
     label: 'Compétences', color: '#9c27b0', table: 'Competences', field: ['Competences_corrigees', 'Competences'], column: 'Competences',
     grouping: 'macro'
@@ -99,7 +102,7 @@ export const CATEGORIES = {
     hint: 'Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi elles',
     placeholder: 'Action ou tâche…'
   },
-  instances: { label: 'Instances', color: '#4f8ee8', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], column: 'Instances' },
+  instances: { label: 'Instances', color: '#2271e2', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], column: 'Instances' },
   etablissement: { label: 'Établissement', color: '#147c72', table: 'Etablissements', field: ['acronyme', 'nom_complet'] },
   role: { label: 'Rôle PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
 };

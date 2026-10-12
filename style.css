@@ -8,7 +8,7 @@
   --violet: #6257d9;
   --orange: #f28a54;
   --teal: #1ba99a;
-  --blue: #4f8ee8;
+  --blue: #2271e2; /* le lien e-mail : 4,6:1 sur blanc, 4,5:1 exigés (WCAG 1.4.3) */
   --pink: #d85b9d;
 }
 * {
