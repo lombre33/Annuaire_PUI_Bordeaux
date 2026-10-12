@@ -6,12 +6,27 @@
 //   http://127.0.0.1:8080/?panne=Actions     simule une table de référence illisible
 //   http://127.0.0.1:8080/?connecte=camille.rousseau@chd.example
 //                                            ouvre le widget comme cette personne : le
-//                                            bandeau « Ma présence » apparaît et son
-//                                            interrupteur écrit dans le jeu de données
-//                                            (en mémoire, rechargez pour repartir de zéro)
-//   ...&refus=BDD                            simule une règle d'accès qui refuse d'écrire
-//                                            dans BDD (liste de tables séparées par des virgules)
-//   ...&readonly=true                        ouvre le widget comme un compte Lecteur
+//                                            bandeau « Ma présence » apparaît, avec son
+//                                            interrupteur et le bouton « Modifier mon profil »,
+//                                            et sa carte porte « Votre fiche » et « ✎ Modifier ».
+//                                            L'interrupteur comme la modification de la fiche
+//                                            (formulaire, relecture « Avant » / « Après », « Valider »)
+//                                            écrivent dans le jeu de données (en mémoire,
+//                                            rechargez pour repartir de zéro)
+//   http://127.0.0.1:8080/?connecte=mehdi.bensaid@udd.example
+//                                            un administrateur (case admin de la table ACL) :
+//                                            toutes les cartes ont un bouton « ✎ Modifier »
+//   http://127.0.0.1:8080/?connecte=sarah.colin@fdx.example
+//                                            une fiche masquée de l'annuaire : la personne la
+//                                            modifie depuis le bandeau, et la relecture dit
+//                                            pourquoi la fiche reste masquée
+//   ...&refus=BDD                            simule une règle d'accès qui refuse d'écrire dans
+//                                            BDD, pour le choix de présence comme pour la
+//                                            modification d'une fiche (liste de tables séparées
+//                                            par des virgules)
+//   ...&readonly=true                        ouvre le widget comme un compte Lecteur : ni bandeau
+//                                            ni bouton « Modifier »
+//   sans ?connecte=                          un compte anonyme : aucun bouton « Modifier »
 //   PORT=9000 node docs/demo/serveur-demo.mjs
 //
 // index.html n'est pas dupliqué : il est lu dans le dépôt à chaque requête et
