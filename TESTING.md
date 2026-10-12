@@ -79,13 +79,13 @@ double clic, écriture refusée, personne sans fiche).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
-`tests/e2e-profile.test.mjs` y ajoute NN_PROFIL scénarios sur la modification d'une fiche : qui
+`tests/e2e-profile.test.mjs` y ajoute 43 scénarios sur la modification d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur, compte Lecteur,
 anonyme, adresse inconnue, doublon), le formulaire et ses refus, la relecture (carte
 avant et carte après, ce qui change repéré, rien d'écrit), l'écriture en une seule
 action, la fiche modifiée par un administrateur, le téléphone numérique ou texte, un
 refus de Grist, un changement concurrent, une fiche supprimée, le double clic, Échap,
-un prénom piégé, le focus, la tabulation dans la fenêtre et l'affichage à 360px.
+un prénom piégé, le focus, la tabulation dans la fenêtre et l'affichage de 280 à 360px.
 
 `tests/responsive.test.mjs` y ajoute 15 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :

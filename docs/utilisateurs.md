@@ -15,6 +15,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 - [Gagner du temps : cliquer sur une étiquette](#gagner-du-temps--cliquer-sur-une-étiquette)
 - [Fondateurs et Partenaires](#fondateurs-et-partenaires)
 - [Réinitialiser](#réinitialiser)
+- [Ma présence : apparaître ou non](#ma-présence--apparaître-ou-non)
 - [Pourquoi une personne n'apparaît-elle pas ?](#pourquoi-une-personne-napparaît-elle-pas-)
 - [Messages du bandeau rouge](#messages-du-bandeau-rouge)
 - [Questions fréquentes](#questions-fréquentes)
@@ -26,7 +27,8 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 - Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (instances, actions, groupes de travail ou GT, communautés, tâches, compétences, rôle).
 - On retrouve quelqu'un par son **nom** ou, grâce aux **filtres**, par ce qu'il fait.
 - L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un grand écran, une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
-- Il est en **lecture seule** : on n'y modifie rien. Pour corriger ou compléter une information, adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist.
+- **Chacun décide s'il y figure.** Une personne n'apparaît que si elle a accepté d'apparaître. Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'adresse e-mail de ce compte, un bandeau **Ma présence** vous dit où vous en êtes et vous laisse changer d'avis d'un clic ([Ma présence](#ma-présence--apparaître-ou-non)).
+- Cet interrupteur est la seule chose que vous modifiez ici. Pour corriger ou compléter une autre information, adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist.
 
 ## Lexique du PUI
 
@@ -39,6 +41,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Établissement fondateur** | L'un des 16 établissements qui ont fondé le PUI |
 | **Établissement partenaire** | Un partenaire du PUI |
 | **Structure « autres »** | Une structure extérieure au PUI, qui a collaboré à certaines tâches. Son statut est « autres » : ses contacts n'apparaissent pas dans l'annuaire |
+| **Accord d'apparaître** | Le choix de chaque personne de figurer ou non dans l'annuaire. Sans son accord, une personne n'apparaît pas, même si son établissement a validé son apparition |
 | **Instances** | *À compléter* |
 | **Actions** | *À compléter* |
 | **Communautés** | *À compléter* |
@@ -53,6 +56,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | Élément | À quoi il sert |
 |---|---|
 | **Compteur** (en haut à droite, « 14 contacts ») | Indique combien de cartes sont affichées avec la recherche et les filtres actuels |
+| **Bandeau « Ma présence »** (au-dessus de la recherche, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
 | **Actions, Tâches, Communautés, GT, Domaines, Compétences, Instances, Établissement** | Huit filtres : chaque bouton ouvre un menu de valeurs à cocher |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
@@ -138,6 +142,57 @@ Quand rien ne correspond, l'annuaire affiche « Aucun contact trouvé » : modif
 
 ![État vide : « Aucun contact trouvé. Modifiez votre recherche ou réinitialisez les filtres. »](images/etat-vide.png)
 
+## Ma présence : apparaître ou non
+
+Chaque personne décide elle-même si elle figure dans l'annuaire. Une personne n'apparaît que si elle a **accepté d'apparaître** et si son établissement a validé son apparition (voir [Pourquoi une personne n'apparaît-elle pas ?](#pourquoi-une-personne-napparaît-elle-pas-)).
+
+Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'adresse e-mail de ce compte, un bandeau **Ma présence** s'affiche au-dessus de la recherche. Il porte votre nom, une phrase qui dit où vous en êtes et un interrupteur.
+
+![Bandeau « Ma présence » de Camille Rousseau : « Vous apparaissez dans l'annuaire. », interrupteur « Apparaître dans l'annuaire » activé, compteur à 14 contacts](images/ma-presence.png)
+
+**Changer d'avis.** Cliquez sur l'interrupteur « Apparaître dans l'annuaire ». S'il était activé, il se désactive : votre carte disparaît de l'annuaire et le compteur perd une unité. S'il était désactivé, il s'active et votre carte revient, si rien d'autre ne vous masque. Pendant l'enregistrement, l'interrupteur est gelé et le bandeau indique « Enregistrement… » ; l'annuaire est ensuite relu, si bien que ce que vous voyez est ce que Grist a vraiment enregistré.
+
+![Bandeau « Ma présence » après un clic sur l'interrupteur : « Vous n'apparaissez pas dans l'annuaire. », interrupteur désactivé, compteur à 13 contacts](images/ma-presence-retiree.png)
+
+**Ce que dit le bandeau**
+
+| Message | Ce que cela veut dire | Que faire |
+|---|---|---|
+| « Vous apparaissez dans l'annuaire. » | Vous avez donné votre accord et rien ne vous masque | Rien. Désactivez l'interrupteur pour vous retirer |
+| « Vous apparaissez dans l'annuaire (visible avec l'interrupteur « Partenaires »). » | Votre établissement est partenaire : votre carte s'affiche quand **Partenaires** est activé | Rien |
+| « Vous n'apparaissez pas dans l'annuaire. » | Vous n'avez pas donné votre accord, ou vous l'avez retiré | Activez l'interrupteur pour apparaître |
+| « Vous avez accepté d'apparaître, mais votre fiche reste masquée : … Contactez un administrateur. » | Votre accord est donné, mais une autre condition manque. La raison suit les deux-points (voir plus bas) | Transmettez le message à l'administrateur des données : cela se corrige dans Grist |
+| « Vous n'avez accepté d'apparaître que sur une partie de vos fiches. » | Plusieurs fiches portent votre adresse, et seules certaines ont votre accord | Un clic sur l'interrupteur donne votre accord à toutes ; prévenez l'administrateur des données pour qu'il supprime les doublons |
+| « 2 fiches portent votre adresse : votre choix s'applique à toutes. » | Plusieurs fiches portent votre adresse (le chiffre varie). Votre choix, dans un sens comme dans l'autre, vaut pour chacune | Prévenez l'administrateur des données pour qu'il supprime les doublons |
+
+![Bandeau « Ma présence » de Sarah Colin : « Vous avez accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'a pas encore été validé. Contactez un administrateur. »](images/ma-presence-masquee.png)
+
+Quand votre fiche reste masquée alors que vous avez accepté d'apparaître, le message donne la ou les raisons, séparées par des points-virgules :
+
+- « votre fiche n'a ni prénom ni nom » ;
+- « votre fiche n'a pas de périmètre » ;
+- « votre fiche n'a pas d'établissement » ;
+- « votre établissement n'est pas reconnu » ;
+- « votre établissement n'a pas encore été validé » ;
+- « votre établissement n'est ni fondateur ni partenaire » (une structure « autres »).
+
+**Quand l'enregistrement échoue.** L'interrupteur reste dans son état réel et rien n'a changé. Le message s'affiche sous le bandeau :
+
+| Message | Ce que cela veut dire | Que faire |
+|---|---|---|
+| « Grist a refusé la modification : vos droits ne permettent pas de changer cette information. Contactez un administrateur. » | Les droits de votre compte ne vous permettent pas de modifier votre fiche | Contactez l'administrateur des données |
+| « Modification enregistrée ; l'annuaire n'a pas pu être rechargé. » | Votre choix est bien enregistré, mais l'annuaire n'a pas pu être relu | Rechargez la page |
+| « La modification n'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Une panne passagère, ou un réglage à revoir | Réessayez ; si cela persiste, prévenez l'administrateur des données |
+| « La colonne Accepte_apparaitre est une colonne à formule : elle doit être une colonne de données (case à cocher). Voir GRIST_SETUP.md. » | Un réglage du document Grist est à revoir | Prévenez l'administrateur des données |
+
+**Ce que l'interrupteur change, et ce qu'il ne change pas**
+
+- Il ne change que **votre accord d'apparaître**, sur **votre** fiche. Dans cette version, pour corriger une autre information (fonction, téléphone, établissement…), adressez-vous à l'administrateur des données.
+- Vous retirer **masque** votre carte, cela **n'efface pas** vos données : elles restent dans le document Grist, lisibles par les personnes qui y ont accès. Pour demander leur suppression, adressez-vous à l'administrateur des données.
+- Vous pouvez changer d'avis à tout moment. Personne ne devrait changer votre choix à votre place : un administrateur ne coche votre case qu'avec votre accord.
+
+**Pas de bandeau ?** C'est normal quand l'annuaire ne peut pas vous reconnaître : vous n'êtes pas connecté à Grist, votre compte ne peut que consulter le document (rôle Lecteur), l'adresse de votre compte ne figure sur aucune fiche, ou l'annuaire n'a pas encore été réglé pour cela. L'annuaire s'affiche alors comme d'habitude. Pour apparaître ou ne plus apparaître, adressez-vous à l'administrateur des données.
+
 ## Pourquoi une personne n'apparaît-elle pas ?
 
 **D'abord, côté écran**
@@ -146,11 +201,13 @@ Quand rien ne correspond, l'annuaire affiche « Aucun contact trouvé » : modif
 2. L'interrupteur qui correspond au statut de son établissement est **désactivé** : vérifiez Fondateurs et Partenaires.
 3. Le nom est mal orthographié (les accents et les majuscules, eux, sont sans effet).
 4. La donnée vient d'être modifiée dans Grist, dans une table autre que la liste des contacts (par exemple la validation d'un établissement) : **rechargez la page**. Grist ne prévient l'annuaire que des changements de la liste des contacts.
+5. Si c'est de **vous** qu'il s'agit, regardez le bandeau [Ma présence](#ma-présence--apparaître-ou-non) : il dit si vous apparaissez et, sinon, pourquoi.
 
 **Ensuite, côté données** (informations à transmettre à l'administrateur des données). Une personne n'est affichée que si **toutes** ces conditions sont réunies :
 
 - elle a un **nom ou un prénom** ;
 - elle a au moins une valeur de **périmètre** (colonne `perimetre`) ;
+- elle a **accepté d'apparaître** (case `Accepte_apparaitre` cochée : par elle-même avec « Ma présence », ou dans Grist avec son accord) ;
 - elle est rattachée à un établissement (colonne `Etablissement`, qui renvoie à une ligne de la table `Etablissements`) ;
 - cet établissement a **validé** son apparition (`ok_pour_apparaitre` coché) ;
 - cet établissement est **fondateur ou partenaire** (une structure « autres », extérieure au PUI, n'apparaît jamais).
@@ -159,13 +216,14 @@ Quelques cas, avec des personnes fictives du jeu de démonstration :
 
 | Personne fictive | Situation | Résultat |
 |---|---|---|
-| Sarah Colin | Établissement fondateur qui n'a pas validé son apparition | Jamais affichée |
+| Sarah Colin | A accepté d'apparaître, mais son établissement fondateur n'a pas validé son apparition | Jamais affichée (son bandeau « Ma présence » le lui dit) |
+| Lucas Mercier | N'a pas accepté d'apparaître | Jamais affiché, tant qu'il n'active pas l'interrupteur de « Ma présence » |
 | Gabriel Noël | Établissement de statut « autres » | Jamais affiché |
 | Alice Bertin | Aucun établissement renseigné | Jamais affichée |
 | Victor Lambert | Aucun périmètre renseigné | Jamais affiché |
 | Clara Dubois | Établissement partenaire validé | Affichée seulement avec l'interrupteur Partenaires |
 
-La page [maintenance](maintenance.md#pourquoi-un-contact-est-visible-ou-non) détaille ces règles pour l'administrateur des données.
+Les deux accords sont indépendants : celui de l'établissement ne remplace pas celui de la personne, et celui de la personne ne contourne pas l'établissement. La page [maintenance](maintenance.md#pourquoi-un-contact-est-visible-ou-non) détaille ces règles pour l'administrateur des données.
 
 ## Messages du bandeau rouge
 
@@ -182,6 +240,7 @@ Un bandeau rouge apparaît sous la barre d'outils quand l'annuaire n'a pas pu ê
 | « Colonne de libellé introuvable : … Les tags et le filtre correspondants restent vides » | Une table de référence se lit, mais la colonne qui porte les libellés n'existe plus (renommée ou supprimée) | À corriger dans Grist par l'administrateur des données |
 | « Acronymes en double dans Etablissements (…) avec des statuts différents » | Cas rare : deux établissements portent le même acronyme avec des statuts contradictoires et Grist a transmis l'établissement sous forme de texte. Le statut le plus strict est retenu : leurs contacts sont masqués s'il ne les rend plus éligibles | À corriger dans Grist par l'administrateur des données |
 | « perimetre est vide… », « Etablissement est vide… », « Aucun contact affichable… » | Les données sont présentes mais aucune ne remplit les conditions d'affichage | À vérifier dans Grist par l'administrateur des données |
+| « Personne n'a accepté d'apparaître : Accepte_apparaitre n'est coché pour aucun contact… » | Personne n'a donné son accord d'apparaître (ou la case n'est plus renseignée) : l'annuaire est vide faute d'accord, pas faute de données | À vérifier dans Grist par l'administrateur des données. Que quelques personnes seulement aient refusé n'est pas une anomalie : aucun bandeau ne le signale |
 
 Le bandeau ne signale pas « aucun résultat pour ma recherche » : c'est le rôle de l'écran « Aucun contact trouvé ».
 
@@ -189,11 +248,11 @@ Le bandeau ne signale pas « aucun résultat pour ma recherche » : c'est le rô
 
 **Puis-je corriger mes informations ?**
 
-Non, l'annuaire est en lecture seule. Les corrections se font dans Grist, par l'administrateur des données.
+Pour décider d'apparaître ou non, oui : c'est l'interrupteur de [Ma présence](#ma-présence--apparaître-ou-non). Pour le reste (fonction, téléphone, établissement…), les corrections se font dans Grist, par l'administrateur des données. Une modification directe de votre fiche, avec une relecture avant d'enregistrer, est en préparation.
 
 **D'où viennent les informations ?**
 
-D'un document Grist, qui sert de base de données à l'annuaire. L'annuaire n'enregistre rien dans votre navigateur.
+D'un document Grist, qui sert de base de données à l'annuaire. L'annuaire n'enregistre rien dans votre navigateur ; la seule chose qu'il écrit dans Grist, à votre demande, est votre choix d'apparaître ou non.
 
 **J'ai changé une information dans Grist et je ne la vois pas.**
 
@@ -209,4 +268,16 @@ Oui : l'annuaire s'adapte à la largeur de la zone que Grist lui donne. Sur un p
 
 **Mes coordonnées sont-elles visibles par tout le monde ?**
 
-L'annuaire n'affiche une personne que si son établissement a validé son apparition et est fondateur ou partenaire. Cette règle ne concerne que l'affichage : les contacts masqués restent lisibles dans le document Grist par toute personne qui y a accès. L'annuaire lui-même est visible par les personnes qui ont accès à la page Grist qui l'héberge ; les droits d'accès au document se gèrent dans Grist. Voir [sécurité et confidentialité](securite.md).
+L'annuaire n'affiche une personne que si elle a accepté d'apparaître, et si son établissement a validé son apparition et est fondateur ou partenaire. Cette règle ne concerne que l'affichage : les contacts masqués, y compris celles et ceux qui se sont retirés, restent lisibles dans le document Grist par toute personne qui y a accès. L'annuaire lui-même est visible par les personnes qui ont accès à la page Grist qui l'héberge ; les droits d'accès au document se gèrent dans Grist. Voir [sécurité et confidentialité](securite.md).
+
+**Puis-je retirer mes coordonnées de l'annuaire ?**
+
+Oui : désactivez l'interrupteur de [Ma présence](#ma-présence--apparaître-ou-non), votre carte disparaît aussitôt. Cela **masque** votre fiche sans l'effacer : vos données restent dans le document Grist. Pour qu'elles soient supprimées, adressez-vous à l'administrateur des données.
+
+**Pourquoi n'ai-je pas de bandeau « Ma présence » ?**
+
+L'annuaire ne vous propose rien quand il ne peut pas vous reconnaître : compte qui ne peut que consulter (rôle Lecteur), adresse de votre compte absente de l'annuaire, ou réglage manquant dans Grist. Voir [Ma présence](#ma-présence--apparaître-ou-non).
+
+**Que sait l'annuaire de moi quand je l'ouvre ?**
+
+Pour savoir qui vous êtes, l'annuaire demande à Grist l'adresse de votre compte : il ajoute puis supprime une ligne de service dans le document, qui porte cette adresse. Elle n'est ni conservée dans votre navigateur ni envoyée ailleurs, mais cette ligne peut rester visible dans l'historique du document Grist. Voir [sécurité et confidentialité](securite.md#écritures-et-règles-daccès).

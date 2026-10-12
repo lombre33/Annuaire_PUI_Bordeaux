@@ -24,9 +24,10 @@ L'annuaire affiche les accompagnateurs de l'innovation du PUI sous forme de **ca
 - 🔎 **Recherche** par nom ou prénom, sans souci d'accents ni de majuscules.
 - 🎛️ **Filtres** : chaque menu liste les valeurs d'une catégorie, avec le nombre de cartes qui portent chacune. Les valeurs d'un même menu s'additionnent (« ou »), les menus se cumulent entre eux (« et »).
 - 🏛️ **Fondateurs et Partenaires** : deux interrupteurs permettent de choisir les établissements affichés, fondateurs du PUI ou partenaires. Seuls les établissements qui ont validé leur apparition sont montrés.
+- 🙋 **Chacun décide s'il apparaît** : une personne n'est affichée que si elle a accepté d'apparaître. Connectée à Grist, elle voit un bandeau « Ma présence » et active ou retire son accord d'un clic.
 - 📇 **Cartes de contact** : identité, fonction, e-mail, téléphone, établissement et participations. Un clic sur une étiquette filtre sur sa valeur.
 - 🛡️ **Fiable** : si Grist ne répond pas, si une table est illisible ou si une colonne indispensable manque, un bandeau le dit. Un annuaire vide alors que la table contient des lignes est toujours expliqué.
-- 🔒 **Lecture seule**, sans dépendance à l'exécution : le widget n'écrit rien dans Grist et ne stocke rien dans le navigateur.
+- 🔒 **Sobre et encadré** : aucune dépendance à l'exécution, rien de stocké dans le navigateur, aucune requête réseau émise par le widget lui-même. Le widget n'écrit dans Grist que deux choses : une ligne de service, qui lui fait connaître la personne connectée, et le choix d'apparaître de celle qui actionne son interrupteur.
 
 ## En images
 
@@ -45,9 +46,11 @@ L'annuaire affiche les accompagnateurs de l'innovation du PUI sous forme de **ca
   </tr>
 </table>
 
+<p align="center"><img src="docs/images/ma-presence.png" alt="Bandeau « Ma présence » : la personne connectée voit qu'elle apparaît dans l'annuaire et peut se retirer d'un clic" width="100%"><br><sub><b>Ma présence</b> : la personne connectée choisit d'apparaître ou non (<a href="docs/utilisateurs.md#ma-présence--apparaître-ou-non">guide utilisateur</a>).</sub></p>
+
 ## Installer dans Grist
 
-Prérequis : un document Grist qui contient les tables décrites dans [`grist_structure.txt`](grist_structure.txt), avec exactement ces noms de tables et de colonnes.
+Prérequis : un document Grist qui contient les tables décrites dans [`grist_structure.txt`](grist_structure.txt), avec exactement ces noms de tables et de colonnes. La colonne `Accepte_apparaitre` de `BDD` (une case à cocher) est obligatoire : sans elle, le widget affiche une erreur plutôt que l'annuaire de tout le monde.
 
 1. Dans le document, ajoutez un widget : **Add New**, puis **Add Widget to Page**, puis, dans **Select Widget**, choisissez **Custom**.
 2. Pour **Select Data**, choisissez la table des contacts, `BDD` : Grist ne prévient le widget que des changements de cette table.
@@ -55,11 +58,12 @@ Prérequis : un document Grist qui contient les tables décrites dans [`grist_st
    ```
    https://lombre33.github.io/Annuaire_PUI_Bordeaux/index.html
    ```
-4. Accordez l'accès **Full document access** quand Grist le demande : le widget lit plusieurs tables, pas seulement celle de sa section.
+4. Accordez l'accès **Full document access** quand Grist le demande : le widget lit plusieurs tables, pas seulement celle de sa section, et il écrit dans le document.
+5. Pour que chaque personne puisse gérer sa présence, suivez [`GRIST_SETUP.md`](GRIST_SETUP.md) : la case `Accepte_apparaitre` en colonne de données, la table `Annuaire_Sonde`, les administrateurs, les règles d'accès. Sans la table-sonde, l'annuaire s'affiche normalement, mais personne n'est identifié et aucun bandeau n'apparaît.
 
 Les libellés ci-dessus sont ceux de l'interface anglaise de Grist ; ils peuvent différer dans une autre langue. Le widget est déclaré dans [`manifest.yml`](manifest.yml) (nom, adresse, niveau d'accès).
 
-> **Accès complet, un choix assumé.** Le widget demande l'accès complet au document : il lit plusieurs tables et les évolutions prévues y écriront. Selon la documentation de Grist, un tel widget peut lire et modifier tout le document ; aujourd'hui, celui-ci ne fait que lire. Trois garde-fous sont à mettre en place ou à vérifier : des règles d'accès Grist, une branche `main` protégée et des tables sensibles sorties du document ou protégées. Lisez la page [Sécurité et confidentialité](docs/securite.md) avant d'installer le widget.
+> **Accès complet, un choix assumé.** Le widget demande l'accès complet au document : il lit plusieurs tables et il y écrit. Selon la documentation de Grist, un tel widget peut lire et modifier tout le document ; celui-ci n'écrit que les deux choses décrites plus haut, mais c'est la confiance dans le code publié et les règles d'accès de Grist qui protègent vraiment le document. Trois garde-fous sont à mettre en place ou à vérifier : des règles d'accès Grist, une branche `main` protégée et des tables sensibles sorties du document ou protégées. Lisez la page [Sécurité et confidentialité](docs/securite.md) avant d'installer le widget.
 
 ## Essayer sans Grist
 
@@ -72,7 +76,7 @@ node docs/demo/serveur-demo.mjs
 # puis ouvrir http://127.0.0.1:8080
 ```
 
-Ajoutez `?panne=Actions` à l'adresse pour simuler une table de référence illisible et voir le bandeau d'état.
+Ajoutez `?panne=Actions` à l'adresse pour simuler une table de référence illisible et voir le bandeau d'état, ou `?connecte=camille.rousseau@chd.example` pour ouvrir le widget comme cette personne fictive : le bandeau « Ma présence » apparaît et son interrupteur fonctionne (en mémoire, rien n'est enregistré).
 
 ## Comment ça marche
 
@@ -82,10 +86,10 @@ flowchart LR
     pages["GitHub Pages<br/>le widget : HTML, CSS, JS natif"]
     cards["Cartes filtrables<br/>dans la page Grist"]
     pages -->|"chargé dans une iframe"| cards
-    grist -->|"API de widget : lecture seule"| cards
+    grist <-->|"API de widget : lecture, et choix d'apparaître"| cards
 ```
 
-Le widget est une page statique : pas de compilation, pas de dépendance npm à l'exécution. Il lit les tables du document Grist, applique les règles d'affichage (périmètre, établissement validé, fondateur ou partenaire), puis construit les cartes et les menus de filtre. Les détails sont dans la [documentation développeur](docs/developpeurs.md).
+Le widget est une page statique : pas de compilation, pas de dépendance npm à l'exécution. Il lit les tables du document Grist, applique les règles d'affichage (accord de la personne, périmètre, établissement validé, fondateur ou partenaire), puis construit les cartes et les menus de filtre. Il n'écrit dans le document que deux choses : une ligne de service, ajoutée puis supprimée à chaque ouverture, qui lui fait connaître la personne connectée, et le choix d'apparaître de cette personne quand elle actionne l'interrupteur « Ma présence ». Les détails sont dans la [documentation développeur](docs/developpeurs.md).
 
 ## Documentation
 
@@ -93,7 +97,8 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 |---|---|
 | **Utiliser l'annuaire** : rechercher, filtrer, comprendre un message, vocabulaire du PUI | [Guide utilisateur](docs/utilisateurs.md) |
 | **Comprendre et modifier le code** : architecture, chargement des données, règles, tests, recettes | [Documentation développeur](docs/developpeurs.md) |
-| **Évaluer les risques** : accès demandé à Grist, données personnelles, recommandations | [Sécurité et confidentialité](docs/securite.md) |
+| **Régler le document Grist** : colonne de consentement, table-sonde, administrateurs, règles d'accès | [`GRIST_SETUP.md`](GRIST_SETUP.md) |
+| **Évaluer les risques** : accès demandé à Grist, écritures, données personnelles, recommandations | [Sécurité et confidentialité](docs/securite.md) |
 | **Faire vivre l'annuaire** : règles de visibilité, diagnostic, publication, retour arrière, continuité (départs, absence d'administrateur) | [Maintenance](docs/maintenance.md) |
 | **Consulter le cahier des charges** | [`specs.md`](specs.md) |
 | **Tester à la main avant un déploiement** | [`TESTING.md`](TESTING.md) |
@@ -109,9 +114,13 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── grist-data.js         Lecture et enrichissement des données Grist
 ├── filters.js            Filtrage et compteurs (fonctions pures)
 ├── render.js             Construction du DOM : menus et cartes
+├── identity.js           Qui est connecté ? (table-sonde dont Grist calcule l'adresse)
+├── presence.js           « Ma présence » : message à la personne et écriture de son choix
+├── account-ui.js         Bandeau « Ma présence »
 ├── constants.js          Taxonomie : catégories, couleurs, tables
 ├── manifest.yml          Déclaration du widget : adresse, niveau d'accès
 ├── grist_structure.txt   Schéma Grist réduit aux tables et colonnes utiles
+├── GRIST_SETUP.md        Réglages à faire dans Grist : colonne, sonde, administrateurs, règles d'accès
 ├── specs.md              Cahier des charges
 ├── CHANGELOG.md          Historique des versions
 ├── VERSION.md            Version courante
@@ -141,6 +150,7 @@ Ces tests ne remplacent pas un essai dans un vrai document Grist : voir [`TESTIN
 
 - **Une modification d'une table de référence n'apparaît pas toute seule.** Grist ne prévient le widget que des changements de la table des contacts (`BDD`). Après avoir modifié `Etablissements` (par exemple `ok_pour_apparaitre`) ou une table de valeurs de filtre, rechargez la page.
 - **Mise en page éprouvée dans Chromium seulement** : le widget s'adapte à la largeur de son cadre, d'un téléphone à un grand écran, mais les tests automatiques couvrent Chromium (écran tactile émulé compris), pas Safari, Firefox ni un vrai Grist sur téléphone. Le protocole de [`TESTING.md`](TESTING.md) (section 12) couvre ce reste.
+- **Les écritures sont encadrées par l'interface, pas par le serveur.** « Ma présence » n'agit que sur la fiche de la personne connectée, mais seules les règles d'accès de Grist empêchent vraiment une écriture indue : celles que propose [`GRIST_SETUP.md`](GRIST_SETUP.md) n'ont pas été essayées dans un vrai document. Chaque ouverture laisse en outre sans doute une trace dans l'historique du document ([Sécurité et confidentialité](docs/securite.md#écritures-et-règles-daccès)).
 - **Script de l'API Grist** : `index.html` charge `grist-plugin-api.js` depuis `docs.getgrist.com`, sans version figée ([Sécurité et confidentialité](docs/securite.md#risques-et-protections)).
 - **Pas de test contre un vrai Grist** : les tests simulent l'API, et seul le protocole de [`TESTING.md`](TESTING.md) valide le comportement dans Grist.
 
@@ -149,6 +159,7 @@ Le détail, avec les cas que le bandeau ne signale pas, est dans [Maintenance](d
 ## Règles du projet
 
 - **La fiabilité passe avant les nouvelles fonctionnalités.** Chaque correction s'accompagne d'un test de non-régression.
+- **Une personne n'apparaît que si elle a accepté et si son établissement a validé**, jamais l'un sans l'autre ni dans le doute. On ne coche `Accepte_apparaitre` qu'avec l'accord de la personne.
 - **L'établissement d'un contact vient de sa référence `Etablissement`** (une ligne de la table `Etablissements`), jamais de la colonne `nom_de_domaine`, qui n'est pas utilisée. Un test le garantit.
 - **Aucune vraie donnée dans ce dépôt public** : ni captures de l'annuaire réel, ni schéma complet du document Grist. Les captures et la démonstration utilisent des données inventées.
 - **Un push sur `main` met le widget à jour en production** pour tous les documents Grist qui l'utilisent : passer de préférence par une pull request dont la CI est verte (un push direct publie aussitôt, sans attendre la CI : lancer `node --test` en local d'abord).

@@ -82,6 +82,8 @@ const COMPETENCES = [
 
 // Ordre d'affichage = ordre de la table (le widget ne trie pas les cartes).
 // `visible: false` : contact hors périmètre (perimetre vide).
+// `accepte: false` : la personne n'a pas donné son accord (Accepte_apparaitre).
+// `admin: true` : administrateur, déclaré dans la table ACL.
 const CONTACTS = [
   {
     prenom: 'Camille', nom: 'Rousseau', fonction: 'Cheffe de projet innovation', etab: 'CHD', tel: '0536490112',
@@ -92,7 +94,7 @@ const CONTACTS = [
   },
   {
     prenom: 'Mehdi', nom: 'Bensaïd', fonction: 'Responsable valorisation', etab: 'UDD', tel: '0536490234',
-    role: 'Coordinateur',
+    role: 'Coordinateur', admin: true,
     instances: ['Comité de pilotage'], actions: ['Valorisation de la recherche', 'Veille et propriété intellectuelle'],
     gt: ['GT Propriété intellectuelle'], communautes: ['Transfert de technologie', 'Deeptech'],
     taches: ['Animation de réseau', 'Relecture de dossiers'],
@@ -199,7 +201,8 @@ const CONTACTS = [
   { prenom: 'Sarah', nom: 'Colin', fonction: 'Chargée de mission', etab: 'FDX', competences: ['Gestion de projet'] },
   { prenom: 'Gabriel', nom: 'Noël', fonction: 'Ingénieur de recherche', etab: 'LABT', competences: ['Open science'] },
   { prenom: 'Alice', nom: 'Bertin', fonction: 'Chargée de mission', etab: '', competences: ['Gestion de projet'] },
-  { prenom: 'Victor', nom: 'Lambert', fonction: 'Chef de projet', etab: 'CHD', visible: false, competences: ['Gestion de projet'] }
+  { prenom: 'Victor', nom: 'Lambert', fonction: 'Chef de projet', etab: 'CHD', visible: false, competences: ['Gestion de projet'] },
+  { prenom: 'Lucas', nom: 'Mercier', fonction: 'Chargé de mission innovation', etab: 'UDD', accepte: false, competences: ['Création d\'entreprise'] }
 ];
 
 const sansAccent = texte => texte.normalize('NFD').replace(/\p{Diacritic}/gu, '');
@@ -207,6 +210,22 @@ const sansAccent = texte => texte.normalize('NFD').replace(/\p{Diacritic}/gu, ''
 function adresse({ prenom, nom, etab }) {
   return `${sansAccent(prenom).toLowerCase()}.${sansAccent(nom).toLowerCase()}@${(etab || 'sans-etablissement').toLowerCase()}.example`;
 }
+
+// Les personnes que la démonstration peut « connecter » (?connecte=adresse) et les
+// captures de « Ma présence » : une qui apparaît, une d'un établissement partenaire,
+// une qui a refusé, une qui a accepté mais reste masquée, un administrateur.
+const adresseDe = (prenom, nom) => {
+  const contact = CONTACTS.find(candidat => candidat.prenom === prenom && candidat.nom === nom);
+  if (!contact) throw new Error(`Personne inconnue dans les données fictives : ${prenom} ${nom}`);
+  return adresse(contact);
+};
+export const PERSONNES_DEMO = {
+  visible: adresseDe('Camille', 'Rousseau'),
+  partenaire: adresseDe('Clara', 'Dubois'),
+  refus: adresseDe('Lucas', 'Mercier'),
+  masquee: adresseDe('Sarah', 'Colin'),
+  administrateur: adresseDe('Mehdi', 'Bensaïd')
+};
 
 // Le libellé brut d'un import : sans accents ni majuscules. Seul le libellé
 // corrigé est affiché, tant qu'il est rempli.
@@ -240,6 +259,7 @@ export function tablesFictives() {
   const idsReferences = Object.fromEntries(Object.entries(REFERENCES).map(([cle, ref]) => [cle, ids(ref.libelles)]));
   const idsRoles = ids(ROLES.libelles);
   const idsCompetences = ids(COMPETENCES.map(competence => competence.libelle));
+  const admins = CONTACTS.filter(contact => contact.admin);
   CONTACTS.forEach(contact => {
     if (contact.etab && !Object.hasOwn(idsEtablissements, contact.etab)) {
       throw new Error(`Établissement inconnu dans les données fictives : « ${contact.etab} »`);
@@ -259,9 +279,10 @@ export function tablesFictives() {
     numero_de_telephone: CONTACTS.map(contact => (contact.tel ? Number(contact.tel) : 0)),
     Role_dans_le_PUI: CONTACTS.map(contact => (contact.role ? idDe(contact.role, idsRoles) : 0)),
     Competences: CONTACTS.map(contact => liste(contact.competences, idsCompetences)),
-    // Colonne que le widget ne lit pas encore (1.9.0). Ici, tout le monde a
-    // donné son accord : seuls les établissements et le périmètre décident.
-    Accepte_apparaitre: CONTACTS.map(() => true)
+    // Consentement (1.10.0) : une personne n'apparaît que si sa case est cochée.
+    // Ici tout le monde a donné son accord sauf `accepte: false` : pour les autres,
+    // seuls les établissements et le périmètre décident.
+    Accepte_apparaitre: CONTACTS.map(contact => contact.accepte !== false)
   };
   Object.entries(REFERENCES).forEach(([cle, ref]) => {
     bdd[ref.colonneBDD] = CONTACTS.map(contact => liste(contact[cle], idsReferences[cle]));
@@ -282,7 +303,17 @@ export function tablesFictives() {
       ...tableDeReference({ corrigee: 'Competences_corrigees', brute: 'Competences' }, COMPETENCES.map(competence => competence.libelle)),
       Macro_competences: COMPETENCES.map(competence => competence.domaine)
     },
-    [ROLES.table]: { id: ROLES.libelles.map((_, index) => index + 1), [ROLES.colonne]: [...ROLES.libelles] }
+    [ROLES.table]: { id: ROLES.libelles.map((_, index) => index + 1), [ROLES.colonne]: [...ROLES.libelles] },
+    // Table-sonde (GRIST_SETUP.md, étape 2) : vide au repos, le widget y ajoute puis y
+    // retire une ligne pour savoir qui est connecté.
+    Annuaire_Sonde: { id: [], Email: [], Admin: [] },
+    // Administrateurs (étape 3) : la formule de la sonde la lit, jamais le widget.
+    ACL: {
+      id: admins.map((_, index) => index + 1),
+      email: admins.map(adresse),
+      Responsable_de_l_Etablissement: admins.map(() => 0),
+      admin: admins.map(() => true)
+    }
   };
   Object.values(REFERENCES).forEach(ref => {
     tables[ref.table] = tableDeReference(ref, ref.libelles);

@@ -83,13 +83,21 @@ ce qui change repéré dans la carte « après ».
   `tests/support/browser.mjs` regroupe l'outillage des tests navigateur (`e2e.test.mjs`
   l'utilise désormais) et le faux document Grist sait refuser une ligne précise
   (`denyRows`) et cacher les tables `_grist_*` de `listTables()`.
-- **Tests** : NN_TESTS tests (NN_E2E dans un vrai navigateur, optionnels sans Playwright), dont
-  NN_NEW pour ce lot : construction des écritures (listes calculées sur la fiche
+- **Mise en page.** Dans un cadre de 280 px (le plus étroit que mesure `tests/responsive.test.mjs`),
+  l'interrupteur du bandeau « Ma présence » débordait de 2 px quand une personne était
+  identifiée : il se resserre désormais, son texte passe à la ligne. Les boutons du pied
+  de la fenêtre passent eux aussi à la ligne au lieu de sortir du cadre.
+- **Tests** : 371 tests (110 dans un vrai navigateur, optionnels sans Playwright), dont
+  144 pour ce lot : construction des écritures (listes calculées sur la fiche
   actuelle, téléphone numérique ou texte), relecture, conflit concurrent, refus, cartes
-  avant/après, et le parcours complet dans Chromium. Contrôle négatif : 47 modifications
-  du code (signature de conflit non comparée, liste écrite sans les valeurs actuelles,
-  retrait ignoré, colonne en trop écrite, carte « après » identique à « avant », bouton
-  sur toutes les cartes, Échap sans avertissement…) font chacune échouer au moins un test.
+  avant/après, avis « fiche masquée », et le parcours complet dans Chromium, de 280 à
+  1 100 px de large. Contrôle négatif : 58 modifications du code (signature de conflit
+  non comparée, liste écrite sans les valeurs actuelles, retrait ignoré, colonne en trop
+  écrite, carte « après » identique à « avant », bouton sur toutes les cartes, Échap
+  sans avertissement, pastille manquante, boutons qui débordent…) ont été essayées :
+  56 font chacune échouer au moins un test ; les deux autres ne changent rien de visible
+  (une copie de brouillon que la fenêtre refait à chaque ouverture, un avis de champ
+  déplacé que le message général remplace).
 
 ## 1.11.0 — « Ma présence » : la personne connectée choisit d'apparaître ou non
 
