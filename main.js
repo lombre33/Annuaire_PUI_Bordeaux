@@ -1,10 +1,14 @@
 // Point d'entrée : relie l'API Grist et les événements du DOM aux modules
-// grist-data.js (lecture, enrichissement), filters.js (filtrage) et render.js
-// (construction du DOM).
+// grist-data.js (lecture, enrichissement), filters.js (filtrage), render.js
+// (construction du DOM), identity.js et presence.js (la personne connectée et
+// son choix d'apparaître) et account-ui.js (son bandeau).
 
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
-import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts } from './render.js';
+import { createFilterUI, renderCards, updateFilterUI, updateFilterCounts, initials } from './render.js';
+import { readIdentity, isReadOnlyAddress } from './identity.js';
+import { describePresence, setPresence, PresenceError } from './presence.js';
+import { createAccountBar } from './account-ui.js';
 
 const state = {
   allContacts: [],
@@ -17,7 +21,11 @@ const state = {
   searchTerm: '',
   // Interrupteurs Fondateurs/Partenaires (specs.md), hors de activeFilters :
   // ce ne sont pas des valeurs de menu. « Réinitialiser » n'y touche pas.
-  scope: { fondateur: true, partenaire: false }
+  scope: { fondateur: true, partenaire: false },
+  // La personne connectée (identity.js ; null tant qu'elle n'est pas lue) et
+  // l'index des lignes de BDD par e-mail (grist-data.js), pour retrouver sa fiche.
+  identity: null,
+  people: null
 };
 
 const elements = {
@@ -31,6 +39,10 @@ const elements = {
   statusBanner: document.getElementById('statusBanner'),
   scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
+
+// Bandeau « Ma présence » (voir « Ma présence » plus bas) : masqué tant que la
+// personne connectée n'est pas identifiée et retrouvée dans BDD.
+const accountBar = createAccountBar(document.getElementById('accountBar'), { onToggle: togglePresence });
 
 function toggleFilter(filterKey, value) {
   if (!state.activeFilters[filterKey]) state.activeFilters[filterKey] = new Set();
@@ -120,7 +132,7 @@ const recordsSequencer = createRequestSequencer();
 
 window.grist.ready({ requiredAccess: 'full' });
 
-function applyDirectory({ contacts, referenceMaps, etabFlags }) {
+function applyDirectory({ contacts, referenceMaps, etabFlags, people }) {
   const filterReferenceMaps = {
     ...referenceMaps,
     etablissement: filterVisibleEstablishments(referenceMaps.etablissement, etabFlags)
@@ -135,24 +147,98 @@ function applyDirectory({ contacts, referenceMaps, etabFlags }) {
   state.activeFilters = pruneStaleFilters(state.activeFilters, filterReferenceMaps);
 
   state.allContacts = contacts;
+  state.people = people;
   if (referenceMapsChanged) rebuildFilterUI();
   refreshCards();
+  refreshAccount();
 }
 
+// Relit Grist et met l'affichage à jour. Renvoie 'applied', 'stale' (une lecture
+// plus récente a pris le relais) ou 'failed' (le bandeau d'état le dit).
+//
 // onRecords() ne sert qu'à savoir quand rafraîchir : son contenu ne porte pas
 // forcément toutes les colonnes de BDD (selon la vue branchée) et résout les
 // Références en texte, alors que fetchTable() renvoie la table complète, les
 // Références en identifiants.
-window.grist.onRecords(debounce(async () => {
+async function reloadDirectory() {
   const requestId = recordsSequencer.next();
   try {
     const directory = await loadDirectory(window.grist.docApi, { previousMaps: state.referenceMaps });
-    if (!recordsSequencer.isLatest(requestId)) return; // une invocation plus récente a démarré : résultat périmé
+    if (!recordsSequencer.isLatest(requestId)) return 'stale'; // une invocation plus récente a démarré : résultat périmé
     applyDirectory(directory);
     showStatus(directory.issues);
+    return 'applied';
   } catch (error) {
-    if (!recordsSequencer.isLatest(requestId)) return;
+    if (!recordsSequencer.isLatest(requestId)) return 'stale';
     console.error('Erreur dans le traitement des contacts:', error);
     showLoadError(error);
+    return 'failed';
   }
-}, 250));
+}
+
+window.grist.onRecords(debounce(reloadDirectory, 250));
+
+// ===== Ma présence =====
+
+// Les lignes de BDD de la personne connectée : aucune tant qu'elle n'est pas
+// identifiée, ou si aucune ligne ne porte son adresse.
+function myPersons() {
+  if (state.identity?.status !== 'ready' || !state.people) return [];
+  return state.people.findByEmail(state.identity.email);
+}
+
+const warned = new Set();
+function warnOnce(key, message) {
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn(message);
+}
+
+function refreshAccount() {
+  const persons = myPersons();
+  if (persons.length === 0) {
+    accountBar.hide();
+    if (state.identity?.status === 'ready' && state.people) {
+      warnOnce('no-row', state.people.hasEmailColumn
+        ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bandeau « Ma présence ».'
+        : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
+    }
+    return;
+  }
+  if (persons.length > 1) {
+    warnOnce('duplicates', `[IDENTITE] ${persons.length} lignes de BDD portent la même adresse (identifiants de ligne : `
+      + `${persons.map(person => person.row.id).join(', ')}) : le choix de présence s'applique à toutes.`);
+  }
+  accountBar.show({ name: persons[0].name || 'Ma fiche', initials: initials(persons[0].row), ...describePresence(persons) });
+}
+
+let togglePending = false;
+
+// Écrit le choix dans Grist, puis relit l'annuaire : l'interrupteur et les cartes
+// montrent ce que Grist a vraiment enregistré, jamais ce qu'on espérait.
+async function togglePresence() {
+  const persons = myPersons();
+  if (togglePending || persons.length === 0) return;
+  togglePending = true;
+  accountBar.setBusy(true);
+  accountBar.setStatus('Enregistrement…');
+  try {
+    await setPresence(window.grist.docApi, persons, !persons.every(person => person.status.accepted));
+    const outcome = await reloadDirectory();
+    accountBar.setStatus(outcome === 'failed' ? 'Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.' : '');
+  } catch (error) {
+    if (!(error instanceof PresenceError)) console.error('Erreur inattendue pendant le changement de présence:', error);
+    accountBar.setStatus(error instanceof PresenceError ? error.message : 'La modification n\'a pas pu être enregistrée.', 'error');
+  } finally {
+    togglePending = false;
+    accountBar.setBusy(false);
+  }
+}
+
+// L'identité ne retarde jamais l'annuaire : lue à part, elle ajoute le bandeau
+// quand elle arrive. Sans elle (pas de table-sonde, compte Lecteur…), personne
+// n'est identifié et aucune modification n'est proposée.
+readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(identity => {
+  state.identity = identity;
+  refreshAccount();
+});

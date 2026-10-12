@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.11.0 — « Ma présence » : la personne connectée choisit d'apparaître ou non
+
+Une personne connectée à Grist voit, au-dessus des filtres, un bandeau qui lui dit
+si elle apparaît dans l'annuaire et lui laisse l'activer ou la retirer d'un clic.
+L'interrupteur écrit `Accepte_apparaitre` sur sa ligne de `BDD`, et seulement cette
+case.
+
+- **Qui est connecté.** L'API des widgets Grist ne donne pas l'adresse e-mail de la
+  personne : le widget emploie la technique de `publipostage+`, une table-sonde
+  `Annuaire_Sonde` dont la formule de déclenchement `user.Email` est calculée par
+  Grist à la création d'une ligne. À chaque chargement, le widget ajoute une ligne,
+  la relit par son identifiant (jamais « la dernière ») puis la supprime. La même
+  ligne dit si la personne est administrateur, d'après `ACL` : la valeur est
+  calculée par Grist, jamais déclarée par le navigateur.
+- **Dans le doute, personne n'est identifié.** Sans table-sonde, sans adresse
+  renvoyée par la formule, si Grist refuse l'écriture, ou pour un compte Lecteur
+  (cadre `?readonly=true` : le widget n'essaie même pas d'écrire), il n'y a pas de
+  bandeau et rien d'autre ne change. L'identité ne retarde ni ne casse jamais
+  l'annuaire. La console dit pourquoi (`[IDENTITE] …`) sans jamais écrire d'adresse.
+- **Retrouver sa fiche** : par `BDD.email`, sans tenir compte de la casse ni des
+  espaces. Aucune ligne ne porte l'adresse (ou `BDD` n'a pas de colonne `email`) :
+  pas de bandeau, la console l'explique. Une adresse portée par plusieurs lignes : le
+  choix s'applique à toutes (un retrait vaut partout), la console le signale.
+- **Ce qu'on dit à la personne**, dans ses mots : elle apparaît (avec, pour un
+  partenaire, la mention de l'interrupteur « Partenaires ») ; elle n'apparaît pas ;
+  ou elle a accepté mais reste masquée, avec la ou les raisons (pas de périmètre,
+  pas d'établissement, établissement inconnu, non validé, ni fondateur ni
+  partenaire, ni nom ni prénom). Ce verdict suit les mêmes critères que
+  l'annuaire : un test le vérifie ligne par ligne.
+- **Un interrupteur fiable.** Gelé pendant l'écriture (un double clic n'écrit
+  qu'une fois) ; une seule action atomique, même pour plusieurs lignes ; puis
+  l'annuaire est relu, si bien que l'interrupteur et les cartes montrent ce que
+  Grist a vraiment enregistré, pas ce qu'on espérait. Écriture refusée par une
+  règle d'accès, ou colonne à formule : message clair en français, rien ne change.
+- **Un verrou d'interface, pas une sécurité.** N'importe qui peut contourner
+  l'interface depuis la console du navigateur ; seules les règles d'accès de Grist
+  protègent les données (`GRIST_SETUP.md`, étape 4).
+- **À faire dans Grist** : voir `GRIST_SETUP.md` : `Accepte_apparaitre` en colonne de
+  données, la table `Annuaire_Sonde`, la case `admin` d'`ACL`.
+- **Pour les développeurs** : `loadDirectory` renvoie aussi `people`, l'index de
+  toutes les lignes de `BDD` par adresse (`findByEmail`) ; `main.js` isole
+  `reloadDirectory()` ; `identity.js`, `presence.js` et `account-ui.js` sont
+  nouveaux ; `tests/support/fake-grist.js` est un faux document Grist qui sert aux
+  tests Node et au test navigateur (lectures, écritures atomiques, formules
+  déclenchées de la sonde, pannes, écritures refusées).
+- **Tests** : 188 tests (136 unitaires, 1 règle du projet, 51 dans un vrai
+  navigateur dont 17 pour ce lot). Contrôle négatif : huit modifications du code
+  (accord compté sur une seule fiche, `true` écrit à tout coup, Lecteur qui tente
+  d'écrire, `admin` accepté pour toute valeur vraie, ligne de sonde non retirée,
+  adresse non vérifiée, adresses comparées avec la casse, verdict sans l'accord
+  de la personne) font chacune échouer de 1 à 3 tests.
+
 ## 1.10.0 — Consentement individuel : seules les personnes qui l'ont accepté apparaissent
 
 Un contact ne s'affiche plus que si la personne a accepté d'apparaître

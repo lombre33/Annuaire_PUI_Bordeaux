@@ -1,10 +1,16 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { CATEGORIES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES } from './constants.js';
+import { CATEGORIES, CONSENT_COLUMN, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
+}
+
+// Adresse e-mail comparée sans casse ni espaces autour : « Ana.Martin@CHU.fr » et
+// « ana.martin@chu.fr » désignent la même personne.
+export function normalizeEmail(value) {
+  return text(value).toLowerCase();
 }
 
 // Comparaison insensible à la casse et aux accents : une compétence saisie à la
@@ -322,7 +328,7 @@ export function mailtoHref(email) {
 // le doute serait pire qu'afficher personne. Les autres colonnes de BDD
 // (Fonction, email, numero_de_telephone, Role_dans_le_PUI…) sont facultatives :
 // absentes, elles ne s'affichent simplement pas.
-const REQUIRED_COLUMNS = ['nom', 'prenom', 'Etablissement', 'perimetre', 'Accepte_apparaitre'];
+const REQUIRED_COLUMNS = ['nom', 'prenom', 'Etablissement', 'perimetre', CONSENT_COLUMN];
 
 // Colonnes d'Etablissements dont dépend l'éligibilité des contacts (specs.md) :
 // l'une d'elles renommée, et plus aucun contact ne s'affiche.
@@ -340,7 +346,7 @@ export class DirectoryLoadError extends Error {
 // Une personne n'apparaît que si elle l'a accepté (BDD.Accepte_apparaitre, une
 // case à cocher) : seul `true` vaut accord. Vide, faux, 0 ou texte : pas d'accord.
 export function hasAccepted(record) {
-  return record.Accepte_apparaitre === true;
+  return record[CONSENT_COLUMN] === true;
 }
 
 // `scopedRows` : lignes de BDD déjà filtrées par isInScope().
@@ -350,6 +356,64 @@ export function buildContacts(scopedRows, referenceMaps, etabFlags) {
     .map(row => enrich(row, referenceMaps, etabFlags))
     .filter(contact => contact.nom || contact.prenom)
     .filter(isEtablissementEligible);
+}
+
+// Pourquoi une ligne de BDD apparaît dans l'annuaire, ou non : reprend, critère
+// par critère, ceux de buildContacts() (un test vérifie que les deux concordent).
+//   accepted, inScope, named   accord de la personne, périmètre, nom ou prénom
+//   etablissement              'ok', ou ce qui l'empêche : 'missing' (aucun),
+//                              'unknown' (absent d'Etablissements), 'not_validated'
+//                              (ok_pour_apparaitre) ou 'not_eligible' (ni fondateur
+//                              ni partenaire)
+//   partnerOnly                affichée seulement avec l'interrupteur Partenaires
+//   visible                    tous les critères sont réunis
+export function describeVisibility(row, referenceMaps, etabFlags) {
+  const contact = enrich(row, referenceMaps, etabFlags);
+  const flags = etablissementFlags(row, etabFlags);
+  const eligible = isEtablissementEligible(contact);
+  let etablissement = 'ok';
+  if (!eligible) {
+    if (isEmptyReference(row.Etablissement)) etablissement = 'missing';
+    else if (!flags) etablissement = 'unknown';
+    else if (!flags.ok_pour_apparaitre) etablissement = 'not_validated';
+    else etablissement = 'not_eligible';
+  }
+  const accepted = hasAccepted(row);
+  const inScope = isInScope(row);
+  const named = Boolean(contact.nom || contact.prenom);
+  return {
+    accepted,
+    inScope,
+    named,
+    etablissement,
+    partnerOnly: eligible && !contact.etablissement_fondateur,
+    visible: accepted && inScope && named && eligible
+  };
+}
+
+// Toutes les lignes de BDD, affichées ou non, retrouvables par adresse e-mail :
+// c'est ce qui permet de dire à une personne pourquoi elle n'apparaît pas. Une
+// adresse peut figurer sur plusieurs lignes ; findByEmail() les renvoie toutes.
+export function createPeopleIndex(rows, referenceMaps, etabFlags) {
+  const byEmail = new Map();
+  rows.forEach(row => {
+    const key = normalizeEmail(row.email);
+    if (!key) return;
+    if (!byEmail.has(key)) byEmail.set(key, []);
+    byEmail.get(key).push(row);
+  });
+  return {
+    hasEmailColumn: rows.length === 0 || 'email' in rows[0],
+    findByEmail(email) {
+      const key = normalizeEmail(email);
+      return (key ? byEmail.get(key) || [] : []).map(row => ({
+        row,
+        name: `${text(row.prenom)} ${text(row.nom)}`.trim(),
+        etablissement: refLabel(row.Etablissement, referenceMaps.etablissement),
+        status: describeVisibility(row, referenceMaps, etabFlags)
+      }));
+    }
+  };
 }
 
 // Quand la table contient des lignes mais qu'aucun contact n'est affichable,
@@ -521,7 +585,8 @@ function directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyRe
 }
 
 // Lit BDD et toutes les tables de référence (chacune une seule fois) et
-// renvoie { contacts, referenceMaps, etabFlags, issues }.
+// renvoie { contacts, referenceMaps, etabFlags, people, issues } ; `people` est
+// l'index des lignes de BDD par adresse e-mail (createPeopleIndex).
 //
 // BDD et Etablissements sont indispensables : leur lecture ratée lève une
 // DirectoryLoadError (l'appelant garde l'affichage précédent). Une autre table
@@ -550,6 +615,7 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
     contacts,
     referenceMaps,
     etabFlags,
+    people: createPeopleIndex(rows, referenceMaps, etabFlags),
     issues: directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason })
   };
 }
