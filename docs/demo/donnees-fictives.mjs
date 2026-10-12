@@ -118,10 +118,10 @@ const COMPETENCES = [
 // Ordre de la table ; le widget affiche les cartes par nom de famille (compareContacts, grist-data.js).
 // `visible: false` : contact hors périmètre (perimetre vide).
 // `accepte: false` : la personne n'a pas donné son accord (Accepte_apparaitre).
-// `portrait: n` : la personne a une photo de profil (colonne Avatar de BDD, 1.18.0), le visage de rang n de
+// `portrait: n` : la personne a une photo de profil (colonne Avatar de BDD, 1.19.0), le visage de rang n de
 // portraits-fictifs.mjs. Les photos ne sont servies qu'avec `tablesFictives({ photos: true })` (?photos dans
 // la démonstration) : sans elles, la colonne Avatar n'existe pas, comme dans un document où elle n'a pas
-// encore été ajoutée, et toutes les captures d'avant la 1.18.0 restent justes.
+// encore été ajoutée, et toutes les captures d'avant la 1.19.0 restent justes.
 // `admin: true` : administrateur, déclaré dans la table ACL.
 // `responsable: true` : responsable de son établissement (1.17.0), déclaré dans la table ACL : elle
 // ou il modifie la fiche de l'établissement, et d'abord nomme les autres responsables.
@@ -360,7 +360,7 @@ export function tablesFictives({ photos = false } = {}) {
     // seuls les établissements et le périmètre décident.
     Accepte_apparaitre: CONTACTS.map(contact => contact.accepte !== false)
   };
-  // Pièces jointes (1.18.0) : ['L', numéro du fichier], ['L'] quand la personne n'a pas de photo.
+  // Pièces jointes (1.19.0) : ['L', numéro du fichier], ['L'] quand la personne n'a pas de photo.
   if (photos) bdd.Avatar = CONTACTS.map(contact => (contact.portrait === undefined ? ['L'] : ['L', PREMIER_PORTRAIT + contact.portrait]));
   Object.entries(REFERENCES).forEach(([cle, ref]) => {
     bdd[ref.colonneBDD] = CONTACTS.map(contact => liste(contact[cle], idsReferences[cle]));

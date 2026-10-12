@@ -369,7 +369,7 @@ de page. Si ce n'est pas le cas, la console dit pourquoi :
 
 ## 6. La photo de profil (facultatif)
 
-Depuis la 1.18.0, une personne peut ajouter sa **photo de profil** : elle remplace ses
+Depuis la 1.19.0, une personne peut ajouter sa **photo de profil** : elle remplace ses
 initiales sur sa carte, s'agrandit au clic et se montre aussi dans le bandeau « Ma
 présence » et dans les fenêtres. Comme un logo, c'est une **pièce jointe du document
 Grist** : le dépôt du widget n'en contient aucune (il est public, et le visage d'une

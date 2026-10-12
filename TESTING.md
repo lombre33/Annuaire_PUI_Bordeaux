@@ -958,7 +958,7 @@ message du widget, la ligne de la console, la requête et son code de réponse d
 - [ ] Comparaison à la maquette v5 : ouvrir la maquette (écrans D0 et D1) et le widget côte à côte à la même largeur
       (1280 px, puis 390 px). Les écarts voulus sont dans le CHANGELOG (1.17.0).
 
-## 18. Photo de profil (1.18.0)
+## 18. Photo de profil (1.19.0)
 
 Réglages d'abord : `GRIST_SETUP.md`, étape 6 (colonne `Avatar`, de type Pièces jointes, dans `BDD`) et étape 4
 (règles d'accès sur `BDD` et sur les pièces jointes). À jouer sur une **copie** du document, avec la console et
@@ -1066,4 +1066,4 @@ l'onglet Réseau.
 - [ ] En réduisant la section du widget de 1280 à 320 px : la carte « Photo de profil » reste lisible (l'aperçu au-dessus
       des boutons sur un cadre étroit), la photo agrandie tient dans l'écran, rien ne dépasse.
 - [ ] Comparaison à la maquette v5 : ouvrir la maquette (écrans de la photo de profil) et le widget côte à côte à la
-      même largeur (1280 px, puis 390 px). Les écarts voulus sont dans le CHANGELOG (1.18.0).
+      même largeur (1280 px, puis 390 px). Les écarts voulus sont dans le CHANGELOG (1.19.0).

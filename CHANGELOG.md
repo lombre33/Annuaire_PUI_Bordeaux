@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.18.0 — Photo de profil : ajoutée, changée ou retirée depuis la fiche, relue avant d'être enregistrée
+## 1.19.0 — Photo de profil : ajoutée, changée ou retirée depuis la fiche, relue avant d'être enregistrée
 
 Demande d'Antoine du 12 octobre 2026 : la colonne `Avatar` de `BDD` (type « Pièces jointes ») porte la photo
 de la personne ; elle remplace les initiales sur la carte, s'agrandit au clic, et la personne l'ajoute depuis la

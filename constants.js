@@ -39,7 +39,7 @@ export const ACL_TABLE = 'ACL';
 export const ACL_COLUMNS = { email: 'email', etablissement: 'Responsable_de_l_Etablissement', admin: 'admin' };
 
 // Les images que le widget envoie à Grist (le logo d'un établissement depuis 1.17.0, la photo de
-// profil d'une personne depuis 1.18.0). Le fichier choisi n'est jamais envoyé tel quel : le navigateur
+// profil d'une personne depuis 1.19.0). Le fichier choisi n'est jamais envoyé tel quel : le navigateur
 // le décode puis le redessine (image-prep.js), ce qui écarte tout contenu actif (un SVG qui porte un
 // script) et les métadonnées de l'image (position GPS d'une photo comprise).
 //   types      les formats acceptés

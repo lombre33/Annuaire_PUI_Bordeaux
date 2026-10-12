@@ -182,7 +182,7 @@ test('le jeu de données fictif est lu sans incident par le vrai loadDirectory()
 });
 
 test('le jeu de données fictif avec photos (?photos) ajoute la colonne Avatar et six photos fictives, sans changer les cartes', async () => {
-  // Sans ?photos, BDD n'a pas de colonne Avatar : les captures d'avant la 1.18.0 restent justes.
+  // Sans ?photos, BDD n'a pas de colonne Avatar : les captures d'avant la 1.19.0 restent justes.
   const without = tablesFictives();
   assert.ok(!('Avatar' in without.BDD) && !JSON.stringify(without._grist_Tables_column).includes('"Avatar"'));
 

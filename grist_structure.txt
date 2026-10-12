@@ -13,7 +13,7 @@
 # Le widget ÉCRIT dans quatre tables, jamais dans une autre : BDD (la colonne
 # Accepte_apparaitre, par l'interrupteur « Ma présence », et les colonnes de la fiche
 # modifiables par « Modifier ma fiche » : prénom, nom, fonction, téléphone, rôle et
-# listes de participations et, depuis la 1.18.0, la photo de profil (colonne facultative
+# listes de participations et, depuis la 1.19.0, la photo de profil (colonne facultative
 # Avatar) ; l'e-mail et l'établissement seulement quand un administrateur, mode admin
 # allumé, modifie la fiche d'une autre personne),
 # Annuaire_Sonde (une ligne ajoutée puis supprimée à chaque chargement) et, depuis la
@@ -28,9 +28,9 @@
 # Les logos (1.14.0) sont des pièces jointes du document : le widget lit les colonnes
 # facultatives logo et ordre_bandeau d'Etablissements et la table facultative Financeurs
 # (jamais écrite). Pour afficher un fichier, il demande à Grist un jeton d'accès en
-# lecture seule (getAccessToken, attachments.js). Les photos de profil (1.18.0) sont lues de la
+# lecture seule (getAccessToken, attachments.js). Les photos de profil (1.19.0) sont lues de la
 # même façon (colonne facultative Avatar de BDD). Pour envoyer un nouveau logo (1.17.0) ou une
-# nouvelle photo (1.18.0), il demande un jeton en écriture, le temps de l'envoi seul (upload.js).
+# nouvelle photo (1.19.0), il demande un jeton en écriture, le temps de l'envoi seul (upload.js).
 
 Table BDD (table principale : une ligne par personne, lue par son nom via fetchTable)
   prenom, nom       : Text          OBLIGATOIRES (sans l'une d'elles, erreur explicite)
@@ -75,7 +75,7 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
   numero_de_telephone : Numeric     (téléphone de la carte ; le 0 initial qu'un
                                      type Numeric fait perdre est rétabli)
   Role_dans_le_PUI    : Reference(Role_Dans_le_PUI)   (tag « Rôle PUI »)
-  Avatar              : Attachments (Pièces jointes)   (photo de profil, depuis la 1.18.0 : elle
+  Avatar              : Attachments (Pièces jointes)   (photo de profil, depuis la 1.19.0 : elle
                                      remplace les initiales sur la carte ; le premier fichier de la
                                      cellule est utilisé, ['L', 12] ; modifiable par la personne dans
                                      la fenêtre de modification, donc colonne de DONNÉES)

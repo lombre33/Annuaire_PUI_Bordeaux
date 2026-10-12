@@ -2,7 +2,7 @@
 // présence » et des fenêtres, la miniature du récapitulatif des changements et la fenêtre qui
 // l'agrandit. La photo remplace les initiales quand la personne en a une et que Grist la donne ; sans
 // photo, avec un fichier supprimé ou illisible, ou sans jeton, ce sont les initiales, comme avant la
-// 1.18.0. DOM seulement : ce qui est montré vient de l'appelant, et tout texte venu de Grist (un nom)
+// 1.19.0. DOM seulement : ce qui est montré vient de l'appelant, et tout texte venu de Grist (un nom)
 // passe par textContent ou par un attribut.
 //
 // Une photo (`photo`) est :

@@ -199,7 +199,7 @@ async function saisirBrouillon(page) {
   });
 }
 
-// ===== La photo de profil (colonne Avatar de BDD, 1.18.0) =====
+// ===== La photo de profil (colonne Avatar de BDD, 1.19.0) =====
 
 // Les cartes de la grille dont l'avatar montre une photo, dans l'ordre (les cartes sont triées par nom).
 const cartesAvecPhoto = page => page.evaluate(() =>

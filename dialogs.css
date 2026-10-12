@@ -1024,7 +1024,7 @@ textarea {
   color: #7ee0c3;
 }
 
-/* ===== Photo de profil (1.18.0) : le cadre du formulaire, les miniatures du récapitulatif et la
+/* ===== Photo de profil (1.19.0) : le cadre du formulaire, les miniatures du récapitulatif et la
    fenêtre qui agrandit une photo (avatar-ui.js) ===== */
 .photo-field {
   display: flex;
