@@ -233,6 +233,11 @@ export function labelsOf(contact, key) {
   return contact.labels?.[key] ?? [];
 }
 
+// « Prénom Nom » tel que la carte l'affiche ; « Sans nom » quand les deux manquent.
+export function displayName(contact) {
+  return `${text(contact.prenom)} ${text(contact.nom)}`.trim() || 'Sans nom';
+}
+
 // Un contact n'est affiché que s'il a au moins une valeur dans perimetre
 // (specs.md). Ne pas tester la longueur brute : une liste vide vaut ['L'].
 export function isInScope(record) {
@@ -391,27 +396,35 @@ export function describeVisibility(row, referenceMaps, etabFlags) {
   };
 }
 
-// Toutes les lignes de BDD, affichées ou non, retrouvables par adresse e-mail :
+// Toutes les lignes de BDD, affichées ou non, retrouvables par adresse e-mail (la
+// personne connectée) ou par identifiant de ligne (la fiche qu'on veut modifier) :
 // c'est ce qui permet de dire à une personne pourquoi elle n'apparaît pas. Une
 // adresse peut figurer sur plusieurs lignes ; findByEmail() les renvoie toutes.
+// Deux index construits d'un seul passage : jamais de recherche linéaire par appel.
 export function createPeopleIndex(rows, referenceMaps, etabFlags) {
   const byEmail = new Map();
+  const byId = new Map();
   rows.forEach(row => {
+    byId.set(row.id, row);
     const key = normalizeEmail(row.email);
     if (!key) return;
     if (!byEmail.has(key)) byEmail.set(key, []);
     byEmail.get(key).push(row);
   });
+  const entry = row => ({
+    row,
+    name: `${text(row.prenom)} ${text(row.nom)}`.trim(),
+    etablissement: refLabel(row.Etablissement, referenceMaps.etablissement),
+    status: describeVisibility(row, referenceMaps, etabFlags)
+  });
   return {
     hasEmailColumn: rows.length === 0 || 'email' in rows[0],
     findByEmail(email) {
       const key = normalizeEmail(email);
-      return (key ? byEmail.get(key) || [] : []).map(row => ({
-        row,
-        name: `${text(row.prenom)} ${text(row.nom)}`.trim(),
-        etablissement: refLabel(row.Etablissement, referenceMaps.etablissement),
-        status: describeVisibility(row, referenceMaps, etabFlags)
-      }));
+      return (key ? byEmail.get(key) || [] : []).map(entry);
+    },
+    findById(id) {
+      return byId.has(id) ? entry(byId.get(id)) : null;
     }
   };
 }

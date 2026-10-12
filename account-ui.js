@@ -1,20 +1,25 @@
 // Bandeau « Ma présence » : la personne connectée voit sa situation dans
-// l'annuaire et la change d'un clic. DOM seulement ; presence.js décrit la
-// situation et décide du message.
+// l'annuaire et la change d'un clic ; elle ouvre de là la modification de sa fiche.
+// DOM seulement ; presence.js décrit la situation et décide du message.
+
+const noop = () => {};
 
 // `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
-// personne clique sur l'interrupteur (jamais pendant une écriture).
-export function createAccountBar(root, { onToggle }) {
+// personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
+// par le bouton « Modifier mon profil ».
+export function createAccountBar(root, { onToggle, onEdit = noop }) {
   const part = selector => root.querySelector(selector);
   const avatar = part('.account-avatar');
   const name = part('.account-name');
   const detail = part('.account-detail');
   const switchButton = part('.presence-switch');
+  const editButton = part('.account-edit');
   const status = part('.account-status');
 
   switchButton.addEventListener('click', () => {
     if (!switchButton.disabled) onToggle();
   });
+  editButton.addEventListener('click', () => onEdit());
 
   return {
     // `view` : { name, initials, accepted, tone, message } (voir describePresence).
@@ -29,6 +34,17 @@ export function createAccountBar(root, { onToggle }) {
 
     hide() {
       root.hidden = true;
+    },
+
+    // Le bouton « Modifier mon profil » : montré seulement quand la fiche de la
+    // personne est identifiée sans ambiguïté.
+    setActions({ edit = false } = {}) {
+      editButton.hidden = !edit;
+    },
+
+    // Rend le focus au bouton « Modifier mon profil » quand la fenêtre qu'il a ouverte se ferme.
+    focusEdit() {
+      if (!editButton.hidden) editButton.focus();
     },
 
     // Pendant une écriture l'interrupteur est gelé : un deuxième clic ne doit pas

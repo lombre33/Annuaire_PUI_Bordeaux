@@ -99,3 +99,31 @@ test('hasEmailColumn tells a BDD without an email column from an empty one', asy
   assert.deepEqual(people.findByEmail(ANA_EMAIL), []);
   assert.equal(createPeopleIndex([], {}, {}).hasEmailColumn, true, 'aucune ligne : rien à reprocher à la table');
 });
+
+// ===== findById : la fiche qu'on veut modifier, désignée par son identifiant de ligne =====
+
+test('findById finds a row by its identifier whether or not it appears in the directory, with the same verdict as findByEmail', async () => {
+  const { people } = await directory();
+  const ana = people.findById(1);
+  assert.equal(ana.row.id, 1);
+  assert.equal(ana.name, 'Ana Martin');
+  assert.equal(ana.etablissement, 'CHU');
+  assert.deepEqual(ana.status, people.findByEmail(ANA_EMAIL)[0].status);
+  const iris = people.findById(11); // a refusé d'apparaître : absente de l'annuaire, mais retrouvable
+  assert.equal(iris.status.visible, false);
+  assert.equal(iris.row.email, IRIS_EMAIL);
+});
+
+test('findById finds nothing for an identifier BDD does not hold, and finds a row without e-mail', async () => {
+  const { people } = await directory();
+  for (const unknown of [0, 99, -1, null, undefined, '1', NaN]) {
+    assert.equal(people.findById(unknown), null, String(unknown));
+  }
+  assert.equal(people.findById(10).row.email, '', 'Hugo n\'a pas d\'adresse : sa ligne reste retrouvable par son identifiant');
+});
+
+test('findById gives the row as stored, so what a form shows and what it writes come from the same cells', async () => {
+  const tables = sampleTables();
+  const { people } = await directory(tables);
+  assert.deepEqual(people.findById(2).row, tableToRows(tables.BDD)[1]);
+});

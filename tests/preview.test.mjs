@@ -1,0 +1,158 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { diffContacts, hasMarks, previewOf } from '../preview.js';
+import { TAG_GROUPS } from '../constants.js';
+import { loadDirectory, tableToRows } from '../grist-data.js';
+import { createFakeGrist } from './support/fake-grist.js';
+import { sampleTables } from './fixtures.mjs';
+
+// ===== preview : la carte « avant », la carte « après » et ce qui les distingue =====
+
+const quiet = { info() {}, warn() {}, error() {} };
+
+// Le document d'exemple chargé comme le fait le widget : les cartes de l'annuaire, les
+// libellés de référence et les indicateurs d'établissement.
+async function directory() {
+  const tables = sampleTables();
+  const { docApi } = createFakeGrist({ tables });
+  const loaded = await loadDirectory(docApi, { log: quiet });
+  return { ...loaded, row: id => tableToRows(tables.BDD).find(candidate => candidate.id === id) };
+}
+
+// Une carte réduite à ce que diffContacts() lit.
+const card = ({ prenom = 'Ana', nom = 'Martin', Fonction = '', numero_de_telephone = 0, labels = {} } = {}) =>
+  ({ prenom, nom, Fonction, numero_de_telephone, labels });
+
+// ===== diffContacts =====
+
+test('diffContacts finds nothing between two identical cards, and hasMarks agrees', () => {
+  const marks = diffContacts(card({ labels: { instances: ['CME'] } }), card({ labels: { instances: ['CME'] } }));
+  assert.deepEqual(marks, { texts: {}, tags: {} });
+  assert.equal(hasMarks(marks), false);
+});
+
+test('diffContacts marks each line of text that changed, and only that line', () => {
+  const name = diffContacts(card(), card({ prenom: 'Anna' }));
+  assert.deepEqual(name.texts, { name: { before: 'Ana Martin', after: 'Anna Martin' } });
+  const role = diffContacts(card(), card({ Fonction: 'Cheffe de service' }));
+  assert.deepEqual(role.texts, { fonction: { before: '', after: 'Cheffe de service' } });
+  const phone = diffContacts(card({ numero_de_telephone: 556789012 }), card({ numero_de_telephone: 556789013 }));
+  assert.deepEqual(phone.texts, { tel: { before: '05 56 78 90 12', after: '05 56 78 90 13' } });
+  assert.equal(hasMarks(name) && hasMarks(role) && hasMarks(phone), true);
+});
+
+test('diffContacts reads the name as the card shows it: a nameless card is called « Sans nom »', () => {
+  const marks = diffContacts(card({ prenom: '', nom: '' }), card({ prenom: 'Ana', nom: '' }));
+  assert.deepEqual(marks.texts, { name: { before: 'Sans nom', after: 'Ana' } });
+  assert.deepEqual(diffContacts(card({ prenom: ' Ana ', nom: 'Martin ' }), card()).texts, {}, 'les espaces ne comptent pas');
+});
+
+test('diffContacts reads the phone as the card shows it: the same number in two forms is not a change', () => {
+  const sameNumber = diffContacts(card({ numero_de_telephone: 556789012 }), card({ numero_de_telephone: '05 56 78 90 12' }));
+  assert.deepEqual(sameNumber.texts, {});
+  const cleared = diffContacts(card({ numero_de_telephone: 556789012 }), card({ numero_de_telephone: null }));
+  assert.deepEqual(cleared.texts, { tel: { before: '05 56 78 90 12', after: '' } });
+  assert.deepEqual(diffContacts(card({ numero_de_telephone: 0 }), card({ numero_de_telephone: '' })).texts, {}, 'vide vaut vide');
+});
+
+test('diffContacts lists the tags added and removed, category by category', () => {
+  const before = card({ labels: { instances: ['CME', 'COVIRIS'], competences: ['Oncologie'], role: ['Référent qualité'] } });
+  const after = card({ labels: { instances: ['CME', 'CLIN'], competences: ['Oncologie', 'Hématologie'], actions: ['Audit'] } });
+  const { tags, texts } = diffContacts(before, after);
+  assert.deepEqual(tags, {
+    instances: { added: ['CLIN'], removed: ['COVIRIS'] },
+    actions: { added: ['Audit'], removed: [] },
+    competences: { added: ['Hématologie'], removed: [] },
+    role: { added: [], removed: ['Référent qualité'] }
+  });
+  assert.deepEqual(texts, {});
+});
+
+test('diffContacts does not mark a label written otherwise: case and accents do not make a new tag', () => {
+  const marks = diffContacts(card({ labels: { competences: ['Hématologie'] } }), card({ labels: { competences: ['hematologie'] } }));
+  assert.deepEqual(marks, { texts: {}, tags: {} });
+});
+
+test('diffContacts only looks at the groups of tags the card shows', () => {
+  // Établissement a son badge, les compétences macro ne figurent pas sur la carte.
+  const marks = diffContacts(card({ labels: { etablissement: ['CHU'], macro: ['Cancérologie'] } }),
+    card({ labels: { etablissement: ['UBM'], macro: ['Pharmacie'] } }));
+  assert.deepEqual(marks, { texts: {}, tags: {} });
+  assert.deepEqual(TAG_GROUPS.map(group => group.key), ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role']);
+});
+
+test('diffContacts keeps the labels of the card, in the order the card shows them', () => {
+  const marks = diffContacts(card({ labels: { gt: ['B', 'A'] } }), card({ labels: { gt: ['C', 'B', 'D'] } }));
+  assert.deepEqual(marks.tags.gt, { added: ['C', 'D'], removed: ['A'] });
+});
+
+// ===== previewOf =====
+
+test('previewOf gives the card before exactly as the directory shows it', async () => {
+  const { contacts, referenceMaps, etabFlags, row } = await directory();
+  const { before } = previewOf(row(1), {}, referenceMaps, etabFlags);
+  assert.deepEqual(before, contacts.find(contact => contact.id === 1));
+});
+
+test('previewOf gives the card after with the values that will be written, enriched like the directory', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  const values = { Fonction: 'Cheffe de service', numero_de_telephone: 556789013, Role_dans_le_PUI: 0, Competences: ['L', 2, 3] };
+  const { before, after, marks } = previewOf(row(1), values, referenceMaps, etabFlags);
+  assert.equal(after.Fonction, 'Cheffe de service');
+  assert.equal(after.numero_de_telephone, 556789013);
+  assert.deepEqual(after.labels.competences, ['Hématologie', 'Pharmacovigilance']);
+  assert.deepEqual(after.labels.role, []);
+  assert.deepEqual(after.labels.macro, ['Cancérologie', 'Pharmacie'], 'les domaines suivent les compétences');
+  assert.equal(after.etablissement_label, 'CHU', 'ce qu\'on ne modifie pas reste');
+  assert.equal(after.etablissement_fondateur, true);
+  assert.equal(after.email, before.email);
+  assert.deepEqual(marks, {
+    texts: {
+      fonction: { before: 'Pharmacienne', after: 'Cheffe de service' },
+      tel: { before: '05 56 78 90 12', after: '05 56 78 90 13' }
+    },
+    tags: {
+      competences: { added: ['Pharmacovigilance'], removed: ['Oncologie'] },
+      role: { added: [], removed: ['Référent qualité'] }
+    }
+  });
+});
+
+test('previewOf marks a name that changes, and the establishment badge follows the establishment', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  const renamed = previewOf(row(1), { prenom: 'Anna' }, referenceMaps, etabFlags);
+  assert.equal(renamed.after.prenom, 'Anna');
+  assert.deepEqual(renamed.marks, { texts: { name: { before: 'Ana Martin', after: 'Anna Martin' } }, tags: {} });
+  // Établissement 4 (INSERM) n'a pas été validé : la carte « après » le dit, comme l'annuaire.
+  const moved = previewOf(row(1), { Etablissement: 4 }, referenceMaps, etabFlags);
+  assert.equal(moved.after.etablissement_label, 'INSERM');
+  assert.equal(moved.after.etablissement_ok_pour_apparaitre, false);
+  assert.equal(moved.before.etablissement_ok_pour_apparaitre, true);
+});
+
+test('previewOf marks nothing when the values written are the ones the card already has', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  const { marks } = previewOf(row(1), { Fonction: 'Pharmacienne', Competences: ['L', 2, 1], numero_de_telephone: 556789012 }, referenceMaps, etabFlags);
+  assert.deepEqual(marks, { texts: {}, tags: {} });
+  assert.equal(hasMarks(marks), false);
+});
+
+test('previewOf keeps the values the form does not show: a value without a name is not turned into a tag', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  // Hugo (10) : Instances ['L', 999], une valeur absente de la table de référence.
+  const { before, after, marks } = previewOf(row(10), { Instances: ['L', 999, 1] }, referenceMaps, etabFlags);
+  assert.deepEqual(before.labels.instances, []);
+  assert.deepEqual(after.labels.instances, ['CME']);
+  assert.deepEqual(marks.tags, { instances: { added: ['CME'], removed: [] } });
+});
+
+test('previewOf does not change the row it is given', async () => {
+  const { referenceMaps, etabFlags, row } = await directory();
+  const original = row(1);
+  const snapshot = structuredClone(original);
+  const values = { Fonction: 'Cheffe', Competences: ['L', 3] };
+  const valuesSnapshot = structuredClone(values);
+  previewOf(original, values, referenceMaps, etabFlags);
+  assert.deepEqual(original, snapshot);
+  assert.deepEqual(values, valuesSnapshot);
+});

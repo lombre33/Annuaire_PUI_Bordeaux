@@ -32,6 +32,19 @@ button,
 input {
   font: inherit;
 }
+/* Un élément `hidden` le reste, même quand une classe lui donne un affichage. */
+[hidden] {
+  display: none !important;
+}
+/* Texte réservé aux lecteurs d'écran */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .widget-shell {
   max-width: 1480px;
   margin: auto;
@@ -582,6 +595,96 @@ h1 {
   box-shadow: 0 2px 6px #1b203d1f;
 }
 
+/* Actions d'une carte que la personne connectée peut modifier : la sienne (« Votre
+   fiche »), ou n'importe laquelle pour une administratrice. */
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  grid-column: 1 / -1;
+  gap: 4px 6px;
+  margin-top: 9px;
+}
+.own-flag {
+  padding: 2px 7px;
+  color: #443aaf;
+  background: #e8e6ff;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+.card-edit {
+  padding: 2px 5px;
+  color: #443aaf;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.card-edit:hover {
+  background: #f1f0ff;
+}
+.card-edit:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+
+/* Carte « après » de la relecture d'une modification : ce qui change se voit. Un texte
+   modifié ou un tag ajouté est en relief ; ce qui a été retiré reste visible, barré. */
+.mark-new {
+  background: #e6f6f0;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #e6f6f0;
+}
+.tag.mark-new {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+}
+.tag.mark-new::before {
+  content: "+ ";
+  font-weight: 900;
+}
+.mark-gone {
+  color: #9b2226;
+  text-decoration: line-through;
+}
+/* Le repère d'une ligne de texte tient à sa valeur, pas à toute la largeur de la carte. */
+:is(.name, .fonction, .detail-row):is(.mark-new, .mark-gone) {
+  width: fit-content;
+  max-width: 100%;
+}
+/* La pastille écrite d'une ligne modifiée. En bloc en ligne, pour que le trait d'une
+   ligne barrée ne la raye pas. */
+.mk-pill {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  color: #fff;
+  background: #0b6b4f;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.mk-pill-del {
+  background: #b8303a;
+}
+.tag.mark-gone {
+  color: #fff;
+  opacity: 0.6;
+  outline: 1px dashed #d85b5b;
+  outline-offset: 1px;
+}
+.etablissement-tag:disabled {
+  cursor: default;
+}
+
 /* Écrans étroits. Le widget est un cadre Grist dont la largeur varie (panneau
    latéral, tablette, téléphone) : les seuils sont ceux du cadre, pas de l'écran.
    À partir de 1400px, la mise en page est celle de départ. */
@@ -677,6 +780,12 @@ h1 {
   .detail-row {
     font-size: 12px;
   }
+  .card-edit {
+    font-size: 12px;
+  }
+  .own-flag {
+    font-size: 11px;
+  }
   .tag-group-title {
     font-size: 10px;
   }
@@ -715,7 +824,8 @@ h1 {
     width: 320px;
   }
   button.tag,
-  .etablissement-tag {
+  .etablissement-tag,
+  .card-edit {
     min-height: 28px;
   }
   .etablissement-tag {
@@ -786,11 +896,13 @@ h1 {
 }
 .presence-switch {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   align-items: center;
   gap: 10px;
+  max-width: 100%;
   height: 46px;
   padding: 0 16px;
+  text-align: left;
   color: var(--ink);
   background: #f7f8fc;
   border: 1px solid var(--line);
@@ -986,4 +1098,24 @@ h1 {
   .page-footer {
     margin-top: 28px;
   }
+}
+
+.account-edit {
+  height: 46px;
+  padding: 0 16px;
+  color: #443aaf;
+  background: transparent;
+  border: 1px solid #c9c5f7;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.account-edit:hover {
+  border-color: var(--violet);
+}
+.account-edit:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
 }

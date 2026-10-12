@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { describePresence, setPresence, explainWriteError, PresenceError } from '../presence.js';
+import { describeHiddenFiche, describePresence, setPresence, explainWriteError, PresenceError } from '../presence.js';
 import { loadDirectory } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { sampleTables, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
@@ -55,6 +55,47 @@ test('describePresence lists every reason when several apply', async () => {
   const { find } = await setup(tables);
   const { message } = describePresence(find('dan@inserm.fr'));
   assert.match(message, /pas de périmètre ; votre établissement n'a pas encore été validé/);
+});
+
+// ===== describeHiddenFiche : ce que la relecture dit d'une fiche absente de l'annuaire =====
+
+test('describeHiddenFiche says nothing about a fiche that figures in the directory', async () => {
+  const { find } = await setup();
+  const [ana] = find(ANA_EMAIL);
+  assert.equal(describeHiddenFiche(ana.status, { own: true }), '');
+  assert.equal(describeHiddenFiche(ana.status, { own: false }), '');
+  const [bob] = find(BOB_EMAIL);
+  assert.equal(describeHiddenFiche(bob.status, { own: true }), '', 'un partenaire validé figure dans l\'annuaire');
+});
+
+test('describeHiddenFiche tells a person who has not accepted where the switch is, and an administrator that the person has not', async () => {
+  const { find } = await setup();
+  const [iris] = find(IRIS_EMAIL);
+  assert.equal(describeHiddenFiche(iris.status, { own: true }),
+    'Votre fiche est masquée de l\'annuaire : vous n\'avez pas accepté d\'apparaître (interrupteur « Apparaître dans l\'annuaire » en haut de page).');
+  assert.equal(describeHiddenFiche(iris.status, { own: false }),
+    'Cette fiche est masquée de l\'annuaire : la personne n\'a pas accepté d\'apparaître.');
+  const [jules] = find('jules@chu-bordeaux.fr');
+  assert.match(describeHiddenFiche(jules.status, { own: false }), /n'a pas accepté d'apparaître/, 'une case vide n\'est pas un accord');
+});
+
+test('describeHiddenFiche gives the reason a fiche that was accepted stays hidden, in the voice of the reader', async () => {
+  const { find } = await setup();
+  const say = (email, own) => describeHiddenFiche(find(email)[0].status, { own });
+  assert.equal(say('dan@inserm.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'a pas encore été validé.');
+  assert.equal(say('dan@inserm.fr', false), 'Cette fiche reste masquée de l\'annuaire : son établissement n\'a pas encore été validé.');
+  assert.equal(say('carla@clinique.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'est ni fondateur ni partenaire.');
+  assert.equal(say('eve@example.fr', false), 'Cette fiche reste masquée de l\'annuaire : la fiche n\'a pas d\'établissement.');
+  assert.equal(say('fred@chu-bordeaux.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre.');
+});
+
+test('describeHiddenFiche lists every reason, and does not change what describePresence says', async () => {
+  const tables = sampleTables();
+  tables.BDD.perimetre[3] = ['L']; // Dan : établissement non validé ET aucun périmètre
+  const { find } = await setup(tables);
+  assert.equal(describeHiddenFiche(find('dan@inserm.fr')[0].status, { own: true }),
+    'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre ; votre établissement n\'a pas encore été validé.');
+  assert.match(describePresence(find('dan@inserm.fr')).message, /pas de périmètre ; votre établissement n'a pas encore été validé\. Contactez un administrateur\./);
 });
 
 test('describePresence with several rows for one address: the switch is on only if all accepted, and the message says it applies to all', async () => {

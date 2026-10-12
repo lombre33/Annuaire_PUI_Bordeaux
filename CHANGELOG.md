@@ -1,5 +1,104 @@
 # Changelog
 
+## 1.12.0 — Modifier sa fiche, directement, avec une relecture avant/après
+
+Une personne connectée peut modifier sa propre fiche, et un administrateur celle de
+n'importe qui. Les modifications s'appliquent tout de suite : **aucune validation par
+un administrateur, aucun historique tenu par le widget, aucune table créée**. Avant
+d'enregistrer, une fenêtre de relecture montre la carte avant et la carte après, avec
+ce qui change repéré dans la carte « après ».
+
+- **Où cliquer.** Un bouton « ✎ Modifier » apparaît sur les cartes que la personne
+  peut modifier : la sienne (marquée « Votre fiche ») et, pour un administrateur,
+  toutes. Le bandeau « Ma présence » ajoute « Modifier mon profil », y compris pour
+  une personne qui n'apparaît pas dans l'annuaire. Quand plusieurs lignes portent la
+  même adresse, le bandeau ne le propose pas (chaque carte garde le sien).
+- **Qui peut quoi.** « Sa fiche » est la ligne de `BDD` dont `email` est l'adresse de
+  la personne connectée (identité de la 1.11.0, sans tenir compte de la casse ni des
+  espaces). Un administrateur (case `admin` d'`ACL`) peut modifier toutes les fiches
+  affichées. Sans identité fiable (pas de table-sonde, compte Lecteur…), aucun bouton.
+  C'est un verrou d'interface : seules les règles d'accès de Grist protègent les
+  données (`GRIST_SETUP.md`, étape 4, réécrite pour ce cas).
+- **Ce qui se modifie** : prénom, nom, fonction, téléphone, rôle dans le PUI, et les
+  listes Instances, Actions, GT, Compétences, Communautés et Tâches (pastilles à
+  cocher, rangées par domaine pour les compétences, avec une recherche au-delà de
+  douze valeurs). **Jamais** l'adresse e-mail, l'établissement ni le périmètre (ils
+  décident de qui apparaît : affaire des administrateurs, dans Grist), ni le choix de
+  présence (le bandeau « Ma présence »). Un texte est nettoyé, refusé s'il commence par
+  `=`, `+`, `-` ou `@` (une formule pour un tableur) ou dépasse 200 caractères ; un
+  numéro doit être un numéro français à 10 chiffres, remis en forme en quittant le
+  champ.
+- **La relecture.** « Relire mes modifications » affiche la carte « Avant » (la fiche
+  telle qu'elle est maintenant dans Grist) à côté de la carte « Après » (exactement
+  ce qui sera écrit, enrichi comme le fait l'annuaire), chacune avec sa légende
+  (« telle qu'elle est aujourd'hui », « telle qu'elle sera »). Dans « Après », une ligne
+  de texte modifiée est mise en relief avec une pastille écrite (« modifié », « ajouté »
+  ou « supprimé » : la couleur n'est jamais le seul repère), un tag ajouté porte un
+  « + », un tag retiré reste visible, barré ; chaque repère est aussi dit en texte aux
+  lecteurs d'écran. Dessous, la liste « Ce qui change ». Quand la fiche ne figure pas
+  dans l'annuaire (la personne n'a pas accepté d'apparaître, ou son établissement n'est
+  pas validé), la relecture le dit, avec la raison. Rien n'est écrit avant « Valider » ;
+  « Retour » ramène au formulaire avec le brouillon intact.
+- **Une écriture sûre.** Une seule action Grist (`UpdateRecord`) sur la seule fiche
+  concernée : tout ou rien. Les valeurs sont calculées sur la fiche telle qu'elle est
+  **au moment d'écrire** : une liste s'obtient en retirant puis en ajoutant, si bien
+  qu'un tag ajouté entre-temps par un autre, ou une valeur que le formulaire ne montre
+  pas (une ligne sans libellé), n'est jamais perdu. Si les champs touchés ont changé
+  dans Grist depuis la relecture, **rien n'est écrit** : la fenêtre revient à la
+  relecture avec ce que Grist contient et un avis ; ce que les autres ont changé dans
+  d'autres champs est conservé. Le bouton est gelé pendant l'écriture (un double clic
+  n'écrit qu'une fois) et Échap ne ferme pas la fenêtre. Ensuite l'annuaire est relu
+  et le widget vérifie que Grist a gardé ce qu'on lui a demandé.
+- **Les échecs sont dits, jamais muets** : écriture refusée par une règle d'accès,
+  colonne à formule, fiche supprimée entre-temps, lecture impossible, liste qui
+  contient autre chose que des identifiants de ligne, fiche qui n'aurait plus ni
+  prénom ni nom : un message en français, rien ne change, le brouillon reste.
+- **Le téléphone s'écrit dans la forme de sa colonne** : un nombre pour une colonne
+  numérique (le 0 initial est rétabli à l'affichage), un texte sinon. Le widget lit
+  pour cela le type des colonnes dans les métadonnées de Grist (`_grist_Tables_column`) ;
+  s'il ne peut pas, il suit la forme de la cellule actuelle.
+- **Accessibilité.** Vraie boîte de dialogue modale (`<dialog>`) : le reste de la page
+  est inerte et le focus ne s'y échappe pas ; le titre de chaque étape est annoncé ;
+  Échap prévient avant d'abandonner des modifications, un second appui ferme ; à la
+  fermeture, le focus revient au bouton d'origine, même quand les cartes ont été
+  redessinées. Sur un téléphone la fenêtre occupe l'écran et les deux cartes sont
+  l'une sous l'autre.
+- **Aucune table créée, aucun historique.** Le widget ne crée ni table ni colonne. La
+  table-sonde `Annuaire_Sonde` de la 1.11.0 reste la seule table dont il dépende : elle
+  se crée à la main, car c'est la seule façon de connaître l'adresse de la personne
+  connectée. Le travail de validation par un administrateur (file de demandes), écarté
+  par décision d'Antoine, est conservé sur la branche `archive/demandes-validation-administrateur`.
+- **À faire dans Grist** : voir `GRIST_SETUP.md` : toutes les colonnes que le widget
+  écrit doivent être des colonnes de données, et les règles d'accès (étape 4) doivent
+  empêcher quiconque de modifier la fiche d'un autre, ou `email`, `Etablissement` et
+  `perimetre`.
+- **Pour les développeurs** : `profile.js` (droits par fiche `rightsFor`, modèle du
+  formulaire, calcul des changements et leur description), `profile-save.js` (relecture
+  `prepareReview`, écriture `saveProfile`, détection d'un changement concurrent),
+  `preview.js` (carte « avant », carte « après », ce qui les distingue), `schema.js`
+  (types des colonnes), `profile-ui.js`, `changes-ui.js` et `dom.js` (la fenêtre) et
+  `dialogs.css` sont nouveaux ; `render.js` sait dessiner une carte de relecture
+  (`renderPreviewCard`) et le bouton « Modifier » ; `grist-data.js` ajoute `displayName()`
+  et `findById()` à l'index des personnes ; `presence.js` exporte `classifyWriteError()`.
+  `tests/support/browser.mjs` regroupe l'outillage des tests navigateur (`e2e.test.mjs`
+  l'utilise désormais) et le faux document Grist sait refuser une ligne précise
+  (`denyRows`) et cacher les tables `_grist_*` de `listTables()`.
+- **Mise en page.** Dans un cadre de 280 px (le plus étroit que mesure `tests/responsive.test.mjs`),
+  l'interrupteur du bandeau « Ma présence » débordait de 2 px quand une personne était
+  identifiée : il se resserre désormais, son texte passe à la ligne. Les boutons du pied
+  de la fenêtre passent eux aussi à la ligne au lieu de sortir du cadre.
+- **Tests** : 371 tests (110 dans un vrai navigateur, optionnels sans Playwright), dont
+  144 pour ce lot : construction des écritures (listes calculées sur la fiche
+  actuelle, téléphone numérique ou texte), relecture, conflit concurrent, refus, cartes
+  avant/après, avis « fiche masquée », et le parcours complet dans Chromium, de 280 à
+  1 100 px de large. Contrôle négatif : 58 modifications du code (signature de conflit
+  non comparée, liste écrite sans les valeurs actuelles, retrait ignoré, colonne en trop
+  écrite, carte « après » identique à « avant », bouton sur toutes les cartes, Échap
+  sans avertissement, pastille manquante, boutons qui débordent…) ont été essayées :
+  56 font chacune échouer au moins un test ; les deux autres ne changent rien de visible
+  (une copie de brouillon que la fenêtre refait à chaque ouverture, un avis de champ
+  déplacé que le message général remplace).
+
 ## 1.11.0 — « Ma présence » : la personne connectée choisit d'apparaître ou non
 
 Une personne connectée à Grist voit, au-dessus des filtres, un bandeau qui lui dit

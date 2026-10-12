@@ -97,3 +97,22 @@ export const REFERENCE_SOURCES = Object.entries(CATEGORIES)
 export const LIST_CATEGORIES = Object.entries(CATEGORIES)
   .filter(([, category]) => category.column)
   .map(([key, { column, table, groups }]) => ({ key, column, table, ...(groups && { groups }) }));
+
+// Ce qu'une personne peut changer sur une fiche, dans l'ordre du formulaire. Jamais :
+// email (c'est lui qui désigne la personne), Etablissement et perimetre (ils décident
+// de ce qui s'affiche : l'affaire des administrateurs, dans Grist) ni Accepte_apparaitre
+// (l'interrupteur « Ma présence » l'écrit).
+//   key       colonne de BDD
+//   kind      'text', 'phone' (numéro français), 'reference' (une valeur d'une
+//             table de référence) ou 'list' (plusieurs)
+//   category  catégorie de CATEGORIES dont viennent les valeurs proposées
+const LIST_FIELD_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches'];
+
+export const PROFILE_FIELDS = [
+  { key: 'prenom', label: 'Prénom', kind: 'text' },
+  { key: 'nom', label: 'Nom', kind: 'text' },
+  { key: 'Fonction', label: 'Fonction', kind: 'text' },
+  { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
+  { key: 'Role_dans_le_PUI', label: CATEGORIES.role.label, kind: 'reference', category: 'role' },
+  ...LIST_FIELD_KEYS.map(category => ({ key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category }))
+];

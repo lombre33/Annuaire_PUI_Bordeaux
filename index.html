@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Annuaire PUI Bordeaux</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dialogs.css">
 </head>
 <body>
   <main class="widget-shell">
@@ -33,7 +34,9 @@
         <span class="presence-track" aria-hidden="true"><span class="presence-thumb"></span></span>
         <span class="presence-label">Apparaître dans l'annuaire</span>
       </button>
-      <div class="account-actions"></div>
+      <div class="account-actions">
+        <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
+      </div>
       <p class="account-status" role="status" data-tone="info"></p>
     </section>
 
@@ -71,6 +74,20 @@
     </footer>
   </main>
 
+  <dialog id="profileDialog" class="dlg" aria-labelledby="profileTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="profileTitle" tabindex="-1">Modifier mon profil</h2>
+          <p class="dlg-sub"></p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>
+      </header>
+      <div class="dlg-body"></div>
+      <footer class="dlg-foot"></footer>
+    </div>
+  </dialog>
+
   <template id="cardTemplate">
     <article class="contact-card">
       <div class="card-topline"></div>
@@ -89,6 +106,10 @@
           <p class="tel detail-row"></p>
         </div>
         <div class="card-tags"></div>
+        <div class="card-actions" hidden>
+          <span class="own-flag" hidden>Votre fiche</span>
+          <button class="card-edit" type="button">✎ Modifier</button>
+        </div>
       </div>
     </article>
   </template>
