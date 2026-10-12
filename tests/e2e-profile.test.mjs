@@ -619,7 +619,7 @@ test('une administratrice modifie la fiche de quelqu\'un d\'autre : la fenêtre 
     assert.equal(await heading(page).textContent(), 'Modifier la fiche de Hugo Bernard');
     assert.match(await dialog(page).locator('.dlg-sub').textContent(), /en tant qu'administrateur/);
     assert.equal(await dialog(page).locator('.ident-name').textContent(), 'Hugo Bernard');
-    assert.match(await dialog(page).locator('.ident-lock').textContent(), /se corrigent dans Grist/);
+    assert.equal(await dialog(page).locator('.ident-lock').count(), 0, 'l\'administrateur peut changer l\'e-mail et l\'établissement : rien n\'est verrouillé');
 
     await field(page, 'Fonction').fill('Directeur');
     await press(page, 'Relire les modifications').click();
@@ -642,6 +642,203 @@ test('sa propre fiche garde le titre « Modifier mon profil », même pour une a
     assert.equal(await heading(page).textContent(), 'Modifier mon profil');
     assert.equal(await press(page, 'Relire mes modifications').count(), 1);
   }));
+
+// ===== L'administrateur change aussi l'e-mail et l'établissement d'une autre personne =====
+
+// Allume le mode admin, puis ouvre la fiche de la personne dont la carte porte `name`.
+async function openOther(page, name) {
+  await enableAdminMode(page);
+  await gridCard(page, name).locator('.card-edit').click();
+  await dialog(page).waitFor();
+}
+
+const selectedLabel = page => field(page, 'Etablissement').evaluate(select => select.selectedOptions[0].textContent);
+
+test('un administrateur voit l\'e-mail et l\'établissement d\'une autre personne comme des champs à modifier, une personne ne les voit pas', { skip }, async () => {
+  await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOther(page, 'Hostile');
+    assert.equal(await field(page, 'email').getAttribute('type'), 'email');
+    assert.equal(await field(page, 'email').inputValue(), 'hostile@chu-bordeaux.fr');
+    assert.equal(await selectedLabel(page), 'CHU');
+    assert.deepEqual(await field(page, 'Etablissement').locator('option').allTextContents(), ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'],
+      'tous les établissements, sans option vide : celui d\'une personne ne se vide pas');
+    assert.equal(await dialog(page).locator('.ident-lock').count(), 0, 'rien n\'est verrouillé pour un administrateur');
+    assert.match(await dialog(page).locator('#profile-email-hint').textContent(), /Ses droits d'administrateur ou de responsable, déclarés dans la table ACL/);
+    assert.match(await field(page, 'email').getAttribute('aria-describedby'), /profile-email-error profile-email-hint/);
+    assert.equal(await summary(page), 'Aucune modification');
+    assert.deepEqual(await bddCalls(page), []);
+  });
+  // Sa propre fiche, même pour un administrateur en mode admin : verrouillée.
+  await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await enableAdminMode(page);
+    await gridCard(page, 'Ana Martin').locator('.card-edit').click();
+    await dialog(page).waitFor();
+    assert.equal(await field(page, 'email').count(), 0);
+    assert.equal(await field(page, 'Etablissement').count(), 0);
+    assert.match(await dialog(page).locator('.ident-lock').textContent(), /liés à votre compte/);
+  });
+  await withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOwn(page);
+    assert.equal(await field(page, 'email').count(), 0);
+    assert.equal(await field(page, 'Etablissement').count(), 0);
+    assert.match(await dialog(page).locator('.ident-lock').textContent(), /liés à votre compte/);
+  });
+});
+
+test('le nouvel e-mail et le nouvel établissement se voient sur la carte après et dans le détail, et s\'écrivent en une seule action', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await openOther(page, 'Hugo Bernard'); // pas d'adresse, au CHU
+    assert.equal(await field(page, 'email').inputValue(), '');
+    await field(page, 'email').fill('  Hugo.Bernard@CHU-Bordeaux.fr ');
+    await field(page, 'Etablissement').selectOption({ label: 'Institut Bergonié' });
+    assert.equal(await summary(page), '2 champs modifiés');
+    await press(page, 'Relire les modifications').click();
+    await headingIs(page, 'Relire les modifications de Hugo Bernard');
+    assert.equal(await notices(page).count(), 0, 'il reste dans l\'annuaire : rien à signaler');
+
+    const before = dialog(page).locator('.preview-before .contact-card');
+    const after = dialog(page).locator('.preview-after .contact-card');
+    assert.equal(await before.locator('.etablissement-tag').textContent(), 'CHU');
+    assert.equal(await before.locator('a.email').isHidden(), true, 'Hugo n\'avait pas d\'adresse');
+    assert.equal(await after.locator('.etablissement-tag.mark-new').textContent(), 'Institut Bergonié modifié');
+    assert.equal(await after.locator('a.email.mark-new').textContent(), 'hugo.bernard@chu-bordeaux.fr ajouté');
+    assert.equal(await after.locator('a.email').getAttribute('href'), null, 'un aperçu n\'est pas cliquable');
+    assert.equal(await after.locator('.etablissement-tag').isDisabled(), true);
+    // Le badge repéré reste lisible (texte blanc sur fond sombre : le vert pâle des lignes de
+    // texte l'effacerait) et sa pastille n'est pas tronquée avec le nom de l'établissement.
+    assert.deepEqual(await after.locator('.etablissement-tag').evaluate(badge => {
+      const style = getComputedStyle(badge);
+      const pill = badge.querySelector('.mk-pill').getBoundingClientRect();
+      const frame = badge.getBoundingClientRect();
+      return {
+        color: style.color,
+        background: style.backgroundColor,
+        pillInside: pill.left >= frame.left - 0.5 && pill.right <= frame.right + 0.5 && pill.bottom <= frame.bottom + 0.5,
+        clipped: badge.scrollWidth > badge.clientWidth + 1
+      };
+    }), { color: 'rgb(255, 255, 255)', background: 'rgb(20, 124, 114)', pillInside: true, clipped: false });
+    assert.equal(await before.locator('.mk-pill').count(), 0);
+    assert.deepEqual(await dialog(page).locator('.recap .diff-label').allTextContents(), ['E-mail', 'Établissement']);
+    const rows = dialog(page).locator('.recap .diff-row');
+    assert.equal(await rows.nth(0).locator('.none').first().textContent(), 'non renseigné');
+    assert.equal(await rows.nth(0).locator('ins').textContent(), 'hugo.bernard@chu-bordeaux.fr');
+    assert.equal(await rows.nth(1).locator('del').textContent(), 'CHU');
+    assert.equal(await rows.nth(1).locator('ins').textContent(), 'Institut Bergonié');
+    assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
+
+    await press(page, 'Valider').click();
+    await headingIs(page, 'Fiche enregistrée');
+    assert.deepEqual(await bddCalls(page), [{
+      action: 'UpdateRecord', table: 'BDD', rowId: 10, ok: true, values: { email: 'hugo.bernard@chu-bordeaux.fr', Etablissement: 5 }
+    }]);
+    assert.deepEqual(await bddCell(page, 'Instances', 9), ['L', 999], 'ce que la fenêtre ne montre pas est conservé');
+    await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.etablissement-tag').textContent()) === 'Institut Bergonié', 'la carte n\'a pas été mise à jour');
+    assert.equal(await gridCard(page, 'Hugo Bernard').locator('a.email').textContent(), 'hugo.bernard@chu-bordeaux.fr');
+    assert.equal(await gridCard(page, 'Hugo Bernard').locator('a.email').getAttribute('href'), 'mailto:hugo.bernard@chu-bordeaux.fr');
+    assert.equal(await dialog(page).locator('.recap .diff-label').count(), 2, 'la confirmation rappelle ce qui a changé');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
+test('déplacer une personne dans un établissement qui n\'a pas validé sa présence la retire de l\'annuaire, et la relecture le dit d\'abord', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOther(page, 'Hugo Bernard');
+    await field(page, 'Etablissement').selectOption({ label: 'INSERM' });
+    await press(page, 'Relire les modifications').click();
+    await headingIs(page, 'Relire les modifications de Hugo Bernard');
+    assert.deepEqual(await notices(page).allTextContents(), [
+      'Cette fiche reste masquée de l\'annuaire : son établissement n\'a pas encore été validé.'
+    ]);
+    assert.equal(await dialog(page).locator('.preview-after .etablissement-tag').textContent(), 'INSERM modifié');
+    await press(page, 'Valider').click();
+    await headingIs(page, 'Fiche enregistrée');
+    assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ Etablissement: 4 }]);
+    await waitForCards(page, 3);
+    assert.equal(await gridCard(page, 'Hugo Bernard').count(), 0, 'la carte a quitté l\'annuaire');
+  }));
+
+test('un e-mail refusé est signalé sous son champ : mal formé, déjà pris, vidé ; un établissement ne se vide pas', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOther(page, 'Hostile');
+    const emailError = page.locator('#profile-email-error');
+    const relire = press(page, 'Relire les modifications');
+    await field(page, 'email').fill('hostile@');
+    assert.match(await emailError.textContent(), /^cette adresse n'est pas valide \(nom@exemple\.fr\)\.$/);
+    assert.equal(await field(page, 'email').getAttribute('aria-invalid'), 'true');
+    assert.equal(await summary(page), 'Corrigez les champs signalés');
+    assert.equal(await relire.isDisabled(), true);
+
+    await field(page, 'email').fill('ANA.Martin@chu-bordeaux.fr');
+    assert.equal(await emailError.textContent(), 'cette adresse est déjà celle d\'une autre fiche.');
+    assert.equal(await relire.isDisabled(), true);
+
+    await field(page, 'email').fill('   ');
+    assert.equal(await emailError.textContent(), 'indiquez une adresse e-mail.');
+    assert.equal(await relire.isDisabled(), true);
+
+    await field(page, 'email').fill('=cmd@chu.fr');
+    assert.equal(await emailError.textContent(), 'ne peut pas commencer par = + - ou @.');
+
+    await field(page, 'email').fill('hostile.nouveau@chu-bordeaux.fr');
+    assert.equal(await emailError.isHidden(), true);
+    assert.equal(await field(page, 'email').getAttribute('aria-invalid'), 'false');
+    assert.equal(await relire.isEnabled(), true);
+    // Revenir à l'adresse d'origine, écrite autrement, n'est pas une modification.
+    await field(page, 'email').fill('HOSTILE@chu-bordeaux.fr');
+    assert.equal(await summary(page), 'Aucune modification');
+    assert.deepEqual(await bddCalls(page), []);
+  }));
+
+test('une adresse prise par une autre fiche pendant la relecture n\'est pas écrite : la fenêtre le dit et reste sur la relecture', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOther(page, 'Hugo Bernard');
+    await field(page, 'email').fill('convoite@exemple.fr');
+    await press(page, 'Relire les modifications').click();
+    await headingIs(page, 'Relire les modifications de Hugo Bernard');
+    await page.evaluate(() => { window.__tables.BDD.email[3] = 'Convoite@Exemple.fr'; }); // Dan, hors de la vue
+    await press(page, 'Valider').click();
+    await page.locator('#profileDialog .dlg-alert [role="alert"]').waitFor();
+    assert.match(await alertText(page), /Cette adresse e-mail est maintenant celle d'une autre fiche : rien n'a été modifié\./);
+    assert.equal(await heading(page).textContent(), 'Relire les modifications de Hugo Bernard');
+    assert.deepEqual(await bddCalls(page), []);
+    assert.equal(await bddCell(page, 'email', 9), '');
+    // On peut revenir à la fiche et en choisir une autre.
+    await press(page, 'Retour').click();
+    await headingIs(page, 'Modifier la fiche de Hugo Bernard');
+    assert.equal(await field(page, 'email').inputValue(), 'convoite@exemple.fr', 'le brouillon est intact');
+  }));
+
+for (const width of [280, 360]) {
+  test(`dans un cadre de ${width} px, le formulaire d'un administrateur et sa relecture de l'e-mail et de l'établissement tiennent dans l'écran`, { skip }, () =>
+    withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+      await page.setViewportSize({ width, height: 640 });
+      await openOther(page, 'Hostile');
+      const fits = () => page.evaluate(() => {
+        const dialog = document.getElementById('profileDialog');
+        const box = dialog.getBoundingClientRect();
+        const outside = [...dialog.querySelectorAll('*')].filter(node => {
+          const at = node.getBoundingClientRect();
+          return at.width > 0 && !node.closest('.sr-only') && (at.right > box.right + 0.5 || at.left < box.left - 0.5);
+        }).map(node => `${node.tagName}.${String(node.className).slice(0, 30)}`);
+        return { inside: box.left >= 0 && box.right <= window.innerWidth + 0.5, pageOverflow: document.documentElement.scrollWidth - window.innerWidth, outside };
+      });
+      const FITS = { inside: true, pageOverflow: 0, outside: [] };
+      assert.deepEqual(await fits(), FITS);
+      await field(page, 'email').fill('une.adresse.assez.longue.pour.mettre.la.mise.en.page.a.l.epreuve@laboratoire-de-recherche-bordeaux.example.fr');
+      await field(page, 'Etablissement').selectOption({ label: 'Institut Bergonié' });
+      assert.deepEqual(await fits(), FITS);
+      await press(page, 'Relire les modifications').click();
+      await headingIs(page, 'Relire les modifications de Hostile'.replace('Hostile', `${HOSTILE_FIRST_NAME} Hostile`));
+      assert.deepEqual(await fits(), FITS);
+      const spill = await dialog(page).locator('.preview-after .contact-card').evaluate(card => {
+        const frame = card.getBoundingClientRect();
+        return [...card.querySelectorAll('*')].filter(node => {
+          const at = node.getBoundingClientRect();
+          return at.width > 0 && (at.right > frame.right + 0.5 || at.left < frame.left - 0.5);
+        }).map(node => node.className || node.tagName);
+      });
+      assert.deepEqual(spill, [], 'rien ne sort de la carte « Après »');
+    }));
+}
 
 test('une personne qui n\'apparaît pas dans l\'annuaire modifie quand même sa fiche depuis le bandeau', { skip }, () =>
   withWidget({ tables: withIdentity(), user: IRIS_EMAIL }, async ({ page }) => {

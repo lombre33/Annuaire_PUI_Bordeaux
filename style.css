@@ -526,6 +526,39 @@ h1 {
 .etablissement-tag:disabled {
   cursor: default;
 }
+/* Le badge établissement repéré dans la carte « après » garde son fond et son texte : le
+   vert pâle des lignes de texte le rendrait illisible. Un anneau le repère, et la
+   pastille passe dessous, en blanc, pour ne pas être tronquée avec le nom. */
+.etablissement-tag.mark-new,
+.etablissement-tag.mark-gone {
+  max-width: 120px;
+  color: #fff;
+  background: #147c72;
+  border-radius: 10px;
+  box-shadow: none;
+  text-align: center;
+  white-space: normal;
+  overflow: visible;
+}
+.etablissement-tag.mark-new {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.etablissement-tag.mark-gone {
+  opacity: 0.6;
+  outline: 1px dashed #d85b5b;
+  outline-offset: 1px;
+}
+.etablissement-tag .mk-pill {
+  display: block;
+  width: fit-content;
+  margin: 3px auto 0;
+  color: #0b6b4f;
+  background: #fff;
+}
+.etablissement-tag .mk-pill-del {
+  color: #b8303a;
+}
 
 /* Écrans étroits. Le widget est un cadre Grist dont la largeur varie (panneau
    latéral, tablette, téléphone) : les seuils sont ceux du cadre, pas de l'écran.

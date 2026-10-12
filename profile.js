@@ -7,7 +7,7 @@
 // Ainsi une valeur que le formulaire ne montre pas (une ligne de référence sans
 // libellé) n'est jamais perdue, et ce qu'un autre a changé entre-temps non plus.
 
-import { CATEGORIES, PROFILE_FIELDS } from './constants.js';
+import { CATEGORIES, PROFILE_FIELDS, fieldsFor } from './constants.js';
 import { compareLabels, formatPhone, normalizeEmail, refId, safeValues, text } from './grist-data.js';
 
 export const MAX_TEXT_LENGTH = 200;
@@ -15,6 +15,11 @@ export const MAX_TEXT_LENGTH = 200;
 // Un texte qui commence par l'un de ces caractères serait lu comme une formule par
 // un tableur qui ouvre un export de l'annuaire.
 const SPREADSHEET_FORMULA_START = /^[=+\-@]/;
+
+// Une adresse e-mail simple : quelque chose, une arobase, un domaine avec un point. Sans
+// espace, virgule, point-virgule, guillemet, parenthèse, chevron, « ? », « # », « & » ni
+// « % » : ce qu'un lien « mailto: » ne saurait pas porter (voir mailtoHref).
+const EMAIL_SHAPE = /^[^\s@,;:<>()"\\?#&%]+@[^\s@,;:<>()"\\?#&%]+\.[^\s@,;:<>()"\\?#&%.]{2,}$/;
 
 // ===== Qui peut modifier quelle fiche =====
 
@@ -53,6 +58,18 @@ export function cleanText(value) {
 export function textFault(value) {
   if (value.length > MAX_TEXT_LENGTH) return `${MAX_TEXT_LENGTH} caractères au plus`;
   if (SPREADSHEET_FORMULA_START.test(value)) return 'ne peut pas commencer par = + - ou @';
+  return '';
+}
+
+// Pourquoi une adresse e-mail (déjà nettoyée et mise en minuscules) est refusée, ou ''.
+// `before` : l'adresse actuelle de la fiche ; `emailTaken(adresse)` dit si une AUTRE fiche
+// porte déjà cette adresse (c'est elle qui retrouve la personne : deux fiches ne la partagent pas).
+function emailFault(after, before, emailTaken) {
+  if (after === '') return before === '' ? '' : 'indiquez une adresse e-mail.';
+  const fault = textFault(after);
+  if (fault) return `${fault}.`;
+  if (!EMAIL_SHAPE.test(after)) return 'cette adresse n\'est pas valide (nom@exemple.fr).';
+  if (after !== before && emailTaken(after)) return 'cette adresse est déjà celle d\'une autre fiche.';
   return '';
 }
 
@@ -101,12 +118,16 @@ function knownIds(cell, options) {
 
 // Le formulaire de modification d'une fiche : un champ par PROFILE_FIELDS, avec la
 // valeur actuelle de la fiche (`value`) et, pour une référence ou une liste, sa
-// `category` et les valeurs proposées (`options`).
-export function profileFormModel(row, referenceMaps) {
+// `category` et les valeurs proposées (`options`). `admin` : un administrateur modifie la
+// fiche d'une autre personne, et change aussi son e-mail et son établissement.
+export function profileFormModel(row, referenceMaps, { admin = false } = {}) {
   // Une colonne facultative absente de BDD n'est pas proposée (rien à modifier).
-  return PROFILE_FIELDS.filter(field => field.key in row).map(field => {
-    const base = { key: field.key, label: field.label, kind: field.kind, ...(field.category && { category: field.category }) };
-    if (field.kind === 'text') return { ...base, value: text(row[field.key]) };
+  return fieldsFor(admin).filter(field => field.key in row).map(field => {
+    const base = {
+      key: field.key, label: field.label, kind: field.kind,
+      ...(field.category && { category: field.category }), ...(field.required && { required: true })
+    };
+    if (field.kind === 'text' || field.kind === 'email') return { ...base, value: text(row[field.key]) };
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
     const options = optionsOf(field.category, referenceMaps);
     if (field.kind === 'reference') return { ...base, options, value: refId(row[field.key]) || 0 };
@@ -137,7 +158,11 @@ function sameSet(a, b) {
 // buildRowUpdate pour son usage) ; `errors` dit pourquoi le brouillon est refusé (une
 // phrase par défaut), `fieldErrors` la même chose champ par champ (colonne → message),
 // pour l'afficher sous le champ.
-export function diffProfile(row, draft, referenceMaps) {
+//   admin        un administrateur modifie la fiche d'une autre personne : l'e-mail et
+//                l'établissement du brouillon comptent. Sinon ils sont ignorés, quoi que
+//                le brouillon contienne.
+//   emailTaken   adresse → vrai si une AUTRE fiche la porte déjà
+export function diffProfile(row, draft, referenceMaps, { admin = false, emailTaken = () => false } = {}) {
   const champs = {};
   const errors = [];
   const fieldErrors = {};
@@ -146,9 +171,19 @@ export function diffProfile(row, draft, referenceMaps) {
     fieldErrors[field.key] = message;
   };
 
-  PROFILE_FIELDS.forEach(field => {
+  fieldsFor(admin).forEach(field => {
     if (!(field.key in draft) || !(field.key in row)) return;
     const input = draft[field.key];
+
+    if (field.kind === 'email') {
+      const before = text(row[field.key]);
+      if (String(input ?? '') === before) return; // laissée telle quelle : pas un changement
+      const after = cleanText(input).toLowerCase();
+      const fault = emailFault(after, before, emailTaken);
+      if (fault) fail(field, fault);
+      else if (after !== before) champs[field.key] = { avant: before, apres: after };
+      return;
+    }
 
     if (field.kind === 'text') {
       const before = text(row[field.key]);
@@ -184,6 +219,8 @@ export function diffProfile(row, draft, referenceMaps) {
       const after = input;
       if (after !== 0 && !options.some(option => option.id === after)) {
         fail(field, 'valeur inconnue.');
+      } else if (after === 0 && field.required && before !== 0) {
+        fail(field, 'une valeur est requise.');
       } else if (after !== before) {
         champs[field.key] = {
           avant: { id: before, label: labelOf(options, before) },
@@ -230,13 +267,15 @@ export function diffProfile(row, draft, referenceMaps) {
 //     état), moins ceux qui sont déjà faits ;
 //   - `moved` nomme les champs dont la valeur a changé dans Grist depuis que le
 //     formulaire a été ouvert : la personne doit le savoir avant de valider.
-export function rebaseChanges(champs, row, referenceMaps) {
+// `admin` : comme pour diffProfile, l'e-mail et l'établissement ne comptent que pour un
+// administrateur qui modifie la fiche d'une autre personne ; sinon ils sont écartés.
+export function rebaseChanges(champs, row, referenceMaps, { admin = false } = {}) {
   const rebased = {};
   const moved = [];
-  PROFILE_FIELDS.filter(field => champs[field.key]).forEach(field => {
+  fieldsFor(admin).filter(field => champs[field.key]).forEach(field => {
     const change = champs[field.key];
 
-    if (field.kind === 'text') {
+    if (field.kind === 'text' || field.kind === 'email') {
       const current = text(row[field.key]);
       if (current === change.apres) return;
       if (current !== change.avant) moved.push(field.label);

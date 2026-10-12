@@ -81,23 +81,27 @@ export function createProfileDialog(dialog) {
 
   // ===== Le formulaire =====
 
-  // Ce qui ne change pas par ce formulaire, dit en clair.
+  // Qui est cette fiche. Pour la sienne, l'e-mail et l'établissement ne changent pas par ce
+  // formulaire, et le bloc le dit. Un administrateur qui modifie la fiche d'une autre
+  // personne les change dans les champs qui suivent.
   function identityBlock() {
     const { person, etablissement } = session;
     const box = el('div', 'ident');
     box.append(el('div', 'avatar', person.initials));
     const main = el('div', 'ident-main');
-    main.append(
-      el('p', 'ident-name', person.name),
-      el('p', 'ident-mail', person.email),
-      el('p', 'ident-lock', isAdmin()
-        ? 'Verrouillé : l\'e-mail et l\'établissement se corrigent dans Grist.'
-        : 'Verrouillé : l\'e-mail et l\'établissement sont liés à votre compte. Pour les corriger, contactez un administrateur.')
-    );
+    main.append(el('p', 'ident-name', person.name), el('p', 'ident-mail', person.email));
+    if (!isAdmin()) {
+      main.append(el('p', 'ident-lock', 'Verrouillé : l\'e-mail et l\'établissement sont liés à votre compte. Pour les corriger, contactez un administrateur.'));
+    }
     box.append(main);
     if (etablissement) box.append(el('span', 'pill', etablissement));
     return box;
   }
+
+  // Ce que dit le champ sous lui, pour le champ qui a besoin d'une explication.
+  const HINTS = {
+    email: 'Sert à retrouver la personne dans l\'annuaire. Ses droits d\'administrateur ou de responsable, déclarés dans la table ACL avec son adresse, ne changent pas.'
+  };
 
   function textField(field) {
     const id = `profile-${field.key}`;
@@ -106,13 +110,20 @@ export function createProfileDialog(dialog) {
     label.htmlFor = id;
     const input = document.createElement('input');
     input.id = id;
-    input.type = field.kind === 'phone' ? 'tel' : 'text';
+    input.type = field.kind === 'phone' ? 'tel' : field.kind === 'email' ? 'email' : 'text';
     input.autocomplete = 'off';
+    if (field.kind === 'email') input.spellcheck = false;
     input.value = draft[field.key];
     const error = el('p', 'fld-err');
     error.id = `${id}-error`;
     error.hidden = true;
-    input.setAttribute('aria-describedby', error.id);
+    const described = [error.id];
+    const hint = HINTS[field.key] ? el('p', 'fld-hint', HINTS[field.key]) : null;
+    if (hint) {
+      hint.id = `${id}-hint`;
+      described.push(hint.id);
+    }
+    input.setAttribute('aria-describedby', described.join(' '));
     input.addEventListener('input', () => {
       draft[field.key] = input.value;
       refresh();
@@ -128,6 +139,7 @@ export function createProfileDialog(dialog) {
       });
     }
     wrap.append(label, input, error);
+    if (hint) wrap.append(hint);
     ui.fields[field.key] = { input, error };
     return wrap;
   }
@@ -139,18 +151,28 @@ export function createProfileDialog(dialog) {
     label.htmlFor = id;
     const select = document.createElement('select');
     select.id = id;
-    [{ id: 0, label: 'Non renseigné' }, ...field.options].forEach(option => {
+    // Une valeur requise (l'établissement) ne se vide pas : l'option vide n'existe que si la
+    // fiche n'en a pas encore.
+    const empty = field.required
+      ? (field.value === 0 ? [{ id: 0, label: 'Choisir…' }] : [])
+      : [{ id: 0, label: 'Non renseigné' }];
+    [...empty, ...field.options].forEach(option => {
       const node = document.createElement('option');
       node.value = String(option.id);
       node.textContent = option.label;
       select.append(node);
     });
     select.value = String(draft[field.key]);
+    const error = el('p', 'fld-err');
+    error.id = `${id}-error`;
+    error.hidden = true;
+    select.setAttribute('aria-describedby', error.id);
     select.addEventListener('change', () => {
       draft[field.key] = Number(select.value);
       refresh();
     });
-    wrap.append(label, select);
+    wrap.append(label, select, error);
+    ui.fields[field.key] = { input: select, error };
     return wrap;
   }
 
@@ -302,7 +324,7 @@ export function createProfileDialog(dialog) {
     const grid = el('div', 'fld-grid');
     const pickers = [];
     session.model.forEach(field => {
-      if (field.kind === 'text' || field.kind === 'phone') grid.append(textField(field));
+      if (field.kind === 'text' || field.kind === 'phone' || field.kind === 'email') grid.append(textField(field));
       else if (field.kind === 'reference') grid.append(referenceField(field));
       else pickers.push(picker(field));
     });

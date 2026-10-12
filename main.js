@@ -311,17 +311,22 @@ function userFacing(error) {
   return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
 }
 
+// Une adresse e-mail qu'une AUTRE fiche que `rowId` porte déjà (d'après l'annuaire lu).
+const emailTakenElsewhere = rowId => email =>
+  Boolean(state.people?.findByEmail(email).some(person => person.row.id !== rowId));
+
 // Ce que le brouillon change (de quoi activer le bouton) et pourquoi il serait refusé.
-function evaluateDraft(row, draft) {
-  const { champs, errors, fieldErrors } = diffProfile(row, draft, state.referenceMaps);
+// `admin` : un administrateur modifie la fiche d'une autre personne (e-mail et établissement compris).
+function evaluateDraft(row, draft, admin) {
+  const { champs, errors, fieldErrors } = diffProfile(row, draft, state.referenceMaps, { admin, emailTaken: emailTakenElsewhere(row.id) });
   return { errors, fieldErrors, lines: describeChanges(champs) };
 }
 
 // Prépare la relecture (profile-save.js) : rien n'est écrit. `row` est la fiche telle que
 // le formulaire l'a montrée.
-async function reviewProfile(row, draft) {
+async function reviewProfile(row, draft, admin) {
   try {
-    return await prepareReview(window.grist.docApi, row, draft, { referenceMaps: state.referenceMaps, etabFlags: state.etabFlags });
+    return await prepareReview(window.grist.docApi, row, draft, { referenceMaps: state.referenceMaps, etabFlags: state.etabFlags, admin });
   } catch (error) {
     throw userFacing(error);
   }
@@ -330,7 +335,7 @@ async function reviewProfile(row, draft) {
 // Écrit ce que la personne a relu. Si la fiche a changé dans Grist depuis la relecture,
 // rien n'est écrit : la personne relit d'abord ce qui s'y trouve. Sinon l'annuaire est
 // relu, et on vérifie que Grist a gardé ce qu'on lui a demandé.
-async function saveReviewed(row, review, draft) {
+async function saveReviewed(row, review, draft, admin) {
   let result;
   try {
     result = await saveProfile(window.grist.docApi, review);
@@ -340,7 +345,7 @@ async function saveReviewed(row, review, draft) {
   if (result.status === 'changed') {
     return {
       status: 'changed',
-      review: await reviewProfile(row, draft),
+      review: await reviewProfile(row, draft, admin),
       notice: 'La fiche a changé dans Grist pendant la relecture. Relisez ce qui suit, puis validez à nouveau.'
     };
   }
@@ -358,17 +363,19 @@ function openProfile(rowId, returnFocus) {
   const rights = person ? state.rightsOf(person.row) : null;
   if (!rights) return;
   const { row } = person;
-  const model = profileFormModel(row, state.referenceMaps);
+  // L'e-mail et l'établissement ne se changent que depuis la fiche d'une autre personne.
+  const admin = rights === 'admin';
+  const model = profileFormModel(row, state.referenceMaps, { admin });
   profileDialog.open({
     mode: rights,
     person: { name: person.name || 'Sans nom', email: text(row.email), initials: initials(row) },
     etablissement: person.etablissement,
     model,
     draft: draftOf(model),
-    evaluate: draft => evaluateDraft(row, draft),
-    review: draft => reviewProfile(row, draft),
+    evaluate: draft => evaluateDraft(row, draft, admin),
+    review: draft => reviewProfile(row, draft, admin),
     hiddenNotice: visibility => describeHiddenFiche(visibility, { own: rights === 'own' }),
-    save: (review, draft) => saveReviewed(row, review, draft),
+    save: (review, draft) => saveReviewed(row, review, draft, admin),
     renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks),
     onClose: returnFocus
   });

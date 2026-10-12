@@ -30,9 +30,9 @@ async function world(options = {}) {
     ...fake, ...directory, tables, row,
     fail: names => { broken.tables = names; },
     // La fiche telle que le formulaire l'ouvre.
-    form: id => {
+    form: (id, { admin = false } = {}) => {
       const opened = structuredClone(row(id));
-      return { row: opened, draft: draftOf(profileFormModel(opened, directory.referenceMaps)) };
+      return { row: opened, draft: draftOf(profileFormModel(opened, directory.referenceMaps, { admin })) };
     },
     context: { referenceMaps: directory.referenceMaps, etabFlags: directory.etabFlags, log: quiet }
   };
@@ -40,10 +40,11 @@ async function world(options = {}) {
 
 const writes = w => w.calls.filter(call => ['AddRecord', 'UpdateRecord', 'RemoveRecord'].includes(call.action));
 
-// Ouvre le formulaire d'une fiche, y saisit `changes`, prépare la relecture.
-async function review(w, id, changes) {
-  const { row, draft } = w.form(id);
-  return prepareReview(w.docApi, row, { ...draft, ...changes }, w.context);
+// Ouvre le formulaire d'une fiche, y saisit `changes`, prépare la relecture. `admin` : un
+// administrateur modifie la fiche d'une autre personne (e-mail et établissement compris).
+async function review(w, id, changes, { admin = false } = {}) {
+  const { row, draft } = w.form(id, { admin });
+  return prepareReview(w.docApi, row, { ...draft, ...changes }, { ...w.context, admin });
 }
 
 // ===== buildRowUpdate =====
@@ -401,4 +402,131 @@ test('unsavedLabels is empty when Grist kept everything, and names the fields it
   // Grist a ignoré la fonction et le rôle, et remis la compétence retirée.
   const stubborn = { ...w.row(1), Fonction: 'Pharmacienne', Role_dans_le_PUI: 1, Competences: ['L', 1, 2, 3] };
   assert.deepEqual(unsavedLabels(next, stubborn, w.referenceMaps), ['Fonction', 'Rôle PUI', 'Compétences']);
+});
+
+// ===== L'administrateur qui change l'e-mail et l'établissement d'une autre personne =====
+
+test('buildRowUpdate writes the e-mail as a text and the établissement as a row id', async () => {
+  const w = await world();
+  const change = {
+    email: { avant: 'bob@u-bordeaux-montaigne.fr', apres: 'nouveau@u-bordeaux-montaigne.fr' },
+    Etablissement: { avant: { id: 2, label: 'UBM' }, apres: { id: 1, label: 'CHU' } }
+  };
+  assert.deepEqual(buildRowUpdate(change, w.row(2)).values, { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1 });
+  const noColumn = { ...w.row(2) };
+  delete noColumn.email;
+  assert.match(buildRowUpdate({ email: change.email }, noColumn).error, /E-mail : la colonne email n'existe pas dans BDD/);
+});
+
+test('prepareReview for an administrator shows the new address and the new établissement on the card after, and marks them', async () => {
+  const w = await world();
+  const next = await review(w, 2, { email: ' Nouveau@U-Bordeaux-Montaigne.fr ', Etablissement: 1 }, { admin: true });
+  assert.equal(next.admin, true);
+  assert.deepEqual(Object.keys(next.champs), ['email', 'Etablissement']);
+  assert.equal(next.before.email, 'bob@u-bordeaux-montaigne.fr');
+  assert.equal(next.after.email, 'nouveau@u-bordeaux-montaigne.fr');
+  assert.equal(next.before.etablissement_label, 'UBM');
+  assert.equal(next.after.etablissement_label, 'CHU');
+  assert.equal(next.after.etablissement_fondateur, true, 'la carte « après » prend les indicateurs du nouvel établissement');
+  assert.deepEqual(next.marks.texts, {
+    etab: { before: 'UBM', after: 'CHU' },
+    email: { before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@u-bordeaux-montaigne.fr' }
+  });
+  assert.deepEqual(next.lines.map(line => [line.key, line.before, line.after]), [
+    ['email', 'bob@u-bordeaux-montaigne.fr', 'nouveau@u-bordeaux-montaigne.fr'],
+    ['Etablissement', 'UBM', 'CHU']
+  ]);
+  assert.deepEqual(writes(w), []);
+});
+
+test('prepareReview says that a fiche moved to an établissement that has not validated its presence leaves the directory', async () => {
+  const w = await world();
+  const before = await review(w, 1, { Fonction: 'Cheffe' });
+  assert.equal(before.visibility.visible, true);
+  // INSERM (id 4) n'a pas validé sa présence : Ana disparaîtrait de l'annuaire.
+  const moved = await review(w, 1, { Etablissement: 4 }, { admin: true });
+  assert.equal(moved.visibility.visible, false);
+  assert.equal(moved.visibility.etablissement, 'not_validated');
+  // Un partenaire validé : Bob reste visible, mais seulement avec l'interrupteur Partenaires.
+  const partner = await review(w, 1, { Etablissement: 2 }, { admin: true });
+  assert.deepEqual([partner.visibility.visible, partner.visibility.partnerOnly], [true, true]);
+});
+
+test('prepareReview refuses an address that another fiche already holds, whatever its case, even when the form did not know', async () => {
+  const w = await world();
+  await assert.rejects(review(w, 2, { email: 'ANA.MARTIN@chu-bordeaux.fr' }, { admin: true }),
+    error => error instanceof ProfileSaveError && /rien à relire/.test(error.message));
+  // Le formulaire ne connaissait pas cette adresse : c'est la relecture de Grist qui la voit.
+  const { row, draft } = w.form(2, { admin: true });
+  w.tables.BDD.email[3] = 'libre@exemple.fr'; // Dan
+  await assert.rejects(prepareReview(w.docApi, row, { ...draft, email: 'libre@exemple.fr' }, { ...w.context, admin: true }), /rien à relire/);
+  assert.deepEqual(writes(w), []);
+  assert.equal((await review(w, 2, { email: 'encore.libre@exemple.fr' }, { admin: true })).after.email, 'encore.libre@exemple.fr');
+});
+
+test('prepareReview does not read the e-mail or the établissement of a draft unless an administrator is at work', async () => {
+  const w = await world();
+  const { row, draft } = w.form(2);
+  await assert.rejects(prepareReview(w.docApi, row, { ...draft, email: 'intrus@exemple.fr', Etablissement: 1 }, w.context),
+    error => error instanceof ProfileSaveError && /rien à relire/.test(error.message), 'rien d\'autre n\'est modifié : rien à relire');
+  const beside = await prepareReview(w.docApi, row, { ...draft, email: 'intrus@exemple.fr', Etablissement: 1, Fonction: 'Chef' }, w.context);
+  assert.deepEqual(Object.keys(beside.champs), ['Fonction'], 'ces deux champs sont écartés, le reste passe');
+  assert.equal(beside.admin, false);
+  assert.equal(beside.after.email, 'bob@u-bordeaux-montaigne.fr');
+});
+
+test('saveProfile writes the e-mail and the établissement beside the other columns in one single UpdateRecord', async () => {
+  const w = await world();
+  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1, Fonction: 'Chef' }, { admin: true });
+  const result = await saveProfile(w.docApi, next, { log: quiet });
+  assert.equal(result.status, 'saved');
+  assert.deepEqual(writes(w), [{
+    action: 'UpdateRecord', table: 'BDD', rowId: 2, ok: true,
+    values: { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1, Fonction: 'Chef' }
+  }]);
+  assert.equal(w.tables.BDD.email[1], 'nouveau@u-bordeaux-montaigne.fr');
+  assert.equal(w.tables.BDD.Etablissement[1], 1);
+});
+
+test('saveProfile refuses an address that another fiche took since the review, and writes nothing', async () => {
+  const w = await world();
+  const next = await review(w, 2, { email: 'convoite@exemple.fr' }, { admin: true });
+  w.tables.BDD.email[3] = 'Convoite@Exemple.fr'; // Dan a pris l'adresse entre-temps (sans toucher à la fiche de Bob)
+  await assert.rejects(saveProfile(w.docApi, next, { log: quiet }),
+    error => error instanceof ProfileSaveError && /Cette adresse e-mail est maintenant celle d'une autre fiche : rien n'a été modifié/.test(error.message));
+  assert.deepEqual(writes(w), []);
+});
+
+test('saveProfile gives the review back when somebody changed the e-mail or the établissement since it was read', async () => {
+  const w = await world();
+  const next = await review(w, 2, { Etablissement: 1 }, { admin: true });
+  w.tables.BDD.Etablissement[1] = 4;
+  const result = await saveProfile(w.docApi, next, { log: quiet });
+  assert.equal(result.status, 'changed', 'la signature couvre l\'établissement');
+  assert.deepEqual(writes(w), []);
+  const mail = await review(w, 2, { email: 'autre@exemple.fr' }, { admin: true });
+  w.tables.BDD.email[1] = 'ailleurs@exemple.fr';
+  assert.equal((await saveProfile(w.docApi, mail, { log: quiet })).status, 'changed', 'la signature couvre l\'e-mail');
+});
+
+test('saveProfile closed by default: a review that was not prepared for an administrator cannot write the e-mail or the établissement', async () => {
+  const w = await world();
+  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.fr' }, { admin: true });
+  for (const admin of [false, undefined, 'oui', 1]) {
+    await assert.rejects(saveProfile(w.docApi, { ...next, admin }, { log: quiet }),
+      error => error instanceof ProfileSaveError && /réservés à un administrateur/.test(error.message), JSON.stringify(admin));
+  }
+  const { admin, ...unmarked } = next;
+  await assert.rejects(saveProfile(w.docApi, unmarked, { log: quiet }), /réservés à un administrateur/);
+  assert.deepEqual(writes(w), []);
+});
+
+test('unsavedLabels notices an e-mail or an établissement that Grist did not keep', async () => {
+  const w = await world();
+  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1 }, { admin: true });
+  assert.deepEqual(unsavedLabels(next, w.row(2), w.referenceMaps), ['E-mail', 'Établissement']);
+  await saveProfile(w.docApi, next, { log: quiet });
+  const saved = tableToRows(w.tables.BDD).find(candidate => candidate.id === 2);
+  assert.deepEqual(unsavedLabels(next, saved, w.referenceMaps), []);
+  assert.deepEqual(unsavedLabels(next, { ...saved, Etablissement: 4 }, w.referenceMaps), ['Établissement']);
 });

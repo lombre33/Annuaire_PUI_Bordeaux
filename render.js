@@ -325,8 +325,16 @@ function buildCard(template, contact, onToggle, view = {}) {
   if (marks?.texts.fonction) showTextChange(fonction, marks.texts.fonction);
   else if (contact.Fonction) reveal(fonction, contact.Fonction);
 
-  fillEtablissement(card.querySelector('.etablissement-tag'), contact.etablissement_label, onToggle);
-  fillEmail(card.querySelector('.email'), contact.email, Boolean(onToggle));
+  const badge = card.querySelector('.etablissement-tag');
+  if (marks?.texts.etab) {
+    showTextChange(badge, marks.texts.etab);
+    badge.disabled = true;
+  } else {
+    fillEtablissement(badge, contact.etablissement_label, onToggle);
+  }
+  const email = card.querySelector('.email');
+  if (marks?.texts.email) showTextChange(email, marks.texts.email);
+  else fillEmail(email, contact.email, Boolean(onToggle));
 
   const tel = card.querySelector('.tel');
   const phone = formatPhone(contact.numero_de_telephone);

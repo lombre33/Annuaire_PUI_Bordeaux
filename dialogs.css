@@ -53,9 +53,13 @@ textarea {
   padding: 20px 22px 14px;
   border-bottom: 1px solid var(--line);
 }
+.dlg-head > div {
+  min-width: 0; /* sans cela, un nom sans espace plus large que le cadre élargit toute l'en-tête */
+}
 .dlg-head h2 {
   font-size: 20px;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 .dlg-head h2:focus {
   outline: none; /* le titre reçoit le focus à chaque étape, pour être annoncé : ce n'est pas un contrôle */
@@ -64,6 +68,7 @@ textarea {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .dlg-x {
   flex: none;
