@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.7.1 — Pannes de lecture Grist visibles, chargement unique, test navigateur
+
+Correctifs issus de l'audit qualité/sécurité. Aucun changement de règle
+d'affichage : les contacts affichés avec des données saines sont les mêmes
+qu'en 1.7.0 (vérifié par le test navigateur, voir ci-dessous).
+
+- **Plus de « 0 contact » trompeur** : une lecture Grist qui échoue
+  (Annuaire ou Etablissements illisibles, colonne `Etablissement2` ou
+  `perimetre_all` absente d'Annuaire) affiche un bandeau d'erreur explicite
+  (`#statusBanner`) au lieu d'un annuaire vide. Si des cartes sont déjà
+  affichées, elles restent en place ; le bandeau disparaît au chargement réussi
+  suivant.
+- **Annuaire vide expliqué** : quand la table contient des lignes mais
+  qu'aucun contact n'est affichable, le bandeau dit pourquoi (`perimetre_all`
+  vide partout, `Etablissement2` vide partout, ou aucun établissement validé).
+- **Table de référence illisible** (Actions, GT, Instances...) : on réutilise
+  ses libellés du chargement précédent et le bandeau le signale. Avant, la
+  table devenait vide en silence : les tags disparaissaient et les filtres
+  cochés étaient effacés par `pruneStaleFilters()`.
+- **Acronymes d'établissement en double** : deux lignes d'Etablissements de
+  même acronyme et de statuts différents ne se départagent plus par leur ordre
+  dans la table. On garde le plus strict (contacts masqués dans le doute) et le
+  bandeau le signale.
+- **Table Etablissements lue une seule fois** par chargement (elle l'était
+  deux fois, pour les libellés puis pour les indicateurs). Nouvelle fonction
+  `loadDirectory()` (grist-data.js) : lit toutes les tables, construit les
+  contacts et renvoie les problèmes à signaler. `fetchTable()` et
+  `fetchEtablissementsFlags()` sont remplacées par `labelMapFromRows()` et
+  `etablissementFlagsFromRows()` (pures, sans lecture).
+- **Lien mailto** : créé seulement pour une adresse simple. Une adresse saisie
+  avec `?cc=...`, plusieurs destinataires ou des espaces reste affichée en
+  texte, sans lien (`mailtoHref()`).
+- **Console** : le diagnostic des contacts sans `Etablissement2` liste les
+  identifiants de ligne Grist (plus les adresses email).
+- **Recherche interne des menus de filtre** insensible aux accents, comme la
+  recherche principale (`normalize()`).
+- **Tests** : 56 tests unitaires (la 1.7.0 en annonçait 45 pour 44 réels) et
+  20 scénarios dans un vrai navigateur (`tests/e2e.test.mjs`, Playwright
+  optionnel, API Grist simulée, données de `tests/fixtures.mjs`). Workflow
+  GitHub Actions `tests.yml` qui les exécute sur chaque PR.
+
+Mesure (pas de correctif) : taper dans la recherche coûte 10 à 17 ms à
+500 lignes d'Annuaire et 45 à 65 ms à 2 000 lignes ; pas de debounce
+nécessaire à l'échelle actuelle.
+
 ## 1.7.0 — Défaut Partenaires désactivé, en-tête PUI Bordeaux, compteurs par option
 
 - **Scope Fondateurs/Partenaires** : "Partenaires" est désormais décoché par

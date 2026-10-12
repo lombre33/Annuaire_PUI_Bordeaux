@@ -1,12 +1,11 @@
 # Protocole de test
 
-Ce widget n'a pas de test end-to-end automatisé contre une vraie instance
-Grist (voir "Pourquoi pas d'E2E automatisé" plus bas). Ce document est le
-protocole de test **manuel**, à exécuter dans Grist avant tout déploiement
-qui touche `main.js`, `render.js`, `index.html` ou `style.css` — c'est-à-dire
-tout ce que `node --test` ne peut pas exercer. Pour un changement limité à
-`grist-data.js`/`filters.js` (fonctions pures), les tests automatisés
-suffisent à condition d'être complétés pour le changement (voir plus bas).
+Ce widget n'a pas de test automatisé contre une vraie instance Grist (voir
+« Tests automatisés » plus bas pour ce qui est couvert avec une API Grist
+simulée). Ce document est le protocole de test **manuel**, à exécuter dans
+Grist avant tout déploiement qui touche `main.js`, `render.js`, `index.html`
+ou `style.css`. Pour un changement limité à `grist-data.js`/`filters.js`, les
+tests automatisés suffisent à condition d'être complétés pour le changement.
 
 ## Tests automatisés
 
@@ -14,29 +13,35 @@ suffisent à condition d'être complétés pour le changement (voir plus bas).
 node --test
 ```
 
-Couvrent (`tests/data.test.mjs`) : `text`, `normalize`, `compareLabels`,
-`formatPhone`, `safeValues`, `tableToRows`, `pickLabel`, `refId`, `refLabel`,
-`fetchTable` (succès, repli multi-colonnes, erreur réseau), `enrich`
-(établissement dans ses 3 encodages, rôle, catégories liste, compétences),
-`isInScope`, `filterContacts`, `createEmptyFilterState`, `pruneStaleFilters`,
-`createRequestSequencer`, `referenceMapsEqual`.
+Sans dépendance : tests unitaires de `tests/data.test.mjs` — `text`,
+`normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
+`pickLabel`, `labelMapFromRows`, `etablissementFlagsFromRows` (dont les
+doublons), `refId`, `refLabel`, `mailtoHref`, `enrich` (établissement dans ses
+3 encodages, rôle, catégories liste, compétences), `isInScope`,
+`filterContacts`, `createEmptyFilterState`, `pruneStaleFilters`,
+`createRequestSequencer`, `referenceMapsEqual`, et `loadDirectory()` avec un
+faux `docApi` (une lecture par table, tables indispensables illisibles, table
+de référence illisible, colonnes manquantes, annuaire vide expliqué).
 
-Ne couvrent pas (structurellement, par choix d'architecture) : tout ce qui
-touche `window.grist` ou le DOM réel — `main.js` (câblage, debounce,
-sequencer *en conditions réelles*, `onRecords`) et `render.js` (construction
-DOM). C'est le rôle du protocole manuel ci-dessous.
+Avec Playwright (`npm install --no-save playwright`, puis
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 20
+scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs` :
+nombre de contacts et badge `Etablissement2` de chaque carte, interrupteurs
+Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
+sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées).
+`CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
+scénarios sont ignorés.
 
-Si vous ajoutez une fonction pure à `grist-data.js` ou `filters.js` : ajoutez
-son test dans `tests/data.test.mjs` avant de considérer le travail fini —
-n'attendez pas une revue ultérieure pour le faire.
+Limite assumée : l'API Grist y est simulée (`docApi.fetchTable` sur des
+données aux encodages observés en production). Le test garantit que le vrai
+`main.js`/`render.js` réagissent correctement à ces encodages et à ces pannes ;
+il ne garantit pas que Grist envoie toujours ces formes — d'où le protocole
+manuel ci-dessous, à jouer dans un vrai document avant déploiement.
 
-## Pourquoi pas d'E2E automatisé
-
-Le widget appelle `window.grist`, qui n'existe que dans un document Grist
-réel (pont iframe/postMessage, voir `grist-plugin-api.js`). Le simuler
-fidèlement demanderait soit une dépendance supplémentaire (le projet est
-volontairement à zéro dépendance npm), soit un mock qui ne testerait au
-final que le mock. Le protocole manuel ci-dessous compense ce vide.
+Si vous ajoutez une fonction à `grist-data.js` ou `filters.js` : ajoutez son
+test dans `tests/data.test.mjs`. Si vous changez l'affichage, ajoutez ou
+adaptez un scénario de `tests/e2e.test.mjs` — n'attendez pas une revue
+ultérieure.
 
 ## Préparation
 
@@ -184,10 +189,10 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       contacts modifiés (pas un état intermédiaire ou partiel).
 - [ ] **Référence orpheline** : si un contact a une valeur `Etablissement`
       qui ne résout à aucun libellé (ni `Etablissement2` renseigné), la
-      console doit afficher un `[ETABLISSEMENT] ... référence orpheline`
-      listant ce contact — et sa carte ne doit pas afficher de badge
-      établissement (ni de tag portant un id numérique brut, pour aucune
-      catégorie).
+      console doit afficher un `[ETABLISSEMENT] ... sans Etablissement2`
+      listant l'identifiant de ligne de ce contact (pas son email) — et il
+      n'apparaît pas dans la grille (aucun indicateur d'établissement à faire
+      valoir), ni aucun tag portant un id numérique brut.
 
 ## 8. Cas limites de données
 
@@ -209,3 +214,18 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 - [ ] Redimensionner/recharger le widget plusieurs fois de suite → pas
       d'accumulation d'erreurs ni de comportement différent au 2e/3e
       chargement (sanity check sur le `debounce`/`sequencer`).
+
+## 10. Bandeau d'état (1.7.1)
+
+À jouer sur une **copie** du document, jamais sur le document de production :
+
+- [ ] Chargement normal : aucun bandeau rouge sous la barre d'outils.
+- [ ] Renommer temporairement la table `Etablissements`, recharger le widget :
+      bandeau « Impossible de charger l'annuaire depuis Grist (table
+      « Etablissements » illisible) », compteur « Chargement impossible ». Une
+      fois la table remise sous son nom, recharger : le bandeau disparaît.
+- [ ] Renommer temporairement la table `Actions`, recharger : les cartes
+      restent affichées et le bandeau signale « Tables illisibles (Actions) ».
+- [ ] Après modification de `ok_pour_apparaitre` dans `Etablissements`,
+      **recharger le widget** (Grist ne le prévient pas, voir README « Limites
+      connues ») puis vérifier le nombre de contacts et le badge de chaque carte.

@@ -1,7 +1,7 @@
-# Version 1.7.0 — Défaut Partenaires désactivé, en-tête PUI Bordeaux, compteurs par option (voir CHANGELOG.md)
+# Version 1.7.1 — Pannes de lecture Grist visibles, chargement unique, test navigateur (voir CHANGELOG.md)
 
-"Partenaires" est décoché par défaut au chargement (Fondateurs reste coché),
-et "Réinitialiser" ne touche plus ces 2 interrupteurs. Nouvel en-tête "PUI
-Bordeaux" / "Annuaire des accompagnateurs de l'innovation" / "Pas de mauvaise
-porte, toujours le bon interlocuteur". Chaque option d'un menu de filtre
-affiche désormais le nombre de cartes qui y correspondraient.
+Un échec de lecture Grist ou une colonne manquante affiche désormais un
+bandeau explicite au lieu d'un « 0 contact » silencieux. Les tables sont lues
+une seule fois par chargement, les acronymes d'établissement en double ne
+dépendent plus de leur ordre, et le lien mailto n'est créé que pour une adresse
+simple. 76 tests (dont 20 dans un vrai navigateur, optionnels sans Playwright).
