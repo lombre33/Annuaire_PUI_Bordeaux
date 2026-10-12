@@ -33,10 +33,16 @@ export function sortWithCheckedFirst(sortedValues, selected) {
   return [...checked, ...unchecked];
 }
 
+// Cellule Grist non renseignée : vide, ou 0 (valeur d'une Référence sans cible
+// et d'un Numeric vide).
+function isBlank(value) {
+  return value === null || value === undefined || value === '' || value === 0;
+}
+
 // numero_de_telephone est Numeric dans Grist, qui perd le 0 initial (556789012).
 // On le rétablit ; un format inattendu est renvoyé tel quel plutôt que déformé.
 export function formatPhone(value) {
-  if (value === null || value === undefined || value === '' || value === 0) return '';
+  if (isBlank(value)) return '';
   const raw = text(value);
   const digits = raw.replace(/\D/g, '');
   if (/^\d{9}$/.test(digits)) return `0${digits}`.match(/.{1,2}/g).join(' ');
@@ -47,10 +53,8 @@ export function formatPhone(value) {
 // Grist encode une liste ['L', item1, item2, ...] : une liste vide vaut ['L']
 // (longueur 1). Il faut retirer le marqueur pour savoir si elle contient quelque chose.
 export function safeValues(value) {
-  if (Array.isArray(value)) {
-    return value.filter(item => item !== 'L' && item !== null && item !== undefined && item !== 0 && item !== '');
-  }
-  return value === null || value === undefined || value === '' || value === 0 ? [] : [value];
+  if (Array.isArray(value)) return value.filter(item => item !== 'L' && !isBlank(item));
+  return isBlank(value) ? [] : [value];
 }
 
 // Table Grist en colonnes ({ id: [...], Nom: [...] }) → tableau de lignes.
