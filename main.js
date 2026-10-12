@@ -6,7 +6,7 @@
 // profile-ui.js (la fenêtre).
 
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, text } from './grist-data.js';
-import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
+import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { describeHiddenFiche, describePresence, setPresence, PresenceError } from './presence.js';
@@ -69,6 +69,14 @@ function toggleFilter(filterKey, value) {
   refreshCards();
 }
 
+// La case d'un groupe de menu (un domaine de compétences) coche ou décoche toutes ses
+// valeurs d'un coup : une seule mise à jour des cartes, pas une par valeur.
+function toggleFilterGroup(filterKey, values) {
+  toggleGroup(state.activeFilters[filterKey], values);
+  updateFilterUI(elements.filtersContainer, filterKey, state.activeFilters);
+  refreshCards();
+}
+
 // Chaque option de menu affiche le nombre de cartes qu'elle donnerait si on la
 // cochait, compte tenu des autres filtres actifs : recalculé à chaque changement.
 function currentCounts() {
@@ -76,7 +84,8 @@ function currentCounts() {
 }
 
 function rebuildFilterUI() {
-  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter, currentCounts());
+  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters,
+    { onToggle: toggleFilter, onToggleGroup: toggleFilterGroup }, currentCounts());
 }
 
 function refreshCards() {

@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { text, normalize } from '../grist-data.js';
+import { text, normalize, enrich } from '../grist-data.js';
+import { FILTERS } from '../constants.js';
 import {
-  filterContacts, createEmptyFilterState, pruneStaleFilters, computeFilterCounts
+  filterContacts, createEmptyFilterState, pruneStaleFilters, computeFilterCounts,
+  menuGroups, groupState, toggleGroup, selectionCount
 } from '../filters.js';
 
 test('filterContacts applies the free-text search on nom/prenom', () => {
@@ -138,25 +140,78 @@ test('computeFilterCounts keys are normalized (case/accent-insensitive), matchin
   assert.equal(counts.competences[normalize('Oncologie')], 1, 'le tally doit matcher un libellé de référence "Oncologie" malgré la casse différente');
 });
 
-// ===== Compétences macro : un filtre de plus, sans toucher au détail =====
+// ===== Compétences et domaines : un seul menu, un seul filtre =====
+// Les domaines (compétences macro) rangent le menu Compétences : cocher un domaine coche
+// toutes ses compétences. Le filtre ne connaît que des compétences.
 
-test('filterContacts: the macro skills filter keeps the contacts with a skill in any selected domain, and combines with the detailed skills', () => {
+const competencesFilter = FILTERS.find(filter => filter.key === 'competences');
+const names = contacts => contacts.map(contact => contact.nom);
+
+// Les libellés d'une table Competences : id → libellé, id → domaine (le repli « Autres »
+// est déjà posé, comme le fait loadDirectory).
+const SKILLS = {
+  competences: { 1: 'Oncologie', 2: 'Hématologie', 3: 'Pharmacovigilance', 4: 'Divers', 5: 'Radiothérapie' },
+  macro: { 1: 'Cancérologie', 2: 'Cancérologie', 3: 'Pharmacie', 4: 'Autres', 5: 'Cancérologie' }
+};
+
+test('createEmptyFilterState has no filter of its own for the domains: they are groups of the skills menu', () => {
+  assert.deepEqual(Object.keys(createEmptyFilterState()),
+    ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement']);
+});
+
+test('ticking a domain keeps the contacts with at least one skill in it, exactly like the former « Domaines » filter', () => {
+  // Chaque contact est enrichi comme dans l'annuaire : ses domaines se déduisent de ses compétences.
   const contacts = [
-    { nom: 'A', labels: { macro: ['Cancérologie'], competences: ['Oncologie', 'Hématologie'] } },
-    { nom: 'B', labels: { macro: ['Pharmacie', 'Cancérologie'], competences: ['Pharmacovigilance', 'Oncologie'] } },
-    { nom: 'C', labels: { macro: ['Autres'], competences: ['Divers'] } }
+    { nom: 'A', Competences: ['L', 1, 2] },
+    { nom: 'B', Competences: ['L', 3, 1] },
+    { nom: 'C', Competences: ['L', 4] },
+    { nom: 'D', Competences: ['L'] },
+    { nom: 'E', Competences: ['L', 5] }
+  ].map(contact => enrich(contact, SKILLS));
+  const groups = menuGroups(competencesFilter, SKILLS);
+  assert.deepEqual(groups.map(group => group.label), ['Cancérologie', 'Pharmacie', 'Autres']);
+
+  groups.forEach(group => {
+    const activeFilters = createEmptyFilterState();
+    toggleGroup(activeFilters.competences, group.values);
+    assert.deepEqual(names(filterContacts(contacts, activeFilters, '')),
+      names(contacts.filter(contact => contact.labels.macro.includes(group.label))),
+      `cocher « ${group.label} » donne les contacts de ce domaine, ni plus ni moins`);
+  });
+  assert.deepEqual(names(contacts.filter(contact => contact.labels.macro.length === 0)), ['D'], 'sans compétence, aucun domaine : la personne n\'est dans aucun groupe');
+});
+
+test('domains add up (OU), skills add up with them, and the whole still combines (ET) with the other filters', () => {
+  const contacts = [
+    { nom: 'A', labels: { competences: ['Oncologie', 'Hématologie'], instances: ['CME'] } },
+    { nom: 'B', labels: { competences: ['Pharmacovigilance', 'Oncologie'], instances: ['COVIRIS'] } },
+    { nom: 'C', labels: { competences: ['Divers'], instances: ['CME'] } },
+    { nom: 'D', labels: { competences: ['Radiothérapie'], instances: ['CME'] } }
   ];
   const activeFilters = createEmptyFilterState();
-  activeFilters.macro.add('Pharmacie');
-  activeFilters.macro.add('Autres');
-  assert.deepEqual(filterContacts(contacts, activeFilters, '').map(c => c.nom), ['B', 'C'], 'OU entre domaines');
+  toggleGroup(activeFilters.competences, ['Pharmacovigilance']); // le domaine Pharmacie
+  toggleGroup(activeFilters.competences, ['Divers']); // le domaine Autres
+  assert.deepEqual(names(filterContacts(contacts, activeFilters, '')), ['B', 'C'], 'OU entre deux domaines');
 
-  activeFilters.macro.clear();
-  activeFilters.macro.add('Cancérologie');
-  assert.deepEqual(filterContacts(contacts, activeFilters, '').map(c => c.nom), ['A', 'B']);
+  activeFilters.competences.add('Radiothérapie'); // une compétence seule, d'un autre domaine
+  assert.deepEqual(names(filterContacts(contacts, activeFilters, '')), ['B', 'C', 'D'], 'une compétence s\'ajoute aux domaines cochés');
 
-  activeFilters.competences.add('Hématologie');
-  assert.deepEqual(filterContacts(contacts, activeFilters, '').map(c => c.nom), ['A'], 'ET avec le détail : le détail reste filtrable');
+  activeFilters.instances.add('CME');
+  assert.deepEqual(names(filterContacts(contacts, activeFilters, '')), ['C', 'D'], 'ET avec un autre filtre');
+});
+
+test('a domain ticked then partly unticked keeps only the contacts of the skills still ticked', () => {
+  const contacts = [
+    { nom: 'A', labels: { competences: ['Oncologie'] } },
+    { nom: 'B', labels: { competences: ['Hématologie'] } },
+    { nom: 'C', labels: { competences: ['Radiothérapie'] } }
+  ];
+  const activeFilters = createEmptyFilterState();
+  const cancerology = menuGroups(competencesFilter, SKILLS)[0].values;
+  toggleGroup(activeFilters.competences, cancerology);
+  assert.deepEqual(names(filterContacts(contacts, activeFilters, '')), ['A', 'B', 'C']);
+  activeFilters.competences.delete('Hématologie');
+  assert.deepEqual(names(filterContacts(contacts, activeFilters, '')), ['A', 'C']);
 });
 
 test('computeFilterCounts counts a contact once per domain, whatever the number of its skills in that domain', () => {
@@ -167,20 +222,139 @@ test('computeFilterCounts counts a contact once per domain, whatever the number 
   const counts = computeFilterCounts(contacts, createEmptyFilterState(), '', undefined);
   assert.deepEqual(counts.macro, { cancerologie: 2, pharmacie: 1 });
   assert.equal(counts.competences.oncologie, 2);
-
-  const activeFilters = createEmptyFilterState();
-  activeFilters.competences.add('Pharmacovigilance');
-  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', undefined).macro, { cancerologie: 1, pharmacie: 1 },
-    'les domaines tiennent compte des compétences cochées');
 });
 
-test('pruneStaleFilters drops a selected domain that no longer exists, and keeps the detailed skills untouched', () => {
+test('the count of a domain ignores the skills ticked in its own menu, but not the other filters, the search or the scope', () => {
+  const contacts = [
+    { nom: 'Alice', labels: { macro: ['Cancérologie'], competences: ['Oncologie'], instances: ['CME'] }, etablissement_fondateur: true },
+    { nom: 'Bob', labels: { macro: ['Cancérologie', 'Pharmacie'], competences: ['Oncologie', 'Pharmacovigilance'], instances: ['COVIRIS'] }, etablissement_partenaire: true },
+    { nom: 'Chloe', labels: { macro: ['Pharmacie'], competences: ['Pharmacovigilance'], instances: ['CME'] }, etablissement_fondateur: true }
+  ];
+  const scope = { fondateur: true, partenaire: true };
   const activeFilters = createEmptyFilterState();
-  activeFilters.macro.add('Ancien domaine');
-  activeFilters.macro.add('Cancérologie');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).macro, { cancerologie: 2, pharmacie: 2 });
+
+  // Cocher une compétence du menu ne change pas le nombre de cartes de son domaine : ce
+  // nombre dit ce que donnerait le domaine, comme celui d'une compétence ignore sa propre sélection.
   activeFilters.competences.add('Oncologie');
-  const referenceMaps = { macro: { 1: 'Cancérologie' }, competences: { 1: 'Oncologie' } };
-  const pruned = pruneStaleFilters(activeFilters, referenceMaps);
-  assert.deepEqual([...pruned.macro], ['Cancérologie']);
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).macro, { cancerologie: 2, pharmacie: 2 });
+
+  // Un autre filtre, la recherche et l'interrupteur Fondateurs/Partenaires s'appliquent bien.
+  activeFilters.instances.add('CME');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).macro, { cancerologie: 1, pharmacie: 1 }, 'autre filtre');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, 'chlo', scope).macro, { pharmacie: 1 }, 'recherche');
+  assert.deepEqual(computeFilterCounts(contacts, createEmptyFilterState(), '', { fondateur: true, partenaire: false }).macro,
+    { cancerologie: 1, pharmacie: 1 }, 'interrupteur');
+});
+
+test('computeFilterCounts tallies the domains with the same keys as the filtering: case and accents ignored', () => {
+  const contacts = [{ nom: 'A', labels: { macro: ['cancérologie'], competences: ['Oncologie'] } }];
+  const counts = computeFilterCounts(contacts, createEmptyFilterState(), '', undefined);
+  assert.equal(counts.macro[normalize('Cancérologie')], 1);
+});
+
+test('pruneStaleFilters drops a ticked skill that no longer exists, whatever domain it was in', () => {
+  const activeFilters = createEmptyFilterState();
+  activeFilters.competences.add('Ancienne compétence');
+  activeFilters.competences.add('Oncologie');
+  const pruned = pruneStaleFilters(activeFilters, { competences: { 1: 'Oncologie' }, macro: { 1: 'Cancérologie' } });
   assert.deepEqual([...pruned.competences], ['Oncologie']);
+  assert.ok(!('macro' in pruned), 'pas de sélection de domaine à purger : le domaine n\'est pas une valeur du filtre');
+});
+
+// ===== Les groupes du menu =====
+
+test('menuGroups ranges the skills by domain: domains sorted, « Autres » last, skills sorted in each', () => {
+  const groups = menuGroups(competencesFilter, {
+    competences: { 1: 'Zoologie', 2: 'Écologie', 3: 'Biologie', 4: 'Divers', 5: 'Chimie' },
+    macro: { 1: 'Vivant', 2: 'Vivant', 3: 'Vivant', 4: 'Autres', 5: 'Sciences' }
+  });
+  assert.deepEqual(groups, [
+    { label: 'Sciences', values: ['Chimie'] },
+    { label: 'Vivant', values: ['Biologie', 'Écologie', 'Zoologie'] },
+    { label: 'Autres', values: ['Divers'] }
+  ], 'tri alphabétique français : « Écologie » entre « Biologie » et « Zoologie »');
+});
+
+test('menuGroups keeps the fallback group last and files an unclassified skill in it, whatever the spelling of « Autres »', () => {
+  const groups = menuGroups(competencesFilter, {
+    competences: { 1: 'Alpha', 2: 'Beta', 3: 'Gamma' },
+    macro: { 1: 'autres', 2: 'Zèbre' } // la ligne 3 n'est pas classée du tout
+  });
+  assert.deepEqual(groups, [
+    { label: 'Zèbre', values: ['Beta'] },
+    { label: 'autres', values: ['Alpha', 'Gamma'] }
+  ], 'un seul groupe de repli, écrit comme la plus petite ligne, rejeté en dernier malgré son initiale');
+});
+
+test('menuGroups merges two spellings of a domain into one group, like the counts do', () => {
+  const groups = menuGroups(competencesFilter, {
+    competences: { 1: 'Oncologie', 2: 'Hématologie' },
+    macro: { 1: 'Cancérologie', 2: 'cancerologie' }
+  });
+  assert.deepEqual(groups, [{ label: 'Cancérologie', values: ['Hématologie', 'Oncologie'] }]);
+});
+
+test('menuGroups lists a skill once per domain, and twice when its label is written on rows of two domains', () => {
+  const groups = menuGroups(competencesFilter, {
+    competences: { 1: 'Gestion', 2: 'Gestion', 3: 'Gestion', 4: 'Droit' },
+    macro: { 1: 'Pilotage', 2: 'Pilotage', 3: 'Achats', 4: 'Achats' }
+  });
+  assert.deepEqual(groups, [
+    { label: 'Achats', values: ['Droit', 'Gestion'] },
+    { label: 'Pilotage', values: ['Gestion'] }
+  ]);
+});
+
+test('menuGroups leaves a menu flat when the category has no grouping, or Grist gives none', () => {
+  const maps = { actions: { 1: 'Vaccination' }, competences: { 1: 'Oncologie' }, macro: { 1: 'Cancérologie' } };
+  assert.equal(menuGroups(FILTERS.find(filter => filter.key === 'actions'), maps), null, 'Actions n\'a pas de regroupement');
+  assert.equal(menuGroups(competencesFilter, { competences: { 1: 'Oncologie' }, macro: {} }), null, 'colonne de domaine absente : menu plat');
+  assert.equal(menuGroups(competencesFilter, { competences: { 1: 'Oncologie' } }), null, 'aucune lecture du regroupement');
+  assert.equal(menuGroups(competencesFilter, { competences: {}, macro: {} }), null);
+  assert.deepEqual(menuGroups(competencesFilter, maps), [{ label: 'Cancérologie', values: ['Oncologie'] }]);
+});
+
+test('groupState tells whether none, some or all of the values of a group are ticked', () => {
+  const values = ['A', 'B', 'C'];
+  assert.equal(groupState(new Set(), values), 'none');
+  assert.equal(groupState(new Set(['X']), values), 'none', 'une valeur d\'ailleurs ne compte pas');
+  assert.equal(groupState(new Set(['A']), values), 'some');
+  assert.equal(groupState(new Set(['A', 'C', 'X']), values), 'some');
+  assert.equal(groupState(new Set(['C', 'A', 'B']), values), 'all');
+});
+
+test('toggleGroup ticks all the values of a group, completes a partial group, and unticks a complete one — touching nothing else', () => {
+  const selected = new Set(['Ailleurs']);
+  toggleGroup(selected, ['A', 'B', 'C']);
+  assert.deepEqual([...selected].sort(), ['A', 'Ailleurs', 'B', 'C'], 'vide → complet');
+  selected.delete('B');
+  toggleGroup(selected, ['A', 'B', 'C']);
+  assert.deepEqual([...selected].sort(), ['A', 'Ailleurs', 'B', 'C'], 'partiel → complet, pas vide');
+  toggleGroup(selected, ['A', 'B', 'C']);
+  assert.deepEqual([...selected], ['Ailleurs'], 'complet → vide, sans toucher aux autres groupes');
+});
+
+test('selectionCount counts a whole domain once and every other ticked skill once, so ticking a domain shows 1, not 12', () => {
+  const groups = [
+    { label: 'Cancérologie', values: ['Oncologie', 'Hématologie', 'Radiothérapie'] },
+    { label: 'Pharmacie', values: ['Pharmacovigilance', 'Galénique'] },
+    { label: 'Autres', values: ['Divers'] }
+  ];
+  assert.equal(selectionCount(new Set(), groups), 0);
+  assert.equal(selectionCount(new Set(['Oncologie', 'Hématologie', 'Radiothérapie']), groups), 1, 'un domaine entier');
+  assert.equal(selectionCount(new Set(['Oncologie', 'Hématologie']), groups), 2, 'deux compétences d\'un domaine partiel');
+  assert.equal(selectionCount(new Set(['Oncologie', 'Hématologie', 'Radiothérapie', 'Galénique']), groups), 2, 'un domaine entier et une compétence');
+  assert.equal(selectionCount(new Set(['Divers']), groups), 1, 'un domaine d\'une seule compétence');
+  assert.equal(selectionCount(new Set(['Oncologie', 'Disparue']), groups), 2, 'une valeur sans groupe compte aussi');
+  assert.equal(selectionCount(new Set(['Oncologie', 'Hématologie']), null), 2, 'menu plat : les valeurs cochées');
+});
+
+test('selectionCount counts a skill written under two domains once', () => {
+  const groups = [
+    { label: 'Achats', values: ['Droit', 'Gestion'] },
+    { label: 'Pilotage', values: ['Gestion'] }
+  ];
+  assert.equal(selectionCount(new Set(['Gestion']), groups), 1, 'le domaine Pilotage est complet, Gestion n\'est pas recomptée à part');
+  assert.equal(selectionCount(new Set(['Droit', 'Gestion']), groups), 2, 'Achats et Pilotage entiers');
 });
