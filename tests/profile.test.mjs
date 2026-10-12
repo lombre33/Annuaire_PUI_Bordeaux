@@ -291,12 +291,30 @@ test('rightsFor lets a person edit their own fiche, whatever the case and spaces
   assert.equal(rights(rowOf(10)), null, 'une fiche sans adresse n\'est la fiche de personne');
 });
 
-test('rightsFor lets an administrator edit every fiche, and tells her own from the others', () => {
-  const rights = rightsFor(ready('ana.martin@chu-bordeaux.fr', true));
+test('rightsFor lets an administrator edit every fiche once the admin mode is on, and tells her own from the others', () => {
+  const rights = rightsFor(ready('ana.martin@chu-bordeaux.fr', true), { adminMode: true });
   assert.equal(rights(rowOf(1)), 'own');
   assert.equal(rights(rowOf(2)), 'admin');
   assert.equal(rights(rowOf(10)), 'admin', 'même une fiche sans adresse');
-  assert.equal(rightsFor(ready('admin@chu-bordeaux.fr', true))(rowOf(1)), 'admin', 'une administratrice sans fiche');
+  assert.equal(rightsFor(ready('admin@chu-bordeaux.fr', true), { adminMode: true })(rowOf(1)), 'admin', 'une administratrice sans fiche');
+});
+
+test('rightsFor gives an administrator no more than anybody else while the admin mode is off', () => {
+  for (const rights of [rightsFor(ready('ana.martin@chu-bordeaux.fr', true)), rightsFor(ready('ana.martin@chu-bordeaux.fr', true), { adminMode: false }),
+    rightsFor(ready('ana.martin@chu-bordeaux.fr', true), {})]) {
+    assert.equal(rights(rowOf(1)), 'own', 'sa propre fiche reste modifiable');
+    assert.equal(rights(rowOf(2)), null, 'celle d\'un autre ne l\'est pas sans le mode admin');
+    assert.equal(rights(rowOf(10)), null);
+  }
+  assert.equal(rightsFor(ready('admin@chu-bordeaux.fr', true))(rowOf(1)), null, 'une administratrice sans fiche n\'a rien à modifier');
+});
+
+test('rightsFor never grants the admin right for an admin mode that is not exactly true, or to somebody who is not an administrator', () => {
+  for (const adminMode of [1, 'true', 'oui', {}, [], null, undefined]) {
+    assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', true), { adminMode })(rowOf(2)), null, JSON.stringify(adminMode));
+  }
+  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', false), { adminMode: true })(rowOf(2)), null, 'le mode ne fait pas un administrateur');
+  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', false), { adminMode: true })(rowOf(1)), 'own');
 });
 
 test('rightsFor is closed by default: no reliable identity, no right, administrator flag or not', () => {
@@ -304,18 +322,19 @@ test('rightsFor is closed by default: no reliable identity, no right, administra
   for (const identity of [null, undefined, {}, { ...hostile, status: 'unavailable' }, { ...hostile, status: 'viewer' }, { ...hostile, status: 'pending' }]) {
     assert.equal(rightsFor(identity)(rowOf(1)), null, JSON.stringify(identity));
     assert.equal(rightsFor(identity)(rowOf(2)), null, JSON.stringify(identity));
+    assert.equal(rightsFor(identity, { adminMode: true })(rowOf(2)), null, `${JSON.stringify(identity)} même en mode admin`);
   }
 });
 
 test('rightsFor takes only a real true for an administrator, and never matches an empty address', () => {
   for (const admin of [1, 'true', 'oui', {}, [], 'admin']) {
-    assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', admin))(rowOf(2)), null, JSON.stringify(admin));
+    assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', admin), { adminMode: true })(rowOf(2)), null, JSON.stringify(admin));
   }
   const blank = rightsFor(ready('   '));
   assert.equal(blank(rowOf(10)), null, 'une adresse vide ne désigne pas les fiches sans adresse');
   assert.equal(blank(rowOf(1)), null);
   assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr'))(null), null);
-  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', true))(undefined), null);
+  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', true), { adminMode: true })(undefined), null);
 });
 
 // ===== rebaseChanges : ramener ce que la personne a changé sur la fiche d'aujourd'hui =====

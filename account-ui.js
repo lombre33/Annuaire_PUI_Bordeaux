@@ -1,34 +1,39 @@
 // Bandeau « Ma présence » : la personne connectée voit sa situation dans
 // l'annuaire et la change d'un clic ; elle ouvre de là la modification de sa fiche.
-// DOM seulement ; presence.js décrit la situation et décide du message.
+// Un administrateur y allume aussi le « mode admin ». DOM seulement ; presence.js
+// décrit la situation et décide du message.
 
 const noop = () => {};
 
 // `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
 // personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
-// par le bouton « Modifier mon profil ».
-export function createAccountBar(root, { onToggle, onEdit = noop }) {
+// par le bouton « Modifier mon profil ». `onAdminMode` : appelé par le bouton « Mode admin ».
+export function createAccountBar(root, { onToggle, onEdit = noop, onAdminMode = noop }) {
   const part = selector => root.querySelector(selector);
   const avatar = part('.account-avatar');
   const name = part('.account-name');
   const detail = part('.account-detail');
   const switchButton = part('.presence-switch');
   const editButton = part('.account-edit');
+  const adminButton = part('.account-admin');
   const status = part('.account-status');
 
   switchButton.addEventListener('click', () => {
     if (!switchButton.disabled) onToggle();
   });
   editButton.addEventListener('click', () => onEdit());
+  adminButton.addEventListener('click', () => onAdminMode());
 
   return {
-    // `view` : { name, initials, accepted, tone, message } (voir describePresence).
+    // `view` : { name, initials, accepted, tone, message } (voir describePresence) et,
+    // pour un compte qui n'a pas de fiche, `switchable: false` (pas d'interrupteur à montrer).
     show(view) {
       avatar.textContent = view.initials;
       name.textContent = view.name;
       detail.textContent = view.message;
       detail.dataset.tone = view.tone;
       switchButton.setAttribute('aria-checked', String(view.accepted));
+      switchButton.hidden = view.switchable === false;
       root.hidden = false;
     },
 
@@ -36,10 +41,16 @@ export function createAccountBar(root, { onToggle, onEdit = noop }) {
       root.hidden = true;
     },
 
-    // Le bouton « Modifier mon profil » : montré seulement quand la fiche de la
-    // personne est identifiée sans ambiguïté.
-    setActions({ edit = false } = {}) {
+    // Les boutons du bandeau. « Modifier mon profil » : montré seulement quand la fiche de
+    // la personne est identifiée sans ambiguïté. « Mode admin » : montré aux seuls
+    // administrateurs ; `adminMode` dit s'il est allumé.
+    setActions({ edit = false, admin = false, adminMode = false } = {}) {
       editButton.hidden = !edit;
+      adminButton.hidden = !admin;
+      adminButton.setAttribute('aria-pressed', String(admin && adminMode));
+      adminButton.title = adminMode
+        ? 'Quitter le mode admin'
+        : 'Mode admin : modifier la fiche de n\'importe quelle personne';
     },
 
     // Rend le focus au bouton « Modifier mon profil » quand la fenêtre qu'il a ouverte se ferme.

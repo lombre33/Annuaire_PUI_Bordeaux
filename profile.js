@@ -23,13 +23,17 @@ const SPREADSHEET_FORMULA_START = /^[=+\-@]/;
 // administratrice peut modifier) ou null. Fermé par défaut : sans identité fiable
 // (pas de table-sonde, compte Lecteur…), personne ne peut rien modifier.
 //
+// Un administrateur n'a le droit 'admin' que lorsqu'il a allumé le « mode admin »
+// (`adminMode`) : sans lui, il se comporte comme tout le monde et ne voit « Modifier »
+// que sur sa propre fiche.
+//
 // Ce n'est qu'un verrou d'interface. N'importe qui peut ouvrir la console de son
 // navigateur et l'ignorer : seules les règles d'accès de Grist protègent vraiment
 // les données (GRIST_SETUP.md).
-export function rightsFor(identity) {
+export function rightsFor(identity, { adminMode = false } = {}) {
   if (identity?.status !== 'ready') return () => null;
   const mine = normalizeEmail(identity.email);
-  const admin = identity.admin === true;
+  const admin = identity.admin === true && adminMode === true;
   return row => {
     if (!row) return null;
     if (mine && normalizeEmail(row.email) === mine) return 'own';

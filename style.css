@@ -788,6 +788,7 @@ h1 {
 }
 .account-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .account-status {
@@ -824,4 +825,58 @@ h1 {
 .account-edit:focus-visible {
   outline: 2px solid var(--violet);
   outline-offset: 2px;
+}
+
+/* Mode admin : un interrupteur réservé aux administrateurs. Éteint, c'est un bouton
+   discret ; allumé, il est plein et la bande qui suit la barre d'outils le rappelle. */
+.account-admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 46px;
+  padding: 0 14px;
+  color: #8f4519;
+  background: #fff3ea;
+  border: 1px solid #f6d3bd;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.account-admin::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--orange);
+  border-radius: 50%;
+}
+.account-admin:hover {
+  border-color: var(--orange);
+}
+.account-admin[aria-pressed="true"] {
+  color: #fff;
+  background: #8f4519;
+  border-color: #8f4519;
+}
+.account-admin[aria-pressed="true"]::before {
+  background: #fff;
+}
+.account-admin:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+.admin-strip {
+  margin-top: 12px;
+  padding: 8px 14px;
+  color: #8f4519;
+  background: #fff3ea;
+  border: 1px solid #f6d3bd;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.admin-strip[hidden] {
+  display: none;
 }

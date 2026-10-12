@@ -9,7 +9,7 @@ import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createR
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
 import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
-import { describeHiddenFiche, describePresence, setPresence, PresenceError } from './presence.js';
+import { describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
 import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges } from './profile.js';
 import { ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
@@ -33,8 +33,10 @@ const state = {
   identity: null,
   people: null,
   // Ce que la personne connectée peut faire de chaque fiche (profile.js) : rien tant
-  // qu'elle n'est pas identifiée.
+  // qu'elle n'est pas identifiée. Un administrateur n'a le droit de modifier les fiches
+  // des autres que lorsqu'il a allumé le « mode admin » (adminMode).
   rightsOf: () => null,
+  adminMode: false,
   // Indicateurs des établissements, pour montrer la fiche « après » telle que
   // l'annuaire la présentera.
   etabFlags: null
@@ -49,12 +51,17 @@ const elements = {
   searchInput: document.getElementById('searchInput'),
   resetFilters: document.getElementById('resetFilters'),
   statusBanner: document.getElementById('statusBanner'),
+  adminStrip: document.getElementById('adminStrip'),
   scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
 
 // Bandeau « Ma présence » (voir « Ma présence » plus bas) : masqué tant que la
 // personne connectée n'est pas identifiée et retrouvée dans BDD.
-const accountBar = createAccountBar(document.getElementById('accountBar'), { onToggle: togglePresence, onEdit: openOwnProfile });
+const accountBar = createAccountBar(document.getElementById('accountBar'), {
+  onToggle: togglePresence,
+  onEdit: openOwnProfile,
+  onAdminMode: toggleAdminMode
+});
 
 const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
 
@@ -219,15 +226,25 @@ function warnOnce(key, message) {
   console.warn(message);
 }
 
+const isAdmin = () => state.identity?.status === 'ready' && state.identity.admin === true;
+
+// Le bandeau de la personne connectée. Sans identité (pas de table-sonde, compte Lecteur…)
+// ou tant que l'annuaire n'est pas lu, il reste masqué. Une adresse qui ne figure pas dans
+// BDD le dit, au lieu de disparaître sans explication : un administrateur y trouve quand
+// même son « mode admin ».
 function refreshAccount() {
-  const persons = myPersons();
-  if (persons.length === 0) {
+  if (state.identity?.status !== 'ready' || !state.people) {
     accountBar.hide();
-    if (state.identity?.status === 'ready' && state.people) {
-      warnOnce('no-row', state.people.hasEmailColumn
-        ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bandeau « Ma présence ».'
-        : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
-    }
+    return;
+  }
+  const persons = myPersons();
+  const admin = isAdmin();
+  if (persons.length === 0) {
+    warnOnce('no-row', state.people.hasEmailColumn
+      ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bouton « Modifier mon profil ».'
+      : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
+    accountBar.show(describeUnknownAccount({ email: state.identity.email, admin, emailColumn: state.people.hasEmailColumn }));
+    accountBar.setActions({ admin, adminMode: state.adminMode });
     return;
   }
   if (persons.length > 1) {
@@ -237,7 +254,18 @@ function refreshAccount() {
   }
   accountBar.show({ name: persons[0].name || 'Ma fiche', initials: initials(persons[0].row), ...describePresence(persons) });
   // Plusieurs fiches pour la même adresse : on ne sait pas laquelle ouvrir depuis le bandeau.
-  accountBar.setActions({ edit: persons.length === 1 });
+  accountBar.setActions({ edit: persons.length === 1, admin, adminMode: state.adminMode });
+}
+
+// Allume ou éteint le « mode admin » : les boutons « Modifier la fiche » des autres cartes
+// n'existent que pendant qu'il est allumé. Réservé aux administrateurs.
+function toggleAdminMode() {
+  if (!isAdmin()) return;
+  state.adminMode = !state.adminMode;
+  state.rightsOf = rightsFor(state.identity, { adminMode: state.adminMode });
+  elements.adminStrip.hidden = !state.adminMode;
+  refreshAccount();
+  refreshCards();
 }
 
 let togglePending = false;
@@ -268,7 +296,7 @@ async function togglePresence() {
 // n'est identifié et aucune modification n'est proposée.
 readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(identity => {
   state.identity = identity;
-  state.rightsOf = rightsFor(identity);
+  state.rightsOf = rightsFor(identity, { adminMode: state.adminMode });
   refreshAccount();
   refreshCards(); // les boutons « Modifier » apparaissent sur les cartes concernées
 });

@@ -577,67 +577,35 @@ test('après une erreur, un nouvel essai réussi efface le message d\'erreur', {
     assert.equal(await isSwitchOn(page), true);
   }));
 
-test('une personne identifiée sans fiche dans BDD n\'a pas de bandeau, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: ADMIN_EMAIL }, async ({ page, logs }) => {
+test('une personne identifiée sans fiche dans BDD voit une mention sans interrupteur, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: 'inconnu@example.fr' }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
-    assert.equal(await accountBar(page).isHidden(), true);
+    await accountBar(page).waitFor();
+    assert.equal(await accountBar(page).locator('.account-name').textContent(), 'Compte absent de l\'annuaire');
+    assert.equal(await accountBar(page).locator('.account-avatar').textContent(), '?');
+    assert.equal(await accountBar(page).locator('.account-detail').textContent(),
+      'Connecté avec inconnu@example.fr : cette adresse ne figure pas dans l\'annuaire, il n\'y a donc pas de fiche à modifier.');
+    assert.equal(await presenceSwitch(page).isHidden(), true, 'aucune fiche, aucun choix de présence');
+    assert.equal(await accountBar(page).locator('.account-edit').isHidden(), true);
+    assert.equal(await accountBar(page).locator('.account-admin').isHidden(), true);
     const warning = (await identityLogs(logs)).find(line => line.includes('Aucune ligne de BDD'));
     assert.ok(warning, 'avertissement présent');
     assert.ok(!warning.includes('@'));
   }));
 
-test('BDD sans colonne email : la console l\'explique, pas de bandeau, annuaire intact', { skip }, () => {
+test('BDD sans colonne email : le bandeau accuse la configuration, la console l\'explique, annuaire intact', { skip }, () => {
   const tables = withIdentity();
   delete tables.BDD.email;
-  return withWidget({ tables, user: ANA_EMAIL }, async ({ page, logs }) => {
+  return withWidget({ tables, user: BOB_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
-    assert.equal(await accountBar(page).isHidden(), true);
+    await accountBar(page).waitFor();
+    assert.equal(await accountBar(page).locator('.account-name').textContent(), 'Fiche introuvable');
+    assert.equal(await accountBar(page).locator('.account-detail').textContent(),
+      'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.');
+    assert.equal(await presenceSwitch(page).isHidden(), true);
     assert.ok((await identityLogs(logs)).some(line => line.includes('colonne « email »')));
+    assert.deepEqual(await Promise.all(logs.errors), []);
   });
 });
-
-test('un partenaire apprend qu\'il faut l\'interrupteur Partenaires pour le voir', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: BOB_EMAIL }, async ({ page }) => {
-    await waitForAccountBar(page);
-    assert.match(await accountMessage(page), /visible avec l'interrupteur « Partenaires »/);
-    assert.equal(await isSwitchOn(page), true);
-    assert.ok(!(await cardNames(page)).includes('Bob Durand'));
-  }));
-
-test('une personne qui a accepté mais reste masquée en apprend la raison', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'dan@inserm.fr' }, async ({ page }) => {
-    await waitForAccountBar(page);
-    assert.equal(await isSwitchOn(page), true, 'elle a bien accepté');
-    assert.match(await accountMessage(page), /votre établissement n'a pas encore été validé/);
-    assert.equal(await page.locator('#accountBar .account-detail').getAttribute('data-tone'), 'warn');
-  }));
-
-test('le nom d\'une personne s\'affiche en texte brut dans le bandeau (aucune injection)', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'hostile@chu-bordeaux.fr' }, async ({ page }) => {
-    await waitForAccountBar(page);
-    assert.equal(await accountBar(page).locator('.account-name').textContent(), `${HOSTILE_FIRST_NAME} Hostile`);
-    assert.equal(await accountBar(page).locator('img').count(), 0);
-    assert.equal(await page.evaluate(() => window.__xss), undefined);
-  }));
-
-test('une panne de la table-sonde n\'empêche jamais l\'annuaire de s\'afficher', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: ANA_EMAIL, failTables: ['Annuaire_Sonde'] }, async ({ page, logs }) => {
-    await waitForCards(page, 4);
-    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
-    assert.equal(await accountBar(page).isHidden(), true);
-    assert.equal(await page.locator('#statusBanner').isHidden(), true, 'pas de bandeau d\'erreur pour une identité introuvable');
-    assert.deepEqual(await Promise.all(logs.errors), []);
-  }));
-
-test('le bandeau suit les modifications faites dans Grist : l\'accord retiré à la main éteint l\'interrupteur', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
-    await waitForAccountBar(page);
-    assert.equal(await isSwitchOn(page), true);
-    await page.evaluate(() => { window.__tables.BDD.Accepte_apparaitre[0] = false; });
-    await reload(page);
-    await waitForCards(page, 3);
-    await page.waitForFunction(() => document.querySelector('.presence-switch').getAttribute('aria-checked') === 'false');
-    assert.equal(await accountMessage(page), 'Vous n\'apparaissez pas dans l\'annuaire.');
-  }));

@@ -306,6 +306,7 @@ function fillActions(box, contact, rights) {
   box.querySelector('.own-flag').hidden = rights !== 'own';
   const edit = box.querySelector('.card-edit');
   edit.dataset.rowId = String(contact.id);
+  edit.textContent = rights === 'admin' ? '✎ Modifier la fiche' : '✎ Modifier';
   edit.setAttribute('aria-label', `Modifier la fiche de ${displayName(contact)}`);
 }
 

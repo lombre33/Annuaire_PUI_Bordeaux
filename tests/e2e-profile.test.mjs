@@ -90,6 +90,19 @@ async function until(condition, message) {
   assert.fail(message);
 }
 
+// Le « mode admin » du bandeau : un interrupteur réservé aux administrateurs, éteint au départ.
+const adminToggle = page => page.locator('#accountBar .account-admin');
+const adminStrip = page => page.locator('#adminStrip');
+const isAdminMode = async page => (await adminToggle(page).getAttribute('aria-pressed')) === 'true';
+
+// Allume le mode admin et attend que les boutons « Modifier » des cartes soient là.
+async function enableAdminMode(page, buttons = 4) {
+  await waitForCards(page, 4);
+  await adminToggle(page).waitFor();
+  await adminToggle(page).click();
+  await waitForEditButtons(page, buttons);
+}
+
 // Ouvre sa propre fiche par le bandeau « Ma présence ».
 async function openOwn(page, cards = 4) {
   await waitForCards(page, cards);
@@ -130,20 +143,113 @@ test('une personne ne voit « Modifier » que sur sa propre fiche, marquée « V
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
-test('une administratrice peut modifier toutes les fiches, et reconnaît la sienne', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+test('une administratrice ne modifie que sa fiche tant que le mode admin est éteint, et toutes une fois allumé', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
+    await waitForEditButtons(page, 1);
+    assert.equal(await adminToggle(page).textContent(), 'Mode admin');
+    assert.equal(await isAdminMode(page), false, 'éteint au départ');
+    assert.equal(await adminStrip(page).isHidden(), true);
+    assert.equal(await gridCard(page, 'Hugo Bernard').locator('.card-actions').isHidden(), true, 'rien sur la fiche d\'un autre');
+    assert.equal(await gridCard(page, 'Ana Martin').locator('.card-edit').textContent(), '✎ Modifier');
+
+    await adminToggle(page).click();
     await waitForEditButtons(page, 4);
+    assert.equal(await isAdminMode(page), true);
+    assert.equal(await adminStrip(page).isVisible(), true);
+    assert.match(await adminStrip(page).textContent(), /^Mode admin : un bouton « Modifier la fiche » apparaît sur chaque carte\./);
+    assert.equal(await gridCard(page, 'Hugo Bernard').locator('.card-edit').textContent(), '✎ Modifier la fiche');
+    assert.equal(await gridCard(page, 'Hugo Bernard').locator('.card-edit').getAttribute('aria-label'), 'Modifier la fiche de Hugo Bernard');
+    assert.equal(await gridCard(page, 'Ana Martin').locator('.card-edit').textContent(), '✎ Modifier', 'sa propre carte garde son libellé');
     assert.equal(await page.locator('#cardsGrid .own-flag:visible').count(), 1);
     assert.equal(await gridCard(page, 'Ana Martin').locator('.own-flag').isVisible(), true);
+
+    await adminToggle(page).click();
+    await waitForEditButtons(page, 1);
+    assert.equal(await isAdminMode(page), false, 'on l\'éteint comme on l\'a allumé');
+    assert.equal(await adminStrip(page).isHidden(), true);
+    assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
-test('un administrateur qui n\'a pas de fiche modifie celles des autres, sans bouton « Modifier mon profil »', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: ADMIN_EMAIL }, async ({ page }) => {
+test('le mode admin s\'allume au clavier, annonce son état, et garde le focus quand les cartes sont redessinées', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
+    await waitForEditButtons(page, 1);
+    assert.equal(await adminToggle(page).evaluate(node => node.tagName), 'BUTTON', 'un vrai bouton : Entrée et Espace l\'actionnent');
+    await adminToggle(page).focus();
+    await page.keyboard.press('Enter');
+    await waitForEditButtons(page, 4);
+    assert.equal(await adminToggle(page).getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.evaluate(() => document.activeElement.className), 'account-admin', 'le focus ne bouge pas');
+    await page.keyboard.press('Space');
+    await waitForEditButtons(page, 1);
+    assert.equal(await adminToggle(page).getAttribute('aria-pressed'), 'false');
+    assert.equal(await adminToggle(page).getAttribute('title'), 'Mode admin : modifier la fiche de n\'importe quelle personne');
+  }));
+
+test('le mode admin reste allumé quand l\'annuaire est relu après une modification dans Grist', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await enableAdminMode(page);
+    await page.evaluate(() => { window.__tables.BDD.Fonction[9] = 'Directeur'; });
+    await reload(page);
+    await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.fonction').textContent()) === 'Directeur', 'l\'annuaire n\'a pas été relu');
+    assert.equal(await isAdminMode(page), true);
+    await waitForEditButtons(page, 4);
+    assert.equal(await adminStrip(page).isVisible(), true);
+  }));
+
+test('un administrateur qui n\'a pas de fiche a un bandeau sans interrupteur de présence, et le mode admin pour modifier celles des autres', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ADMIN_EMAIL }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await adminToggle(page).waitFor();
+    assert.equal(await page.locator('#accountBar').isVisible(), true);
+    assert.equal(await page.locator('#accountBar .account-name').textContent(), 'Administrateur');
+    assert.match(await page.locator('#accountBar .account-detail').textContent(), new RegExp(`^Connecté avec ${ADMIN_EMAIL.replace('.', '\\.')} : cette adresse ne figure pas dans l'annuaire, vous n'avez donc pas de fiche à modifier`));
+    assert.equal(await page.locator('#accountBar .presence-switch').isHidden(), true, 'pas de fiche, pas de choix de présence');
+    assert.equal(await page.locator('#accountBar .account-edit').isHidden(), true);
+    assert.equal(await page.locator('#cardsGrid .card-actions:not([hidden])').count(), 0, 'rien à modifier tant que le mode est éteint');
+
+    await adminToggle(page).click();
     await waitForEditButtons(page, 4);
     assert.equal(await page.locator('#cardsGrid .own-flag:visible').count(), 0);
-    assert.equal(await page.locator('#accountBar').isHidden(), true);
+    assert.ok(!JSON.stringify(await Promise.all([...logs.warnings, ...logs.infos])).includes('@'), 'aucune adresse dans la console');
+  }));
+
+for (const [who, options] of [
+  ['un membre', { tables: memberTables(), user: ANA_EMAIL }],
+  ['une personne dont la fiche est masquée', { tables: withIdentity(), user: IRIS_EMAIL }],
+  ['une personne que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.fr' }]
+]) {
+  test(`${who} ne voit jamais « Mode admin », et ne peut pas l'allumer en forçant le bouton`, { skip }, () =>
+    withWidget(options, async ({ page }) => {
+      await waitForCards(page, 4);
+      await page.waitForFunction(() => window.__fake.calls.some(call => call.table === 'Annuaire_Sonde' && call.action === 'RemoveRecord'));
+      await page.locator('#accountBar:not([hidden])').waitFor();
+      assert.equal(await adminToggle(page).isHidden(), true);
+      await page.evaluate(() => {
+        const button = document.querySelector('#accountBar .account-admin');
+        button.hidden = false;
+        button.click();
+      });
+      assert.equal(await adminStrip(page).isHidden(), true, 'le verrou d\'interface tient ; Grist reste la vraie protection');
+      assert.equal(await page.locator('#cardsGrid .card-edit:visible').filter({ hasText: 'Modifier la fiche' }).count(), 0);
+      assert.equal(await page.locator('#cardsGrid .card-actions:not([hidden]) .card-edit').count(), options.user === ANA_EMAIL ? 1 : 0);
+    }));
+}
+
+test('un administrateur dont le mode est éteint n\'ouvre rien en forçant un bouton « Modifier » sur la fiche d\'un autre', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await waitForEditButtons(page, 1);
+    await page.evaluate(() => {
+      const card = [...document.querySelectorAll('#cardsGrid .contact-card')].find(candidate => candidate.textContent.includes('Gina'));
+      const box = card.querySelector('.card-actions');
+      box.hidden = false;
+      const button = box.querySelector('.card-edit');
+      button.dataset.rowId = '9';
+      button.click();
+    });
+    assert.equal(await isOpen(page), false);
   }));
 
 const settled = {
@@ -490,8 +596,7 @@ test('« Valider » écrit en une seule action Grist, confirme, puis l\'annuaire
 
 test('le focus revient au bouton de la fiche modifiée, même quand les cartes ont été redessinées', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
-    await waitForCards(page, 4);
-    await waitForEditButtons(page, 4);
+    await enableAdminMode(page);
     const hugo = gridCard(page, 'Hugo Bernard').locator('.card-edit');
     await hugo.focus();
     await page.keyboard.press('Enter');
@@ -508,8 +613,7 @@ test('le focus revient au bouton de la fiche modifiée, même quand les cartes o
 
 test('une administratrice modifie la fiche de quelqu\'un d\'autre : la fenêtre le dit, et seule cette fiche est écrite', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
-    await waitForCards(page, 4);
-    await waitForEditButtons(page, 4);
+    await enableAdminMode(page);
     await gridCard(page, 'Hugo Bernard').locator('.card-edit').click();
     await dialog(page).waitFor();
     assert.equal(await heading(page).textContent(), 'Modifier la fiche de Hugo Bernard');
@@ -530,10 +634,9 @@ test('une administratrice modifie la fiche de quelqu\'un d\'autre : la fenêtre 
     await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.fonction').textContent()) === 'Directeur', 'la carte n\'a pas été mise à jour');
   }));
 
-test('sa propre fiche garde le titre « Modifier mon profil », même pour une administratrice', { skip }, () =>
+test('sa propre fiche garde le titre « Modifier mon profil », même pour une administratrice en mode admin', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
-    await waitForCards(page, 4);
-    await waitForEditButtons(page, 4);
+    await enableAdminMode(page);
     await gridCard(page, 'Ana Martin').locator('.card-edit').click();
     await dialog(page).waitFor();
     assert.equal(await heading(page).textContent(), 'Modifier mon profil');
@@ -765,8 +868,7 @@ test('un double clic sur « Valider » n\'écrit qu\'une fois, et la fenêtre ne
 
 test('un prénom piégé reste du texte dans la fenêtre : titre, cartes de relecture et confirmation', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page, logs }) => {
-    await waitForCards(page, 4);
-    await waitForEditButtons(page, 4);
+    await enableAdminMode(page);
     const hostileName = `${HOSTILE_FIRST_NAME} Hostile`;
     await gridCard(page, 'Hostile').locator('.card-edit').click();
     await dialog(page).waitFor();

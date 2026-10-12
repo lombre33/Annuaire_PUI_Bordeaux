@@ -68,6 +68,30 @@ export function describePresence(persons) {
   };
 }
 
+// Ce que le bandeau dit à une personne connectée dont l'adresse ne figure dans aucune
+// ligne de BDD : il n'y a pas de fiche à modifier. Un administrateur y trouve quand même
+// le « mode admin ». Même forme que describePresence, sans interrupteur à montrer
+// (`switchable: false`). `emailColumn: false` : BDD n'a pas de colonne « email », le
+// widget ne peut retrouver la fiche de personne (une affaire de configuration).
+export function describeUnknownAccount({ email, admin, emailColumn = true }) {
+  const name = admin ? 'Administrateur' : 'Compte absent de l\'annuaire';
+  const view = { name, initials: '?', accepted: false, switchable: false, tone: 'info' };
+  if (!emailColumn) {
+    return {
+      ...view,
+      name: admin ? name : 'Fiche introuvable',
+      message: 'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.'
+    };
+  }
+  const who = email ? `Connecté avec ${email} : cette adresse ne figure pas dans l'annuaire` : 'Cette adresse ne figure pas dans l\'annuaire';
+  return {
+    ...view,
+    message: admin
+      ? `${who}, vous n'avez donc pas de fiche à modifier. Le mode admin vous permet de modifier celles des autres.`
+      : `${who}, il n'y a donc pas de fiche à modifier.`
+  };
+}
+
 // Ce que la relecture d'une modification dit d'une fiche absente de l'annuaire : la
 // carte « Après » montre une carte que personne ne verra dans la grille tant que la
 // cause demeure. `status` vient de describeVisibility() ; `own` dit si la fiche est celle
