@@ -30,6 +30,8 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 ## Lexique du PUI
 
+<!-- Les lignes « À compléter » attendent une phrase de définition, à écrire directement ici. -->
+
 | Mot | Sens |
 |---|---|
 | **PUI** | Pôle universitaire d'innovation de Bordeaux |
@@ -37,6 +39,12 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Établissement fondateur** | L'un des 16 établissements qui ont fondé le PUI |
 | **Établissement partenaire** | Un partenaire du PUI |
 | **Structure « autres »** | Une structure extérieure au PUI, qui a collaboré à certaines tâches. Son statut est « autres » : ses contacts n'apparaissent pas dans l'annuaire |
+| **Instances** | *À compléter* |
+| **Actions** | *À compléter* |
+| **Communautés** | *À compléter* |
+| **Tâches** | *À compléter* |
+| **Rôle PUI** | *À compléter* |
+| **Périmètre** | *À compléter.* Pour qu'une personne apparaisse, au moins un périmètre doit être renseigné (colonne `perimetre`) |
 
 ## Découvrir l'écran
 
