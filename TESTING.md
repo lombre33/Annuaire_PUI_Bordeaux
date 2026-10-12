@@ -153,7 +153,7 @@ carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numé
 et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
 les tâches par action.
 
-`tests/e2e-profile.test.mjs` y ajoute 62 scénarios sur la modification d'une fiche : qui
+`tests/e2e-profile.test.mjs` y ajoute 63 scénarios sur la modification d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
 compte Lecteur, anonyme, adresse inconnue, doublon), le formulaire et ses refus, la
 relecture (carte avant et carte après, ce qui change repéré, rien d'écrit), l'écriture
@@ -163,8 +163,9 @@ retirée de l'annuaire), le message de confirmation et ses délais (horloge du n
 la fenêtre qui reste ouverte quand Grist n'a pas tout gardé, le téléphone numérique ou
 texte, un refus de Grist, un changement concurrent, une fiche supprimée, le double clic,
 Échap, un prénom piégé, le focus, la tabulation dans la fenêtre, le bouton « Modifier »
-rangé sous la fonction, le bandeau « Ma présence » qui ne se chevauche à aucune largeur et
-l'affichage de 280 à 360px.
+rangé sous la fonction, le bandeau « Ma présence » qui ne se chevauche à aucune largeur, dont le
+texte garde 200px de 320 à 840px (sept comptes, un mot sans coupure, le bloc des boutons vide caché)
+et l'affichage de 280 à 360px.
 
 `tests/e2e-etablissement.test.mjs` y ajoute 49 scénarios sur la fiche d'un établissement :
 qui voit « ✎ Modifier » sous un logo et « Mon établissement » (responsable, administrateur non
@@ -577,6 +578,11 @@ iOS, Chrome Android) que les tests ne couvrent pas :
 - [ ] Carte avec un nom, un prénom et une fonction très longs : le nom tient sur
       deux lignes au plus, le badge d'établissement reste à sa droite, rien ne
       passe sous le badge ni hors de la carte.
+- [ ] **Bandeau « Ma présence »** (1.17.2), compte identifié, cadre réduit de 860px à 320px (panneau
+      latéral, tablette en portrait, téléphone) : le nom et le message gardent 200px de large au moins ; quand
+      l'interrupteur ne tient plus à côté du texte, il passe dessous (jamais de texte serré en colonne étroite
+      à côté de lui) ; l'avatar reste à gauche du texte ; un compte sans fiche n'a pas de vide sous son message.
+      Vérifier aussi avec un message long (fiche masquée pour plusieurs raisons).
 - [ ] Téléphone ou tablette : toucher le champ de recherche ne zoome pas la page
       (champs à 16px), les badges, tags et le lien e-mail se touchent sans
       viser, et un filtre touché ne reste pas coloré une fois relâché.
