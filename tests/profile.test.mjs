@@ -2,11 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   profileFormModel, diffProfile, cleanText, frenchPhoneDigits, textFault, MAX_TEXT_LENGTH,
-  draftOf, rightsFor, rebaseChanges, describeChanges
+  draftOf, rightsFor, rebaseChanges, describeChanges, blankFiche, NAME_REQUIRED, ETABLISSEMENT_REQUIRED
 } from '../profile.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
-import { sampleTables, withoutOptionalColumns, withTaskActions } from './fixtures.mjs';
+import { sampleTables, withoutOptionalColumns, withTaskActions, withShownEmail, BOB_SHOWN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
 
 // ===== profile : qui peut modifier une fiche, ce qu'on peut y changer, et ce qui change =====
 
@@ -599,4 +599,51 @@ test('describeChanges says the e-mail and the établissement like any other text
     { key: 'email', label: 'E-mail', kind: 'email', before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@u-bordeaux-montaigne.fr' },
     { key: 'Etablissement', label: 'Établissement', kind: 'reference', before: 'Université Bordeaux Montaigne', after: 'CHU de Bordeaux' }
   ]);
+});
+
+// ===== email_affiche : l'adresse que la carte montre à la place de l'adresse du compte =====
+
+test('email_affiche is offered to everyone, may be emptied or shared, and only its shape is checked; the account e-mail stays locked', async () => {
+  const { referenceMaps, row } = await setup(withShownEmail());
+  const model = profileFormModel(row(1), referenceMaps);
+  assert.deepEqual(model.map(entry => entry.key).slice(0, 4), ['prenom', 'nom', 'Fonction', 'email_affiche']);
+  assert.deepEqual(field(model, 'email_affiche'), { key: 'email_affiche', label: 'E-mail affiché', kind: 'email', optional: true, value: '' });
+
+  const kept = diffProfile(row(1), { email_affiche: ' Contact@CHU-Bordeaux.fr ' }, referenceMaps);
+  assert.deepEqual(kept.champs, { email_affiche: { avant: '', apres: 'contact@chu-bordeaux.fr' } });
+  assert.deepEqual(kept.errors, []);
+  assert.deepEqual(diffProfile(row(1), { email_affiche: BOB_SHOWN_EMAIL }, referenceMaps).errors, [], 'une boîte de service se partage entre fiches');
+  assert.deepEqual(diffProfile(row(2), { email_affiche: '' }, referenceMaps).champs,
+    { email_affiche: { avant: BOB_SHOWN_EMAIL, apres: '' } }, 'vidée, la carte revient à l\'adresse du compte');
+
+  assert.equal(diffProfile(row(1), { email_affiche: 'pas une adresse' }, referenceMaps).fieldErrors.email_affiche, 'Indiquez une adresse e-mail valide.');
+  assert.match(diffProfile(row(1), { email_affiche: '=cmd@exemple.fr' }, referenceMaps).fieldErrors.email_affiche, /^Ne peut pas commencer par/);
+  assert.deepEqual(diffProfile(row(1), { email: 'autre@exemple.fr' }, referenceMaps).champs, {}, 'l\'adresse du compte ne se change pas ici');
+});
+
+// ===== Une fiche qu'on crée : la fiche vide, l'établissement à choisir =====
+
+test('a person who creates her fiche picks her établissement, is asked for a name and an établissement only once she has begun, and cannot touch the e-mail', async () => {
+  const tables = withShownEmail();
+  const { referenceMaps } = await setup(tables);
+  const blank = blankFiche(Object.keys(tables.BDD), NEW_EMAIL);
+  const model = profileFormModel(blank, referenceMaps, { creating: true });
+  assert.deepEqual(model.map(entry => entry.key), ['prenom', 'nom', 'Etablissement', 'Fonction', 'email_affiche', 'numero_de_telephone',
+    'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+  assert.equal(field(model, 'Etablissement').value, 0);
+  assert.equal(field(model, 'Etablissement').required, true);
+  const draft = draftOf(model);
+  const create = changes => diffProfile(blank, { ...draft, ...changes }, referenceMaps, { creating: true });
+
+  assert.deepEqual(create({}), { champs: {}, errors: [], fieldErrors: {} }, 'le formulaire vide ne réclame rien');
+  const begun = create({ Fonction: 'Pharmacienne' });
+  assert.equal(begun.fieldErrors.prenom, NAME_REQUIRED);
+  assert.equal(begun.fieldErrors.nom, NAME_REQUIRED);
+  assert.equal(begun.fieldErrors.Etablissement, ETABLISSEMENT_REQUIRED);
+  const done = create({ prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 });
+  assert.deepEqual(done.errors, []);
+  assert.deepEqual(Object.keys(done.champs), ['prenom', 'nom', 'Etablissement']);
+  assert.equal(done.champs.Etablissement.apres.label, 'CHU de Bordeaux');
+  assert.equal(create({ prenom: 'Zoé', Etablissement: 1, email: 'autre@exemple.fr' }).champs.email, undefined, 'l\'adresse est celle du compte');
+  assert.deepEqual(diffProfile(blank, { ...draft, Etablissement: 1 }, referenceMaps).champs, {}, 'hors création, l\'établissement ne se choisit pas');
 });

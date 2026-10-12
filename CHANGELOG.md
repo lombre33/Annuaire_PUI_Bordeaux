@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.18.0 — « Créer ma fiche » et l'e-mail affiché
+
+Deux petites fonctions demandées par Antoine le 12 octobre 2026 (12 h 52), construites sur la fenêtre
+« Modifier mon profil » : son aspect (maquette v5) ne change pas. Une seule version, une seule PR.
+
+- **« Créer ma fiche ».** Un compte que Grist reconnaît mais dont l'adresse ne figure dans aucune ligne de
+  `BDD` (le bandeau disait « Compte absent de l'annuaire », ou « Administrateur ») a un bouton « Créer ma
+  fiche » ; une personne qui a une fiche ne le voit jamais, et il n'y en a pas quand `BDD` n'a pas de
+  colonne `email` (la fiche ne pourrait pas être reliée à la personne). Il ouvre la fenêtre de « Modifier mon
+  profil », avec trois différences : la personne **choisit son établissement** (obligatoire : sans lui la fiche
+  ne pourrait jamais s'afficher, et un établissement ne se change ensuite que par un administrateur) ;
+  l'adresse e-mail est **celle de son compte** et ne se saisit pas ; la relecture montre **une seule carte**,
+  sans repères (il n'y a pas de carte « avant »). « Créer ma fiche » ajoute **une ligne** à `BDD` en une seule
+  action Grist (`AddRecord`) : jamais une table. Elle porte l'adresse du compte (en minuscules) et ce que la
+  personne a rempli, rien d'autre : **ni `Accepte_apparaitre`** (la personne apparaît quand elle active
+  l'interrupteur du bandeau, qui s'affiche dès la création) **ni `perimetre`** (l'affaire de Grist : un
+  administrateur le renseigne). Une fiche créée n'apparaît donc dans l'annuaire qu'une fois ces deux choses
+  faites ; le bandeau et la relecture le disent, comme pour toute fiche masquée, et le nombre de contacts
+  affichés ne change pas à la création. Juste avant d'écrire, le widget relit `BDD` : si une fiche porte déjà
+  l'adresse (créée entre-temps, dans un autre onglet ou par un administrateur), rien n'est écrit.
+- **E-mail affiché.** La colonne facultative `BDD.email_affiche` (texte, déjà ajoutée par Antoine) : quand elle
+  n'est pas vide, la carte, son lien `mailto:` et la carte « Après » de la relecture montrent cette adresse **à
+  la place de** `email`. La fenêtre de modification propose le champ « E-mail affiché » à tout le monde (et à
+  l'administrateur qui modifie la fiche d'un autre) : facultatif, on peut le vider pour revenir à l'adresse du
+  compte, plusieurs fiches peuvent porter la même (une boîte de service), seule sa forme est vérifiée. Sans la
+  colonne, le champ n'est pas proposé. **L'adresse du compte reste la seule identité** : qui est connecté, les
+  droits, la recherche de la fiche d'une personne et l'unicité des adresses lisent `email`, jamais
+  `email_affiche`.
+- **Ce que ça demande à Grist.** (1) Une règle d'accès qui laisse une personne **ajouter une ligne à `BDD` dont
+  `email` est le sien** : la règle de `GRIST_SETUP.md` § 4 (« ajouter ou supprimer une ligne : les
+  administrateurs ») refuse la création, et le widget le dit (« Grist a refusé la création : vos droits ne
+  permettent pas d'ajouter une fiche… ») sans rien écrire. (2) Un périmètre pour toute fiche créée (un
+  administrateur, ou une formule de déclenchement sur `perimetre` pour les nouvelles lignes). (3) Les droits
+  d'écriture sur `email_affiche` comme sur les autres colonnes de la fiche. Non essayé dans un vrai Grist :
+  à tester sur une copie du document.
+- **Pour la passe de documentation** : `docs/utilisateurs.md` (« Pourquoi n'ai-je pas de bouton Modifier ? »,
+  bandeau d'un compte sans fiche, fenêtre de modification), `GRIST_SETUP.md` (colonne, règles d'accès :
+  « le widget ne crée ni ne supprime jamais de fiche » devient faux), `docs/securite.md` et
+  `docs/maintenance.md` (écritures dans `BDD`), `TESTING.md` (essai dans un vrai Grist).
+- **Ce qui ne change pas.** La relecture avant écriture, l'écriture en une seule action Grist, l'identité par
+  la table-sonde, la règle de visibilité (établissement validé et accord de la personne), la colonne
+  `nom_de_domaine` (jamais lue), aucune table créée.
+- **Tests.** 808 tests (285 dans un vrai navigateur, optionnels sans Playwright), 8 de plus qu'à la 1.17.2. Ciblés : `email_affiche` (lecture, saisie, carte, adresse du compte intacte), la fiche vide et le
+  formulaire de création, `createProfile` (une seule ligne, refus d'une fiche déjà là ou d'une écriture
+  refusée) et deux scénarios dans Chromium (création de bout en bout, e-mail affiché saisi puis vidé). Le
+  bandeau « Ma présence » de 320 à 840 px est mesuré avec le nouveau bouton, et sans lui quand `BDD` n'a pas
+  de colonne `email` (le bloc des boutons vide ne prend toujours aucune place).
+- **Revenir en arrière** : `git revert` de la fusion de cette version.
+
 ## 1.17.2 — Bandeau « Ma présence » : le texte garde 200 px, l'interrupteur passe dessous
 
 Sixième et dernier des « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un gain

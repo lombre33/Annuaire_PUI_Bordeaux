@@ -9,14 +9,16 @@ const noop = () => {};
 
 // `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
 // personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
-// par le bouton « Modifier mon profil ». `onEtab` : appelé par le bouton « Mon établissement ».
+// par le bouton « Modifier mon profil », `onCreate` par « Créer ma fiche » (un compte qui n'a pas
+// de fiche). `onEtab` : appelé par le bouton « Mon établissement ».
 // `onAdminMode` : appelé par le bouton « Mode admin ».
-export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop, onAdminMode = noop }) {
+export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noop, onEtab = noop, onAdminMode = noop }) {
   const part = selector => root.querySelector(selector);
   const avatar = part('.account-avatar');
   const name = part('.account-name');
   const detail = part('.account-detail');
   const switchButton = part('.presence-switch');
+  const createButton = part('.account-create');
   const editButton = part('.account-edit');
   const etabButton = part('.account-etab');
   const adminButton = part('.account-admin');
@@ -36,7 +38,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop,
     root.classList.toggle('no-switch', !withSwitch);
     // Le bloc des boutons, vide, ne prend aucune place : même sans rien dedans, un élément de la
     // ligne ou de la grille coûte un écart (audit UI/UX, U46).
-    actions.hidden = editButton.hidden && etabButton.hidden && adminButton.hidden;
+    actions.hidden = createButton.hidden && editButton.hidden && etabButton.hidden && adminButton.hidden;
   };
 
   // Message passager sous le bandeau ('' l'efface) ; `tone` : 'info', 'error' pour un échec, ou
@@ -54,6 +56,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop,
   switchButton.addEventListener('click', () => {
     if (switchButton.getAttribute('aria-disabled') !== 'true') onToggle();
   });
+  createButton.addEventListener('click', () => onCreate());
   editButton.addEventListener('click', () => onEdit());
   etabButton.addEventListener('click', () => onEtab());
   adminButton.addEventListener('click', () => onAdminMode());
@@ -77,10 +80,12 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop,
     },
 
     // Les boutons du bandeau. « Modifier mon profil » : montré seulement quand la fiche de
-    // la personne est identifiée sans ambiguïté. « Mon établissement » : montré aux responsables
+    // la personne est identifiée sans ambiguïté. « Créer ma fiche » : montré seulement quand elle
+    // n'en a pas. « Mon établissement » : montré aux responsables
     // d'au moins un établissement, que sa carte soit affichée ou non. « Mode admin » : montré aux
     // seuls administrateurs ; `adminMode` dit s'il est allumé.
-    setActions({ edit = false, etab = false, admin = false, adminMode = false } = {}) {
+    setActions({ create = false, edit = false, etab = false, admin = false, adminMode = false } = {}) {
+      createButton.hidden = !create;
       editButton.hidden = !edit;
       etabButton.hidden = !etab;
       adminButton.hidden = !admin;
@@ -91,9 +96,20 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop,
         : 'Mode admin : modifier la fiche de n\'importe quelle personne';
     },
 
-    // Rend le focus au bouton « Modifier mon profil » quand la fenêtre qu'il a ouverte se ferme.
+    // Rend le focus au bouton « Modifier mon profil » quand la fenêtre qu'il a ouverte se ferme ;
+    // faux quand le bouton n'est pas là.
     focusEdit() {
-      if (!editButton.hidden) editButton.focus();
+      if (editButton.hidden) return false;
+      editButton.focus();
+      return true;
+    },
+
+    // Rend le focus à « Créer ma fiche » quand la fenêtre se ferme sans que la fiche soit créée ;
+    // faux quand le bouton n'est pas là.
+    focusCreate() {
+      if (createButton.hidden) return false;
+      createButton.focus();
+      return true;
     },
 
     // Rend le focus au bouton « Mon établissement » quand la fenêtre qu'il a ouverte se ferme ;

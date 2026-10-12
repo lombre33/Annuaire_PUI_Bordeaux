@@ -252,6 +252,7 @@ h1 {
     grid-column: 1 / -1;
   }
   .page-header > .account-bar .presence-switch,
+  .page-header > .account-bar .account-create,
   .page-header > .account-bar .account-edit,
   .page-header > .account-bar .account-etab,
   .page-header > .account-bar .account-admin {
@@ -1315,6 +1316,7 @@ h1 {
   }
 }
 
+.account-create,
 .account-edit,
 .account-etab {
   height: 46px;
@@ -1328,10 +1330,12 @@ h1 {
   font-weight: 800;
   white-space: nowrap;
 }
+.account-create:hover,
 .account-edit:hover,
 .account-etab:hover {
   border-color: var(--violet);
 }
+.account-create:focus-visible,
 .account-edit:focus-visible,
 .account-etab:focus-visible {
   outline: 2px solid var(--violet);

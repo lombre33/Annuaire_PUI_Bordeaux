@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ProfileSaveError, buildRowUpdate, signatureOf, readRow, prepareReview, saveProfile, unsavedLabels
+  ProfileSaveError, buildRowUpdate, signatureOf, readRow, prepareReview, saveProfile, unsavedLabels, prepareCreation, createProfile
 } from '../profile-save.js';
-import { profileFormModel, draftOf } from '../profile.js';
+import { profileFormModel, draftOf, blankFiche } from '../profile.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
-import { sampleTables, withIdentity, withSchema, ANA_EMAIL } from './fixtures.mjs';
+import { sampleTables, withIdentity, withSchema, withShownEmail, ANA_EMAIL, NEW_EMAIL } from './fixtures.mjs';
 
 // ===== profile-save : relire, vérifier, écrire une fiche modifiée =====
 
@@ -530,4 +530,50 @@ test('unsavedLabels notices an e-mail or an établissement that Grist did not ke
   const saved = tableToRows(w.tables.BDD).find(candidate => candidate.id === 2);
   assert.deepEqual(unsavedLabels(next, saved, w.referenceMaps), []);
   assert.deepEqual(unsavedLabels(next, { ...saved, Etablissement: 4 }, w.referenceMaps), ['Établissement']);
+});
+
+// ===== Créer la fiche de la personne connectée =====
+
+// Le formulaire de création de NEW_EMAIL (qui n'a pas de fiche), rempli avec `changes`.
+async function creation(w, changes) {
+  const blank = blankFiche(w.people.columns, NEW_EMAIL);
+  const draft = draftOf(profileFormModel(blank, w.referenceMaps, { creating: true }));
+  return prepareCreation(w.docApi, blank, { ...draft, ...changes }, { email: NEW_EMAIL, ...w.context });
+}
+const newcomer = () => world({ tables: withSchema(withIdentity(withShownEmail())), user: { email: NEW_EMAIL } });
+
+test('createProfile adds one row to BDD with the address of the account and what was filled in, and nothing else', async () => {
+  const w = await newcomer();
+  const next = await creation(w, { prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission', email_affiche: 'Zoe@CHU-Bordeaux.fr', Competences: [3] });
+  assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien');
+  assert.equal(next.after.prenom, 'Zoé');
+  assert.equal(next.after.etablissement_label, 'CHU');
+  assert.equal(next.visibility.visible, false, 'ni accord, ni périmètre : la fiche créée n\'apparaît pas');
+  assert.equal(next.visibility.accepted, false);
+
+  const result = await createProfile(w.docApi, next, { log: quiet });
+  assert.deepEqual(result, { status: 'created', rowId: 13 });
+  assert.deepEqual(writes(w), [{
+    action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
+    values: { email: NEW_EMAIL, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission', email_affiche: 'zoe@chu-bordeaux.fr', Competences: ['L', 3] }
+  }]);
+  assert.equal(w.tables.BDD.id.length, 13, 'une ligne de plus');
+  assert.deepEqual(unsavedLabels(next, tableToRows(w.tables.BDD).find(row => row.id === 13), w.referenceMaps), []);
+  const { people } = await loadDirectory(w.docApi, { log: quiet });
+  assert.equal(people.findByEmail(NEW_EMAIL).length, 1, 'la personne retrouve sa fiche par son adresse');
+});
+
+test('createProfile writes nothing when a fiche already carries the address, when the draft is incomplete, or when Grist refuses', async () => {
+  const w = await newcomer();
+  await assert.rejects(creation(w, { prenom: 'Zoé' }), error => error instanceof ProfileSaveError && /rien à relire/.test(error.message), 'sans établissement');
+  const next = await creation(w, { prenom: 'Zoé', Etablissement: 1 });
+  await w.docApi.applyUserActions([['AddRecord', 'BDD', null, { email: NEW_EMAIL.toUpperCase(), prenom: 'Autre' }]]); // créée entre-temps, ailleurs
+  await assert.rejects(createProfile(w.docApi, next, { log: quiet }), error => error instanceof ProfileSaveError && /Une fiche porte déjà votre adresse/.test(error.message));
+  assert.equal(writes(w).length, 1, 'seul l\'ajout simulé ci-dessus est passé');
+  await assert.rejects(createProfile(w.docApi, { ...next, creating: false }, { log: quiet }), /Aucune fiche à créer/);
+
+  const refused = await world({ tables: withSchema(withIdentity(withShownEmail())), user: { email: NEW_EMAIL }, denyWrites: ['BDD'] });
+  const denied = await creation(refused, { prenom: 'Zoé', Etablissement: 1 });
+  await assert.rejects(createProfile(refused.docApi, denied, { log: quiet }), error => error instanceof ProfileSaveError && /Grist a refusé la création/.test(error.message));
+  assert.equal(refused.tables.BDD.id.length, 12, 'rien n\'a été ajouté');
 });

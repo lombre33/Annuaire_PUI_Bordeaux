@@ -340,6 +340,15 @@ export function filterVisibleEstablishments(labelMap, etabFlags) {
   return result;
 }
 
+// ===== ADRESSE AFFICHÉE =====
+// L'adresse que la carte montre : celle que la personne a choisi d'afficher (BDD.email_affiche,
+// colonne facultative) quand elle n'est pas vide, sinon l'adresse de son compte (BDD.email). Elle
+// ne sert qu'à l'affichage : qui est connecté, les droits et l'unicité des adresses restent fondés
+// sur `email`.
+export function shownEmail(contact) {
+  return text(contact?.email_affiche) || text(contact?.email);
+}
+
 // ===== LIEN MAILTO =====
 // Une adresse saisie à la main peut contenir des paramètres (`?cc=...`) ou
 // plusieurs destinataires : on ne fabrique le lien que pour une adresse simple,
@@ -427,8 +436,10 @@ export function describeVisibility(row, referenceMaps, etabFlags) {
 // personne connectée) ou par identifiant de ligne (la fiche qu'on veut modifier) :
 // c'est ce qui permet de dire à une personne pourquoi elle n'apparaît pas. Une
 // adresse peut figurer sur plusieurs lignes ; findByEmail() les renvoie toutes.
-// Deux index construits d'un seul passage : jamais de recherche linéaire par appel.
-export function createPeopleIndex(rows, referenceMaps, etabFlags) {
+// Deux index construits d'un seul passage : jamais de recherche linéaire par appel. `columns` :
+// les colonnes de BDD (à défaut, celles de sa première ligne), pour proposer à une personne sans
+// fiche les champs que la table porte.
+export function createPeopleIndex(rows, referenceMaps, etabFlags, columns = rows.length ? Object.keys(rows[0]) : []) {
   const byEmail = new Map();
   const byId = new Map();
   rows.forEach(row => {
@@ -445,6 +456,7 @@ export function createPeopleIndex(rows, referenceMaps, etabFlags) {
     status: describeVisibility(row, referenceMaps, etabFlags)
   });
   return {
+    columns,
     hasEmailColumn: rows.length === 0 || 'email' in rows[0],
     findByEmail(email) {
       const key = normalizeEmail(email);
@@ -722,11 +734,14 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
 
   const emptyReason = describeEmptyDirectory(rows.length, scopedRows, contacts);
   const funders = results[BRANDING.fundersTable];
+  // Les colonnes de BDD viennent de la table elle-même : une table vide en a aussi.
+  const mainTable = results[MAIN_TABLE].value;
+  const columns = mainTable && typeof mainTable === 'object' && !Array.isArray(mainTable) ? Object.keys(mainTable) : undefined;
   return {
     contacts,
     referenceMaps,
     etabFlags,
-    people: createPeopleIndex(rows, referenceMaps, etabFlags),
+    people: createPeopleIndex(rows, referenceMaps, etabFlags, columns),
     etablissementRows,
     financeurRows: funders.status === 'fulfilled' ? tableToRows(funders.value) : null,
     issues: directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason })
