@@ -66,8 +66,9 @@ test('aucune règle ne supprime l’anneau de focus sans le remplacer (WCAG 2.4.
 // ===== Couleurs de catégorie et lien e-mail (sans navigateur) =====
 
 // Texte courant : 4,5:1 au moins, quelle que soit sa taille (WCAG 1.4.3) ; les pastilles sont à
-// 8,5 px. Avant leur correction (audit U19), les cinq couleurs de catégorie les plus claires
-// faisaient de 2,16:1 (Tâches) à 3,56:1 (Communautés), et le lien e-mail 3,30:1.
+// 12 px (8,5 px avant la 1.17.1), très loin du « grand texte ». Avant leur correction (audit U19),
+// les cinq couleurs de catégorie les plus claires faisaient de 2,16:1 (Tâches) à 3,56:1
+// (Communautés), et le lien e-mail 3,30:1.
 const MIN_TEXT_CONTRAST = 4.5;
 
 test('chaque couleur de catégorie garde 4,5:1 avec le blanc : pastille à texte blanc, titre de groupe sur fond blanc (WCAG 1.4.3)', () => {
