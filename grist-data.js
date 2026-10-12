@@ -3,6 +3,9 @@
 
 import { CATEGORIES, LIST_CATEGORIES, REFERENCE_TABLES } from './constants.js';
 
+// Nombre de colonnes competences_N dans Annuaire.
+const COMPETENCE_COLUMNS = 15;
+
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
 }
@@ -139,45 +142,55 @@ export function resolveListItem(item, referenceMap) {
   return referenceMap?.[String(item)] || '';
 }
 
-// Ajoute à un contact les libellés de ses catégories et les indicateurs de son
-// établissement. `etabFlags` est optionnel : sans lui, aucun indicateur n'est
-// vrai et le contact n'est pas éligible.
+// Libellés des catégories dont Annuaire porte une ReferenceList. Un id sans
+// libellé est ignoré plutôt qu'affiché brut (« 47 » n'aide personne).
+function listLabels(contact, referenceMaps) {
+  return Object.fromEntries(LIST_CATEGORIES.map(({ key, column, table }) => [
+    key,
+    safeValues(contact[column])
+      .map(item => resolveListItem(item, referenceMaps[table]))
+      .filter(Boolean)
+  ]));
+}
+
+// Les compétences sont du texte libre réparti sur competences_1 … competences_15.
+function competenceLabels(contact) {
+  return Array.from({ length: COMPETENCE_COLUMNS }, (_, index) => text(contact[`competences_${index + 1}`]))
+    .filter(Boolean);
+}
+
+// Ajoute à un contact `labels` (pour chaque catégorie, la liste de ses libellés) et
+// les indicateurs de son établissement. `etabFlags` est optionnel : sans lui,
+// aucun indicateur n'est vrai et le contact n'est pas éligible.
 export function enrich(contact, referenceMaps, etabFlags) {
-  const enriched = { ...contact };
-
-  LIST_CATEGORIES.forEach(({ key, column, table }) => {
-    // Un id sans libellé est ignoré plutôt qu'affiché brut (« 47 » n'aide personne).
-    enriched[`${key}_labels`] = safeValues(contact[column])
-      .map(id => resolveListItem(id, referenceMaps[table]))
-      .filter(Boolean);
-  });
-
-  const competences = [];
-  for (let i = 1; i <= 15; i++) {
-    const value = text(contact[`competences_${i}`]);
-    if (value) competences.push(value);
-  }
-  enriched.competences_labels = competences;
-
   // Etablissement2 (Text, formule Grist) est la seule source de l'établissement
   // d'un contact : une chaîne simple, sans l'ambiguïté des Références. Ne pas lui
   // substituer une colonne Référence, dont l'encodage varie.
-  enriched.etablissement_label = text(contact.Etablissement2) || '';
-  // Même forme tableau que les autres catégories, pour que filters.js n'ait pas
-  // de cas particulier ; le badge de la carte utilise la forme singulière.
-  enriched.etablissement_labels = enriched.etablissement_label ? [enriched.etablissement_label] : [];
-
+  const etablissement = text(contact.Etablissement2);
+  const role = refLabel(contact.Role_dans_le_PUI, referenceMaps[CATEGORIES.role.table]);
   const flags = etablissementFlags(contact, etabFlags);
-  enriched.etablissement_fondateur = flags?.fondateur === true;
-  enriched.etablissement_partenaire = flags?.partenaire === true;
-  enriched.etablissement_ok_pour_apparaitre = flags?.ok_pour_apparaitre === true;
 
-  const roleLabel = refLabel(contact.Role_dans_le_PUI, referenceMaps[CATEGORIES.role.table]);
-  // Tableau comme les autres groupes de tags : le rendu des cartes ne lit que
-  // `${clé}_labels`, une valeur singulière ne serait lue nulle part.
-  enriched.role_labels = roleLabel ? [roleLabel] : [];
+  return {
+    ...contact,
+    // Établissement et Rôle n'ont qu'une valeur mais prennent la même forme de
+    // liste que les autres catégories : filters.js et render.js n'ont ainsi pas
+    // de cas particulier (le badge de la carte utilise `etablissement_label`).
+    labels: {
+      ...listLabels(contact, referenceMaps),
+      competences: competenceLabels(contact),
+      etablissement: etablissement ? [etablissement] : [],
+      role: role ? [role] : []
+    },
+    etablissement_label: etablissement,
+    etablissement_fondateur: flags?.fondateur === true,
+    etablissement_partenaire: flags?.partenaire === true,
+    etablissement_ok_pour_apparaitre: flags?.ok_pour_apparaitre === true
+  };
+}
 
-  return enriched;
+// Libellés d'un contact enrichi pour une catégorie (liste vide si aucun).
+export function labelsOf(contact, key) {
+  return contact.labels?.[key] ?? [];
 }
 
 // Un contact n'est affiché que s'il a au moins une valeur dans perimetre_all

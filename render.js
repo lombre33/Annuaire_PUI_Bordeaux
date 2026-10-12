@@ -1,7 +1,7 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
 import { TAG_GROUPS, FILTERS } from './constants.js';
-import { compareLabels, formatPhone, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { compareLabels, formatPhone, labelsOf, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
 
 export function createFilterUI(container, referenceMaps, activeFilters, onToggle, counts) {
   if (!container) return;
@@ -167,7 +167,7 @@ export function renderCards(grid, template, contacts, onToggle) {
     }
     const tags = clone.querySelector('.card-tags');
     TAG_GROUPS.forEach(group => {
-      const labels = contact[`${group.key}_labels`] || [];
+      const labels = labelsOf(contact, group.key);
       if (labels.length === 0) return;
       const section = document.createElement('section');
       section.className = 'tag-group';

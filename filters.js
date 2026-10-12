@@ -1,7 +1,7 @@
 // Filtrage et comptage des contacts, sans DOM. Seule pruneStaleFilters() modifie son argument.
 
 import { FILTERS } from './constants.js';
-import { normalize } from './grist-data.js';
+import { normalize, labelsOf } from './grist-data.js';
 
 export function createEmptyFilterState() {
   const state = {};
@@ -37,8 +37,7 @@ export function filterContacts(contacts, activeFilters, searchTerm, scope, exclu
       if (FILTERS[i].key === excludeKey) continue;
       const normalizedSelected = normalizedSelections[i];
       if (!normalizedSelected) continue;
-      const labels = contact[`${FILTERS[i].key}_labels`] || [];
-      if (!labels.some(label => normalizedSelected.has(normalize(label)))) return false;
+      if (!labelsOf(contact, FILTERS[i].key).some(label => normalizedSelected.has(normalize(label)))) return false;
     }
     return true;
   });
@@ -69,8 +68,7 @@ export function computeFilterCounts(contacts, activeFilters, searchTerm, scope) 
     const facetContacts = filterContacts(contacts, activeFilters, searchTerm, scope, filter.key);
     const tally = {};
     facetContacts.forEach(contact => {
-      const labels = contact[`${filter.key}_labels`] || [];
-      labels.forEach(label => {
+      labelsOf(contact, filter.key).forEach(label => {
         const key = normalize(label);
         tally[key] = (tally[key] || 0) + 1;
       });

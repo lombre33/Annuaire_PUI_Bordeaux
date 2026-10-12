@@ -4,7 +4,7 @@ import {
   safeValues, tableToRows, isInScope, text, pickLabel, enrich, refId, refLabel,
   normalize, compareLabels, formatPhone, createRequestSequencer, referenceMapsEqual,
   sortWithCheckedFirst, resolveListItem, labelMapFromRows, etablissementFlagsFromRows, etablissementFlags,
-  isEtablissementEligible, filterVisibleEstablishments, mailtoHref, loadDirectory, DirectoryLoadError
+  isEtablissementEligible, filterVisibleEstablishments, mailtoHref, loadDirectory, DirectoryLoadError, labelsOf
 } from '../grist-data.js';
 import { filterContacts, createEmptyFilterState, pruneStaleFilters, computeFilterCounts } from '../filters.js';
 import { sampleTables, DEFAULT_CARD_NAMES } from './fixtures.mjs';
@@ -121,10 +121,10 @@ test('filterContacts free-text search on Nom/Prenom is accent- and case-insensit
   assert.equal(filterContacts(contacts, activeFilters, 'ÉCOLE').length, 1);
 });
 
-test('filterContacts applies a category filter (etablissement) via the uniform etablissement_labels array', () => {
+test('filterContacts applies a category filter (etablissement) via the uniform labels.etablissement array', () => {
   const contacts = [
-    { Nom: 'A', etablissement_labels: ['CHU'] },
-    { Nom: 'B', etablissement_labels: ['Clinique'] }
+    { Nom: 'A', labels: { etablissement: ['CHU'] } },
+    { Nom: 'B', labels: { etablissement: ['Clinique'] } }
   ];
   const activeFilters = createEmptyFilterState();
   activeFilters.etablissement.add('CHU');
@@ -135,8 +135,8 @@ test('filterContacts applies a category filter (etablissement) via the uniform e
 
 test('filterContacts applies a tag-list filter (e.g. instances)', () => {
   const contacts = [
-    { Nom: 'A', instances_labels: ['CME'] },
-    { Nom: 'B', instances_labels: ['COVIRIS'] }
+    { Nom: 'A', labels: { instances: ['CME'] } },
+    { Nom: 'B', labels: { instances: ['COVIRIS'] } }
   ];
   const activeFilters = createEmptyFilterState();
   activeFilters.instances.add('CME');
@@ -151,8 +151,8 @@ test('filterContacts matches a category filter regardless of case/accent differe
   // les deux peuvent diverger par la casse/les accents sans être une vraie
   // différence pour l'utilisateur (cf. CHANGELOG, audit archi/sécurité).
   const contacts = [
-    { Nom: 'A', competences_labels: ['oncologie'] },
-    { Nom: 'B', competences_labels: ['Autre'] }
+    { Nom: 'A', labels: { competences: ['oncologie'] } },
+    { Nom: 'B', labels: { competences: ['Autre'] } }
   ];
   const activeFilters = createEmptyFilterState();
   activeFilters.competences.add('Oncologie');
@@ -218,26 +218,26 @@ test('enrich: etablissement_label reads Etablissement2 directly (Text, formule c
   assert.equal(enrich({}, {}).etablissement_label, '');
 });
 
-test('enrich: etablissement_labels mirrors etablissement_label as a single-element array (or empty)', () => {
-  assert.deepEqual(enrich({ Etablissement2: 'CHU' }, {}).etablissement_labels, ['CHU']);
-  assert.deepEqual(enrich({}, {}).etablissement_labels, []);
+test('enrich: labels.etablissement mirrors etablissement_label as a single-element array (or empty)', () => {
+  assert.deepEqual(enrich({ Etablissement2: 'CHU' }, {}).labels.etablissement, ['CHU']);
+  assert.deepEqual(enrich({}, {}).labels.etablissement, []);
 });
 
-test('enrich: role_labels resolves Role_dans_le_PUI as an array, matching the _labels convention every other tag group uses', () => {
-  // Régression : avant ce correctif, enrich() ne posait que role_label
-  // (singulier), que rien ne lisait jamais — le tag "Rôle PUI" n'apparaissait
-  // donc sur aucune carte, quelles que soient les données (cf. CHANGELOG).
+test('enrich: labels.role resolves Role_dans_le_PUI as an array, like every other tag group', () => {
+  // Régression : enrich() ne posait qu'une valeur singulière, que rien ne
+  // lisait — le tag "Rôle PUI" n'apparaissait donc sur aucune carte, quelles
+  // que soient les données (cf. CHANGELOG).
   const referenceMaps = { Role_Dans_le_PUI: { 3: 'Référent qualité' } };
-  assert.deepEqual(enrich({ Role_dans_le_PUI: 3 }, referenceMaps).role_labels, ['Référent qualité']);
-  assert.deepEqual(enrich({}, referenceMaps).role_labels, [], 'pas de référence: liste vide');
-  assert.deepEqual(enrich({ Role_dans_le_PUI: 999 }, referenceMaps).role_labels, [], 'référence introuvable: liste vide, pas de valeur fantôme');
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 3 }, referenceMaps).labels.role, ['Référent qualité']);
+  assert.deepEqual(enrich({}, referenceMaps).labels.role, [], 'pas de référence: liste vide');
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 999 }, referenceMaps).labels.role, [], 'référence introuvable: liste vide, pas de valeur fantôme');
 });
 
 test('enrich: list-reference categories (Instances/Actions/GT/Communautés/Tâches) drop ids that fail to resolve, instead of leaking the raw numeric id as a fake label', () => {
   const referenceMaps = { Instances: { 7: 'CME' } };
-  assert.deepEqual(enrich({ Instances: ['L', 7, 999] }, referenceMaps).instances_labels, ['CME'],
+  assert.deepEqual(enrich({ Instances: ['L', 7, 999] }, referenceMaps).labels.instances, ['CME'],
     'id 999 introuvable dans la table de référence: ignoré, pas affiché comme "999"');
-  assert.deepEqual(enrich({ Instances: ['L'] }, referenceMaps).instances_labels, []);
+  assert.deepEqual(enrich({ Instances: ['L'] }, referenceMaps).labels.instances, []);
 });
 
 test('resolveListItem resolves a ReferenceList item whether Grist sends a raw id or already-resolved text', () => {
@@ -258,7 +258,7 @@ test('enrich: list-reference categories resolve correctly when Grist sends pre-r
   const referenceMaps = { Instances: { 7: 'CME' } };
   // ['L', 'CME'] : la table Instances a une visible column configurée en
   // prod, donc Grist envoie directement le texte, pas ['L', 7].
-  assert.deepEqual(enrich({ Instances: ['L', 'CME'] }, referenceMaps).instances_labels, ['CME']);
+  assert.deepEqual(enrich({ Instances: ['L', 'CME'] }, referenceMaps).labels.instances, ['CME']);
 });
 
 test('enrich: each list-reference category reads its own Annuaire column and its own reference table, not another\'s', () => {
@@ -277,16 +277,24 @@ test('enrich: each list-reference category reads its own Annuaire column and its
     Taches: ['L', 5]
   };
   const result = enrich(contact, referenceMaps);
-  assert.deepEqual(result.instances_labels, ['Instance A']);
-  assert.deepEqual(result.actions_labels, ['Action B']);
-  assert.deepEqual(result.gt_labels, ['GT C']);
-  assert.deepEqual(result.communautes_labels, ['Communauté D']);
-  assert.deepEqual(result.taches_labels, ['Tâche E']);
+  assert.deepEqual(result.labels.instances, ['Instance A']);
+  assert.deepEqual(result.labels.actions, ['Action B']);
+  assert.deepEqual(result.labels.gt, ['GT C']);
+  assert.deepEqual(result.labels.communautes, ['Communauté D']);
+  assert.deepEqual(result.labels.taches, ['Tâche E']);
 });
 
-test('enrich: competences_labels reads exactly competences_1 through competences_15', () => {
+test('enrich: labels.competences reads exactly competences_1 through competences_15', () => {
   const contact = { competences_1: 'A', competences_15: 'O', competences_16: 'ignoré (pas une colonne réelle)' };
-  assert.deepEqual(enrich(contact, {}).competences_labels, ['A', 'O']);
+  assert.deepEqual(enrich(contact, {}).labels.competences, ['A', 'O']);
+});
+
+test('labelsOf returns the labels of one category, or an empty list for a contact that has none', () => {
+  const contact = enrich({ Etablissement2: 'CHU' }, {});
+  assert.deepEqual(labelsOf(contact, 'etablissement'), ['CHU']);
+  assert.deepEqual(labelsOf(contact, 'instances'), []);
+  assert.deepEqual(labelsOf(contact, 'inconnue'), []);
+  assert.deepEqual(labelsOf({ Nom: 'Sans enrichissement' }, 'instances'), []);
 });
 
 test('labelMapFromRows resolves rows into an id->label map using the given label field, skipping rows without a label', () => {
@@ -409,9 +417,9 @@ test('filterContacts applies the scope toggle (fondateur/partenaire) in addition
 
 test('filterContacts excludeKey skips one category\'s own selection while still applying every other filter', () => {
   const contacts = [
-    { Nom: 'A', instances_labels: ['CME'], gt_labels: ['GT1'] },
-    { Nom: 'B', instances_labels: ['COVIRIS'], gt_labels: ['GT1'] },
-    { Nom: 'C', instances_labels: ['CME'], gt_labels: ['GT2'] }
+    { Nom: 'A', labels: { instances: ['CME'], gt: ['GT1'] } },
+    { Nom: 'B', labels: { instances: ['COVIRIS'], gt: ['GT1'] } },
+    { Nom: 'C', labels: { instances: ['CME'], gt: ['GT2'] } }
   ];
   const activeFilters = createEmptyFilterState();
   activeFilters.instances.add('CME');
@@ -424,9 +432,9 @@ test('filterContacts excludeKey skips one category\'s own selection while still 
 
 test('computeFilterCounts tallies, per filter category, how many contacts each option would match given every OTHER active filter/search/scope', () => {
   const contacts = [
-    { Nom: 'Alice', instances_labels: ['CME'], gt_labels: ['GT1'], etablissement_fondateur: true, etablissement_partenaire: false },
-    { Nom: 'Bob', instances_labels: ['COVIRIS'], gt_labels: ['GT1'], etablissement_fondateur: false, etablissement_partenaire: true },
-    { Nom: 'Chloe', instances_labels: ['CME'], gt_labels: ['GT2'], etablissement_fondateur: true, etablissement_partenaire: false }
+    { Nom: 'Alice', labels: { instances: ['CME'], gt: ['GT1'] }, etablissement_fondateur: true, etablissement_partenaire: false },
+    { Nom: 'Bob', labels: { instances: ['COVIRIS'], gt: ['GT1'] }, etablissement_fondateur: false, etablissement_partenaire: true },
+    { Nom: 'Chloe', labels: { instances: ['CME'], gt: ['GT2'] }, etablissement_fondateur: true, etablissement_partenaire: false }
   ];
   const activeFilters = createEmptyFilterState();
   activeFilters.gt.add('GT1'); // ne doit pas influencer le compte de sa propre catégorie (gt), seulement celui des autres.
@@ -439,7 +447,7 @@ test('computeFilterCounts tallies, per filter category, how many contacts each o
 });
 
 test('computeFilterCounts keys are normalized (case/accent-insensitive), matching filterContacts\' own matching rules', () => {
-  const contacts = [{ Nom: 'A', competences_labels: ['oncologie'] }];
+  const contacts = [{ Nom: 'A', labels: { competences: ['oncologie'] } }];
   const activeFilters = createEmptyFilterState();
   const counts = computeFilterCounts(contacts, activeFilters, '', undefined);
   assert.equal(counts.competences[normalize('Oncologie')], 1, 'le tally doit matcher un libellé de référence "Oncologie" malgré la casse différente du texte libre');
