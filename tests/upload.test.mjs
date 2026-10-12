@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UploadError, uploadAttachment } from '../upload.js';
+import { PHOTO_UPLOAD_HINT } from '../profile-save.js';
 import { createFakeGrist, FAKE_ATTACHMENTS_URL } from './support/fake-grist.js';
 
 // ===== upload : l'envoi d'un fichier dans les pièces jointes du document (la seule requête réseau
@@ -29,7 +30,7 @@ function answering(...answers) {
 const ok = ids => ({ ok: true, status: 200, json: async () => ids });
 const status = code => ({ ok: false, status: code, json: async () => ({}) });
 
-const send = (docApi, { fetchImpl, ...options }, file = FILE) => uploadAttachment(docApi, file, { fetchImpl, log: recordingLog(), ...options });
+const send = (docApi, { fetchImpl, ...options }, file = FILE, more = {}) => uploadAttachment(docApi, file, { fetchImpl, log: recordingLog(), ...options, ...more });
 const rejection = async promise => {
   try {
     await promise;
@@ -155,4 +156,43 @@ test('uploadAttachment never writes the token or the address to the console', as
   const everything = log.lines.join('\n');
   assert.ok(!everything.includes('jeton-secret-123'), 'le jeton ne passe jamais dans la console');
   assert.ok(!everything.includes('docs.getgrist.com'), 'ni l’adresse du document');
+});
+
+// ===== La phrase qui dit quoi faire : pour une photo de profil, prévenir un administrateur =====
+
+test('uploadAttachment says what to do with the hint of the caller: a profile photo asks for an administrator, not for a hand-made upload', async () => {
+  const hint = PHOTO_UPLOAD_HINT;
+  assert.match(hint, /administrateur/);
+  const refusedToken = await rejection(send(createFakeGrist({ accessToken: null }).docApi, answering(ok([1])), FILE, { hint }));
+  assert.match(refusedToken.message, /n’a pas donné au widget l’autorisation d’envoyer un fichier\. Contactez un administrateur si le problème persiste\.$/);
+
+  const unreachable = await rejection(send(createFakeGrist({}).docApi, answering(() => { throw new TypeError('Failed to fetch'); }), FILE, { hint }));
+  assert.match(unreachable.message, /le navigateur n’a pas pu joindre le serveur, ou l’a refusé\. Contactez un administrateur/);
+
+  const failed = await rejection(send(createFakeGrist({}).docApi, answering(status(500)), FILE, { hint }));
+  assert.match(failed.message, /\(erreur 500\)\. Réessayez ; contactez un administrateur si le problème persiste\.$/, 'la phrase suit « Réessayez ; », en minuscule');
+
+  const unconfirmed = await rejection(send(createFakeGrist({}).docApi, answering(ok([])), FILE, { hint }));
+  assert.match(unconfirmed.message, /Réessayez ; contactez un administrateur/);
+
+  const hangs = answering(options => new Promise((_, reject) => {
+    options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+  }));
+  const slow = await rejection(send(createFakeGrist({}).docApi, { ...hangs, timeout: 20 }, FILE, { hint }));
+  assert.match(slow.message, /n’a pas répondu à temps à l’envoi du fichier\. Réessayez ; contactez un administrateur/);
+
+  for (const message of [refusedToken, unreachable, failed, unconfirmed, slow].map(error => error.message)) {
+    assert.ok(!message.includes('GRIST_SETUP'), `aucune mention du dépôt manuel dans « ${message} »`);
+  }
+});
+
+test('uploadAttachment keeps the hand-made upload hint for a logo, and the refusals that name no hint', async () => {
+  const failed = await rejection(send(createFakeGrist({}).docApi, answering(status(500))));
+  assert.match(failed.message, /Réessayez ; déposez le fichier directement dans Grist \(voir GRIST_SETUP\.md\)\.$/);
+  for (const [code, expected] of [[403, /Contactez un administrateur\.$/], [413, /il est trop volumineux\.$/]]) {
+    const withHint = await rejection(send(createFakeGrist({}).docApi, answering(status(code)), FILE, { hint: PHOTO_UPLOAD_HINT }));
+    const without = await rejection(send(createFakeGrist({}).docApi, answering(status(code))));
+    assert.equal(withHint.message, without.message, `${code} : le même texte avec ou sans phrase`);
+    assert.match(withHint.message, expected);
+  }
 });

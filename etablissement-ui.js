@@ -36,9 +36,11 @@ const SELF_REMOVAL = 'Vous retirez votre propre accès : une fois enregistré, v
 //                                 cet établissement, et si la mienne en fait partie
 //                 meEmail         l'adresse de la personne connectée
 //               un échec porte dans `message` la phrase à montrer
-//   lookup      adresse → { name, initials } si la personne a une fiche visible dans l'annuaire,
-//               { hidden: true } si elle en a une qui n'y figure pas (son nom ne se dévoile pas),
-//               null si aucune fiche ne porte cette adresse
+//   lookup      adresse → { name, initials, photo } si la personne a une fiche visible dans l'annuaire
+//               (`photo` : l'identifiant de sa photo de profil, 0 sans photo), { hidden: true } si elle
+//               en a une qui n'y figure pas (son nom ne se dévoile pas), null si aucune fiche ne porte
+//               cette adresse
+//   renderAvatar  { initials, photo } → l'avatar rond d'une personne (avatar-ui.js)
 //   renderLogo  (fiche) → l'élément qui montre le logo actuel (null : le sigle en pastille)
 //   save        (draft, fiche) → promesse de { status: 'saved', unsaved, reloaded } ou
 //               { status: 'changed', fiche, notice } (la fiche a changé dans Grist pendant que la
@@ -353,8 +355,8 @@ export function createEtablissementDialog(dialog) {
   // peut en dire sans la dévoiler.
   function whoIs(email) {
     const found = session.lookup?.(email) ?? null;
-    if (found?.name) return { name: found.name, initials: found.initials, named: true };
-    return { name: found?.hidden ? 'Fiche masquée de l’annuaire' : 'Adresse sans fiche dans l’annuaire', initials: '@', named: false };
+    if (found?.name) return { name: found.name, initials: found.initials, photo: found.photo ?? 0, named: true };
+    return { name: found?.hidden ? 'Fiche masquée de l’annuaire' : 'Adresse sans fiche dans l’annuaire', initials: '@', photo: 0, named: false };
   }
 
   function responsableRow(item) {
@@ -363,8 +365,7 @@ export function createEtablissementDialog(dialog) {
     const row = el('li', 'es-resp');
     row.dataset.state = item.state;
     row.dataset.mail = item.email;
-    const avatar = el('div', 'avatar', person.initials);
-    avatar.setAttribute('aria-hidden', 'true');
+    const avatar = session.renderAvatar({ initials: person.initials, photo: person.photo });
     const main = el('div', 'es-resp-main');
     const label = el('p', 'es-resp-name', name);
     if (isMe(item.email)) label.append(el('span', 'es-tag es-tag-you', 'vous'));

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CATEGORIES, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE } from '../constants.js';
+import { CATEGORIES, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE, PROFILE_FIELDS } from '../constants.js';
 
 test('FILTERS lists the 7 filter buttons in display order: a grouping has no button of its own, it is the groups of the menu it arranges', () => {
   assert.deepEqual(FILTERS.map(f => f.key), ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement']);
@@ -123,4 +123,10 @@ test('LIST_CATEGORIES maps each ReferenceList column of BDD to its own reference
     { key: 'macroTaches', column: 'Taches', table: 'Taches', groups: 'taches' },
     { key: 'instances', column: 'Instances', table: 'INSTANCES' }
   ]);
+});
+
+test('the profile starts with the photo, which anybody edits on their own fiche, like the other columns of the person', () => {
+  assert.deepEqual(PROFILE_FIELDS[0], { key: 'Avatar', label: 'Photo de profil', kind: 'image' });
+  assert.equal(PROFILE_FIELDS.filter(field => field.kind === 'image').length, 1);
+  assert.ok(!PROFILE_FIELDS[0].admin, 'la photo n\'est pas réservée à un administrateur');
 });

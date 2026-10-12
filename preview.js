@@ -45,7 +45,7 @@ export function diffContacts(before, after) {
 }
 
 // Il y a quelque chose à montrer.
-export const hasMarks = marks => Object.keys(marks.texts).length + Object.keys(marks.tags).length > 0;
+export const hasMarks = marks => Object.keys(marks.texts).length + Object.keys(marks.tags).length + (marks.avatar ? 1 : 0) > 0;
 
 // { before, after, marks } pour la ligne `row` à laquelle on applique `values` (la
 // forme de buildRowUpdate : les cellules telles que Grist les stockera).
@@ -53,4 +53,16 @@ export function previewOf(row, values, referenceMaps, etabFlags) {
   const before = enrich(row, referenceMaps, etabFlags);
   const after = enrich({ ...row, ...values }, referenceMaps, etabFlags);
   return { before, after, marks: diffContacts(before, after) };
+}
+
+// Ajoute le changement de photo de profil (`change`, de rebaseChanges) à { before, after, marks }.
+// La nouvelle photo n'est pas encore dans Grist : la carte « après » la montre d'après l'image que le
+// formulaire vient de préparer (`photo.url`, une adresse locale à la page) ; si on retire la photo,
+// elle n'a plus que les initiales. `marks.avatar` : { before, after } (l'identifiant de la photo
+// actuelle, 0 sans photo ; 'replace' ou 'remove').
+export function withAvatarChange({ before, after, marks }, change, photo) {
+  const changed = change.action === 'replace'
+    ? { ...after, avatarUrl: String(photo?.url ?? '') }
+    : { ...after, Avatar: ['L'] };
+  return { before, after: changed, marks: { ...marks, avatar: { before: change.avant, after: change.action } } };
 }

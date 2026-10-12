@@ -5,6 +5,7 @@
 // Le fichier N est un SVG dont les proportions dépendent de N (de 60 x 30 à 180 x 50),
 // pour que les logos aient des formes différentes comme les vrais. Des fichiers
 // particuliers simulent les cas limites :
+//   PORTRAIT_FIRST à +99  des photos de profil (256 x 256), de couleur différente selon le numéro
 //   TALL_FILE      un logo en hauteur (40 x 120)
 //   WIDE_FILE      une bannière très large (300 x 30)
 //   UNSIZED_FILE   un SVG qui n'a qu'un viewBox, sans width ni height (100 x 50)
@@ -12,7 +13,7 @@
 //   BROKEN_FILE    le serveur répond 200 mais le contenu n'est pas une image
 //
 // Il reçoit aussi les envois de fichiers (POST <adresse>/attachments?auth=<jeton>, le logo d'un
-// établissement) : le fichier est gardé, reçoit l'identifiant suivant (à partir de FIRST_UPLOAD_ID)
+// établissement, la photo de profil d'une personne) : le fichier est gardé, reçoit l'identifiant suivant (à partir de FIRST_UPLOAD_ID)
 // et se télécharge ensuite comme les autres. `upload` règle la réponse du serveur :
 //   mode   'ok' (défaut), 'denied' (403), 'too-large' (413), 'error' (500), 'bad-answer' (200 sans
 //          identifiant), 'unreachable' (la connexion échoue)
@@ -28,6 +29,9 @@ export const BROKEN_FILE = 998;
 export const TALL_FILE = 997;
 export const WIDE_FILE = 996;
 export const UNSIZED_FILE = 995;
+// Les photos de profil des tests : les fichiers 500 à 599 sont des portraits carrés.
+export const PORTRAIT_FIRST = 500;
+const isPortrait = id => id >= PORTRAIT_FIRST && id < PORTRAIT_FIRST + 100;
 
 const SPECIAL_SIZES = {
   [TALL_FILE]: { width: 40, height: 120 },
@@ -46,6 +50,26 @@ function logoSvg(id) {
   return `<svg xmlns="http://www.w3.org/2000/svg"${size} viewBox="0 0 ${width} ${height}">`
     + `<rect width="${width}" height="${height}" rx="6" fill="hsl(${(id * 47) % 360} 55% 45%)"/>`
     + `<text x="50%" y="55%" fill="#fff" font-family="sans-serif" font-size="14" text-anchor="middle">${id}</text></svg>`;
+}
+
+// Six illustrations de visages, les mêmes que celles de la maquette v5 (de simples dessins, pas de
+// vraies personnes) : { fond, peau, haut, cheveux, longs }.
+const PORTRAITS = [
+  { bg: '#dbeafe', skin: '#f2c9a0', shirt: '#6257d9', hair: '#3b2a20', long: false },
+  { bg: '#fde7d9', skin: '#c68a62', shirt: '#1ba99a', hair: '#1b1b1f', long: true },
+  { bg: '#e8e6ff', skin: '#f5d3b3', shirt: '#d85b9d', hair: '#8a5a2b', long: true },
+  { bg: '#dff5ef', skin: '#8d5a3b', shirt: '#172033', hair: '#141414', long: false },
+  { bg: '#fff3d6', skin: '#ecbf97', shirt: '#f28a54', hair: '#d9a441', long: false },
+  { bg: '#e9ecf5', skin: '#d9a581', shirt: '#4f8ee8', hair: '#5b3a29', long: true }
+];
+
+function portraitSvg(id) {
+  const { bg, skin, shirt, hair, long } = PORTRAITS[(id - PORTRAIT_FIRST) % PORTRAITS.length];
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 120 120">'
+    + `<rect width="120" height="120" fill="${bg}"/>`
+    + (long ? `<ellipse cx="60" cy="58" rx="25" ry="31" fill="${hair}"/>` : '')
+    + `<path d="M16 120c2-26 22-38 44-38s42 12 44 38z" fill="${shirt}"/><rect x="52" y="64" width="16" height="22" rx="7" fill="${skin}"/>`
+    + `<ellipse cx="60" cy="52" rx="18" ry="21" fill="${skin}"/><path d="M41 50c-1-17 9-27 20-27 13 0 21 9 19 27-4-7-10-11-19-11s-15 4-20 11z" fill="${hair}"/></svg>`;
 }
 
 const ORIGIN = new URL(FAKE_ATTACHMENTS_URL).origin;
@@ -90,6 +114,7 @@ export async function routeAttachments(context) {
     if (id === BROKEN_FILE) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: 'ceci n\'est pas une image' });
     const stored = record.stored[id];
     if (stored) return route.fulfill({ status: 200, contentType: stored.contentType, body: stored.bytes });
+    if (isPortrait(id)) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: portraitSvg(id) });
     return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: logoSvg(id) });
   });
 

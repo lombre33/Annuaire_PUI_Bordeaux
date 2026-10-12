@@ -4,8 +4,9 @@
 // son choix d'apparaître), account-ui.js (son bandeau), pour la modification d'une
 // fiche, profile.js / profile-save.js / preview.js (la logique) avec profile-ui.js (la
 // fenêtre), pour celle d'un établissement etablissement.js / etablissement-save.js (la
-// logique), upload.js et image-prep.js (le logo) avec etablissement-ui.js (la fenêtre), et
-// branding.js, attachments.js et branding-ui.js (les logos : cartes, financeurs, fondateurs).
+// logique), upload.js et image-prep.js (le logo, la photo) avec etablissement-ui.js (la
+// fenêtre), branding.js, attachments.js et branding-ui.js (les logos : cartes, financeurs,
+// fondateurs) et avatar-ui.js (les photos de profil).
 
 import { CARD_LOGO, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS } from './constants.js';
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
@@ -15,15 +16,16 @@ import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
 import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges } from './profile.js';
-import { ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
+import { PHOTO_UPLOAD_HINT, ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
 import { createProfileDialog } from './profile-ui.js';
 import { diffEtablissement, etablissementOf, etablissementRightsFor, peopleOfEtablissement, responsablesOf } from './etablissement.js';
 import { EtablissementSaveError, readEtablissement, saveEtablissement, savePlanOf } from './etablissement-save.js';
 import { createEtablissementDialog } from './etablissement-ui.js';
 import { uploadAttachment } from './upload.js';
 import { buildBranding, logoForContact } from './branding.js';
-import { createAttachments } from './attachments.js';
+import { avatarIdOf, createAttachments } from './attachments.js';
 import { createBrandingUI, createLogoImage, sizeLogo } from './branding-ui.js';
+import { createAvatar, createPhotoViewer, createThumb } from './avatar-ui.js';
 
 const state = {
   allContacts: [],
@@ -72,21 +74,24 @@ const elements = {
   scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
 
+// Les logos et les photos de profil sont des pièces jointes de Grist : leurs adresses demandent
+// un jeton, réclamé à Grist seulement quand une image est à afficher.
+const attachments = createAttachments(window.grist.docApi);
+
 // Bandeau « Ma présence » (voir « Ma présence » plus bas) : masqué tant que la
 // personne connectée n'est pas identifiée et retrouvée dans BDD.
 const accountBar = createAccountBar(document.getElementById('accountBar'), {
   onToggle: togglePresence,
   onEdit: openOwnProfile,
   onEtab: openMyEtablissement,
-  onAdminMode: toggleAdminMode
+  onAdminMode: toggleAdminMode,
+  attachments
 });
 
 const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
 const etablissementDialog = createEtablissementDialog(document.getElementById('etabDialog'));
 
-// Les logos sont des pièces jointes de Grist : leurs adresses demandent un jeton,
-// réclamé à Grist seulement quand un logo est à afficher.
-const attachments = createAttachments(window.grist.docApi);
+const photoViewer = createPhotoViewer(document.getElementById('photoDialog'), attachments);
 const brandingUI = createBrandingUI({
   funders: document.getElementById('funders'),
   fundersLogos: document.getElementById('fundersLogos'),
@@ -138,10 +143,15 @@ function refreshCards() {
   updateFilterCounts(elements.filtersContainer, currentCounts());
 }
 
-// Un seul écouteur pour tous les boutons « Modifier » : les cartes sont reconstruites à
-// chaque filtre. Les cartes étant redessinées après un enregistrement, le focus revient
+// Un seul écouteur pour tous les boutons « Modifier » et les photos à agrandir : les cartes sont
+// reconstruites à chaque filtre. Les cartes étant redessinées après un enregistrement, le focus revient
 // au bouton de la même fiche et non à celui, disparu, qui a ouvert la fenêtre.
 elements.grid.addEventListener('click', event => {
+  const zoom = event.target.closest('.avatar-zoom');
+  if (zoom) {
+    photoViewer.open({ photo: Number(zoom.dataset.photo), name: zoom.dataset.name, detail: zoom.dataset.detail });
+    return;
+  }
   const edit = event.target.closest('.card-edit');
   if (edit) {
     const rowId = Number(edit.dataset.rowId);
@@ -331,7 +341,12 @@ function refreshAccount() {
       + `${persons.map(person => person.row.id).join(', ')}) : le choix de présence s'applique à toutes, `
       + 'le bouton « Modifier mon profil » n\'est pas proposé (chaque carte garde le sien).');
   }
-  accountBar.show({ name: persons[0].name || 'Ma fiche', initials: initials(persons[0].row), ...describePresence(persons) });
+  accountBar.show({
+    name: persons[0].name || 'Ma fiche',
+    initials: initials(persons[0].row),
+    photo: avatarIdOf(persons[0].row.Avatar),
+    ...describePresence(persons)
+  });
   // Plusieurs fiches pour la même adresse : on ne sait pas laquelle ouvrir depuis le bandeau.
   accountBar.setActions({ edit: persons.length === 1, etab: myEtablissements().length > 0, admin, adminMode: state.adminMode });
 }
@@ -392,7 +407,10 @@ readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.
 // Une erreur attendue (ProfileSaveError) porte une phrase française ; toute autre est
 // consignée dans la console et remplacée par une phrase générale.
 function userFacing(error) {
-  if (error instanceof ProfileSaveError) return error;
+  if (error instanceof ProfileSaveError) {
+    if (!error.leftover) return error;
+    return new Error(`${error.message} Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.`);
+  }
   console.error('[PROFIL] Erreur inattendue :', error);
   return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
 }
@@ -460,7 +478,9 @@ async function reviewProfile(row, draft, admin) {
 async function saveReviewed(row, review, draft, admin) {
   let result;
   try {
-    result = await saveProfile(window.grist.docApi, review);
+    result = await saveProfile(window.grist.docApi, review, {
+      upload: file => uploadAttachment(window.grist.docApi, file, { hint: PHOTO_UPLOAD_HINT })
+    });
   } catch (error) {
     throw userFacing(error);
   }
@@ -469,11 +489,12 @@ async function saveReviewed(row, review, draft, admin) {
       status: 'changed',
       review: await reviewProfile(row, draft, admin),
       notice: 'La fiche a changé dans Grist pendant la relecture. Relisez ce qui suit, puis validez à nouveau.'
+        + (result.leftover ? ' Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.' : '')
     };
   }
   const outcome = await reloadDirectory();
   const saved = outcome === 'applied' ? state.people?.findById(review.rowId)?.row : null;
-  const leftovers = saved ? unsavedLabels(review, saved, state.referenceMaps) : [];
+  const leftovers = saved ? unsavedLabels(review, saved, state.referenceMaps, { attachmentId: result.attachmentId }) : [];
   return { status: 'saved', lines: review.lines, leftovers, reloaded: outcome !== 'failed' };
 }
 
@@ -496,6 +517,10 @@ function etablissementBadge(row, label) {
   return holder;
 }
 
+// L'avatar rond d'une personne dans les fenêtres : sa photo de Grist, celle qu'elle vient de choisir
+// ({ url }) ou ses initiales.
+const renderAvatar = ({ initials: letters, photo }) => createAvatar({ initials: letters, photo, attachments });
+
 // Ouvre la fenêtre de modification de la fiche `rowId`, si la personne connectée en a le
 // droit : la sienne, ou n'importe laquelle pour une administratrice. Fermé par défaut.
 // `returnFocus` redonne le focus à l'endroit d'où la fenêtre a été ouverte, à sa fermeture.
@@ -510,7 +535,7 @@ function openProfile(rowId, returnFocus) {
   profileDialog.open({
     mode: rights,
     viewerAdmin: isAdmin(),
-    person: { name: person.name || 'Sans nom', email: text(row.email), initials: initials(row) },
+    person: { name: person.name || 'Sans nom', email: text(row.email), initials: initials(row), photo: avatarIdOf(row.Avatar) },
     etablissement: person.etablissement,
     model,
     draft: draftOf(model),
@@ -520,6 +545,13 @@ function openProfile(rowId, returnFocus) {
     fieldWarning: (key, value) => (key === 'Etablissement' ? etablissementWarning(value) : ''),
     save: (review, draft) => saveReviewed(row, review, draft, admin),
     renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks, cardLogos()),
+    renderAvatar,
+    renderThumb: (photo, label) => createThumb({
+      photo,
+      attachments,
+      label,
+      onOpen: () => photoViewer.open({ photo, name: person.name || 'Sans nom', detail: label })
+    }),
     renderEtablissement: label => etablissementBadge(row, label),
     notify: showToast,
     onClose: returnFocus
@@ -551,7 +583,7 @@ function lookupPerson(email) {
   const found = state.people?.findByEmail(email) ?? [];
   if (found.length === 0) return null;
   const shown = found.find(person => person.status.visible && person.name);
-  return shown ? { name: shown.name, initials: initials(shown.row) } : { hidden: true };
+  return shown ? { name: shown.name, initials: initials(shown.row), photo: avatarIdOf(shown.row.Avatar) } : { hidden: true };
 }
 
 // Ce que la fenêtre montre de l'établissement : la fiche lue dans Grist (readEtablissement) et, de
@@ -652,6 +684,7 @@ function openEtablissement(ids, onClose) {
     choices,
     load: loadFiche,
     lookup: lookupPerson,
+    renderAvatar,
     renderLogo: etablissementLogo,
     save: saveFiche,
     notify: showToast,

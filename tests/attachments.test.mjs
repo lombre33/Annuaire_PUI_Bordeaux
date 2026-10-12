@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attachmentIds, createAttachments } from '../attachments.js';
+import { attachmentIds, avatarIdOf, createAttachments } from '../attachments.js';
 import { createFakeGrist, FAKE_ATTACHMENTS_URL } from './support/fake-grist.js';
 
 // ===== attachmentIds : les fichiers d'une cellule « Pièces jointes » =====
@@ -18,6 +18,17 @@ test('attachmentIds returns nothing for an empty or unexpected cell', () => {
 
 test('attachmentIds keeps only whole positive numbers from a mixed list', () => {
   assert.deepEqual(attachmentIds(['L', 5, 'x', null, 0, 7]), [5, 7]);
+});
+
+// ===== avatarIdOf : la photo de profil d'une cellule Avatar =====
+
+test('avatarIdOf gives the first attachment of the cell, and 0 when the person has no photo', () => {
+  assert.equal(avatarIdOf(['L', 501]), 501);
+  assert.equal(avatarIdOf(['L', 7, 8]), 7, 'plusieurs pièces jointes : on montre la première');
+  assert.equal(avatarIdOf(['L', 'x', 9]), 9);
+  for (const cell of [null, undefined, 0, '', ['L'], [], ['L', 0], ['L', -1], 'photo.jpg', {}]) {
+    assert.equal(avatarIdOf(cell), 0, JSON.stringify(cell));
+  }
 });
 
 // ===== createAttachments : jeton, adresses, renouvellement =====

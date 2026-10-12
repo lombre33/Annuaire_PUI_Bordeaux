@@ -6,7 +6,7 @@ import {
 } from '../profile.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
-import { sampleTables, withoutOptionalColumns, withTaskActions } from './fixtures.mjs';
+import { sampleTables, withAvatars, withoutOptionalColumns, withTaskActions } from './fixtures.mjs';
 
 // ===== profile : qui peut modifier une fiche, ce qu'on peut y changer, et ce qui change =====
 
@@ -49,7 +49,7 @@ test('profileFormModel lists the options of each reference sorted by label, and 
   const model = profileFormModel(row(1), referenceMaps);
   assert.deepEqual(field(model, 'Instances').options.map(option => option.label), ['CME', 'COVIRIS']);
   assert.deepEqual(field(model, 'Role_dans_le_PUI').options, [{ id: 1, label: 'Référent qualité' }]);
-  for (const forbidden of ['email', 'Etablissement', 'perimetre', 'Accepte_apparaitre', 'Avatar']) {
+  for (const forbidden of ['email', 'Etablissement', 'perimetre', 'Accepte_apparaitre']) {
     assert.equal(field(model, forbidden), undefined, forbidden);
   }
 });
@@ -599,4 +599,145 @@ test('describeChanges says the e-mail and the établissement like any other text
     { key: 'email', label: 'E-mail', kind: 'email', before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@u-bordeaux-montaigne.fr' },
     { key: 'Etablissement', label: 'Établissement', kind: 'reference', before: 'Université Bordeaux Montaigne', after: 'CHU de Bordeaux' }
   ]);
+});
+
+// ===== La photo de profil (colonne Avatar de BDD, pièce jointe) =====
+
+// Une photo que le formulaire vient de préparer (image-prep.js) : le fichier et son adresse locale.
+const photo = (overrides = {}) => ({ blob: new Blob(['jpeg']), name: 'photo-de-profil.jpg', width: 256, height: 256, url: 'blob:http://widget/1', ...overrides });
+
+test('profileFormModel offers the photo first, with the id of the current attachment, only when BDD has an Avatar column', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const ana = profileFormModel(row(1), referenceMaps);
+  assert.deepEqual(ana[0], { key: 'Avatar', label: 'Photo de profil', kind: 'image', value: 501 });
+  assert.deepEqual(ana.slice(1).map(entry => entry.key), ['prenom', 'nom', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+  assert.ok(!('options' in ana[0]) && !('category' in ana[0]));
+
+  const without = await setup();
+  assert.equal(field(profileFormModel(without.row(1), without.referenceMaps), 'Avatar'), undefined, 'rien à modifier sans la colonne');
+});
+
+test('profileFormModel shows 0 for a person without photo, whatever form Grist gives an empty attachment cell', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  assert.equal(field(profileFormModel(row(9), referenceMaps), 'Avatar').value, 0, "une liste vide ['L']");
+  assert.equal(field(profileFormModel(row(10), referenceMaps), 'Avatar').value, 0, 'une cellule null');
+  const odd = { ...row(1), Avatar: 0 };
+  assert.equal(field(profileFormModel(odd, referenceMaps), 'Avatar').value, 0);
+  const several = { ...row(1), Avatar: ['L', 7, 8] };
+  assert.equal(field(profileFormModel(several, referenceMaps), 'Avatar').value, 7, 'la première pièce jointe est celle qu’on montre');
+});
+
+test('profileFormModel offers the photo to an administrator too, still first', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const keys = profileFormModel(row(1), referenceMaps, { admin: true }).map(entry => entry.key);
+  assert.deepEqual(keys.slice(0, 3), ['Avatar', 'prenom', 'nom']);
+  assert.ok(keys.includes('email') && keys.includes('Etablissement'));
+});
+
+test('draftOf starts the photo at the current attachment id', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  assert.equal(draftOf(profileFormModel(row(1), referenceMaps)).Avatar, 501);
+  assert.equal(draftOf(profileFormModel(row(9), referenceMaps)).Avatar, 0);
+});
+
+test('diffProfile sees no change in a photo left as it is, with or without one', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  assert.deepEqual(diffProfile(row(1), { Avatar: 501 }, referenceMaps), { champs: {}, errors: [], fieldErrors: {} });
+  assert.deepEqual(diffProfile(row(9), { Avatar: 0 }, referenceMaps), { champs: {}, errors: [], fieldErrors: {} });
+  assert.deepEqual(diffProfile(row(10), { Avatar: 0 }, referenceMaps), { champs: {}, errors: [], fieldErrors: {} }, 'cellule null : rien à retirer');
+});
+
+test('diffProfile records a new photo as a replacement and keeps the id of the one it replaces', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  assert.deepEqual(diffProfile(row(1), { Avatar: photo() }, referenceMaps).champs, { Avatar: { action: 'replace', avant: 501 } });
+  assert.deepEqual(diffProfile(row(9), { Avatar: photo() }, referenceMaps).champs, { Avatar: { action: 'replace', avant: 0 } }, 'une première photo');
+});
+
+test('diffProfile records 0 as the removal of the photo, and nothing when there is none to remove', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  assert.deepEqual(diffProfile(row(1), { Avatar: 0 }, referenceMaps).champs, { Avatar: { action: 'remove', avant: 501 } });
+  assert.deepEqual(diffProfile(row(9), { Avatar: 0 }, referenceMaps).champs, {});
+});
+
+test('diffProfile refuses every other photo: an attachment id that is not the current one, an empty or foreign object', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const refused = [502, 1, 999999, -1, 1.5, '501', '', 'photo', null, undefined, true, [], [501], {}, { url: 'blob:x' },
+    { blob: new Blob([]) }, { blob: { size: 0 } }, { blob: 'x' }, photo({ blob: new Blob([]) }), { blob: { size: -3 } }, { blob: { size: NaN } }];
+  for (const input of refused) {
+    const result = diffProfile(row(1), { Avatar: input }, referenceMaps);
+    assert.deepEqual(result.champs, {}, `${String(JSON.stringify(input))} n’est pas un changement`);
+    assert.deepEqual(result.fieldErrors, { Avatar: 'Valeur illisible.' }, `${String(JSON.stringify(input))} est refusée`);
+    assert.equal(result.errors.length, 1);
+  }
+});
+
+test('diffProfile never lets a draft point to another attachment of the document: only the current id, 0 or a prepared file', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  // 502 est la photo de Bob : une fiche ne peut pas la reprendre en la désignant par son numéro.
+  assert.deepEqual(diffProfile(row(1), { Avatar: 502 }, referenceMaps).fieldErrors, { Avatar: 'Valeur illisible.' });
+  assert.deepEqual(diffProfile(row(9), { Avatar: 502 }, referenceMaps).fieldErrors, { Avatar: 'Valeur illisible.' });
+});
+
+test('diffProfile ignores the photo of a draft when the row has no Avatar column, and a draft that does not mention it', async () => {
+  const plain = await setup();
+  assert.deepEqual(diffProfile(plain.row(1), { Avatar: photo() }, plain.referenceMaps), { champs: {}, errors: [], fieldErrors: {} });
+  const { referenceMaps, row } = await setup(withAvatars());
+  assert.deepEqual(diffProfile(row(1), { Fonction: 'Cheffe' }, referenceMaps).champs, { Fonction: { avant: 'Pharmacienne', apres: 'Cheffe' } });
+});
+
+test('diffProfile combines the photo with the other changes', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const { champs, errors } = diffProfile(row(1), { Avatar: photo(), Fonction: 'Cheffe' }, referenceMaps);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(Object.keys(champs).sort(), ['Avatar', 'Fonction']);
+  // Une erreur ailleurs ne change pas la lecture de la photo.
+  const broken = diffProfile(row(1), { Avatar: photo(), Fonction: '=SOMME(A1)' }, referenceMaps);
+  assert.equal(broken.errors.length, 1);
+  assert.deepEqual(broken.champs.Avatar, { action: 'replace', avant: 501 });
+});
+
+test('rebaseChanges keeps a photo change as it is while the photo has not moved', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const { champs } = diffProfile(row(1), { Avatar: photo() }, referenceMaps);
+  assert.deepEqual(rebaseChanges(champs, row(1), referenceMaps), { champs: { Avatar: { action: 'replace', avant: 501 } }, moved: [] });
+  const { champs: removal } = diffProfile(row(1), { Avatar: 0 }, referenceMaps);
+  assert.deepEqual(rebaseChanges(removal, row(1), referenceMaps), { champs: { Avatar: { action: 'remove', avant: 501 } }, moved: [] });
+});
+
+test('rebaseChanges names the photo when somebody else changed it, and starts from the photo of today', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const { champs } = diffProfile(row(1), { Avatar: photo() }, referenceMaps);
+  const today = { ...row(1), Avatar: ['L', 777] };
+  assert.deepEqual(rebaseChanges(champs, today, referenceMaps), { champs: { Avatar: { action: 'replace', avant: 777 } }, moved: ['Photo de profil'] });
+  const { champs: removal } = diffProfile(row(1), { Avatar: 0 }, referenceMaps);
+  assert.deepEqual(rebaseChanges(removal, today, referenceMaps), { champs: { Avatar: { action: 'remove', avant: 777 } }, moved: ['Photo de profil'] });
+  // Quelqu'un a mis une première photo là où la personne n'en avait pas.
+  const { champs: first } = diffProfile(row(9), { Avatar: photo() }, referenceMaps);
+  assert.deepEqual(rebaseChanges(first, { ...row(9), Avatar: ['L', 5] }, referenceMaps), { champs: { Avatar: { action: 'replace', avant: 5 } }, moved: ['Photo de profil'] });
+});
+
+test('rebaseChanges drops the removal of a photo that somebody else has already removed, and says nothing', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const { champs } = diffProfile(row(1), { Avatar: 0 }, referenceMaps);
+  assert.deepEqual(rebaseChanges(champs, { ...row(1), Avatar: ['L'] }, referenceMaps), { champs: {}, moved: [] });
+  assert.deepEqual(rebaseChanges(champs, { ...row(1), Avatar: null }, referenceMaps), { champs: {}, moved: [] });
+});
+
+test('rebaseChanges still replaces a photo that was removed meanwhile, and says so', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const { champs } = diffProfile(row(1), { Avatar: photo() }, referenceMaps);
+  assert.deepEqual(rebaseChanges(champs, { ...row(1), Avatar: ['L'] }, referenceMaps), { champs: { Avatar: { action: 'replace', avant: 0 } }, moved: ['Photo de profil'] });
+});
+
+test('describeChanges puts the photo first, with the current id and the action, and no file', async () => {
+  const { referenceMaps, row } = await setup(withAvatars());
+  const { champs } = diffProfile(row(1), { Fonction: 'Cheffe', Avatar: photo() }, referenceMaps);
+  const lines = describeChanges(champs);
+  assert.deepEqual(lines.map(line => line.key), ['Avatar', 'Fonction']);
+  assert.deepEqual(lines[0], { key: 'Avatar', label: 'Photo de profil', kind: 'image', before: 501, after: 'replace' });
+  const removal = describeChanges(diffProfile(row(1), { Avatar: 0 }, referenceMaps).champs);
+  assert.deepEqual(removal, [{ key: 'Avatar', label: 'Photo de profil', kind: 'image', before: 501, after: 'remove' }]);
+  const first = describeChanges(diffProfile(row(9), { Avatar: photo() }, referenceMaps).champs);
+  assert.deepEqual(first, [{ key: 'Avatar', label: 'Photo de profil', kind: 'image', before: 0, after: 'replace' }]);
+  assert.ok(!JSON.stringify(lines).includes('blob'), 'le fichier n’est jamais dans les lignes montrées');
 });

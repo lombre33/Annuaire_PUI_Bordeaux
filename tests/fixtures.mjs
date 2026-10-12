@@ -150,7 +150,8 @@ export function withSchema(tables = sampleTables(), { phoneType = 'Numeric' } = 
     ['Etablissement', 'Ref:Etablissements'], ['Role_dans_le_PUI', 'Ref:Role_Dans_le_PUI'],
     ['Instances', 'RefList:INSTANCES'], ['Actions', 'RefList:Actions'], ['GT', 'RefList:GT'],
     ['Communautes', 'RefList:Communautes'], ['Taches', 'RefList:Taches'], ['Competences', 'RefList:Competences'],
-    ['perimetre', 'RefList:REMMAPING_PERIMETRES_COMPETENCES'], ['Accepte_apparaitre', 'Bool']
+    ['perimetre', 'RefList:REMMAPING_PERIMETRES_COMPETENCES'], ['Accepte_apparaitre', 'Bool'],
+    ...('Avatar' in tables.BDD ? [['Avatar', 'Attachments']] : [])
   ];
   copy._grist_Tables_column = {
     id: bdd.map((_, index) => index + 1),
@@ -158,6 +159,17 @@ export function withSchema(tables = sampleTables(), { phoneType = 'Numeric' } = 
     colId: bdd.map(([colId]) => colId),
     type: bdd.map(([, type]) => type)
   };
+  return copy;
+}
+
+// Les photos de profil : la colonne Avatar de BDD (pièces jointes). Les fichiers 500 à 599 sont des
+// portraits que tests/support/fake-attachments.mjs dessine. Ana a le 501, Bob le 502, Hostile un
+// fichier qui n'est pas une image (998 : les initiales restent), Hugo une cellule vide (null, comme
+// Grist en donne pour une pièce jointe jamais remplie) et les autres une liste vide.
+export const AVATAR_FILES = { 1: 501, 2: 502, 6: 998 };
+export function withAvatars(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  copy.BDD.Avatar = copy.BDD.id.map(id => (id === 10 ? null : AVATAR_FILES[id] ? ['L', AVATAR_FILES[id]] : ['L']));
   return copy;
 }
 

@@ -1,8 +1,8 @@
-// Pièces jointes de Grist (logos des établissements et des financeurs, plus tard les
-// avatars). Une colonne « Pièces jointes » contient une liste d'identifiants
-// ['L', 12, 13] ; le fichier se télécharge avec un jeton d'accès en lecture seule que
-// Grist délivre au widget (docApi.getAccessToken). Rien ici ne touche le DOM : les
-// images sont construites par branding-ui.js.
+// Pièces jointes de Grist (logos des établissements et des financeurs, photos de profil).
+// Une colonne « Pièces jointes » contient une liste d'identifiants ['L', 12, 13] ; le fichier se
+// télécharge avec un jeton d'accès en lecture seule que Grist délivre au widget
+// (docApi.getAccessToken). Rien ici ne touche le DOM : les images sont construites par
+// branding-ui.js (logos) et avatar-ui.js (photos).
 
 // Durée de validité supposée quand Grist n'en annonce pas.
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
@@ -25,6 +25,11 @@ export function attachmentIds(cell) {
   const items = Array.isArray(cell) ? cell : [cell];
   return items.filter(item => Number.isInteger(item) && item > 0);
 }
+
+// L'identifiant de la pièce jointe de la photo de profil d'une cellule `Avatar` de BDD (['L', 12]),
+// ou 0 si la personne n'en a pas. Une cellule qui en porte plusieurs donne la première : c'est elle
+// qu'on montre.
+export const avatarIdOf = cell => attachmentIds(cell)[0] ?? 0;
 
 // Réponse de docApi.getAccessToken : { token, baseUrl, ttlMsecs }. null si elle est
 // inutilisable (pas de jeton, adresse qui n'est pas une adresse web, adresse déjà

@@ -5,14 +5,18 @@
 // DOM seulement : ce qui change (profile.js), ce qui s'écrit (profile-save.js) et les
 // cartes (render.js) viennent de la session que main.js donne à open().
 
-import { CATEGORIES } from './constants.js';
+import { CATEGORIES, IMAGE_RULES } from './constants.js';
 import { formatPhone, normalize } from './grist-data.js';
 import { button, el, notice } from './dom.js';
+import { megabytes, prepareImage } from './image-prep.js';
 import { frenchPhoneDigits, NAME_REQUIRED } from './profile.js';
 import { renderChangeList } from './changes-ui.js';
 
 // Au-delà de ce nombre de valeurs, un sélecteur propose une recherche.
 const SEARCH_FROM = 12;
+
+const PHOTO_HELP = 'Elle remplace les initiales sur la carte et s’agrandit au clic. '
+  + `JPG, PNG ou WebP, ${megabytes(IMAGE_RULES.avatar.maxBytes)} au maximum, recadrée en carré.`;
 
 const fieldsChanged = count => `${count} champ${count > 1 ? 's' : ''} modifié${count > 1 ? 's' : ''}`;
 
@@ -21,7 +25,8 @@ const fieldsChanged = count => `${count} champ${count > 1 ? 's' : ''} modifié${
 // open(session) :
 //   mode          'own' (sa propre fiche) ou 'admin' (celle d'une autre personne)
 //   viewerAdmin   la personne connectée est administratrice, même sur sa propre fiche
-//   person        { name, email, initials } de la fiche
+//   person        { name, email, initials, photo } de la fiche (`photo` : l'identifiant de sa photo
+//                 de profil dans Grist, 0 sans photo)
 //   etablissement libellé de son établissement
 //   renderEtablissement  (facultatif) libellé → l'élément qui montre l'établissement dans le bloc
 //                 d'identité (son logo quand Grist en a un) ; sans lui, une pastille avec le nom
@@ -40,6 +45,9 @@ const fieldsChanged = count => `${count} champ${count > 1 ? 's' : ''} modifié${
 //                 reloaded } ou { status: 'changed', review, notice } (la fiche a changé
 //                 pendant la relecture : rien n'est écrit) ; un échec porte `message`
 //   renderCard    (contact, marks) → la carte à montrer (render.js)
+//   renderAvatar  { initials, photo } → l'avatar rond (identifiant de pièce jointe, 0 ou { url } : voir
+//                 avatar-ui.js ; les initiales sans photo)
+//   renderThumb   (photo, légende) → la miniature d'une photo, qui l'agrandit au clic (ou null)
 //   notify        (facultatif) message → la confirmation d'un enregistrement sans réserve,
 //                 donnée une fois la fenêtre fermée
 //   onClose       (facultatif) appelé quand la fenêtre est fermée : rend le focus à
@@ -58,9 +66,20 @@ export function createProfileDialog(dialog) {
   let evaluation = { errors: [], fieldErrors: {}, lines: [] };
   let review = null;
   let escapeArmed = false;
+  let preparingPhoto = false;
   let ui = {};
 
   const isAdmin = () => session.mode === 'admin';
+
+  // ----- La photo du brouillon -----
+  // `draft.Avatar` vaut l'identifiant de la photo actuelle (rien ne change), 0 (la retirer) ou
+  // l'image que le formulaire vient de préparer (image-prep.js) avec `url`, son adresse locale. Cette
+  // adresse est libérée dès que la photo n'est plus dans le brouillon, et à la fermeture.
+  const isChosenPhoto = value => Boolean(value) && typeof value === 'object';
+
+  function forgetPhoto() {
+    if (isChosenPhoto(draft.Avatar)) URL.revokeObjectURL(draft.Avatar.url);
+  }
 
   function setHeading(heading, detail) {
     title.textContent = heading;
@@ -83,7 +102,7 @@ export function createProfileDialog(dialog) {
   function identityBlock() {
     const { person, etablissement } = session;
     const box = el('div', 'ident');
-    box.append(el('div', 'avatar', person.initials));
+    box.append(session.renderAvatar({ initials: person.initials, photo: person.photo }));
     const main = el('div', 'ident-main');
     main.append(el('p', 'ident-name', person.name), el('p', 'ident-mail', person.email));
     if (!isAdmin()) {
@@ -94,6 +113,112 @@ export function createProfileDialog(dialog) {
     box.append(main);
     if (etablissement) box.append(session.renderEtablissement?.(etablissement) ?? el('span', 'et-pill', etablissement));
     return box;
+  }
+
+  // ===== La photo de profil =====
+
+  function paintPhoto() {
+    const has = Boolean(draft.Avatar);
+    ui.photoPreview.replaceChildren(session.renderAvatar({ initials: session.person.initials, photo: draft.Avatar }));
+    ui.photoAdd.textContent = has ? 'Changer la photo' : 'Ajouter une photo';
+    ui.photoRemove.hidden = !has;
+  }
+
+  function photoError(message) {
+    ui.photoErr.textContent = message;
+    ui.photoErr.hidden = message === '';
+  }
+
+  // Pendant que l'image se prépare, les deux boutons et « Relire » attendent (refresh() lit le drapeau).
+  // Les boutons sont marqués `aria-disabled` et non `disabled` : un bouton désactivé perd le focus du
+  // clavier, qui ne reviendrait pas une fois l'image prête.
+  function setPhotoBusy(busy) {
+    preparingPhoto = busy;
+    for (const control of [ui.photoAdd, ui.photoRemove]) {
+      if (busy) control.setAttribute('aria-disabled', 'true');
+      else control.removeAttribute('aria-disabled');
+    }
+    ui.photoStatus.textContent = busy ? 'Préparation de l’image…' : '';
+    refresh();
+  }
+
+  // « Retirer la photo » : le brouillon n'a plus de photo, qu'elle soit celle de Grist ou celle qu'on vient de
+  // choisir. Sans photo au départ, choisir puis retirer revient à ne rien changer. Le bouton disparaît :
+  // le focus passe à « Ajouter une photo » plutôt que de se perdre.
+  function dropPhoto() {
+    if (preparingPhoto) return;
+    forgetPhoto();
+    draft.Avatar = 0;
+    photoError('');
+    paintPhoto();
+    ui.photoAdd.focus();
+    refresh();
+  }
+
+  async function choosePhoto(file) {
+    const mine = generation;
+    photoError('');
+    setPhotoBusy(true);
+    let prepared;
+    try {
+      prepared = await prepareImage(file, IMAGE_RULES.avatar);
+    } catch (error) {
+      if (mine !== generation) return;
+      setPhotoBusy(false);
+      if (error?.name === 'ImageError') photoError(error.message);
+      else {
+        console.error('[IMAGE] Préparation de l\'image impossible :', error);
+        photoError('Cette image n’a pas pu être lue : choisissez un autre fichier.');
+      }
+      return;
+    }
+    if (mine !== generation || phase !== 'editing') return;
+    forgetPhoto();
+    prepared.url = URL.createObjectURL(prepared.blob);
+    draft.Avatar = prepared;
+    paintPhoto();
+    setPhotoBusy(false);
+  }
+
+  // Le cadre « Photo de profil » du formulaire : la photo du brouillon, les deux boutons et l'aide.
+  function photoSection() {
+    const box = el('section', 'photo-field');
+    ui.photoPreview = el('div', 'photo-preview');
+    const help = el('p', 'photo-help', PHOTO_HELP);
+    help.id = 'profilePhotoHelp';
+    ui.photoErr = el('p', 'fld-err');
+    ui.photoErr.id = 'profilePhotoError';
+    ui.photoErr.hidden = true;
+    ui.photoStatus = el('p', 'photo-status');
+    ui.photoStatus.setAttribute('role', 'status');
+    const file = document.createElement('input');
+    file.type = 'file';
+    file.accept = IMAGE_RULES.avatar.types.join(',');
+    file.hidden = true;
+    file.id = 'profilePhotoFile';
+    file.setAttribute('aria-label', 'Choisir une photo de profil');
+    file.setAttribute('aria-describedby', `${help.id} ${ui.photoErr.id}`);
+    file.addEventListener('change', () => {
+      const chosen = file.files[0];
+      file.value = '';
+      if (chosen) choosePhoto(chosen);
+    });
+    ui.photoAdd = button('', 'btn', () => { if (!preparingPhoto) file.click(); });
+    ui.photoRemove = button('Retirer la photo', 'btn btn-danger', dropPhoto);
+    const actions = el('div', 'photo-actions');
+    actions.append(ui.photoAdd, ui.photoRemove);
+    const info = el('div', 'photo-info');
+    info.append(el('h3', 'photo-title', 'Photo de profil'), help, actions, ui.photoStatus, ui.photoErr, file);
+    box.append(ui.photoPreview, info);
+    paintPhoto();
+    return box;
+  }
+
+  // Les miniatures de la ligne « Photo de profil » d'une liste de changements : la photo actuelle,
+  // puis la nouvelle (celle du brouillon). Rien pour une photo qui n'existe pas.
+  function photoThumb(side, line) {
+    const photo = side === 'before' ? line.before : (line.after === 'replace' ? draft.Avatar : 0);
+    return photo ? session.renderThumb(photo, side === 'before' ? 'Photo actuelle' : 'Nouvelle photo') : null;
   }
 
   function textField(field) {
@@ -312,11 +437,11 @@ export function createProfileDialog(dialog) {
 
     // « Ce qui va changer » se lit sous le formulaire pendant qu'on le remplit.
     ui.recap.hidden = lines.length === 0;
-    ui.recap.replaceChildren(...(lines.length === 0 ? [] : [el('h4', 'recap-title', 'Ce qui va changer'), renderChangeList(lines)]));
+    ui.recap.replaceChildren(...(lines.length === 0 ? [] : [el('h4', 'recap-title', 'Ce qui va changer'), renderChangeList(lines, photoThumb)]));
 
     ui.summary.textContent = errors.length > 0 ? faultSummary(fieldErrors)
       : lines.length === 0 ? 'Aucune modification' : fieldsChanged(lines.length);
-    ui.review.disabled = errors.length > 0 || lines.length === 0;
+    ui.review.disabled = errors.length > 0 || lines.length === 0 || preparingPhoto;
   }
 
   function renderEditing() {
@@ -337,12 +462,14 @@ export function createProfileDialog(dialog) {
 
     const grid = el('div', 'fld-grid');
     const pickers = [];
+    let photo = null;
     session.model.forEach(field => {
-      if (field.kind === 'text' || field.kind === 'phone' || field.kind === 'email') grid.append(textField(field));
+      if (field.kind === 'image') photo = photoSection();
+      else if (field.kind === 'text' || field.kind === 'phone' || field.kind === 'email') grid.append(textField(field));
       else if (field.kind === 'reference') grid.append(referenceField(field));
       else pickers.push(picker(field));
     });
-    body.replaceChildren(ui.alert, identityBlock(), grid, ...pickers, ui.recap);
+    body.replaceChildren(ui.alert, identityBlock(), ...(photo ? [photo] : []), grid, ...pickers, ui.recap);
 
     ui.review = button(isAdmin() ? 'Relire les modifications' : 'Relire mes modifications', 'btn btn-primary', startReview);
     renderFoot('', button('Annuler', 'btn', () => dialog.close()), ui.review);
@@ -437,7 +564,7 @@ export function createProfileDialog(dialog) {
     );
     const detail = el('section', 'recap');
     detail.setAttribute('aria-label', 'Détail des changements');
-    detail.append(el('h4', 'recap-title', 'Détail des changements'), renderChangeList(review.lines));
+    detail.append(el('h4', 'recap-title', 'Détail des changements'), renderChangeList(review.lines, photoThumb));
     parts.push(cards, detail);
     body.replaceChildren(...parts);
 
@@ -508,7 +635,7 @@ export function createProfileDialog(dialog) {
       el('p', '', 'Elles s\'appliquent tout de suite dans Grist, sans validation.')
     );
     const recap = el('div', 'recap');
-    recap.append(el('h4', 'recap-title', 'Ce qui a changé'), renderChangeList(result.lines));
+    recap.append(el('h4', 'recap-title', 'Ce qui a changé'), renderChangeList(result.lines, photoThumb));
     done.append(recap);
     const parts = [done];
     if (result.leftovers.length > 0) {
@@ -552,6 +679,9 @@ export function createProfileDialog(dialog) {
   dialog.addEventListener('close', () => {
     const closed = session;
     generation += 1;
+    forgetPhoto();
+    draft = {};
+    preparingPhoto = false;
     session = null;
     review = null;
     phase = 'editing';
@@ -573,6 +703,8 @@ export function createProfileDialog(dialog) {
 
     open(next) {
       generation += 1;
+      forgetPhoto();
+      preparingPhoto = false;
       session = next;
       draft = Object.fromEntries(Object.entries(next.draft).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]));
       escapeArmed = false;
