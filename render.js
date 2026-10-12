@@ -2,6 +2,7 @@
 
 import { TAG_GROUPS, FILTERS } from './constants.js';
 import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { el } from './dom.js';
 
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
@@ -197,37 +198,39 @@ export function initials(contact) {
   return `${(contact.prenom || '').charAt(0)}${(contact.nom || '').charAt(0)}`.toUpperCase() || '?';
 }
 
-// Pour une carte de relecture, ce qui est modifié se voit (une couleur, un trait) mais
-// se dit aussi : le mot est ajouté en texte réservé aux lecteurs d'écran.
-function flag(element, className, spoken) {
-  element.classList.add(className);
-  const note = document.createElement('span');
-  note.className = 'sr-only';
-  note.textContent = ` (${spoken})`;
-  element.appendChild(note);
+// ----- Repères de la carte « Après » d'une relecture (maquette v5) -----
+// Ce qui est modifié se voit (un contour, une couleur, un trait) mais se dit aussi : une
+// pastille écrite pour une ligne de texte, un mot réservé aux lecteurs d'écran pour un tag.
+
+// La pastille écrite d'une ligne ou d'un badge (« modifié », « ajouté », « supprimé »).
+function pill(word, gone = false) {
+  return el('span', gone ? 'mk-pill mk-pill-del' : 'mk-pill', word);
 }
 
-// Une ligne de texte modifiée porte sa pastille écrite (« modifié », « ajouté », « supprimé ») :
-// la couleur n'est jamais le seul repère, et le mot se lit aussi à l'écran.
-function flagText(element, className, word) {
-  element.classList.add(className);
-  const pill = document.createElement('span');
-  pill.className = className === 'mark-gone' ? 'mk-pill mk-pill-del' : 'mk-pill';
-  pill.textContent = word;
-  element.append(' ', pill);
+function spoken(element, word) {
+  element.append(el('span', 'sr-only', ` (${word})`));
 }
 
 // Une ligne de texte de la carte de relecture qui a changé (marque `{ before, after }`
 // de preview.js) : la nouvelle valeur en relief (« ajouté » si la ligne était vide, sinon
-// « modifié »), ou l'ancienne barrée si la ligne a été vidée.
+// « modifié »), ou l'ancienne barrée si la ligne a été vidée (« supprimé »).
 function showTextChange(element, mark, format = value => value) {
-  if (mark.after) {
-    reveal(element, format(mark.after));
-    flagText(element, 'mark-new', mark.before ? 'modifié' : 'ajouté');
-  } else {
-    reveal(element, format(mark.before));
-    flagText(element, 'mark-gone', 'supprimé');
+  element.classList.add('visible');
+  if (mark.after) element.replaceChildren(el('span', 'mk', format(mark.after)), ' ', pill(mark.before ? 'modifié' : 'ajouté'));
+  else element.replaceChildren(el('span', 'mk-gone', format(mark.before)), ' ', pill('supprimé', true));
+}
+
+// Le badge de l'établissement d'une carte « Après » dont l'établissement a changé : un
+// anneau le repère et la pastille se lit dessous, dans la colonne de droite de la carte.
+function markEtablissement(badge, mark) {
+  badge.classList.add('rv-ring');
+  let column = badge.closest('.etab-col');
+  if (!column) {
+    column = el('div', 'etab-col');
+    badge.replaceWith(column);
+    column.append(badge);
   }
+  column.append(pill(mark.before ? 'modifié' : 'ajouté'));
 }
 
 function fillEtablissement(badge, label, onToggle) {
@@ -256,14 +259,20 @@ function buildTag(group, value, onToggle, isNew) {
   tag.style.backgroundColor = group.color;
   tag.textContent = value;
   if (filterable) tag.addEventListener('click', () => onToggle(group.key, value));
-  if (isNew) flag(tag, 'mark-new', 'ajouté');
+  if (isNew) {
+    tag.classList.add('tag-add');
+    spoken(tag, 'ajouté');
+  }
   return tag;
 }
 
-// Un tag retiré, montré barré dans la carte « après » : ce qui a disparu se voit aussi.
+// Un tag retiré, montré barré dans la carte « Après » : ce qui a disparu se voit aussi. Il
+// perd la couleur de sa catégorie, le rouge pâle de « retiré » la remplace.
 function buildRemovedTag(group, value) {
   const tag = buildTag(group, value, null, false);
-  flag(tag, 'mark-gone', 'retiré');
+  tag.style.backgroundColor = '';
+  tag.classList.add('tag-del');
+  spoken(tag, 'retiré');
   return tag;
 }
 
@@ -307,6 +316,7 @@ function fillActions(box, contact, rights) {
   const edit = box.querySelector('.card-edit');
   edit.dataset.rowId = String(contact.id);
   edit.textContent = rights === 'admin' ? '✎ Modifier la fiche' : '✎ Modifier';
+  edit.title = rights === 'admin' ? `Modifier la fiche de ${displayName(contact)} (mode admin)` : 'Modifier ma fiche';
   edit.setAttribute('aria-label', `Modifier la fiche de ${displayName(contact)}`);
 }
 
@@ -318,20 +328,23 @@ function buildCard(template, contact, onToggle, view = {}) {
   card.querySelector('.avatar').textContent = initials(contact);
 
   const name = card.querySelector('.name');
-  name.textContent = displayName(contact);
-  if (marks?.texts.name) flagText(name, 'mark-new', 'modifié');
+  if (marks?.texts.name) {
+    // Dans un seul <span> : le nom est une boîte à plusieurs lignes (style.css) qui rangerait
+    // sinon le repère, le blanc et la pastille les uns sous les autres.
+    const line = el('span');
+    line.append(el('span', 'mk', displayName(contact)), ' ', pill('modifié'));
+    name.replaceChildren(line);
+  } else {
+    name.textContent = displayName(contact);
+  }
 
   const fonction = card.querySelector('.fonction');
   if (marks?.texts.fonction) showTextChange(fonction, marks.texts.fonction);
   else if (contact.Fonction) reveal(fonction, contact.Fonction);
 
   const badge = card.querySelector('.etablissement-tag');
-  if (marks?.texts.etab) {
-    showTextChange(badge, marks.texts.etab);
-    badge.disabled = true;
-  } else {
-    fillEtablissement(badge, contact.etablissement_label, onToggle);
-  }
+  fillEtablissement(badge, contact.etablissement_label, onToggle);
+  if (marks?.texts.etab?.after) markEtablissement(badge, marks.texts.etab);
   const email = card.querySelector('.email');
   if (marks?.texts.email) showTextChange(email, marks.texts.email);
   else fillEmail(email, contact.email, Boolean(onToggle));
@@ -357,5 +370,7 @@ export function renderCards(grid, template, contacts, onToggle, rightsOf = () =>
 // dans l'annuaire, mais rien n'y est cliquable. `marks` (preview.js) repère dans la
 // carte « après » ce qui a changé ; sans lui, c'est la carte « avant ».
 export function renderPreviewCard(template, contact, marks = null) {
-  return buildCard(template, contact, null, { marks });
+  const card = buildCard(template, contact, null, { marks });
+  card.querySelector('.contact-card').classList.add('rv-card');
+  return card;
 }

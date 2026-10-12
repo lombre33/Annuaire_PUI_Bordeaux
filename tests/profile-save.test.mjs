@@ -401,7 +401,7 @@ test('unsavedLabels is empty when Grist kept everything, and names the fields it
   assert.deepEqual(unsavedLabels(next, w.row(1), w.referenceMaps), []);
   // Grist a ignoré la fonction et le rôle, et remis la compétence retirée.
   const stubborn = { ...w.row(1), Fonction: 'Pharmacienne', Role_dans_le_PUI: 1, Competences: ['L', 1, 2, 3] };
-  assert.deepEqual(unsavedLabels(next, stubborn, w.referenceMaps), ['Fonction', 'Rôle PUI', 'Compétences']);
+  assert.deepEqual(unsavedLabels(next, stubborn, w.referenceMaps), ['Fonction', 'Rôle dans le PUI', 'Compétences']);
 });
 
 // ===== L'administrateur qui change l'e-mail et l'établissement d'une autre personne =====
@@ -432,9 +432,10 @@ test('prepareReview for an administrator shows the new address and the new étab
     etab: { before: 'UBM', after: 'CHU' },
     email: { before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@u-bordeaux-montaigne.fr' }
   });
+  // Le détail des changements dit les noms complets ; la carte, elle, garde les acronymes.
   assert.deepEqual(next.lines.map(line => [line.key, line.before, line.after]), [
     ['email', 'bob@u-bordeaux-montaigne.fr', 'nouveau@u-bordeaux-montaigne.fr'],
-    ['Etablissement', 'UBM', 'CHU']
+    ['Etablissement', 'Université Bordeaux Montaigne', 'CHU de Bordeaux']
   ]);
   assert.deepEqual(writes(w), []);
 });

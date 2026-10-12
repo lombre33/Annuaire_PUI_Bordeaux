@@ -443,9 +443,13 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
+  grid-row: 3;
   gap: 4px 6px;
-  margin-top: 9px;
+  margin-top: 6px;
+}
+.card-actions[hidden] {
+  display: none;
 }
 .own-flag {
   padding: 2px 7px;
@@ -475,89 +479,8 @@ h1 {
   outline-offset: 2px;
 }
 
-/* Carte « après » de la relecture d'une modification : ce qui change se voit. Un texte
-   modifié ou un tag ajouté est en relief ; ce qui a été retiré reste visible, barré. */
-.mark-new {
-  background: #e6f6f0;
-  border-radius: 4px;
-  box-shadow: 0 0 0 2px #e6f6f0;
-}
-.tag.mark-new {
-  outline: 2px solid var(--teal);
-  outline-offset: 1px;
-}
-.tag.mark-new::before {
-  content: "+ ";
-  font-weight: 900;
-}
-.mark-gone {
-  color: #9b2226;
-  text-decoration: line-through;
-}
-/* Le repère d'une ligne de texte tient à sa valeur, pas à toute la largeur de la carte. */
-:is(.name, .fonction, .detail-row):is(.mark-new, .mark-gone) {
-  width: fit-content;
-  max-width: 100%;
-}
-/* La pastille écrite d'une ligne modifiée. En bloc en ligne, pour que le trait d'une
-   ligne barrée ne la raye pas. */
-.mk-pill {
-  display: inline-block;
-  margin-left: 4px;
-  padding: 1px 7px;
-  color: #fff;
-  background: #0b6b4f;
-  border-radius: 999px;
-  font-size: 9.5px;
-  font-weight: 800;
-  line-height: 1.4;
-  white-space: nowrap;
-  vertical-align: 1px;
-}
-.mk-pill-del {
-  background: #b8303a;
-}
-.tag.mark-gone {
-  color: #fff;
-  opacity: 0.6;
-  outline: 1px dashed #d85b5b;
-  outline-offset: 1px;
-}
 .etablissement-tag:disabled {
   cursor: default;
-}
-/* Le badge établissement repéré dans la carte « après » garde son fond et son texte : le
-   vert pâle des lignes de texte le rendrait illisible. Un anneau le repère, et la
-   pastille passe dessous, en blanc, pour ne pas être tronquée avec le nom. */
-.etablissement-tag.mark-new,
-.etablissement-tag.mark-gone {
-  max-width: 120px;
-  color: #fff;
-  background: #147c72;
-  border-radius: 10px;
-  box-shadow: none;
-  text-align: center;
-  white-space: normal;
-  overflow: visible;
-}
-.etablissement-tag.mark-new {
-  outline: 2px solid var(--teal);
-  outline-offset: 2px;
-}
-.etablissement-tag.mark-gone {
-  opacity: 0.6;
-  outline: 1px dashed #d85b5b;
-  outline-offset: 1px;
-}
-.etablissement-tag .mk-pill {
-  display: block;
-  width: fit-content;
-  margin: 3px auto 0;
-  color: #0b6b4f;
-  background: #fff;
-}
-.etablissement-tag .mk-pill-del {
-  color: #b8303a;
 }
 
 /* Écrans étroits. Le widget est un cadre Grist dont la largeur varie (panneau
@@ -901,7 +824,7 @@ h1 {
   outline-offset: 2px;
 }
 .admin-strip {
-  margin-top: 12px;
+  margin-top: 18px;
   padding: 8px 14px;
   color: #8f4519;
   background: #fff3ea;
@@ -912,4 +835,8 @@ h1 {
 }
 .admin-strip[hidden] {
   display: none;
+}
+/* Sous la bande, les cartes la suivent de près : elle fait déjà la séparation. */
+.admin-strip:not([hidden]) ~ .cards-grid {
+  margin-top: 14px;
 }

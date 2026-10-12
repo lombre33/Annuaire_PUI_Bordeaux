@@ -106,18 +106,21 @@ test('describeHiddenFiche tells a person who has not accepted where the switch i
   const { find } = await setup();
   const [iris] = find(IRIS_EMAIL);
   assert.equal(describeHiddenFiche(iris.status, { own: true }),
-    'Votre fiche est masquée de l\'annuaire : vous n\'avez pas accepté d\'apparaître (interrupteur « Apparaître dans l\'annuaire » en haut de page).');
+    'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).');
   assert.equal(describeHiddenFiche(iris.status, { own: false }),
-    'Cette fiche est masquée de l\'annuaire : la personne n\'a pas accepté d\'apparaître.');
+    'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.');
   const [jules] = find('jules@chu-bordeaux.fr');
-  assert.match(describeHiddenFiche(jules.status, { own: false }), /n'a pas accepté d'apparaître/, 'une case vide n\'est pas un accord');
+  assert.match(describeHiddenFiche(jules.status, { own: false }), /n’a pas accepté d’apparaître/, 'une case vide n\'est pas un accord');
 });
 
 test('describeHiddenFiche gives the reason a fiche that was accepted stays hidden, in the voice of the reader', async () => {
   const { find } = await setup();
   const say = (email, own) => describeHiddenFiche(find(email)[0].status, { own });
-  assert.equal(say('dan@inserm.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'a pas encore été validé.');
-  assert.equal(say('dan@inserm.fr', false), 'Cette fiche reste masquée de l\'annuaire : son établissement n\'a pas encore été validé.');
+  assert.equal(say('dan@inserm.fr', true), 'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.');
+  assert.equal(say('dan@inserm.fr', false),
+    'Son établissement n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.');
+  assert.equal(describeHiddenFiche(find('dan@inserm.fr')[0].status, { own: false, etablissement: 'Inserm Bordeaux' }),
+    'Inserm Bordeaux n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.', 'l\'administrateur lit le nom de l\'établissement');
   assert.equal(say('carla@clinique.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'est ni fondateur ni partenaire.');
   assert.equal(say('eve@example.fr', false), 'Cette fiche reste masquée de l\'annuaire : la fiche n\'a pas d\'établissement.');
   assert.equal(say('fred@chu-bordeaux.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre.');

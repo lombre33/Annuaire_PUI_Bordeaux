@@ -1,12 +1,14 @@
-// La fenêtre de modification d'une fiche, en trois temps : le formulaire, la relecture
-// (la carte avant et la carte après, avec ce qui change repéré) puis la confirmation.
+// La fenêtre de modification d'une fiche, en deux temps : le formulaire, puis la relecture
+// (la carte avant et la carte après, avec ce qui change repéré). Valider ferme la fenêtre
+// et main.js confirme par un message ; un écran de confirmation ne reste que si Grist n'a
+// pas tout gardé. Textes et mise en page suivent la maquette v5 validée.
 // DOM seulement : ce qui change (profile.js), ce qui s'écrit (profile-save.js) et les
 // cartes (render.js) viennent de la session que main.js donne à open().
 
 import { CATEGORIES } from './constants.js';
 import { formatPhone, normalize } from './grist-data.js';
 import { el } from './dom.js';
-import { frenchPhoneDigits } from './profile.js';
+import { frenchPhoneDigits, NAME_REQUIRED } from './profile.js';
 import { renderChangeList } from './changes-ui.js';
 
 // Au-delà de ce nombre de valeurs, un sélecteur propose une recherche.
@@ -32,6 +34,7 @@ function notice(kind, text, role) {
 //
 // open(session) :
 //   mode          'own' (sa propre fiche) ou 'admin' (celle d'une autre personne)
+//   viewerAdmin   la personne connectée est administratrice, même sur sa propre fiche
 //   person        { name, email, initials } de la fiche
 //   etablissement libellé de son établissement
 //   model         profileFormModel(row, referenceMaps)
@@ -41,12 +44,16 @@ function notice(kind, text, role) {
 //   review        draft → promesse de { before, after, marks, lines, visibility, notice } :
 //                 relit la fiche dans Grist et prépare les deux cartes ; un échec porte
 //                 dans `message` la phrase à montrer
-//   hiddenNotice  visibility → ce que la relecture dit d'une fiche absente de l'annuaire
+//   hiddenNotice  review → ce que la relecture dit d'une fiche absente de l'annuaire
 //                 ('' si elle y figure)
+//   fieldWarning  (facultatif) (colonne, valeur) → une mise en garde à lire sous le champ
+//                 ('' s'il n'y en a pas)
 //   save          (review, draft) → promesse de { status: 'saved', lines, leftovers,
 //                 reloaded } ou { status: 'changed', review, notice } (la fiche a changé
 //                 pendant la relecture : rien n'est écrit) ; un échec porte `message`
 //   renderCard    (contact, marks) → la carte à montrer (render.js)
+//   notify        (facultatif) message → la confirmation d'un enregistrement sans réserve,
+//                 donnée une fois la fenêtre fermée
 //   onClose       (facultatif) appelé quand la fenêtre est fermée : rend le focus à
 //                 l'endroit d'où elle a été ouverte
 export function createProfileDialog(dialog) {
@@ -82,8 +89,9 @@ export function createProfileDialog(dialog) {
   // ===== Le formulaire =====
 
   // Qui est cette fiche. Pour la sienne, l'e-mail et l'établissement ne changent pas par ce
-  // formulaire, et le bloc le dit. Un administrateur qui modifie la fiche d'une autre
-  // personne les change dans les champs qui suivent.
+  // formulaire, et le bloc le dit (un administrateur n'a personne à contacter : il le sait).
+  // Un administrateur qui modifie la fiche d'une autre personne les change dans les champs
+  // qui suivent.
   function identityBlock() {
     const { person, etablissement } = session;
     const box = el('div', 'ident');
@@ -91,17 +99,14 @@ export function createProfileDialog(dialog) {
     const main = el('div', 'ident-main');
     main.append(el('p', 'ident-name', person.name), el('p', 'ident-mail', person.email));
     if (!isAdmin()) {
-      main.append(el('p', 'ident-lock', 'Verrouillé : l\'e-mail et l\'établissement sont liés à votre compte. Pour les corriger, contactez un administrateur.'));
+      main.append(el('p', 'ident-lock', session.viewerAdmin
+        ? 'Verrouillé sur votre propre fiche : l’e-mail et l’établissement sont liés à votre compte.'
+        : 'Verrouillé : l’e-mail et l’établissement sont liés à votre compte. Pour les corriger, contactez un administrateur.'));
     }
     box.append(main);
-    if (etablissement) box.append(el('span', 'pill', etablissement));
+    if (etablissement) box.append(el('span', 'et-pill', etablissement));
     return box;
   }
-
-  // Ce que dit le champ sous lui, pour le champ qui a besoin d'une explication.
-  const HINTS = {
-    email: 'Sert à retrouver la personne dans l\'annuaire. Ses droits d\'administrateur ou de responsable, déclarés dans la table ACL avec son adresse, ne changent pas.'
-  };
 
   function textField(field) {
     const id = `profile-${field.key}`;
@@ -117,13 +122,7 @@ export function createProfileDialog(dialog) {
     const error = el('p', 'fld-err');
     error.id = `${id}-error`;
     error.hidden = true;
-    const described = [error.id];
-    const hint = HINTS[field.key] ? el('p', 'fld-hint', HINTS[field.key]) : null;
-    if (hint) {
-      hint.id = `${id}-hint`;
-      described.push(hint.id);
-    }
-    input.setAttribute('aria-describedby', described.join(' '));
+    input.setAttribute('aria-describedby', error.id);
     input.addEventListener('input', () => {
       draft[field.key] = input.value;
       refresh();
@@ -139,7 +138,6 @@ export function createProfileDialog(dialog) {
       });
     }
     wrap.append(label, input, error);
-    if (hint) wrap.append(hint);
     ui.fields[field.key] = { input, error };
     return wrap;
   }
@@ -166,13 +164,19 @@ export function createProfileDialog(dialog) {
     const error = el('p', 'fld-err');
     error.id = `${id}-error`;
     error.hidden = true;
-    select.setAttribute('aria-describedby', error.id);
+    const warning = session.fieldWarning ? el('p', 'fld-hint warn') : null;
+    if (warning) {
+      warning.id = `${id}-warning`;
+      warning.hidden = true;
+    }
+    select.setAttribute('aria-describedby', warning ? `${error.id} ${warning.id}` : error.id);
     select.addEventListener('change', () => {
       draft[field.key] = Number(select.value);
       refresh();
     });
     wrap.append(label, select, error);
-    ui.fields[field.key] = { input: select, error };
+    if (warning) wrap.append(warning);
+    ui.fields[field.key] = { input: select, error, warning };
     return wrap;
   }
 
@@ -290,6 +294,15 @@ export function createProfileDialog(dialog) {
 
   // ===== Étape 1 : le formulaire =====
 
+  // Le résumé du pied de fenêtre quand le brouillon est refusé : le premier problème, dans
+  // l'ordre du formulaire.
+  function faultSummary({ prenom, nom, email, numero_de_telephone: phone }) {
+    if (prenom === NAME_REQUIRED || nom === NAME_REQUIRED) return 'Indiquez au moins un prénom ou un nom';
+    if (email) return 'Corrigez l’adresse e-mail';
+    if (phone) return 'Corrigez le numéro de téléphone';
+    return 'Corrigez les champs signalés';
+  }
+
   // Remet à jour tout ce qui dépend du brouillon, sans reconstruire les champs (ils
   // garderaient leur curseur).
   function refresh() {
@@ -297,29 +310,42 @@ export function createProfileDialog(dialog) {
     evaluation = session.evaluate(draft);
     const { lines, errors, fieldErrors } = evaluation;
 
-    Object.entries(ui.fields).forEach(([key, { input, error }]) => {
+    Object.entries(ui.fields).forEach(([key, { input, error, warning }]) => {
       const fault = fieldErrors[key] || '';
       error.textContent = fault;
       error.hidden = !fault;
       input.setAttribute('aria-invalid', String(Boolean(fault)));
+      if (warning) {
+        const text = session.fieldWarning(key, draft[key]) || '';
+        warning.textContent = text;
+        warning.hidden = !text;
+      }
     });
 
-    ui.summary.textContent = errors.length > 0 ? 'Corrigez les champs signalés'
+    // « Ce qui va changer » se lit sous le formulaire pendant qu'on le remplit.
+    ui.recap.hidden = lines.length === 0;
+    ui.recap.replaceChildren(...(lines.length === 0 ? [] : [el('h4', 'recap-title', 'Ce qui va changer'), renderChangeList(lines)]));
+
+    ui.summary.textContent = errors.length > 0 ? faultSummary(fieldErrors)
       : lines.length === 0 ? 'Aucune modification' : fieldsChanged(lines.length);
     ui.review.disabled = errors.length > 0 || lines.length === 0;
   }
 
   function renderEditing() {
     phase = 'editing';
+    dialog.classList.remove('dlg-review');
     const { person } = session;
     setHeading(
       isAdmin() ? `Modifier la fiche de ${person.name}` : 'Modifier mon profil',
       isAdmin()
-        ? 'Vous modifiez cette fiche en tant qu\'administrateur. Avant d\'enregistrer, vous relirez la carte avant et après.'
-        : 'Avant d\'enregistrer, vous relirez votre carte avant et après.'
+        ? 'Mode admin : vous modifiez la fiche d’une autre personne. Vous relisez les modifications avant de les valider, elles s’appliquent ensuite tout de suite.'
+        : 'Vous relisez vos modifications avant de les valider : elles s’appliquent ensuite tout de suite à votre fiche.'
     );
     ui = { fields: {} };
     ui.alert = el('div', 'dlg-alert');
+    ui.recap = el('section', 'recap');
+    ui.recap.setAttribute('aria-label', 'Ce qui va changer');
+    ui.recap.hidden = true;
 
     const grid = el('div', 'fld-grid');
     const pickers = [];
@@ -328,7 +354,7 @@ export function createProfileDialog(dialog) {
       else if (field.kind === 'reference') grid.append(referenceField(field));
       else pickers.push(picker(field));
     });
-    body.replaceChildren(ui.alert, identityBlock(), grid, ...pickers);
+    body.replaceChildren(ui.alert, identityBlock(), grid, ...pickers, ui.recap);
 
     ui.review = button(isAdmin() ? 'Relire les modifications' : 'Relire mes modifications', 'btn btn-primary', startReview);
     renderFoot('', button('Annuler', 'btn', () => dialog.close()), ui.review);
@@ -368,50 +394,67 @@ export function createProfileDialog(dialog) {
     renderReview(next, next.notice);
   }
 
-  function previewColumn(label, note, tone, card) {
-    const column = el('figure', `preview-col preview-${tone}`);
-    const caption = el('figcaption', 'preview-caption');
-    caption.append(el('span', 'preview-label', label), el('span', 'preview-note', note));
-    column.append(caption, card);
+  // Une colonne de la relecture : « Avant » ou « Après », sa légende et la carte.
+  function previewColumn(tone, label, note, card) {
+    const column = el('section', `rv-col rv-col-${tone}`);
+    const heading = el('h3', '', label);
+    heading.id = `review-${tone}-title`;
+    heading.append(el('small', '', note));
+    column.setAttribute('aria-labelledby', heading.id);
+    column.append(heading, card);
     return column;
   }
 
+  // Ce que veulent dire les repères de la carte « Après » : un exemple de chacun.
   function legend() {
-    const box = el('p', 'legend');
-    box.append(
-      el('span', 'legend-key legend-new', 'Ajouté ou modifié : en vert, avec une pastille ou un «\u00a0+\u00a0»'),
-      el('span', 'legend-key legend-gone', 'Retiré : barré en rouge')
-    );
+    const box = el('p', 'rv-legend');
+    const added = el('span');
+    const sampleAdded = el('b', 'lg lg-add', '+ Exemple');
+    sampleAdded.setAttribute('aria-hidden', 'true');
+    added.append(sampleAdded, ' ajouté ou modifié : contour vert et pastille');
+    const gone = el('span');
+    const sampleGone = el('b', 'lg lg-del', 'Exemple');
+    sampleGone.setAttribute('aria-hidden', 'true');
+    gone.append(sampleGone, ' retiré : barré en rouge');
+    box.append(added, gone);
     return box;
   }
+
+  // Ce que l'administrateur doit savoir quand il change l'adresse e-mail d'une fiche :
+  // les droits de la personne (table ACL) ne suivent pas.
+  const EMAIL_NOTICE = 'L’adresse change dans BDD, pas dans la table ACL : si cette personne est administratrice ou '
+    + 'responsable d’un établissement, ses droits restent attachés à son ancienne adresse.';
 
   function renderReview(next, message = '') {
     review = next;
     phase = 'reviewing';
+    dialog.classList.add('dlg-review');
     setHeading(
-      isAdmin() ? `Relire les modifications de ${session.person.name}` : 'Relire vos modifications',
-      'Rien n\'est enregistré avant « Valider ». Ce qui change est repéré dans la carte « Après ».'
+      'Relire avant de valider',
+      `Voici ${isAdmin() ? `la carte de ${session.person.name}` : 'votre carte'} telle qu’elle est aujourd’hui et telle qu’elle apparaîtra. `
+        + 'Les changements sont repérés sur la carte « Après ».'
     );
     ui = { fields: {} };
     ui.alert = el('div', 'dlg-alert');
 
-    const parts = [ui.alert];
+    const parts = [ui.alert, legend()];
     if (message) parts.push(notice('pending', message, 'status'));
-    const hidden = session.hiddenNotice?.(review.visibility) || '';
+    const hidden = session.hiddenNotice?.(review) || '';
     if (hidden) parts.push(notice('pending', hidden, 'status'));
-    const cards = el('div', 'preview');
+    if (isAdmin() && review.lines.some(line => line.key === 'email')) parts.push(notice('pending', EMAIL_NOTICE, 'status'));
+    const cards = el('div', 'rv-cols');
     cards.append(
-      previewColumn('Avant', 'telle qu\'elle est aujourd\'hui', 'before', session.renderCard(review.before, null)),
-      previewColumn('Après', 'telle qu\'elle sera', 'after', session.renderCard(review.after, review.marks))
+      previewColumn('before', 'Avant', 'telle qu’elle est aujourd’hui', session.renderCard(review.before, null)),
+      previewColumn('after', 'Après', 'telle qu’elle apparaîtra', session.renderCard(review.after, review.marks))
     );
     const detail = el('section', 'recap');
     detail.setAttribute('aria-label', 'Détail des changements');
-    detail.append(el('h4', 'recap-title', 'Ce qui change'), renderChangeList(review.lines));
-    parts.push(legend(), cards, detail);
+    detail.append(el('h4', 'recap-title', 'Détail des changements'), renderChangeList(review.lines));
+    parts.push(cards, detail);
     body.replaceChildren(...parts);
 
     ui.back = button('Retour', 'btn', backToEditing);
-    ui.validate = button('Valider', 'btn btn-primary', validate);
+    ui.validate = button('Valider', 'btn btn-ok', validate);
     renderFoot(fieldsChanged(review.lines.length), ui.back, ui.validate);
     announceStep();
   }
@@ -451,11 +494,23 @@ export function createProfileDialog(dialog) {
     if (mine !== generation) return;
     closeButton.disabled = false;
     if (result.status === 'changed') renderReview(result.review, result.notice);
-    else renderSaved(result);
+    else if (result.leftovers.length > 0 || !result.reloaded) renderSaved(result);
+    else finish();
   }
 
+  // Tout est enregistré : la fenêtre se ferme et un message le confirme. Rien ne reste à lire.
+  function finish() {
+    const { person, notify } = session;
+    phase = 'saved';
+    dialog.close();
+    notify?.(isAdmin() ? `La fiche de ${person.name} est enregistrée.` : 'Vos modifications sont enregistrées.');
+  }
+
+  // Enregistré, mais avec une réserve à lire : Grist n'a pas tout gardé, ou l'annuaire n'a
+  // pas pu être rechargé. La fenêtre reste ouverte pour la dire.
   function renderSaved(result) {
     phase = 'saved';
+    dialog.classList.remove('dlg-review');
     const { person } = session;
     setHeading('Fiche enregistrée', isAdmin() ? `La fiche de ${person.name} est à jour.` : 'Votre fiche est à jour.');
     const done = el('div', 'sent');
@@ -512,6 +567,7 @@ export function createProfileDialog(dialog) {
     session = null;
     review = null;
     phase = 'editing';
+    dialog.classList.remove('dlg-review');
     evaluation = { errors: [], fieldErrors: {}, lines: [] };
     closeButton.disabled = false;
     body.replaceChildren();

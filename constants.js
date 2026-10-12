@@ -41,6 +41,12 @@ export const CATEGORIES = {
   role: { label: 'Rôle PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
 };
 
+// Clé, parmi les libellés lus de Grist (referenceMaps), des noms complets des établissements
+// (nom_complet, à défaut l'acronyme). Les cartes, les filtres et les tags parlent par acronyme ;
+// les fenêtres (la liste d'un administrateur, le détail des changements) disent « Université de
+// Bordeaux ». Ce n'est pas une catégorie : aucun filtre ni tag n'en vient.
+export const ETABLISSEMENT_NAMES = 'etablissementNom';
+
 // Ordre des boutons de filtre. Rôle PUI n'a pas de filtre (specs.md).
 const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'macro', 'competences', 'instances', 'etablissement'];
 
@@ -78,6 +84,7 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 //             (une valeur d'une table de référence) ou 'list' (plusieurs)
 //   category  catégorie de CATEGORIES dont viennent les valeurs proposées
 //   admin     réservé à un administrateur sur la fiche d'une autre personne
+//   labelsFrom  la table de libellés à proposer, quand ce n'est pas celle de la catégorie
 //   required  une référence qu'on ne peut pas vider
 const LIST_FIELD_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches'];
 
@@ -85,10 +92,10 @@ export const PROFILE_FIELDS = [
   { key: 'prenom', label: 'Prénom', kind: 'text' },
   { key: 'nom', label: 'Nom', kind: 'text' },
   { key: 'email', label: 'E-mail', kind: 'email', admin: true },
-  { key: 'Etablissement', label: CATEGORIES.etablissement.label, kind: 'reference', category: 'etablissement', admin: true, required: true },
+  { key: 'Etablissement', label: CATEGORIES.etablissement.label, kind: 'reference', category: 'etablissement', labelsFrom: ETABLISSEMENT_NAMES, admin: true, required: true },
   { key: 'Fonction', label: 'Fonction', kind: 'text' },
   { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
-  { key: 'Role_dans_le_PUI', label: CATEGORIES.role.label, kind: 'reference', category: 'role' },
+  { key: 'Role_dans_le_PUI', label: 'Rôle dans le PUI', kind: 'reference', category: 'role' },
   ...LIST_FIELD_KEYS.map(category => ({ key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category }))
 ];
 

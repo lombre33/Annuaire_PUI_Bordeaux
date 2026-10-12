@@ -5,7 +5,8 @@
 // d'une fiche, profile.js / profile-save.js / preview.js (la logique) avec
 // profile-ui.js (la fenêtre).
 
-import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, text } from './grist-data.js';
+import { ETABLISSEMENT_NAMES } from './constants.js';
+import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts } from './filters.js';
 import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
@@ -52,6 +53,8 @@ const elements = {
   resetFilters: document.getElementById('resetFilters'),
   statusBanner: document.getElementById('statusBanner'),
   adminStrip: document.getElementById('adminStrip'),
+  toast: document.getElementById('toast'),
+  toastLive: document.getElementById('toastLive'),
   scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
 
@@ -311,9 +314,45 @@ function userFacing(error) {
   return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
 }
 
-// Une adresse e-mail qu'une AUTRE fiche que `rowId` porte déjà (d'après l'annuaire lu).
-const emailTakenElsewhere = rowId => email =>
-  Boolean(state.people?.findByEmail(email).some(person => person.row.id !== rowId));
+// Une adresse e-mail qu'une AUTRE fiche que `rowId` porte déjà (d'après l'annuaire lu) :
+// le nom de la personne quand sa fiche figure dans l'annuaire (on le voit déjà), sinon
+// simplement vrai : le nom d'une fiche masquée ne se dévoile pas.
+const emailTakenElsewhere = rowId => email => {
+  const other = state.people?.findByEmail(email).find(person => person.row.id !== rowId);
+  if (!other) return false;
+  return other.status.visible && other.name ? other.name : true;
+};
+
+// La confirmation d'un enregistrement, en bas de l'écran. Le message visible est masqué aux
+// lecteurs d'écran : une zone `status` toujours présente le leur annonce, ce qu'un élément
+// qui apparaît d'un coup ne garantit pas.
+const TOAST_DURATION = 6000;
+let toastTimer = 0;
+function showToast(message) {
+  elements.toast.textContent = message;
+  elements.toast.hidden = false;
+  elements.toastLive.textContent = message;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    elements.toast.hidden = true;
+    elements.toastLive.textContent = '';
+  }, TOAST_DURATION);
+}
+
+// Le nom complet de l'établissement d'une carte (l'acronyme à défaut), pour les phrases des fenêtres.
+function etablissementName(contact) {
+  const names = state.referenceMaps[ETABLISSEMENT_NAMES] || {};
+  return names[String(refId(contact.Etablissement))] || contact.etablissement_label;
+}
+
+// La mise en garde sous le champ « Établissement » du formulaire : un établissement qui n'a
+// pas validé sa présence (Etablissements.ok_pour_apparaitre) ne laisse voir aucune de ses fiches.
+function etablissementWarning(id) {
+  const flags = state.etabFlags?.byId?.[String(id)];
+  return flags && flags.ok_pour_apparaitre !== true
+    ? 'Cet établissement n’a pas validé sa présence : la fiche ne sera pas visible dans l’annuaire.'
+    : '';
+}
 
 // Ce que le brouillon change (de quoi activer le bouton) et pourquoi il serait refusé.
 // `admin` : un administrateur modifie la fiche d'une autre personne (e-mail et établissement compris).
@@ -368,15 +407,18 @@ function openProfile(rowId, returnFocus) {
   const model = profileFormModel(row, state.referenceMaps, { admin });
   profileDialog.open({
     mode: rights,
+    viewerAdmin: isAdmin(),
     person: { name: person.name || 'Sans nom', email: text(row.email), initials: initials(row) },
     etablissement: person.etablissement,
     model,
     draft: draftOf(model),
     evaluate: draft => evaluateDraft(row, draft, admin),
     review: draft => reviewProfile(row, draft, admin),
-    hiddenNotice: visibility => describeHiddenFiche(visibility, { own: rights === 'own' }),
+    hiddenNotice: review => describeHiddenFiche(review.visibility, { own: rights === 'own', etablissement: etablissementName(review.after) }),
+    fieldWarning: (key, value) => (key === 'Etablissement' ? etablissementWarning(value) : ''),
     save: (review, draft) => saveReviewed(row, review, draft, admin),
     renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks),
+    notify: showToast,
     onClose: returnFocus
   });
 }

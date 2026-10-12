@@ -12,6 +12,10 @@ import { compareLabels, formatPhone, normalizeEmail, refId, safeValues, text } f
 
 export const MAX_TEXT_LENGTH = 200;
 
+// Ce que dit le formulaire d'une fiche qui n'aurait ni prénom ni nom : le champ et le
+// résumé du pied de fenêtre le reconnaissent à cette phrase.
+export const NAME_REQUIRED = 'Indiquez au moins un prénom ou un nom.';
+
 // Un texte qui commence par l'un de ces caractères serait lu comme une formule par
 // un tableur qui ouvre un export de l'annuaire.
 const SPREADSHEET_FORMULA_START = /^[=+\-@]/;
@@ -61,15 +65,21 @@ export function textFault(value) {
   return '';
 }
 
+// Une phrase de message commence par une majuscule : elle s'affiche seule sous le champ.
+const sentence = text => text.charAt(0).toUpperCase() + text.slice(1);
+
 // Pourquoi une adresse e-mail (déjà nettoyée et mise en minuscules) est refusée, ou ''.
 // `before` : l'adresse actuelle de la fiche ; `emailTaken(adresse)` dit si une AUTRE fiche
-// porte déjà cette adresse (c'est elle qui retrouve la personne : deux fiches ne la partagent pas).
+// porte déjà cette adresse (c'est elle qui retrouve la personne : deux fiches ne la partagent
+// pas). Il renvoie vrai, ou le nom de la personne quand la fiche est visible dans l'annuaire
+// (un nom qu'on voit déjà ne dévoile rien ; celui d'une fiche masquée, si).
 function emailFault(after, before, emailTaken) {
-  if (after === '') return before === '' ? '' : 'indiquez une adresse e-mail.';
+  if (after === '') return before === '' ? '' : 'Indiquez une adresse e-mail valide.';
   const fault = textFault(after);
-  if (fault) return `${fault}.`;
-  if (!EMAIL_SHAPE.test(after)) return 'cette adresse n\'est pas valide (nom@exemple.fr).';
-  if (after !== before && emailTaken(after)) return 'cette adresse est déjà celle d\'une autre fiche.';
+  if (fault) return `${sentence(fault)}.`;
+  if (!EMAIL_SHAPE.test(after)) return 'Indiquez une adresse e-mail valide.';
+  const owner = after !== before && emailTaken(after);
+  if (owner) return `Cette adresse est déjà utilisée par ${typeof owner === 'string' ? owner : 'une autre fiche'}.`;
   return '';
 }
 
@@ -109,6 +119,13 @@ export function optionsOf(category, referenceMaps) {
       : compareLabels(a.label, b.label)));
 }
 
+// La table de libellés d'un champ de référence ou de liste : les noms complets quand le champ
+// en propose (`labelsFrom`) et que Grist en a donné, sinon ceux de sa catégorie.
+function labelsKey(field, referenceMaps) {
+  const names = field.labelsFrom;
+  return names && Object.keys(referenceMaps[names] || {}).length > 0 ? names : field.category;
+}
+
 // Identifiants d'une cellule ReferenceList qui figurent parmi `options` (ceux que
 // le formulaire peut montrer).
 function knownIds(cell, options) {
@@ -129,7 +146,7 @@ export function profileFormModel(row, referenceMaps, { admin = false } = {}) {
     };
     if (field.kind === 'text' || field.kind === 'email') return { ...base, value: text(row[field.key]) };
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
-    const options = optionsOf(field.category, referenceMaps);
+    const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps);
     if (field.kind === 'reference') return { ...base, options, value: refId(row[field.key]) || 0 };
     return { ...base, options, value: knownIds(row[field.key], options) };
   });
@@ -161,7 +178,7 @@ function sameSet(a, b) {
 //   admin        un administrateur modifie la fiche d'une autre personne : l'e-mail et
 //                l'établissement du brouillon comptent. Sinon ils sont ignorés, quoi que
 //                le brouillon contienne.
-//   emailTaken   adresse → vrai si une AUTRE fiche la porte déjà
+//   emailTaken   adresse → vrai (ou le nom de la personne) si une AUTRE fiche la porte déjà
 export function diffProfile(row, draft, referenceMaps, { admin = false, emailTaken = () => false } = {}) {
   const champs = {};
   const errors = [];
@@ -190,7 +207,7 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, emailTak
       if (String(input ?? '') === before) return; // laissé tel quel : pas un changement, même si le texte n'est pas « propre »
       const after = cleanText(input);
       const fault = textFault(after);
-      if (fault) fail(field, `${fault}.`);
+      if (fault) fail(field, `${sentence(fault)}.`);
       else if (after !== before) champs[field.key] = { avant: before, apres: after };
       return;
     }
@@ -201,26 +218,26 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, emailTak
       const typed = cleanText(input);
       const before = frenchPhoneDigits(shown) || '';
       const after = typed === '' ? '' : frenchPhoneDigits(typed);
-      if (after === null) fail(field, 'un numéro français à 10 chiffres est attendu (05 56 78 90 12).');
+      if (after === null) fail(field, 'Un numéro français compte 10 chiffres, par exemple 05 56 78 90 12.');
       else if (after !== before) champs[field.key] = { avant: before, apres: after };
       return;
     }
 
-    const options = optionsOf(field.category, referenceMaps);
+    const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps);
 
     // Un brouillon d'un autre type que prévu est une erreur, jamais « aucune valeur » :
     // une saisie illisible ne doit pas retirer un rôle ou vider une liste.
     if (field.kind === 'reference') {
       if (!Number.isSafeInteger(input) || input < 0) {
-        fail(field, 'valeur illisible.');
+        fail(field, 'Valeur illisible.');
         return;
       }
       const before = refId(row[field.key]) || 0;
       const after = input;
       if (after !== 0 && !options.some(option => option.id === after)) {
-        fail(field, 'valeur inconnue.');
+        fail(field, 'Valeur inconnue.');
       } else if (after === 0 && field.required && before !== 0) {
-        fail(field, 'une valeur est requise.');
+        fail(field, 'Une valeur est requise.');
       } else if (after !== before) {
         champs[field.key] = {
           avant: { id: before, label: labelOf(options, before) },
@@ -233,12 +250,12 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, emailTak
     // Liste : seules les valeurs que le formulaire montre peuvent être retirées ou
     // ajoutées ; les autres (ligne sans libellé…) restent telles quelles.
     if (!Array.isArray(input) || !input.every(Number.isSafeInteger)) {
-      fail(field, 'valeur illisible.');
+      fail(field, 'Valeur illisible.');
       return;
     }
     const wanted = input;
     if (wanted.some(id => !options.some(option => option.id === id))) {
-      fail(field, 'valeur inconnue.');
+      fail(field, 'Valeur inconnue.');
       return;
     }
     const current = knownIds(row[field.key], options);
@@ -252,9 +269,8 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, emailTak
 
   const name = field => (champs[field] ? champs[field].apres : text(row[field]));
   if (('nom' in champs || 'prenom' in champs) && !name('nom') && !name('prenom')) {
-    const message = 'Indiquez au moins un prénom ou un nom.';
-    errors.push(message);
-    ['prenom', 'nom'].filter(key => key in champs).forEach(key => { fieldErrors[key] = message; });
+    errors.push(NAME_REQUIRED);
+    ['prenom', 'nom'].filter(key => key in champs).forEach(key => { fieldErrors[key] = NAME_REQUIRED; });
   }
   return { champs, errors, fieldErrors };
 }
@@ -295,7 +311,7 @@ export function rebaseChanges(champs, row, referenceMaps, { admin = false } = {}
       const current = refId(row[field.key]) || 0;
       if (current === change.apres.id) return;
       if (current !== change.avant.id) moved.push(field.label);
-      const labels = referenceMaps[field.category] || {};
+      const labels = referenceMaps[labelsKey(field, referenceMaps)] || {};
       rebased[field.key] = { avant: { id: current, label: labels[String(current)] || '' }, apres: change.apres };
       return;
     }

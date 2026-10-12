@@ -65,6 +65,21 @@ const focusReturnsTo = (page, selector) => page.waitForFunction(
 const press = (page, name) => dialog(page).getByRole('button', { name, exact: true });
 const closeSaved = page => dialog(page).locator('.dlg-foot').getByRole('button', { name: 'Fermer', exact: true });
 const field = (page, key) => page.locator(`#profile-${key}`);
+// La confirmation d'un enregistrement sans réserve : la fenêtre se ferme et un message
+// (visuel, plus une zone `status` pour les lecteurs d'écran) le dit.
+const toast = page => page.locator('#toast');
+const toastLive = page => page.locator('#toastLive');
+async function savedWith(page, message) {
+  await closed(page);
+  await toast(page).waitFor({ state: 'visible' });
+  assert.equal(await toast(page).textContent(), message);
+  assert.equal(await toastLive(page).textContent(), message, 'une zone « status » l\'annonce aux lecteurs d\'écran');
+  assert.equal(await toast(page).getAttribute('aria-hidden'), 'true', 'le message visuel n\'est pas lu deux fois');
+}
+// Les colonnes de la relecture : « Avant » et « Après », leur légende et leur carte.
+const column = (page, tone) => dialog(page).locator(`.rv-col-${tone}`);
+const columnLabel = (page, tone) => page.locator(`#review-${tone}-title`).evaluate(node => node.firstChild.textContent);
+const columnNote = (page, tone) => page.locator(`#review-${tone}-title small`).textContent();
 const picker = (page, label) => dialog(page).locator('.grp').filter({ has: page.locator('.grp-title', { hasText: new RegExp(`^${label}$`) }) });
 const chip = (page, group, label) => picker(page, group).locator('.pick', { hasText: new RegExp(`^${label}$`) });
 const isPressed = async (page, group, label) => (await chip(page, group, label).getAttribute('aria-pressed')) === 'true';
@@ -123,7 +138,7 @@ async function changeAna(page) {
 
 async function review(page) {
   await press(page, 'Relire mes modifications').click();
-  await headingIs(page, 'Relire vos modifications');
+  await headingIs(page, 'Relire avant de valider');
 }
 
 // ===== Qui voit un bouton « Modifier » =====
@@ -161,6 +176,8 @@ test('une administratrice ne modifie que sa fiche tant que le mode admin est ét
     assert.equal(await gridCard(page, 'Hugo Bernard').locator('.card-edit').textContent(), '✎ Modifier la fiche');
     assert.equal(await gridCard(page, 'Hugo Bernard').locator('.card-edit').getAttribute('aria-label'), 'Modifier la fiche de Hugo Bernard');
     assert.equal(await gridCard(page, 'Ana Martin').locator('.card-edit').textContent(), '✎ Modifier', 'sa propre carte garde son libellé');
+    assert.equal(await gridCard(page, 'Hugo Bernard').locator('.card-edit').getAttribute('title'), 'Modifier la fiche de Hugo Bernard (mode admin)');
+    assert.equal(await gridCard(page, 'Ana Martin').locator('.card-edit').getAttribute('title'), 'Modifier ma fiche');
     assert.equal(await page.locator('#cardsGrid .own-flag:visible').count(), 1);
     assert.equal(await gridCard(page, 'Ana Martin').locator('.own-flag').isVisible(), true);
 
@@ -170,6 +187,31 @@ test('une administratrice ne modifie que sa fiche tant que le mode admin est ét
     assert.equal(await adminStrip(page).isHidden(), true);
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
+
+// Les rectangles qui se recouvrent : la ligne d'actions ne doit jamais passer sous le badge.
+const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+test('le bouton « Modifier » est rangé sous la fonction, dans la colonne du nom, sans toucher au badge d\'établissement', { skip }, async () => {
+  for (const width of [1280, 390, 320]) {
+    await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await waitForCards(page, 4);
+      await waitForEditButtons(page, 1);
+      await adminToggle(page).click();
+      await waitForEditButtons(page, 4);
+      for (const person of ['Ana Martin', 'Hugo Bernard']) { // Hugo n'a pas de fonction : la ligne suit son nom
+        const card = gridCard(page, person);
+        const boxOf = selector => (selector ? card.locator(selector) : card).boundingBox();
+        const [frame, name, fonction, actions, badge] = await Promise.all(['', '.name', '.fonction', '.card-actions', '.etablissement-tag'].map(boxOf));
+        const above = person === 'Ana Martin' ? fonction : name;
+        assert.ok(actions.y >= above.y + above.height - 1, `${person} à ${width} px : la ligne d'actions est sous ${person === 'Ana Martin' ? 'la fonction' : 'le nom'}`);
+        assert.ok(Math.abs(actions.x - name.x) <= 1, `${person} à ${width} px : alignée sur la colonne du nom`);
+        assert.ok(actions.x + actions.width <= frame.x + frame.width + 0.5 && actions.x >= frame.x, `${person} à ${width} px : dans la carte`);
+        assert.equal(overlaps(actions, badge), false, `${person} à ${width} px : le badge n'est pas recouvert`);
+      }
+    });
+  }
+});
 
 test('le mode admin s\'allume au clavier, annonce son état, et garde le focus quand les cartes sont redessinées', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
@@ -306,12 +348,14 @@ test('« Modifier mon profil » ouvre le formulaire avec les valeurs de la fiche
     await openOwn(page);
     assert.equal(await heading(page).textContent(), 'Modifier mon profil');
     assert.equal(await focusedId(page), 'profileTitle', 'le lecteur d\'écran entend le titre de l\'étape');
-    assert.match(await dialog(page).locator('.dlg-sub').textContent(), /vous relirez votre carte avant et après/);
+    assert.equal(await dialog(page).locator('.dlg-sub').textContent(),
+      'Vous relisez vos modifications avant de les valider : elles s’appliquent ensuite tout de suite à votre fiche.');
 
     assert.equal(await dialog(page).locator('.ident-name').textContent(), 'Ana Martin');
     assert.equal(await dialog(page).locator('.ident-mail').textContent(), ANA_EMAIL);
-    assert.equal(await dialog(page).locator('.pill').textContent(), 'CHU');
-    assert.match(await dialog(page).locator('.ident-lock').textContent(), /^Verrouillé : l'e-mail et l'établissement sont liés à votre compte/);
+    assert.equal(await dialog(page).locator('.et-pill').textContent(), 'CHU');
+    assert.equal(await dialog(page).locator('.ident-lock').textContent(),
+      'Verrouillé : l’e-mail et l’établissement sont liés à votre compte. Pour les corriger, contactez un administrateur.');
     assert.equal(await dialog(page).locator('input[type="email"], #profile-email, #profile-Etablissement').count(), 0, 'ni adresse ni établissement à modifier');
 
     assert.equal(await field(page, 'prenom').inputValue(), 'Ana');
@@ -341,9 +385,9 @@ test('une saisie refusée est signalée sous son champ et ne laisse pas passer �
     await openOwn(page);
     const phoneError = page.locator('#profile-numero_de_telephone-error');
     await field(page, 'numero_de_telephone').fill('12');
-    assert.equal(await phoneError.textContent(), 'un numéro français à 10 chiffres est attendu (05 56 78 90 12).');
+    assert.equal(await phoneError.textContent(), 'Un numéro français compte 10 chiffres, par exemple 05 56 78 90 12.');
     assert.equal(await field(page, 'numero_de_telephone').getAttribute('aria-invalid'), 'true');
-    assert.equal(await summary(page), 'Corrigez les champs signalés');
+    assert.equal(await summary(page), 'Corrigez le numéro de téléphone', 'le pied de fenêtre nomme le problème');
     assert.equal(await press(page, 'Relire mes modifications').isDisabled(), true);
 
     await field(page, 'numero_de_telephone').fill('05 56 78 90 12');
@@ -351,7 +395,8 @@ test('une saisie refusée est signalée sous son champ et ne laisse pas passer �
     assert.equal(await summary(page), 'Aucune modification');
 
     await field(page, 'Fonction').fill('=1+1');
-    assert.equal(await page.locator('#profile-Fonction-error').textContent(), 'ne peut pas commencer par = + - ou @.');
+    assert.equal(await page.locator('#profile-Fonction-error').textContent(), 'Ne peut pas commencer par = + - ou @.');
+    assert.equal(await summary(page), 'Corrigez les champs signalés');
     await field(page, 'Fonction').fill('x'.repeat(201));
     assert.equal(await page.locator('#profile-Fonction-error').textContent(), '200 caractères au plus.');
     await field(page, 'Fonction').fill('Cheffe');
@@ -362,6 +407,7 @@ test('une saisie refusée est signalée sous son champ et ne laisse pas passer �
     await field(page, 'nom').fill('');
     assert.equal(await page.locator('#profile-prenom-error').textContent(), 'Indiquez au moins un prénom ou un nom.');
     assert.equal(await page.locator('#profile-nom-error').textContent(), 'Indiquez au moins un prénom ou un nom.');
+    assert.equal(await summary(page), 'Indiquez au moins un prénom ou un nom');
     assert.equal(await press(page, 'Relire mes modifications').isDisabled(), true);
     assert.deepEqual(await bddCalls(page), []);
   }));
@@ -454,31 +500,36 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     assert.equal(await summary(page), '3 champs modifiés');
     await review(page);
     assert.equal(await focusedId(page), 'profileTitle');
-    assert.match(await dialog(page).locator('.dlg-sub').textContent(), /Rien n'est enregistré avant « Valider »/);
+    assert.equal(await dialog(page).locator('.dlg-sub').textContent(),
+      'Voici votre carte telle qu’elle est aujourd’hui et telle qu’elle apparaîtra. Les changements sont repérés sur la carte « Après ».');
+    assert.equal(await dialog(page).evaluate(node => node.classList.contains('dlg-review')), true, 'la fenêtre s\'élargit pour deux cartes');
 
-    const before = dialog(page).locator('.preview-before .contact-card');
-    const after = dialog(page).locator('.preview-after .contact-card');
-    assert.equal(await dialog(page).locator('.preview-before .preview-label').textContent(), 'Avant');
-    assert.equal(await dialog(page).locator('.preview-before .preview-note').textContent(), 'telle qu\'elle est aujourd\'hui');
-    assert.equal(await dialog(page).locator('.preview-after .preview-label').textContent(), 'Après');
-    assert.equal(await dialog(page).locator('.preview-after .preview-note').textContent(), 'telle qu\'elle sera');
+    const before = column(page, 'before').locator('.contact-card');
+    const after = column(page, 'after').locator('.contact-card');
+    assert.equal(await columnLabel(page, 'before'), 'Avant');
+    assert.equal(await columnNote(page, 'before'), 'telle qu’elle est aujourd’hui');
+    assert.equal(await columnLabel(page, 'after'), 'Après');
+    assert.equal(await columnNote(page, 'after'), 'telle qu’elle apparaîtra');
+    assert.equal(await column(page, 'after').getAttribute('aria-labelledby'), 'review-after-title');
     assert.equal(await notices(page).count(), 0, 'Ana figure dans l\'annuaire : rien à signaler');
+    assert.equal(await before.evaluate(node => node.classList.contains('rv-card')), true);
 
     // Avant : la carte de l'annuaire, sans aucun repère.
     assert.equal(await before.locator('.name').textContent(), 'Ana Martin');
     assert.equal(await before.locator('.fonction').textContent(), 'Pharmacienne');
     assert.deepEqual(await before.locator('.tag').allTextContents(), ['CME', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur', 'Référent qualité']);
-    assert.equal(await before.locator('.mark-new, .mark-gone').count(), 0);
+    assert.equal(await before.locator('.mk, .mk-gone, .mk-pill, .tag-add, .tag-del, .rv-ring').count(), 0);
 
-    // Après : ce qui change se voit (classe, pastille écrite pour un texte, « + » pour un tag)
-    // et se dit (texte pour les lecteurs d'écran).
-    assert.equal(await after.locator('.fonction.mark-new').textContent(), 'Cheffe de service modifié');
+    // Après : ce qui change se voit (contour, pastille écrite pour un texte, « + » pour un tag
+    // ajouté, trait rouge pour un tag retiré) et se dit (texte pour les lecteurs d'écran).
+    assert.equal(await after.locator('.fonction').textContent(), 'Cheffe de service modifié');
+    assert.equal(await after.locator('.fonction .mk').textContent(), 'Cheffe de service');
     assert.equal(await after.locator('.fonction .mk-pill').isVisible(), true);
     assert.equal(await after.locator('.mk-pill').count(), 1, 'une seule ligne de texte a changé');
-    assert.deepEqual(await after.locator('.tag.mark-new').allTextContents(), ['COVIRIS (ajouté)', 'Pharmacovigilance (ajouté)']);
-    assert.deepEqual(await after.locator('.tag.mark-gone').allTextContents(), ['CME (retiré)']);
-    assert.equal(await after.locator('.name.mark-new, .tel.mark-new, .mark-new .email').count(), 0, 'ce qui ne change pas n\'est pas repéré');
-    assert.deepEqual(await after.locator('.tag:not(.mark-new):not(.mark-gone)').allTextContents(),
+    assert.deepEqual(await after.locator('.tag.tag-add').allTextContents(), ['COVIRIS (ajouté)', 'Pharmacovigilance (ajouté)']);
+    assert.deepEqual(await after.locator('.tag.tag-del').allTextContents(), ['CME (retiré)']);
+    assert.equal(await after.locator('.name .mk, .tel .mk, .email .mk, .rv-ring').count(), 0, 'ce qui ne change pas n\'est pas repéré');
+    assert.deepEqual(await after.locator('.tag:not(.tag-add):not(.tag-del)').allTextContents(),
       ['Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur', 'Référent qualité']);
 
     // Les deux cartes sont des aperçus : rien n'y est cliquable.
@@ -489,9 +540,12 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
       assert.equal(await card.locator('.card-actions').isHidden(), true);
     }
 
-    // La légende et le détail.
-    assert.deepEqual(await dialog(page).locator('.legend-key').allTextContents(),
-      ['Ajouté ou modifié : en vert, avec une pastille ou un «\u00a0+\u00a0»', 'Retiré : barré en rouge']);
+    // La légende (un exemple de chaque repère) et le détail.
+    assert.equal(await dialog(page).locator('.rv-legend').textContent(),
+      '+ Exemple ajouté ou modifié : contour vert et pastilleExemple retiré : barré en rouge');
+    assert.equal(await dialog(page).locator('.rv-legend .lg').evaluateAll(nodes => nodes.every(node => node.getAttribute('aria-hidden') === 'true')), true,
+      'les exemples sont décoratifs : le texte de la légende suffit');
+    assert.equal(await dialog(page).locator('.recap-title').textContent(), 'Détail des changements');
     assert.deepEqual(await dialog(page).locator('.recap .diff-label').allTextContents(), ['Fonction', 'Instances', 'Compétences']);
     const first = dialog(page).locator('.recap .diff-row').first();
     assert.equal(await first.locator('del').textContent(), 'Pharmacienne');
@@ -501,8 +555,8 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     assert.equal(await summary(page), '3 champs modifiés');
 
     // Sur grand écran, avant et après sont côte à côte.
-    const left = await dialog(page).locator('.preview-before').boundingBox();
-    const right = await dialog(page).locator('.preview-after').boundingBox();
+    const left = await column(page, 'before').boundingBox();
+    const right = await column(page, 'after').boundingBox();
     assert.ok(right.x > left.x + left.width - 1, 'avant à gauche, après à droite');
     assert.ok(Math.abs(right.y - left.y) < 4);
 
@@ -527,7 +581,7 @@ test('« Retour » ramène au formulaire avec le brouillon intact, puis on relit
     assert.equal(await summary(page), '3 champs modifiés');
     await field(page, 'Fonction').fill('Directrice');
     await review(page);
-    assert.match(await dialog(page).locator('.preview-after .fonction').textContent(), /^Directrice/);
+    assert.match(await column(page, 'after').locator('.fonction').textContent(), /^Directrice/);
     assert.deepEqual(await bddCalls(page), []);
   }));
 
@@ -550,18 +604,14 @@ test('« Valider » écrit en une seule action Grist, confirme, puis l\'annuaire
     await changeAna(page);
     await review(page);
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
+    // Grist a tout gardé : la fenêtre se ferme et un message le confirme, rien d'autre à lire.
+    await savedWith(page, 'Vos modifications sont enregistrées.');
 
     assert.deepEqual(await bddCalls(page), [{
       action: 'UpdateRecord', table: 'BDD', rowId: 1, ok: true,
       values: { Fonction: 'Cheffe de service', Instances: ['L', 3], Competences: ['L', 1, 2, 3] }
     }]);
-    assert.equal(await dialog(page).locator('.sent h3').textContent(), 'Vos modifications sont enregistrées');
-    assert.equal(await dialog(page).locator('.sent p').textContent(), 'Elles s\'appliquent tout de suite dans Grist, sans validation.');
-    assert.equal(await dialog(page).locator('.sent .recap-title').textContent(), 'Ce qui a changé');
-    assert.equal(await dialog(page).locator('.sent .diff-row').count(), 3);
-    assert.equal(await notices(page).count(), 0, 'Grist a tout gardé : aucun avertissement');
-    assert.equal(await focusedId(page), 'profileTitle');
+    assert.equal(await isOpen(page), false);
 
     // L'annuaire derrière la fenêtre a été relu.
     await until(async () => (await gridCard(page, 'Ana Martin').locator('.fonction').textContent()) === 'Cheffe de service',
@@ -569,8 +619,6 @@ test('« Valider » écrit en une seule action Grist, confirme, puis l\'annuaire
     assert.deepEqual(await gridCard(page, 'Ana Martin').locator('.tag').allTextContents(),
       ['COVIRIS', 'Vaccination', 'Oncologie', 'Hématologie', 'Pharmacovigilance', 'Réseau douleur', 'Référent qualité']);
 
-    await closeSaved(page).click();
-    await closed(page);
     await waitForCards(page, 4);
     await focusReturnsTo(page, '#accountBar .account-edit');
 
@@ -594,6 +642,95 @@ test('« Valider » écrit en une seule action Grist, confirme, puis l\'annuaire
     assert.ok(!JSON.stringify(await Promise.all([...logs.warnings, ...logs.infos])).includes('@'), 'aucune adresse dans la console');
   }));
 
+test('le message de confirmation disparaît de lui-même, et un nouvel enregistrement le remplace et relance son délai', { skip }, () =>
+  withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOwn(page);
+    await page.clock.install();
+    await field(page, 'Fonction').fill('Cheffe');
+    await review(page);
+    await press(page, 'Valider').click();
+    await savedWith(page, 'Vos modifications sont enregistrées.');
+
+    await page.clock.fastForward(5500);
+    assert.equal(await toast(page).isVisible(), true, 'le message reste lisible quelques secondes');
+    await page.clock.fastForward(1000);
+    assert.equal(await toast(page).isHidden(), true);
+    assert.equal(await toastLive(page).textContent(), '', 'la zone « status » est vidée avec lui');
+
+    // Un enregistrement remet le message ; un autre, fait pendant qu'il est encore là, le
+    // remplace et relance son délai (l'ancien délai ne le retire pas trop tôt).
+    for (const [function_, wait] of [['Directrice', 3000], ['Cheffe de pôle', 0]]) {
+      await waitForCards(page, 4);
+      await openOwn(page);
+      await field(page, 'Fonction').fill(function_);
+      await review(page);
+      await press(page, 'Valider').click();
+      await savedWith(page, 'Vos modifications sont enregistrées.');
+      if (wait) {
+        await page.clock.fastForward(wait);
+        assert.equal(await toast(page).isVisible(), true);
+      }
+    }
+    await page.clock.fastForward(5500);
+    assert.equal(await toast(page).isVisible(), true, 'le délai est reparti du dernier enregistrement');
+    await page.clock.fastForward(1000);
+    assert.equal(await toast(page).isHidden(), true);
+    assert.equal(await toastLive(page).textContent(), '');
+  }));
+
+// Grist peut accepter l'écriture sans tout garder (une formule, un déclencheur, une règle) ou ne
+// plus répondre ensuite : la fenêtre ne se ferme pas sur un message trop beau pour être vrai.
+const afterWrite = (page, effect) => page.evaluate(code => {
+  const docApi = window.__fake.docApi;
+  const write = docApi.applyUserActions.bind(docApi);
+  docApi.applyUserActions = async actions => {
+    const result = await write(actions);
+    new Function(code)();
+    return result;
+  };
+}, effect);
+
+test('si Grist n\'a pas tout gardé, la fenêtre reste ouverte pour le dire, sans message de confirmation', { skip }, () =>
+  withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOwn(page);
+    await field(page, 'Fonction').fill('Cheffe');
+    await review(page);
+    await afterWrite(page, "window.__tables.BDD.Fonction[0] = 'Pharmacienne';"); // l'ancienne valeur revient
+    await press(page, 'Valider').click();
+    await headingIs(page, 'Fiche enregistrée');
+    assert.equal(await dialog(page).locator('.dlg-sub').textContent(), 'Votre fiche est à jour.');
+    const alert = dialog(page).locator('.notice-ko');
+    assert.equal(await alert.getAttribute('role'), 'alert');
+    assert.equal(await alert.textContent(),
+      'Grist n\'a pas gardé tout ce qui était demandé (Fonction). Vérifiez la fiche dans Grist ou contactez un administrateur.');
+    assert.equal(await dialog(page).locator('.sent h3').textContent(), 'Vos modifications sont enregistrées');
+    assert.equal(await dialog(page).locator('.sent .recap-title').textContent(), 'Ce qui a changé');
+    assert.equal(await dialog(page).locator('.sent .diff-row').count(), 1);
+    assert.equal(await focusedId(page), 'profileTitle');
+    assert.equal(await toast(page).isHidden(), true, 'pas de confirmation quand tout n\'est pas confirmé');
+    assert.equal(await toastLive(page).textContent(), '');
+    await closeSaved(page).click();
+    await closed(page);
+    await focusReturnsTo(page, '#accountBar .account-edit');
+  }));
+
+test('si l\'annuaire ne se recharge pas après l\'écriture, la fenêtre le dit et reste ouverte', { skip }, () =>
+  withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOwn(page);
+    await field(page, 'Fonction').fill('Cheffe');
+    await review(page);
+    await afterWrite(page, "window.__failTables = ['BDD'];"); // Grist ne répond plus pour BDD
+    await press(page, 'Valider').click();
+    await headingIs(page, 'Fiche enregistrée');
+    const notice = dialog(page).locator('.notice-pending');
+    assert.equal(await notice.getAttribute('role'), 'status');
+    assert.equal(await notice.textContent(),
+      'Les modifications sont enregistrées, mais l\'annuaire n\'a pas pu être rechargé. Rechargez la page pour les voir.');
+    assert.equal(await dialog(page).locator('.notice-ko').count(), 0, 'rien n\'est perdu : seule la relecture de l\'annuaire a échoué');
+    assert.equal(await toast(page).isHidden(), true);
+    assert.deepEqual((await bddCalls(page)).map(call => call.ok), [true]);
+  }));
+
 test('le focus revient au bouton de la fiche modifiée, même quand les cartes ont été redessinées', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await enableAdminMode(page);
@@ -603,11 +740,9 @@ test('le focus revient au bouton de la fiche modifiée, même quand les cartes o
     await dialog(page).waitFor();
     await field(page, 'Fonction').fill('Directeur');
     await press(page, 'Relire les modifications').click();
-    await headingIs(page, 'Relire les modifications de Hugo Bernard');
+    await headingIs(page, 'Relire avant de valider');
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
-    await closeSaved(page).click();
-    await closed(page);
+    await savedWith(page, 'La fiche de Hugo Bernard est enregistrée.');
     await focusReturnsTo(page, '#cardsGrid .card-edit[data-row-id="10"]'); // la carte de Hugo, redessinée
   }));
 
@@ -617,17 +752,19 @@ test('une administratrice modifie la fiche de quelqu\'un d\'autre : la fenêtre 
     await gridCard(page, 'Hugo Bernard').locator('.card-edit').click();
     await dialog(page).waitFor();
     assert.equal(await heading(page).textContent(), 'Modifier la fiche de Hugo Bernard');
-    assert.match(await dialog(page).locator('.dlg-sub').textContent(), /en tant qu'administrateur/);
+    assert.equal(await dialog(page).locator('.dlg-sub').textContent(),
+      'Mode admin : vous modifiez la fiche d’une autre personne. Vous relisez les modifications avant de les valider, elles s’appliquent ensuite tout de suite.');
     assert.equal(await dialog(page).locator('.ident-name').textContent(), 'Hugo Bernard');
     assert.equal(await dialog(page).locator('.ident-lock').count(), 0, 'l\'administrateur peut changer l\'e-mail et l\'établissement : rien n\'est verrouillé');
 
     await field(page, 'Fonction').fill('Directeur');
     await press(page, 'Relire les modifications').click();
-    await headingIs(page, 'Relire les modifications de Hugo Bernard');
-    assert.match(await dialog(page).locator('.preview-after .fonction').textContent(), /^Directeur/);
+    await headingIs(page, 'Relire avant de valider');
+    assert.equal(await dialog(page).locator('.dlg-sub').textContent(),
+      'Voici la carte de Hugo Bernard telle qu’elle est aujourd’hui et telle qu’elle apparaîtra. Les changements sont repérés sur la carte « Après ».');
+    assert.match(await column(page, 'after').locator('.fonction').textContent(), /^Directeur/);
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
-    assert.equal(await dialog(page).locator('.sent h3').textContent(), 'La fiche de Hugo Bernard est enregistrée');
+    await savedWith(page, 'La fiche de Hugo Bernard est enregistrée.');
 
     assert.deepEqual(await bddCalls(page), [{ action: 'UpdateRecord', table: 'BDD', rowId: 10, ok: true, values: { Fonction: 'Directeur' } }]);
     assert.deepEqual(await bddCell(page, 'Instances', 9), ['L', 999], 'la valeur que le formulaire ne montre pas est conservée');
@@ -659,12 +796,14 @@ test('un administrateur voit l\'e-mail et l\'établissement d\'une autre personn
     await openOther(page, 'Hostile');
     assert.equal(await field(page, 'email').getAttribute('type'), 'email');
     assert.equal(await field(page, 'email').inputValue(), 'hostile@chu-bordeaux.fr');
-    assert.equal(await selectedLabel(page), 'CHU');
-    assert.deepEqual(await field(page, 'Etablissement').locator('option').allTextContents(), ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'],
-      'tous les établissements, sans option vide : celui d\'une personne ne se vide pas');
+    assert.equal(await selectedLabel(page), 'CHU de Bordeaux');
+    assert.deepEqual(await field(page, 'Etablissement').locator('option').allTextContents(),
+      ['CHU de Bordeaux', 'Clinique du Parc', 'INSERM', 'Institut Bergonié', 'Université Bordeaux Montaigne'],
+      'les noms complets, tous les établissements, sans option vide : celui d\'une personne ne se vide pas');
     assert.equal(await dialog(page).locator('.ident-lock').count(), 0, 'rien n\'est verrouillé pour un administrateur');
-    assert.match(await dialog(page).locator('#profile-email-hint').textContent(), /Ses droits d'administrateur ou de responsable, déclarés dans la table ACL/);
-    assert.match(await field(page, 'email').getAttribute('aria-describedby'), /profile-email-error profile-email-hint/);
+    assert.equal(await dialog(page).locator('#profile-email-hint').count(), 0, 'la mise en garde sur les droits est dite à la relecture, pas dans le formulaire');
+    assert.equal(await field(page, 'email').getAttribute('aria-describedby'), 'profile-email-error');
+    assert.equal(await field(page, 'Etablissement').getAttribute('aria-describedby'), 'profile-Etablissement-error profile-Etablissement-warning');
     assert.equal(await summary(page), 'Aucune modification');
     assert.deepEqual(await bddCalls(page), []);
   });
@@ -675,13 +814,13 @@ test('un administrateur voit l\'e-mail et l\'établissement d\'une autre personn
     await dialog(page).waitFor();
     assert.equal(await field(page, 'email').count(), 0);
     assert.equal(await field(page, 'Etablissement').count(), 0);
-    assert.match(await dialog(page).locator('.ident-lock').textContent(), /liés à votre compte/);
+    assert.match(await dialog(page).locator('.ident-lock').textContent(), /^Verrouillé sur votre propre fiche : l’e-mail et l’établissement sont liés à votre compte\.$/);
   });
   await withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
     assert.equal(await field(page, 'email').count(), 0);
     assert.equal(await field(page, 'Etablissement').count(), 0);
-    assert.match(await dialog(page).locator('.ident-lock').textContent(), /liés à votre compte/);
+    assert.match(await dialog(page).locator('.ident-lock').textContent(), /^Verrouillé : l’e-mail et l’établissement sont liés à votre compte\. Pour les corriger, contactez un administrateur\.$/);
   });
 });
 
@@ -693,41 +832,50 @@ test('le nouvel e-mail et le nouvel établissement se voient sur la carte après
     await field(page, 'Etablissement').selectOption({ label: 'Institut Bergonié' });
     assert.equal(await summary(page), '2 champs modifiés');
     await press(page, 'Relire les modifications').click();
-    await headingIs(page, 'Relire les modifications de Hugo Bernard');
-    assert.equal(await notices(page).count(), 0, 'il reste dans l\'annuaire : rien à signaler');
+    await headingIs(page, 'Relire avant de valider');
+    // Il reste dans l'annuaire : seul l'avis sur les droits (table ACL) accompagne le changement d'adresse.
+    assert.deepEqual(await notices(page).allTextContents(), [
+      'L’adresse change dans BDD, pas dans la table ACL : si cette personne est administratrice ou responsable d’un établissement, ses droits restent attachés à son ancienne adresse.'
+    ]);
+    assert.equal(await notices(page).first().getAttribute('role'), 'status');
 
-    const before = dialog(page).locator('.preview-before .contact-card');
-    const after = dialog(page).locator('.preview-after .contact-card');
+    const before = column(page, 'before').locator('.contact-card');
+    const after = column(page, 'after').locator('.contact-card');
     assert.equal(await before.locator('.etablissement-tag').textContent(), 'CHU');
     assert.equal(await before.locator('a.email').isHidden(), true, 'Hugo n\'avait pas d\'adresse');
-    assert.equal(await after.locator('.etablissement-tag.mark-new').textContent(), 'Institut Bergonié modifié');
-    assert.equal(await after.locator('a.email.mark-new').textContent(), 'hugo.bernard@chu-bordeaux.fr ajouté');
+    // L'établissement change : un anneau repère le badge et la pastille se lit dessous, dans la
+    // colonne de droite de la carte (le badge, lui, reste lisible).
+    assert.equal(await after.locator('.etablissement-tag').textContent(), 'Institut Bergonié');
+    assert.equal(await after.locator('.etablissement-tag').evaluate(node => node.classList.contains('rv-ring')), true);
+    assert.equal(await after.locator('.etab-col .mk-pill').textContent(), 'modifié');
+    assert.equal(await after.locator('a.email').textContent(), 'hugo.bernard@chu-bordeaux.fr ajouté');
+    assert.equal(await after.locator('a.email .mk').textContent(), 'hugo.bernard@chu-bordeaux.fr');
     assert.equal(await after.locator('a.email').getAttribute('href'), null, 'un aperçu n\'est pas cliquable');
     assert.equal(await after.locator('.etablissement-tag').isDisabled(), true);
-    // Le badge repéré reste lisible (texte blanc sur fond sombre : le vert pâle des lignes de
-    // texte l'effacerait) et sa pastille n'est pas tronquée avec le nom de l'établissement.
     assert.deepEqual(await after.locator('.etablissement-tag').evaluate(badge => {
       const style = getComputedStyle(badge);
-      const pill = badge.querySelector('.mk-pill').getBoundingClientRect();
+      const pill = badge.closest('.etab-col').querySelector('.mk-pill').getBoundingClientRect();
+      const card = badge.closest('.contact-card').getBoundingClientRect();
       const frame = badge.getBoundingClientRect();
       return {
         color: style.color,
         background: style.backgroundColor,
-        pillInside: pill.left >= frame.left - 0.5 && pill.right <= frame.right + 0.5 && pill.bottom <= frame.bottom + 0.5,
+        pillBelow: pill.top >= frame.bottom - 0.5,
+        pillInsideCard: pill.left >= card.left && pill.right <= card.right + 0.5,
         clipped: badge.scrollWidth > badge.clientWidth + 1
       };
-    }), { color: 'rgb(255, 255, 255)', background: 'rgb(20, 124, 114)', pillInside: true, clipped: false });
+    }), { color: 'rgb(255, 255, 255)', background: 'rgb(20, 124, 114)', pillBelow: true, pillInsideCard: true, clipped: false });
     assert.equal(await before.locator('.mk-pill').count(), 0);
     assert.deepEqual(await dialog(page).locator('.recap .diff-label').allTextContents(), ['E-mail', 'Établissement']);
     const rows = dialog(page).locator('.recap .diff-row');
     assert.equal(await rows.nth(0).locator('.none').first().textContent(), 'non renseigné');
     assert.equal(await rows.nth(0).locator('ins').textContent(), 'hugo.bernard@chu-bordeaux.fr');
-    assert.equal(await rows.nth(1).locator('del').textContent(), 'CHU');
+    assert.equal(await rows.nth(1).locator('del').textContent(), 'CHU de Bordeaux');
     assert.equal(await rows.nth(1).locator('ins').textContent(), 'Institut Bergonié');
     assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
 
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
+    await savedWith(page, 'La fiche de Hugo Bernard est enregistrée.');
     assert.deepEqual(await bddCalls(page), [{
       action: 'UpdateRecord', table: 'BDD', rowId: 10, ok: true, values: { email: 'hugo.bernard@chu-bordeaux.fr', Etablissement: 5 }
     }]);
@@ -735,22 +883,29 @@ test('le nouvel e-mail et le nouvel établissement se voient sur la carte après
     await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.etablissement-tag').textContent()) === 'Institut Bergonié', 'la carte n\'a pas été mise à jour');
     assert.equal(await gridCard(page, 'Hugo Bernard').locator('a.email').textContent(), 'hugo.bernard@chu-bordeaux.fr');
     assert.equal(await gridCard(page, 'Hugo Bernard').locator('a.email').getAttribute('href'), 'mailto:hugo.bernard@chu-bordeaux.fr');
-    assert.equal(await dialog(page).locator('.recap .diff-label').count(), 2, 'la confirmation rappelle ce qui a changé');
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
 test('déplacer une personne dans un établissement qui n\'a pas validé sa présence la retire de l\'annuaire, et la relecture le dit d\'abord', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await openOther(page, 'Hugo Bernard');
+    const warning = page.locator('#profile-Etablissement-warning');
+    assert.equal(await warning.isHidden(), true, 'CHU a validé sa présence : rien à dire');
+    await field(page, 'Etablissement').selectOption({ label: 'INSERM' });
+    assert.equal(await warning.textContent(), 'Cet établissement n’a pas validé sa présence : la fiche ne sera pas visible dans l’annuaire.');
+    assert.equal(await warning.isVisible(), true, 'la mise en garde se lit dès le formulaire');
+    await field(page, 'Etablissement').selectOption({ label: 'Institut Bergonié' });
+    assert.equal(await warning.isHidden(), true);
     await field(page, 'Etablissement').selectOption({ label: 'INSERM' });
     await press(page, 'Relire les modifications').click();
-    await headingIs(page, 'Relire les modifications de Hugo Bernard');
+    await headingIs(page, 'Relire avant de valider');
     assert.deepEqual(await notices(page).allTextContents(), [
-      'Cette fiche reste masquée de l\'annuaire : son établissement n\'a pas encore été validé.'
+      'INSERM n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.'
     ]);
-    assert.equal(await dialog(page).locator('.preview-after .etablissement-tag').textContent(), 'INSERM modifié');
+    assert.equal(await column(page, 'after').locator('.etablissement-tag').textContent(), 'INSERM');
+    assert.equal(await column(page, 'after').locator('.etab-col .mk-pill').textContent(), 'modifié');
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
+    await savedWith(page, 'La fiche de Hugo Bernard est enregistrée.');
     assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ Etablissement: 4 }]);
     await waitForCards(page, 3);
     assert.equal(await gridCard(page, 'Hugo Bernard').count(), 0, 'la carte a quitté l\'annuaire');
@@ -762,21 +917,24 @@ test('un e-mail refusé est signalé sous son champ : mal formé, déjà pris, v
     const emailError = page.locator('#profile-email-error');
     const relire = press(page, 'Relire les modifications');
     await field(page, 'email').fill('hostile@');
-    assert.match(await emailError.textContent(), /^cette adresse n'est pas valide \(nom@exemple\.fr\)\.$/);
+    assert.equal(await emailError.textContent(), 'Indiquez une adresse e-mail valide.');
     assert.equal(await field(page, 'email').getAttribute('aria-invalid'), 'true');
-    assert.equal(await summary(page), 'Corrigez les champs signalés');
+    assert.equal(await summary(page), 'Corrigez l’adresse e-mail');
     assert.equal(await relire.isDisabled(), true);
 
+    // Une fiche visible dans l'annuaire se nomme (son nom s'y lit déjà) ; une fiche masquée, non.
     await field(page, 'email').fill('ANA.Martin@chu-bordeaux.fr');
-    assert.equal(await emailError.textContent(), 'cette adresse est déjà celle d\'une autre fiche.');
+    assert.equal(await emailError.textContent(), 'Cette adresse est déjà utilisée par Ana Martin.');
     assert.equal(await relire.isDisabled(), true);
+    await field(page, 'email').fill(IRIS_EMAIL);
+    assert.equal(await emailError.textContent(), 'Cette adresse est déjà utilisée par une autre fiche.', 'le nom d\'une fiche masquée ne se dévoile pas');
 
     await field(page, 'email').fill('   ');
-    assert.equal(await emailError.textContent(), 'indiquez une adresse e-mail.');
+    assert.equal(await emailError.textContent(), 'Indiquez une adresse e-mail valide.');
     assert.equal(await relire.isDisabled(), true);
 
     await field(page, 'email').fill('=cmd@chu.fr');
-    assert.equal(await emailError.textContent(), 'ne peut pas commencer par = + - ou @.');
+    assert.equal(await emailError.textContent(), 'Ne peut pas commencer par = + - ou @.');
 
     await field(page, 'email').fill('hostile.nouveau@chu-bordeaux.fr');
     assert.equal(await emailError.isHidden(), true);
@@ -793,12 +951,12 @@ test('une adresse prise par une autre fiche pendant la relecture n\'est pas écr
     await openOther(page, 'Hugo Bernard');
     await field(page, 'email').fill('convoite@exemple.fr');
     await press(page, 'Relire les modifications').click();
-    await headingIs(page, 'Relire les modifications de Hugo Bernard');
+    await headingIs(page, 'Relire avant de valider');
     await page.evaluate(() => { window.__tables.BDD.email[3] = 'Convoite@Exemple.fr'; }); // Dan, hors de la vue
     await press(page, 'Valider').click();
     await page.locator('#profileDialog .dlg-alert [role="alert"]').waitFor();
     assert.match(await alertText(page), /Cette adresse e-mail est maintenant celle d'une autre fiche : rien n'a été modifié\./);
-    assert.equal(await heading(page).textContent(), 'Relire les modifications de Hugo Bernard');
+    assert.equal(await heading(page).textContent(), 'Relire avant de valider');
     assert.deepEqual(await bddCalls(page), []);
     assert.equal(await bddCell(page, 'email', 9), '');
     // On peut revenir à la fiche et en choisir une autre.
@@ -827,9 +985,9 @@ for (const width of [280, 360]) {
       await field(page, 'Etablissement').selectOption({ label: 'Institut Bergonié' });
       assert.deepEqual(await fits(), FITS);
       await press(page, 'Relire les modifications').click();
-      await headingIs(page, 'Relire les modifications de Hostile'.replace('Hostile', `${HOSTILE_FIRST_NAME} Hostile`));
+      await headingIs(page, 'Relire avant de valider');
       assert.deepEqual(await fits(), FITS);
-      const spill = await dialog(page).locator('.preview-after .contact-card').evaluate(card => {
+      const spill = await column(page, 'after').locator('.contact-card').evaluate(card => {
         const frame = card.getBoundingClientRect();
         return [...card.querySelectorAll('*')].filter(node => {
           const at = node.getBoundingClientRect();
@@ -845,16 +1003,15 @@ test('une personne qui n\'apparaît pas dans l\'annuaire modifie quand même sa 
     await openOwn(page);
     await field(page, 'Fonction').fill('Ingénieure');
     await review(page);
-    assert.equal(await dialog(page).locator('.preview-before .name').textContent(), 'Iris Refus');
+    assert.equal(await column(page, 'before').locator('.name').textContent(), 'Iris Refus');
     assert.deepEqual(await notices(page).allTextContents(), [
-      'Votre fiche est masquée de l\'annuaire : vous n\'avez pas accepté d\'apparaître (interrupteur « Apparaître dans l\'annuaire » en haut de page).'
+      'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).'
     ]);
     assert.equal(await notices(page).first().getAttribute('role'), 'status');
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
+    await savedWith(page, 'Vos modifications sont enregistrées.');
     assert.deepEqual((await bddCalls(page)).map(call => [call.action, call.rowId, call.values]), [['UpdateRecord', 11, { Fonction: 'Ingénieure' }]]);
     assert.equal(await bddCell(page, 'Accepte_apparaitre', 10), false, 'modifier sa fiche ne change pas son choix de présence');
-    await closeSaved(page).click();
     await waitForCards(page, 4);
   }));
 
@@ -869,10 +1026,10 @@ for (const [type, tables, written] of [
       await field(page, 'numero_de_telephone').fill('0556789013');
       await field(page, 'numero_de_telephone').blur();
       await review(page);
-      assert.equal(await dialog(page).locator('.preview-before .tel').textContent(), '☎ 05 56 78 90 12');
-      assert.match(await dialog(page).locator('.preview-after .tel.mark-new').textContent(), /^☎ 05 56 78 90 13/);
+      assert.equal(await column(page, 'before').locator('.tel').textContent(), '☎ 05 56 78 90 12');
+      assert.equal(await column(page, 'after').locator('.tel').textContent(), '☎ 05 56 78 90 13 modifié');
       await press(page, 'Valider').click();
-      await headingIs(page, 'Fiche enregistrée');
+      await savedWith(page, 'Vos modifications sont enregistrées.');
       assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ numero_de_telephone: written }]);
       await until(async () => (await gridCard(page, 'Ana Martin').locator('.tel').textContent()) === '☎ 05 56 78 90 13', 'le numéro n\'a pas été mis à jour');
     }));
@@ -883,11 +1040,13 @@ test('vider le téléphone barre l\'ancien numéro dans la carte après, et écr
     await openOwn(page);
     await field(page, 'numero_de_telephone').fill('');
     await review(page);
-    assert.match(await dialog(page).locator('.preview-after .tel.mark-gone').textContent(), /^☎ 05 56 78 90 12 supprimé$/);
-    assert.equal(await dialog(page).locator('.preview-after .tel .mk-pill-del').textContent(), 'supprimé');
+    const tel = column(page, 'after').locator('.tel');
+    assert.equal(await tel.textContent(), '☎ 05 56 78 90 12 supprimé');
+    assert.equal(await tel.locator('.mk-gone').textContent(), '☎ 05 56 78 90 12', 'l\'ancien numéro reste lisible, barré');
+    assert.equal(await tel.locator('.mk-pill-del').textContent(), 'supprimé');
     assert.equal(await dialog(page).locator('.recap .diff-row .none').textContent(), 'supprimé');
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
+    await savedWith(page, 'Vos modifications sont enregistrées.');
     assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ numero_de_telephone: null }]);
     await until(async () => (await gridCard(page, 'Ana Martin').locator('.tel').textContent()) === '', 'le numéro n\'a pas disparu de la carte');
   }));
@@ -898,11 +1057,12 @@ test('changer le rôle ou le nom se voit sur la carte après, et le retirer barr
     await field(page, 'prenom').fill('Anna');
     await field(page, 'Role_dans_le_PUI').selectOption('0');
     await review(page);
-    const after = dialog(page).locator('.preview-after .contact-card');
-    assert.match(await after.locator('.name.mark-new').textContent(), /^Anna Martin modifié$/);
-    assert.deepEqual(await after.locator('.tag.mark-gone').allTextContents(), ['Référent qualité (retiré)']);
+    const after = column(page, 'after').locator('.contact-card');
+    assert.equal(await after.locator('.name').textContent(), 'Anna Martin modifié');
+    assert.equal(await after.locator('.name .mk').textContent(), 'Anna Martin');
+    assert.deepEqual(await after.locator('.tag.tag-del').allTextContents(), ['Référent qualité (retiré)']);
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
+    await savedWith(page, 'Vos modifications sont enregistrées.');
     assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ prenom: 'Anna', Role_dans_le_PUI: 0 }]);
     await until(async () => (await page.locator('#cardsGrid .name').allTextContents()).includes('Anna Martin'), 'le prénom n\'a pas été mis à jour');
   }));
@@ -913,7 +1073,7 @@ test('la relecture dit pourquoi une fiche acceptée reste hors de l\'annuaire : 
     await field(page, 'Fonction').fill('Chargé de projet');
     await review(page);
     assert.deepEqual(await notices(page).allTextContents(), [
-      'Votre fiche reste masquée de l\'annuaire : votre établissement n\'a pas encore été validé.'
+      'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.'
     ]);
     await press(page, 'Retour').click();
     await headingIs(page, 'Modifier mon profil');
@@ -926,10 +1086,10 @@ test('une ligne ajoutée porte la pastille « ajouté », sur la carte après se
     await field(page, 'numero_de_telephone').fill('0556789014');
     await field(page, 'prenom').fill('Robert');
     await review(page);
-    const after = dialog(page).locator('.preview-after .contact-card');
-    assert.equal(await after.locator('.tel.mark-new').textContent(), '☎ 05 56 78 90 14 ajouté');
-    assert.equal(await after.locator('.name.mark-new').textContent(), 'Robert Durand modifié');
-    assert.equal(await dialog(page).locator('.preview-before .mk-pill').count(), 0, 'la carte avant n\'a aucun repère');
+    const after = column(page, 'after').locator('.contact-card');
+    assert.equal(await after.locator('.tel').textContent(), '☎ 05 56 78 90 14 ajouté');
+    assert.equal(await after.locator('.name').textContent(), 'Robert Durand modifié');
+    assert.equal(await column(page, 'before').locator('.mk-pill').count(), 0, 'la carte avant n\'a aucun repère');
     assert.equal(await notices(page).count(), 0, 'Bob est partenaire, validé : sa fiche figure dans l\'annuaire');
   }));
 
@@ -947,7 +1107,7 @@ for (const [rule, options] of [
       await press(page, 'Valider').click();
       await page.locator('#profileDialog .dlg-alert [role="alert"]').waitFor();
       assert.match(await alertText(page), /^Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche/);
-      assert.equal(await heading(page).textContent(), 'Relire vos modifications');
+      assert.equal(await heading(page).textContent(), 'Relire avant de valider');
       assert.equal(await press(page, 'Valider').isEnabled(), true, 'on peut réessayer');
       assert.equal(await dialog(page).locator('[data-close]').isEnabled(), true);
       assert.deepEqual((await bddCalls(page)).map(call => call.ok), [false]);
@@ -965,20 +1125,20 @@ test('si la fiche change dans Grist pendant la relecture, rien n\'est écrit : o
     await openOwn(page);
     await field(page, 'Fonction').fill('Cheffe de service');
     await review(page);
-    assert.equal(await dialog(page).locator('.preview-before .fonction').textContent(), 'Pharmacienne');
+    assert.equal(await column(page, 'before').locator('.fonction').textContent(), 'Pharmacienne');
 
     // Quelqu'un d'autre change la fonction pendant que la personne relit.
     await page.evaluate(() => { window.__tables.BDD.Fonction[0] = 'Directrice'; });
     await press(page, 'Valider').click();
     await page.waitForFunction(() => document.querySelector('#profileDialog .notice') !== null);
     assert.match(await notices(page).first().textContent(), /^La fiche a changé dans Grist pendant la relecture\. Relisez ce qui suit, puis validez à nouveau\./);
-    assert.equal(await heading(page).textContent(), 'Relire vos modifications');
-    assert.equal(await dialog(page).locator('.preview-before .fonction').textContent(), 'Directrice', 'la carte avant est celle d\'aujourd\'hui');
+    assert.equal(await heading(page).textContent(), 'Relire avant de valider');
+    assert.equal(await column(page, 'before').locator('.fonction').textContent(), 'Directrice', 'la carte avant est celle d\'aujourd\'hui');
     assert.deepEqual(await bddCalls(page), [], 'la première validation n\'a rien écrit');
     assert.equal(await bddCell(page, 'Fonction'), 'Directrice');
 
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
+    await savedWith(page, 'Vos modifications sont enregistrées.');
     assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ Fonction: 'Cheffe de service' }]);
   }));
 
@@ -989,8 +1149,7 @@ test('ce qu\'un autre a changé dans une autre colonne pendant la relecture n\'e
     await review(page);
     await page.evaluate(() => { window.__tables.BDD.Fonction[0] = 'Directrice'; });
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
-    assert.equal(await notices(page).count(), 0);
+    await savedWith(page, 'Vos modifications sont enregistrées.');
     assert.equal(await bddCell(page, 'Fonction'), 'Directrice');
     assert.equal(await bddCell(page, 'numero_de_telephone'), 556789013);
   }));
@@ -1002,7 +1161,7 @@ test('si les champs modifiés ont changé dans Grist avant la relecture, la fen�
     await page.evaluate(() => { window.__tables.BDD.Fonction[0] = 'Directrice'; });
     await review(page);
     assert.match(await notices(page).first().textContent(), /ont changé dans Grist depuis l'ouverture de la fenêtre : Fonction\./);
-    assert.equal(await dialog(page).locator('.preview-before .fonction').textContent(), 'Directrice');
+    assert.equal(await column(page, 'before').locator('.fonction').textContent(), 'Directrice');
     assert.deepEqual(await dialog(page).locator('.recap .diff-row del').allTextContents(), ['Directrice']);
   }));
 
@@ -1054,11 +1213,8 @@ test('un double clic sur « Valider » n\'écrit qu\'une fois, et la fenêtre ne
     const prevented = await page.evaluate(() => [1, 2, 3].map(() => !document.getElementById('profileDialog').dispatchEvent(new Event('cancel', { cancelable: true }))));
     assert.deepEqual(prevented, [true, true, true]);
     assert.equal(await isOpen(page), true, 'Échap ne ferme pas la fenêtre pendant l\'enregistrement');
-    await headingIs(page, 'Fiche enregistrée');
+    await savedWith(page, 'Vos modifications sont enregistrées.');
     assert.equal((await bddCalls(page)).length, 1);
-    assert.equal(await dialog(page).locator('[data-close]').isEnabled(), true);
-    await page.keyboard.press('Escape');
-    await closed(page);
   }));
 
 // ===== Sécurité et accessibilité =====
@@ -1073,12 +1229,13 @@ test('un prénom piégé reste du texte dans la fenêtre : titre, cartes de rele
     assert.equal(await dialog(page).locator('.ident-name').textContent(), hostileName);
     await field(page, 'Fonction').fill('Test');
     await press(page, 'Relire les modifications').click();
-    await headingIs(page, `Relire les modifications de ${hostileName}`);
-    assert.equal(await dialog(page).locator('.preview-after .name').textContent(), hostileName);
+    await headingIs(page, 'Relire avant de valider');
+    assert.equal(await dialog(page).locator('.dlg-sub').textContent(),
+      `Voici la carte de ${hostileName} telle qu’elle est aujourd’hui et telle qu’elle apparaîtra. Les changements sont repérés sur la carte « Après ».`);
+    assert.equal(await column(page, 'after').locator('.name').textContent(), hostileName);
     await press(page, 'Valider').click();
-    await headingIs(page, 'Fiche enregistrée');
-    assert.equal(await dialog(page).locator('.sent h3').textContent(), `La fiche de ${hostileName} est enregistrée`);
-    assert.equal(await dialog(page).locator('img').count(), 0);
+    await savedWith(page, `La fiche de ${hostileName} est enregistrée.`);
+    assert.equal(await page.locator('#toast img, #toastLive img, #profileDialog img').count(), 0);
     assert.equal(await page.evaluate(() => window.__xss), undefined, 'aucun script de la fiche ne s\'est exécuté');
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
@@ -1139,15 +1296,15 @@ for (const width of [280, 320, 360]) {
       await chip(page, 'Instances', 'CME').click();
       await review(page);
       assert.equal(await notices(page).count(), 1, 'l\'avis « fiche masquée » est dans la relecture');
-      assert.equal(await dialog(page).locator('.preview-after .mk-pill').count(), 2, 'deux lignes de texte ont changé : le nom et la fonction');
+      assert.equal(await column(page, 'after').locator('.mk-pill').count(), 2, 'deux lignes de texte ont changé : le nom et la fonction');
       assert.deepEqual(await fits(), FITS);
-      const before = await dialog(page).locator('.preview-before').boundingBox();
-      const after = await dialog(page).locator('.preview-after').boundingBox();
+      const before = await column(page, 'before').boundingBox();
+      const after = await column(page, 'after').boundingBox();
       assert.ok(after.y >= before.y + before.height - 1, 'les deux cartes sont l\'une sous l\'autre');
       assert.ok(Math.abs(after.x - before.x) < 2);
       // Rien ne déborde de la carte « Après » : ni la pastille, ni le texte, ni les tags.
-      const cardBox = await dialog(page).locator('.preview-after .contact-card').boundingBox();
-      const spill = await dialog(page).locator('.preview-after .contact-card').evaluate(card => {
+      const cardBox = await column(page, 'after').locator('.contact-card').boundingBox();
+      const spill = await column(page, 'after').locator('.contact-card').evaluate(card => {
         const frame = card.getBoundingClientRect();
         return [...card.querySelectorAll('*')].filter(node => {
           const box = node.getBoundingClientRect();

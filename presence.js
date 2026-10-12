@@ -95,13 +95,21 @@ export function describeUnknownAccount({ email, admin, emailColumn = true }) {
 // Ce que la relecture d'une modification dit d'une fiche absente de l'annuaire : la
 // carte « Après » montre une carte que personne ne verra dans la grille tant que la
 // cause demeure. `status` vient de describeVisibility() ; `own` dit si la fiche est celle
-// de la personne qui relit. Renvoie '' quand la fiche figure dans l'annuaire.
-export function describeHiddenFiche(status, { own }) {
+// de la personne qui relit ; `etablissement` est le nom de son établissement après la
+// modification. Les deux causes les plus courantes ont la phrase de la maquette : un
+// établissement qui n'a pas validé sa présence (quand c'est la seule raison), puis une
+// personne qui n'a pas accepté d'apparaître. Renvoie '' quand la fiche figure dans l'annuaire.
+export function describeHiddenFiche(status, { own, etablissement = '' }) {
   if (status.visible) return '';
+  if (status.etablissement === 'not_validated' && status.named && status.inScope) {
+    return own
+      ? 'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.'
+      : `${etablissement || 'Son établissement'} n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.`;
+  }
   if (!status.accepted) {
     return own
-      ? 'Votre fiche est masquée de l\'annuaire : vous n\'avez pas accepté d\'apparaître (interrupteur « Apparaître dans l\'annuaire » en haut de page).'
-      : 'Cette fiche est masquée de l\'annuaire : la personne n\'a pas accepté d\'apparaître.';
+      ? 'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).'
+      : 'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.';
   }
   const reasons = hiddenReasons([status], own ? VOICES.own : VOICES.admin);
   const why = reasons.length ? ` : ${reasons.join(' ; ')}` : '';
