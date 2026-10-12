@@ -636,6 +636,8 @@ Règles :
 ## Conventions
 
 - **Pas de dépendance à l'exécution.** Toute nouvelle dépendance se discute d'abord.
+- **Pas d'IA à l'exécution.** Le widget n'appelle aucun service d'intelligence artificielle et n'émet aucune requête réseau : `tests/docs.test.mjs` échoue si le code en émet une. Toute exception se discute d'abord avec le propriétaire du dépôt, car elle change ce que la page de [sécurité](securite.md#lintelligence-artificielle-dans-ce-projet) affirme.
+- **Le code est co-créé avec un assistant de programmation** (Claude Code) : les tests de non-régression et la CI sont le filet de sécurité, et aucune relecture n'est imposée avant fusion (voir [sécurité](securite.md#risques-et-protections)). Relire une modification comme n'importe quel code.
 - **JavaScript** : modules ES, point-virgule, apostrophes simples, indentation de deux espaces ; des fonctions courtes et nommées plutôt que de longs blocs.
 - **Commentaires** : ils disent *pourquoi* le code est ainsi. L'histoire détaillée des bugs vit dans le [CHANGELOG](../CHANGELOG.md) et les messages de commit ; un commentaire peut y renvoyer, sans la raconter.
 - **Langue** : identifiants en anglais (sauf les noms de colonnes Grist et les fichiers de `docs/demo/`, en français), commentaires et textes affichés en français.
@@ -647,6 +649,7 @@ Règles :
 
 - Une modification passe de préférence par une branche et une pull request vers `main`. La CI (`.github/workflows/tests.yml`) exécute `node --test` sous Node 22 avec `playwright@1.64.0` et `REQUIRE_E2E=1`, avec le seul droit `contents: read`. Elle s'exécute aussi à chaque push sur `main`, mais elle ne bloque pas la publication : avant un push direct, lancer `node --test` en local.
 - **Un push sur `main` met le widget à jour en production** pour tous les documents Grist qui l'utilisent, via GitHub Pages (`https://lombre33.github.io/Annuaire_PUI_Bordeaux/`), sans retour arrière automatique. Taguer les versions stables (`git tag vX.Y.Z`) permet de savoir où revenir ; la procédure de retour en arrière est dans [maintenance](maintenance.md#revenir-en-arrière).
+- **Pourquoi GitHub et pas le GitLab UB.** Le widget est une page statique que Grist charge par son adresse, servie ici par GitHub Pages. Le GitLab UB n'a pas de module « Pages » : y migrer n'est pas possible aujourd'hui. La piste proposée est un GitHub DIESE ; une migration change l'adresse du site, voir [hébergement et risques à ce jour](maintenance.md#hébergement-et-risques-à-ce-jour).
 - Le numéro de version est dans le titre de [`VERSION.md`](../VERSION.md) et dans les en-têtes du [CHANGELOG](../CHANGELOG.md), la version la plus récente en premier.
 - En local, les modules ES ne se chargent pas via `file://`. Servir le dossier avec `python3 -m http.server 8080` ; pour un essai complet avec un vrai document, ajouter un widget personnalisé qui pointe vers `http://localhost:8080` (voir la préparation de [`TESTING.md`](../TESTING.md)). Le serveur de démonstration (`node docs/demo/serveur-demo.mjs`) remplace l'API Grist par un simulateur : il ne sert qu'à essayer le widget sans Grist.
 
