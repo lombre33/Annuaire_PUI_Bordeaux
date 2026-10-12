@@ -5,10 +5,15 @@
 //   2. Les fichiers et les fonctions cités entre accents graves existent encore.
 //   3. Le jeu de données fictif de docs/demo est lu sans incident par le vrai
 //      loadDirectory(), donne le nombre de cartes annoncé et reste fictif.
-//   4. Le serveur de démonstration ne sert que les fichiers du widget.
+//   4. Le serveur de démonstration ne sert que les fichiers du widget, et permet de
+//      se connecter comme une personne fictive : le bandeau « Ma présence » dit
+//      alors ce que le guide annonce, et l'interrupteur fait ce que le guide promet.
 //   5. Les documents suivent le code : nombre et noms des filtres dans le guide
 //      utilisateur (le README reste générique : les filtres pourraient devenir
 //      personnalisables), vocabulaire du PUI, modules, tables et colonnes de libellé.
+//   6. La page de sécurité décrit fidèlement le code : méthodes de l'API Grist
+//      employées, aucun réseau, aucun stockage, aucun HTML injecté ; et aucune page
+//      ne présente le widget comme étant « en lecture seule ».
 // Un échec dit quoi corriger : la documentation (docs/maintenance.md, « Maintenir
 // la documentation ») ou le jeu fictif (docs/developpeurs.md, « Données et
 // captures de démonstration »).
@@ -18,11 +23,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { CATEGORIES, FILTERS } from '../constants.js';
 import { loadDirectory } from '../grist-data.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
-import { tablesFictives, CARTES_ATTENDUES } from '../docs/demo/donnees-fictives.mjs';
+import { readIdentity } from '../identity.js';
+import { describePresence, setPresence, explainWriteError } from '../presence.js';
+import { tablesFictives, CARTES_ATTENDUES, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -126,7 +134,8 @@ const FILE_REFERENCE = /^[\w./-]+\.(?:js|mjs|css|html|yml|md|txt|png)$/;
 
 test('les fichiers et les fonctions cités dans la documentation existent encore', () => {
   const sources = SOURCE_FILES.map(read).join('\n');
-  const isDefined = name => new RegExp(`\\b(?:function|class)\\s+${name}\\b|\\b(?:const|let|var)\\s+${name}\\s*=`).test(sources);
+  // Une fonction, une classe, une constante qui en porte une, ou une méthode d'objet (account-ui.js).
+  const isDefined = name => new RegExp(`\\b(?:function|class)\\s+${name}\\b|\\b(?:const|let|var)\\s+${name}\\s*=|^\\s+(?:async\\s+)?${name}\\s*\\([^)]*\\)\\s*\\{`, 'm').test(sources);
   const problems = [];
   DOC_FILES.forEach(file => {
     const spans = new Set([...withoutCodeBlocks(read(file)).matchAll(/`([^`\n]+)`/g)].map(match => match[1]));
@@ -211,6 +220,145 @@ test('le serveur de démonstration sert le widget avec l\'API Grist simulée, et
   }
 });
 
+// Se connecter comme une personne fictive : ?connecte=adresse. On exécute le script que
+// le serveur de démonstration sert à la place de grist-plugin-api.js, comme le ferait
+// une page ouverte avec cette adresse, puis on le fait parler au vrai code du widget.
+
+const QUIET_LOG = { info() {}, warn() {}, error() {} };
+
+let demoScript;
+async function openDemoPage(search = '') {
+  if (!demoScript) {
+    const { server, url } = await startDemoServer();
+    try {
+      demoScript = await (await fetch(`${url}/__grist-simule.js`)).text();
+    } finally {
+      server.close();
+      server.closeAllConnections?.();
+    }
+  }
+  const page = { URLSearchParams, structuredClone, setTimeout, location: { search } };
+  page.window = page;
+  vm.runInNewContext(demoScript, page);
+  return page;
+}
+
+const demoDirectory = page => loadDirectory(page.grist.docApi, { log: QUIET_LOG });
+const founders = contacts => filterContacts(contacts, createEmptyFilterState(), '', { fondateur: true, partenaire: false });
+
+test('la démonstration connecte la personne passée dans l\'adresse (?connecte=) et laisse la table-sonde vide', async () => {
+  for (const [role, email] of Object.entries(PERSONNES_DEMO)) {
+    const page = await openDemoPage(`?connecte=${email}`);
+    const identity = await readIdentity(page.grist.docApi, { log: QUIET_LOG });
+    assert.equal(identity.status, 'ready', `${role} : ${identity.reason}`);
+    assert.equal(identity.email, email);
+    assert.equal(identity.admin, role === 'administrateur', `${role} : le droit d'administrateur vient de la table ACL`);
+    await new Promise(resolve => setTimeout(resolve, 0)); // le widget n'attend pas la suppression de la ligne de la sonde
+    assert.equal((await page.grist.docApi.fetchTable('Annuaire_Sonde')).id.length, 0, `${role} : la ligne de la sonde doit être supprimée`);
+  }
+});
+
+test('sans ?connecte=, la démonstration est un compte anonyme : personne n\'est identifié', async () => {
+  const identity = await readIdentity((await openDemoPage('')).grist.docApi, { log: QUIET_LOG });
+  assert.equal(identity.status, 'unavailable');
+});
+
+test('pour chaque personne de démonstration, le bandeau « Ma présence » dit ce que le guide utilisateur annonce', async () => {
+  const guide = read('docs/utilisateurs.md');
+  const expectedTone = { visible: 'ok', partenaire: 'ok', refus: 'off', masquee: 'warn', administrateur: 'ok' };
+  assert.deepEqual(Object.keys(PERSONNES_DEMO).sort(), Object.keys(expectedTone).sort(), 'Une personne de démonstration est à décrire ici.');
+  for (const [role, email] of Object.entries(PERSONNES_DEMO)) {
+    const { people } = await demoDirectory(await openDemoPage());
+    const persons = people.findByEmail(email);
+    assert.equal(persons.length, 1, `${role} : une seule fiche doit porter ${email}`);
+    const { tone, message } = describePresence(persons);
+    assert.equal(tone, expectedTone[role], role);
+    assert.ok(guide.includes(message), `Le guide utilisateur doit citer le message de « ${role} » : ${message}`);
+  }
+});
+
+test('le guide utilisateur cite les autres messages de « Ma présence » : raisons de masquage, fiches multiples, erreurs d\'écriture', () => {
+  const guide = read('docs/utilisateurs.md');
+  const status = overrides => ({ accepted: true, visible: false, named: true, inScope: true, etablissement: 'ok', partnerOnly: false, ...overrides });
+  const alone = overrides => describePresence([{ status: status(overrides) }]).message;
+  const reasons = [{ named: false }, { inScope: false }, { etablissement: 'missing' }, { etablissement: 'unknown' },
+    { etablissement: 'not_validated' }, { etablissement: 'not_eligible' }]
+    .map(overrides => alone(overrides).match(/masquée : (.+)\. Contactez/)?.[1]);
+  assert.ok(reasons.every(Boolean), 'presence.js ne donne plus la raison du masquage sous la forme attendue : adaptez ce test et le guide.');
+
+  const two = statuses => describePresence(statuses.map(item => ({ status: status(item) }))).message;
+  const messages = [
+    ...reasons,
+    ...two([{ accepted: true, visible: true }, { accepted: false }]).split(/(?<=\.) /),
+    ...two([{ accepted: true, visible: true }, { accepted: true, visible: true }]).split(/(?<=\.) /),
+    explainWriteError(new Error('Blocked by table update access rules')),
+    explainWriteError(new Error('Cannot modify a formula column')),
+    explainWriteError(new Error('boom'))
+  ];
+  const missing = messages.filter(message => !guide.includes(message));
+  assert.deepEqual(missing, [], 'Citez ces messages dans la section « Ma présence » de docs/utilisateurs.md.');
+
+  // Messages de main.js, qui ne sont pas exportés : le guide et le code doivent dire la même chose.
+  const main = read('main.js');
+  ['Enregistrement…', 'Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.'].forEach(message => {
+    assert.ok(main.includes(message.replaceAll('\'', '\\\'')), `main.js ne dit plus « ${message} » : adaptez le guide utilisateur.`);
+    assert.ok(guide.includes(message), `Le guide utilisateur doit citer « ${message} ».`);
+  });
+});
+
+test('dans la démonstration, un clic sur l\'interrupteur retire la personne de l\'annuaire, et la personne qui avait refusé peut y apparaître', async () => {
+  const email = PERSONNES_DEMO.visible;
+  const page = await openDemoPage(`?connecte=${email}`);
+  let directory = await demoDirectory(page);
+  assert.equal(founders(directory.contacts).length, CARTES_ATTENDUES.fondateurs);
+
+  await setPresence(page.grist.docApi, directory.people.findByEmail(email), false, { log: QUIET_LOG });
+  directory = await demoDirectory(page);
+  assert.equal(founders(directory.contacts).length, CARTES_ATTENDUES.fondateurs - 1, 'une carte de moins : celle de la personne qui s\'est retirée');
+  assert.equal(describePresence(directory.people.findByEmail(email)).message, 'Vous n\'apparaissez pas dans l\'annuaire.');
+
+  const refus = PERSONNES_DEMO.refus;
+  await setPresence(page.grist.docApi, directory.people.findByEmail(refus), true, { log: QUIET_LOG });
+  directory = await demoDirectory(page);
+  assert.equal(founders(directory.contacts).length, CARTES_ATTENDUES.fondateurs, 'la personne qui avait refusé est revenue, l\'autre est partie');
+  assert.equal(describePresence(directory.people.findByEmail(refus)).tone, 'ok');
+});
+
+test('?refus=BDD simule une règle d\'accès : l\'écriture est refusée, avec un message en français, et rien ne change', async () => {
+  const email = PERSONNES_DEMO.visible;
+  const page = await openDemoPage(`?connecte=${email}&refus=BDD`);
+  const { people } = await demoDirectory(page);
+  await assert.rejects(setPresence(page.grist.docApi, people.findByEmail(email), false, { log: QUIET_LOG }),
+    error => error.name === 'PresenceError' && /Grist a refusé la modification/.test(error.message));
+  assert.equal(describePresence((await demoDirectory(page)).people.findByEmail(email)).tone, 'ok', 'la personne est toujours visible');
+});
+
+test('les personnes fictives citées dans le guide sont masquées, ou visibles, pour la raison qu\'il donne', async () => {
+  const guide = read('docs/utilisateurs.md');
+  const { contacts, people } = await demoDirectory(await openDemoPage());
+  const bdd = tablesFictives().BDD;
+  const statusOf = name => {
+    const index = bdd.prenom.findIndex((prenom, row) => `${prenom} ${bdd.nom[row]}` === name);
+    assert.ok(index >= 0, `${name} n'existe pas dans le jeu de démonstration`);
+    return people.findByEmail(bdd.email[index])[0].status;
+  };
+  const reasons = {
+    'Sarah Colin': status => status.accepted && status.etablissement === 'not_validated',
+    'Gabriel Noël': status => status.etablissement === 'not_eligible',
+    'Alice Bertin': status => status.etablissement === 'missing',
+    'Victor Lambert': status => !status.inScope,
+    'Lucas Mercier': status => !status.accepted
+  };
+  Object.entries(reasons).forEach(([name, because]) => {
+    assert.ok(guide.includes(name), `Le guide utilisateur doit citer ${name}.`);
+    const status = statusOf(name);
+    assert.ok(!status.visible && because(status), `${name} : la raison donnée par le guide n'est plus celle du jeu fictif`);
+  });
+  const names = new Set(founders(contacts).map(contact => `${contact.prenom} ${contact.nom}`));
+  assert.ok(guide.includes('Clara Dubois') && statusOf('Clara Dubois').partnerOnly && !names.has('Clara Dubois'),
+    'Clara Dubois est d\'un établissement partenaire : visible seulement avec l\'interrupteur Partenaires');
+});
+
 // ===== 5. Cohérence avec le code =====
 
 const NUMBER_WORDS = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze'];
@@ -273,4 +421,48 @@ test('la page de maintenance donne la table et les colonnes de libellé de chaqu
     .flatMap(({ table, field }) => [table, ...[].concat(field)]);
   const missing = [...new Set(names)].filter(name => !page.includes(`\`${name}\``));
   assert.deepEqual(missing, [], 'Ajoutez ces noms à docs/maintenance.md (« Opérations courantes dans Grist »).');
+});
+
+// ===== 6. La page de sécurité décrit fidèlement le code =====
+
+const WIDGET_SOURCES = () => fs.readdirSync(ROOT).filter(name => name.endsWith('.js')).map(name => ({ name, code: read(name) }));
+
+// docs/securite.md affirme : peu de méthodes de l'API de Grist, aucune requête réseau,
+// aucun stockage dans le navigateur, aucun texte de Grist inséré comme HTML, un seul
+// script externe. Ces affirmations sont vraies tant que ce test passe.
+test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Grist, aucun réseau, aucun stockage, aucun HTML injecté', () => {
+  const sources = WIDGET_SOURCES();
+  const used = new Set(sources.flatMap(({ code }) => [...code.matchAll(/\b(?:grist|docApi)\.([A-Za-z_$][\w$]*)/g)].map(match => match[1])));
+  used.delete('docApi'); // `grist.docApi` est l'objet qui porte les méthodes, pas une méthode
+  const cited = ['ready', 'onRecords', 'fetchTable', 'listTables', 'applyUserActions'];
+  assert.deepEqual([...used].sort(), [...cited].sort(),
+    'Le code emploie d\'autres méthodes de l\'API Grist que celles de docs/securite.md (« Ce que le widget lit, écrit et envoie ») : revoyez cette page, puis ce test.');
+  const security = read('docs/securite.md');
+  assert.deepEqual(cited.filter(name => !security.includes(`\`${name}\``)), [], 'docs/securite.md doit citer chacune de ces méthodes entre accents graves.');
+
+  const banned = /\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|EventSource|localStorage|sessionStorage|indexedDB|document\.cookie|\beval\s*\(|new Function|insertAdjacentHTML|outerHTML|document\.write/;
+  assert.deepEqual(sources.filter(({ code }) => banned.test(code)).map(({ name }) => name), [],
+    'Ces fichiers emploient une API réseau, de stockage ou d\'injection de HTML que docs/securite.md dit absente.');
+  const injected = sources.flatMap(({ name, code }) => [...code.matchAll(/\.innerHTML\s*=\s*([^\n]*)/g)]
+    .filter(([, value]) => value.trim().replace(/;$/, '') !== '\'\'').map(([line]) => `${name} : ${line}`));
+  assert.deepEqual(injected, [], 'innerHTML ne sert qu\'à vider un conteneur : tout texte venu de Grist passe par textContent.');
+
+  const external = [...read('index.html').matchAll(/\b(?:src|href)="(https?:\/\/[^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(external, ['https://docs.getgrist.com/grist-plugin-api.js'], 'index.html ne doit charger que le script de l\'API Grist.');
+  assert.doesNotMatch(read('style.css'), /@import|url\(\s*["']?https?:/, 'style.css ne doit rien charger d\'externe.');
+});
+
+// Le widget écrit (la sonde, le choix de présence) : une page qui le dit « en lecture seule »
+// serait fausse, et c'est l'erreur la plus facile à laisser traîner après une évolution.
+test('aucune page ne présente le widget comme étant en lecture seule', () => {
+  const claims = [
+    /\b(?:le widget|l'annuaire|il)\s+(?:est|reste|fonctionne)\s+(?:\*\*)?en\s+(?:\*\*)?lecture seule/i,
+    /\bn'(?:\*\*)?écrit(?:\*\*)?\s+rien\b/i,
+    /\bne fait que lire\b/i
+  ];
+  const problems = DOC_FILES.flatMap(file => withoutCodeBlocks(read(file)).split('\n')
+    .filter(line => claims.some(claim => claim.test(line)))
+    .map(line => `${file} : « ${line.trim().slice(0, 90)}… »`));
+  assert.deepEqual(problems, [],
+    'Le widget écrit dans le document Grist (ligne de la sonde, choix de présence) : corrigez ces phrases (docs/securite.md, « Ce que le widget lit, écrit et envoie »).');
 });
