@@ -46,12 +46,26 @@ test('loadDirectory returns the displayable contacts, each with its Etablissemen
   // Contrôle demandé avant chaque changement : nombre de contacts + établissement rempli.
   assert.deepEqual(contacts.filter(c => c.etablissement_fondateur).map(c => `${c.prenom} ${c.nom}`), DEFAULT_CARD_NAMES);
   assert.equal(contacts.length, 5, '4 fondateurs + 1 partenaire (Bob), avant l\'interrupteur Partenaires de l\'UI');
-  assert.deepEqual(contacts.map(c => c.etablissement_label), ['CHU', 'UBM', 'CHU', 'Institut Bergonié', 'CHU'],
+  // Dans l'ordre des cartes : Bergonié, Bernard, Durand, Hostile, Martin.
+  assert.deepEqual(contacts.map(c => c.etablissement_label), ['Institut Bergonié', 'CHU', 'UBM', 'CHU', 'CHU'],
     'tous les contacts affichables ont leur établissement');
   assert.deepEqual(issues, []);
   Object.values(docApi.calls).forEach(count => assert.equal(count, 1));
   assert.equal(docApi.calls.Etablissements, 1, 'Etablissements n\'est lu qu\'une fois (libellés ET indicateurs)');
   assert.equal(docApi.calls.BDD, 1);
+});
+
+test('loadDirectory sorts the contacts by family name then first name, and keeps the order of the rows for homonyms', async () => {
+  const tables = sampleTables();
+  // Hugo Bernard (ligne 10) devient un second « Gina Bergonié », puis les lignes 9 et 10 échangent leur place.
+  tables.BDD.prenom[9] = 'Gina';
+  tables.BDD.nom[9] = 'Bergonié';
+  const swapped = tables.BDD;
+  Object.keys(swapped).forEach(column => [swapped[column][8], swapped[column][9]] = [swapped[column][9], swapped[column][8]]);
+  const { contacts } = await load(tables);
+  assert.deepEqual(contacts.map(c => `${c.prenom} ${c.nom}`),
+    ['Gina Bergonié', 'Gina Bergonié', 'Bob Durand', `${HOSTILE_FIRST_NAME} Hostile`, 'Ana Martin'], 'par nom de famille, ni dans l\'ordre des lignes ni par prénom d\'abord');
+  assert.deepEqual(contacts.slice(0, 2).map(c => c.id), [10, 9], 'homonymes : l\'ordre des lignes de la table');
 });
 
 test('loadDirectory reads the tables of the new structure, the optional funders table, and none of the old ones', async () => {
@@ -155,9 +169,10 @@ test('loadDirectory falls back to the raw label with a console warning when only
 
 test('loadDirectory reads the phone and the PUI role that BDD now holds', async () => {
   const { contacts } = await load(sampleTables());
-  assert.equal(contacts[0].numero_de_telephone, 556789012);
-  assert.deepEqual(contacts[0].labels.role, ['Référent qualité']);
-  assert.deepEqual(contacts[1].labels.role, []);
+  const [ana, bob] = ['Ana', 'Bob'].map(prenom => contacts.find(contact => contact.prenom === prenom));
+  assert.equal(ana.numero_de_telephone, 556789012);
+  assert.deepEqual(ana.labels.role, ['Référent qualité']);
+  assert.deepEqual(bob.labels.role, []);
 });
 
 test('loadDirectory works without the optional BDD columns (Fonction, email, phone, PUI role): same contacts, no issue', async () => {
@@ -175,7 +190,7 @@ test('loadDirectory works without the optional BDD columns (Fonction, email, pho
 test('loadDirectory hides the people who have not accepted to appear, with no banner: refusals are normal', async () => {
   const { contacts, issues } = await load(sampleTables());
   const names = contacts.map(contact => contact.prenom);
-  assert.deepEqual(names, ['Ana', 'Bob', HOSTILE_FIRST_NAME, 'Gina', 'Hugo']);
+  assert.deepEqual(names, ['Gina', 'Hugo', 'Bob', HOSTILE_FIRST_NAME, 'Ana'], 'dans l\'ordre des noms : Bergonié, Bernard, Durand, Hostile, Martin');
   assert.ok(!names.includes('Iris'), 'Iris a refusé d\'apparaître');
   assert.ok(!names.includes('Jules'), 'Jules n\'a pas répondu : cellule vide');
   assert.deepEqual(issues, []);
@@ -196,7 +211,7 @@ test('loadDirectory shows a person as soon as they accept, and consent never ove
   tables.BDD.Accepte_apparaitre[10] = true; // Iris
   tables.BDD.Accepte_apparaitre[11] = true; // Jules
   const { contacts } = await load(tables);
-  assert.deepEqual(contacts.map(contact => contact.prenom), ['Ana', 'Bob', HOSTILE_FIRST_NAME, 'Gina', 'Hugo', 'Iris', 'Jules']);
+  assert.deepEqual(contacts.map(contact => contact.prenom), ['Gina', 'Hugo', 'Bob', HOSTILE_FIRST_NAME, 'Ana', 'Iris', 'Jules']);
   const accepted = tables.BDD.prenom.filter((_, index) => tables.BDD.Accepte_apparaitre[index] === true);
   ['Carla', 'Dan', 'Eve', 'Fred'].forEach(name => {
     assert.ok(accepted.includes(name), `${name} a accepté d'apparaître`);
@@ -253,7 +268,7 @@ test('loadDirectory stays quiet when the BDD table is genuinely empty', async ()
 
 test('loadDirectory: duplicate acronyms hide nobody when contacts reference their own Etablissements row', async () => {
   const { contacts, issues } = await load(withDuplicateCHU(sampleTables()));
-  assert.deepEqual(contacts.map(c => c.nom), ['Martin', 'Durand', 'Hostile', 'Bergonié', 'Bernard'],
+  assert.deepEqual(contacts.map(c => c.nom), ['Bergonié', 'Bernard', 'Durand', 'Hostile', 'Martin'],
     'chaque contact garde le statut de sa propre ligne (ici la ligne validée, id 1)');
   assert.deepEqual(issues, []);
 });
@@ -263,7 +278,7 @@ test('loadDirectory: when Grist sends the establishment as text, duplicate acron
   const textLabels = { 1: 'CHU', 2: 'UBM', 3: 'Clinique', 4: 'INSERM', 5: 'Institut Bergonié', 0: '' };
   tables.BDD.Etablissement = tables.BDD.Etablissement.map(id => textLabels[id]);
   const { contacts, issues } = await load(tables);
-  assert.deepEqual(contacts.map(c => c.nom), ['Durand', 'Bergonié'], 'plus aucun contact du CHU');
+  assert.deepEqual(contacts.map(c => c.nom), ['Bergonié', 'Durand'], 'plus aucun contact du CHU');
   assert.match(issues[0], /CHU/);
 });
 
@@ -308,7 +323,7 @@ test('loadDirectory without the Macro_competences column leaves the domain filte
   assert.equal(issues.length, 1);
   assert.match(issues[0], /Competences \(Macro_competences\)/);
   assert.ok(contacts.every(c => c.labels.macro.length === 0));
-  assert.deepEqual(contacts[0].labels.competences, ['Oncologie', 'Hématologie']);
+  assert.deepEqual(contacts.find(c => c.prenom === 'Ana').labels.competences, ['Oncologie', 'Hématologie']);
 });
 
 test('loadDirectory reuses the previous skills and domains together when the Competences table cannot be read, and names the table once', async () => {
@@ -319,7 +334,7 @@ test('loadDirectory reuses the previous skills and domains together when the Com
   const { referenceMaps, contacts, issues } = await load(sampleTables(), { docApi: { failing: ['Competences'] }, load: { previousMaps } });
   assert.deepEqual(referenceMaps.macro, previousMaps.macro);
   assert.deepEqual(referenceMaps.competences, previousMaps.competences);
-  assert.deepEqual(contacts[0].labels.macro, ['Cancérologie']);
+  assert.deepEqual(contacts.find(c => c.prenom === 'Ana').labels.macro, ['Cancérologie']);
   assert.deepEqual(issues.length, 1);
   assert.match(issues[0], /Competences/);
   assert.equal(issues[0].match(/Competences/g).length, 1, 'table nommée une seule fois');

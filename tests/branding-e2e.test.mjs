@@ -21,7 +21,10 @@ const withWidget = (options, run) => withWidgetOn({ tables: withBranding(), ...o
 const waitForLogos = (page, count) =>
   page.waitForFunction(expected => document.querySelectorAll('.logo-img.loaded').length >= expected, count);
 const tokenRequests = page => page.evaluate(() => window.__fake.tokenRequests);
-const badgeOf = (page, index) => page.locator('.contact-card').nth(index).locator('.etablissement-tag');
+// L'étiquette d'établissement de la carte d'une personne, retrouvée par son nom affiché : les
+// cartes sont triées par nom de famille, leur position ne désigne personne.
+const badgeOf = (page, name) => page.locator('.contact-card')
+  .filter({ has: page.locator('.name', { hasText: name }) }).locator('.etablissement-tag');
 const logoUrl = id => `${FAKE_ATTACHMENTS_URL}/attachments/${id}/download?auth=fake-token`;
 
 // Ce que le navigateur consigne tout seul pour un fichier introuvable n'est pas une erreur du widget.
@@ -38,7 +41,7 @@ test('une carte montre le logo de son établissement, seul : ni nom dessous ni p
   withWidget({}, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await waitForLogos(page, 1);
-    const badge = badgeOf(page, 0); // Ana, CHU
+    const badge = badgeOf(page, 'Ana Martin'); // CHU
     await badge.locator('img.loaded').waitFor();
     assert.equal(await badge.evaluate(element => element.classList.contains('has-logo')), true);
     assert.equal(await badge.locator('img').getAttribute('src'), logoUrl(11), 'le fichier 11 est le logo du CHU');
@@ -52,7 +55,7 @@ test('un établissement sans logo garde la pastille texte, et les autres cartes 
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     await waitForLogos(page, 1);
-    const gina = badgeOf(page, 2); // Institut Bergonié : pas de logo
+    const gina = badgeOf(page, 'Gina Bergonié'); // Institut Bergonié : pas de logo
     assert.equal(await gina.evaluate(element => element.classList.contains('has-logo')), false);
     assert.equal(await gina.locator('img').count(), 0);
     assert.equal(await gina.textContent(), 'Institut Bergonié');
@@ -63,11 +66,11 @@ test('cliquer le logo filtre sur l\'établissement, comme la pastille', { skip }
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     await waitForLogos(page, 1);
-    await badgeOf(page, 0).click();
+    await badgeOf(page, 'Ana Martin').click();
     await waitForCards(page, 3);
     const filter = page.locator('.filter[data-filter-key="etablissement"]');
     assert.equal(await filter.locator('.filter-count').textContent(), '1');
-    await badgeOf(page, 0).click();
+    await badgeOf(page, 'Ana Martin').click();
     await waitForCards(page, 4);
   }));
 
@@ -75,7 +78,7 @@ test('le logo est un bouton qu\'on atteint au clavier, nommé par l\'établissem
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     await waitForLogos(page, 1);
-    const badge = badgeOf(page, 0);
+    const badge = badgeOf(page, 'Ana Martin');
     assert.equal(await badge.evaluate(element => element.tagName), 'BUTTON');
     await badge.focus();
     await page.keyboard.press('Enter');
@@ -107,7 +110,7 @@ test('sans aucun logo ni financeur dans le document, Grist n\'est jamais sollici
   withWidget({ tables: sampleTables() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await tokenRequests(page), []);
-    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['CHU', 'CHU', 'Institut Bergonié', 'CHU']);
+    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['Institut Bergonié', 'CHU', 'CHU', 'CHU']);
     assert.deepEqual(await errorsOf(logs), []);
     assert.deepEqual(await warningsOf(logs, /LOGOS|Financeurs|logo/i), []);
   }));
@@ -224,7 +227,7 @@ test('si Grist refuse le jeton, les logos laissent la place aux noms, une seule 
   withWidget({ accessToken: null }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await page.waitForFunction(() => !document.querySelector('.etablissement-tag.has-logo') && !document.querySelector('.logo-holder img'));
-    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['CHU', 'CHU', 'Institut Bergonié', 'CHU']);
+    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['Institut Bergonié', 'CHU', 'CHU', 'CHU']);
     assert.deepEqual(await entriesOf(page, '#bandLogos li'), ['Institut Bergonié', 'CHU']);
     assert.deepEqual(await entriesOf(page, '#fundersLogos li'), ['République française', 'ANR', 'Bpifrance', 'France 2030']);
     assert.equal(await page.locator('#bandRoundel').textContent(), 'France 2030');
@@ -232,7 +235,7 @@ test('si Grist refuse le jeton, les logos laissent la place aux noms, une seule 
     assert.equal((await warningsOf(logs, /\[LOGOS\]/)).length, 1);
     assert.deepEqual(await errorsOf(logs), []);
     // L'annuaire, lui, marche : le filtre par établissement aussi.
-    await badgeOf(page, 0).click();
+    await badgeOf(page, 'Ana Martin').click();
     await waitForCards(page, 3);
   }));
 
@@ -246,10 +249,10 @@ test('un fichier supprimé dans Grist : la pastille texte reprend sa place, sans
     await page.waitForFunction(() => [...document.querySelectorAll('.contact-card .etablissement-tag')]
       .filter(badge => badge.textContent.trim() === 'CHU').length === 3);
     assert.equal(await page.locator('.contact-card .etablissement-tag.has-logo').count(), 0);
-    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['CHU', 'CHU', 'Institut Bergonié', 'CHU']);
+    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['Institut Bergonié', 'CHU', 'CHU', 'CHU']);
     assert.equal((await tokenRequests(page)).length, 1, 'un fichier absent n\'est pas un jeton périmé');
     assert.deepEqual(await errorsOf(logs), []);
-    await badgeOf(page, 0).click();
+    await badgeOf(page, 'Ana Martin').click();
     await waitForCards(page, 3);
   });
 });
@@ -308,7 +311,7 @@ test('une version de Grist sans getAccessToken s\'affiche avec les noms, sans er
   withWidget({ withoutMethods: ['getAccessToken'] }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await page.waitForFunction(() => !document.querySelector('.etablissement-tag.has-logo'));
-    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['CHU', 'CHU', 'Institut Bergonié', 'CHU']);
+    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['Institut Bergonié', 'CHU', 'CHU', 'CHU']);
     assert.deepEqual(await entriesOf(page, '#bandLogos li'), ['Institut Bergonié', 'CHU']);
     assert.deepEqual(await errorsOf(logs), []);
   }));
@@ -325,7 +328,8 @@ test('une lecture de Grist qui ne change aucun logo ne reconstruit ni le bandeau
     });
     await page.evaluate(() => { window.__tables.BDD.Fonction[0] = 'Cheffe de projet'; });
     await reload(page);
-    await page.waitForFunction(() => document.querySelector('.contact-card .fonction').textContent === 'Cheffe de projet');
+    await page.waitForFunction(() => [...document.querySelectorAll('.contact-card')].some(card =>
+      card.querySelector('.name').textContent === 'Ana Martin' && card.querySelector('.fonction').textContent === 'Cheffe de projet'));
     assert.equal(await page.locator('#bandLogos li').first().getAttribute('data-kept'), 'oui');
     assert.equal(await page.locator('#fundersLogos li').first().getAttribute('data-kept'), 'oui');
   }));
@@ -337,8 +341,8 @@ test('changer un logo dans Grist change l\'image du bandeau et des cartes à la 
     await page.evaluate(() => { window.__tables.Etablissements.logo[0] = ['L', 31]; });
     await reload(page);
     await page.waitForFunction(() => document.querySelector('#bandLogos li:nth-child(2) img')?.src.includes('/attachments/31/'));
-    await badgeOf(page, 0).locator('img.loaded').waitFor();
-    assert.equal(await badgeOf(page, 0).locator('img').getAttribute('src'), logoUrl(31));
+    await badgeOf(page, 'Ana Martin').locator('img.loaded').waitFor();
+    assert.equal(await badgeOf(page, 'Ana Martin').locator('img').getAttribute('src'), logoUrl(31));
   }));
 
 test('ajouter la table Financeurs dans Grist fait apparaître les financeurs sans recharger la page', { skip }, () => {

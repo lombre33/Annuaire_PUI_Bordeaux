@@ -37,6 +37,11 @@ export const FUNDER_LOGO = { area: 1100, maxWidth: 110, maxHeight: 36 };
 // surface (la surface visée est celle de la boîte : elle ne borne jamais).
 export const CARD_LOGO = { area: 92 * 32, maxWidth: 92, maxHeight: 32 };
 
+// Recherche principale : les cartes ne se redessinent qu'une fois la frappe arrêtée depuis ce
+// nombre de millisecondes. Chaque lettre tapée redessinerait sinon toute la liste (0,15 s
+// à 400 contacts d'après l'audit) : un mot de six lettres n'en provoque plus qu'un seul.
+export const SEARCH_DELAY_MS = 200;
+
 // Page du projet, vers laquelle renvoie la phrase du bandeau du bas.
 export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos-leviers/pui-reveler-le-potentiel-du-territoire';
 

@@ -115,6 +115,7 @@ flowchart TD
     main --> branding
     main --> attachments
     main --> brandingui
+    main --> constants
     render --> data
     render --> constants
     render --> brandingui

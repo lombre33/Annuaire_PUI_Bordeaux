@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, compareLabels,
+  safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, normalizeForSearch,
+  compareLabels, compareContacts,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
   labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName
 } from '../grist-data.js';
@@ -30,6 +31,52 @@ test('normalize() folds case and strips accents for resilient label matching', (
   assert.equal(normalize('Référent qualité'), 'referent qualite');
   assert.equal(normalize('  Pharmacie Clinique  '), 'pharmacie clinique');
   assert.equal(normalize(null), '');
+});
+
+test('normalizeForSearch() makes the usual spellings of a name equal: œ, apostrophes, hyphens, dots, spaces', () => {
+  // Les écritures dont l'audit UI/UX a constaté qu'elles ne donnaient aucun résultat (U31).
+  assert.equal(normalizeForSearch('Jean Le Cœur'), 'jean le coeur', 'œ s\'écrit « oe »');
+  assert.equal(normalizeForSearch('Aeschylus Æsir'), 'aeschylus aesir', 'æ s\'écrit « ae »');
+  assert.equal(normalizeForSearch('Sophie D’Arcy'), 'sophie darcy', 'apostrophe typographique');
+  assert.equal(normalizeForSearch('Sophie D\'Arcy'), 'sophie darcy', 'apostrophe droite : même résultat');
+  assert.equal(normalizeForSearch('Marie-Christine de La Rochefoucauld-Montmorency'),
+    'marie christine de la rochefoucauld montmorency', 'le tiret vaut une espace');
+  assert.equal(normalizeForSearch('Jean–Pierre'), 'jean pierre', 'tiret demi-cadratin');
+  assert.equal(normalizeForSearch('J.-P. Martin'), 'j p martin', 'initiales avec points');
+  assert.equal(normalizeForSearch('  Zoé \t  Élise  '), 'zoe elise', 'accents, casse et espaces multiples');
+  assert.equal(normalizeForSearch('Straße Søren Łukasz Đorđe'), 'strasse soren lukasz dorde', 'lettres que la décomposition accentuée ne touche pas');
+  assert.equal(normalizeForSearch(null), '');
+  assert.equal(normalizeForSearch(' - \' . '), '', 'que des séparateurs : rien');
+  // normalize(), lui, ne change pas : il sert aux menus, aux sélections et aux compteurs.
+  assert.equal(normalize('Marie-Christine D’Arcy Cœur'), 'marie-christine d’arcy cœur');
+});
+
+test('compareContacts() orders by family name then first name, the French way', () => {
+  const sorted = people => people.slice().sort(compareContacts).map(person => `${person.prenom} ${person.nom}`);
+  assert.deepEqual(sorted([
+    { prenom: 'Zoé', nom: 'Fabre' },
+    { prenom: 'Ana', nom: 'Éluard' },
+    { prenom: 'Bob', nom: 'Durand' },
+    { prenom: 'Léa', nom: 'Dupont' },
+    { prenom: 'Eve', nom: 'de Gaulle' }
+  ]), ['Eve de Gaulle', 'Léa Dupont', 'Bob Durand', 'Ana Éluard', 'Zoé Fabre'],
+  'les accents ne rejettent pas « Éluard » après le Z, et « de Gaulle » est avec les D');
+  assert.deepEqual(sorted([
+    { prenom: 'Hugo', nom: 'Martin' },
+    { prenom: 'Ana', nom: 'Martin' },
+    { prenom: 'Élise', nom: 'Martin' }
+  ]), ['Ana Martin', 'Élise Martin', 'Hugo Martin'], 'même nom : par prénom');
+  assert.deepEqual(sorted([
+    { prenom: 'Jean', nom: 'Lebrun' },
+    { prenom: 'Jean', nom: 'Le Cœur' }
+  ]), ['Jean Le Cœur', 'Jean Lebrun'], 'l\'espace d\'un nom composé passe avant les lettres');
+  assert.deepEqual(sorted([
+    { prenom: 'Madonna', nom: '' },
+    { prenom: 'Zoé', nom: 'Martin' },
+    { prenom: 'Ana', nom: 'Bernard' }
+  ]), ['Ana Bernard', 'Madonna ', 'Zoé Martin'], 'une personne sans nom de famille se range d\'après son prénom');
+  assert.equal(compareContacts({ prenom: 'Ana', nom: 'Martin' }, { prenom: 'Ana', nom: 'Martin' }), 0, 'homonymes : égalité, le tri stable garde l\'ordre des lignes');
+  assert.equal(compareContacts({ prenom: null, nom: undefined }, { prenom: '', nom: '' }), 0, 'valeurs vides sans erreur');
 });
 
 test('compareLabels sorts using French locale rules, not raw UTF-16 order', () => {
