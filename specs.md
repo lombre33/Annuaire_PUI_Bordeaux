@@ -27,7 +27,7 @@ Features
 * Filtres
   * Un champs de texte libre qui recherche sur le nom prénom
   * 6 filtres pour les instances, actions, GT, Taches compétances et communauté
-  * Nous n'afficherons QUE les contacts ayant au moins une valeur dans perimètre_all (meme si nous n'avons pas clairement les périmètre la colones sert juste à cela)
+  * Nous n'afficherons QUE les contacts ayant au moins une valeur dans la colonne perimetre de la table BDD (même si nous n'avons pas clairement les périmètres, la colonne sert juste à cela)
   * Visibilité par établissement (table Etablissements, colonnes booléennes fondateur / partenaire / autres / ok_pour_apparaitre) :
     * Un contact n'apparaît que si son établissement est fondateur OU partenaire — jamais si "autres" (ni l'un ni l'autre).
     * Dans tous les cas, l'établissement doit avoir validé (ok_pour_apparaitre = true), sans quoi ses contacts n'apparaissent jamais.
@@ -40,6 +40,6 @@ Tech : Custom Widget Grist, via hébergement sur GitHub et servi via url (tout s
 
 HTML/CSS/JS natif.
 
-Le nom et le type des colonnes sont disponibles dans le fichier girst_structure.txt
+Le nom et le type des colonnes sont disponibles dans le fichier grist_structure.txt
 
-Les colonnes périmètres ne sont pas à utiliser, elles ont uniquement servi lors d'un précédant important.
+L'ancienne table Annuaire et ses colonnes perimetre_1 à perimetre_25 ne sont plus utilisées : elles ont uniquement servi lors d'un précédent import. La table principale est BDD.

@@ -1,7 +1,7 @@
 // Test navigateur de bout en bout : charge le vrai index.html (main.js,
 // render.js, style.css) dans Chromium, avec une API Grist simulée qui sert les
 // données de tests/fixtures.mjs, et vérifie ce que voit l'utilisateur :
-// nombre de contacts, badge établissement (Etablissement2), filtres, pannes.
+// nombre de contacts, badge établissement (BDD.Etablissement), filtres, pannes.
 //
 // Limite assumée : le simulateur ne remplace pas un vrai document Grist (voir
 // TESTING.md) ; il garantit que le câblage et le rendu réels réagissent bien
@@ -17,7 +17,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sampleTables, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME } from './fixtures.mjs';
+import { sampleTables, withoutOptionalColumns, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME } from './fixtures.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
@@ -124,7 +124,7 @@ async function withWidget(options, run) {
 
 // ===== Affichage nominal =====
 
-test('affiche les contacts éligibles, avec le badge établissement (Etablissement2) de chaque carte', { skip }, () =>
+test('affiche les contacts éligibles, avec le badge établissement (Etablissement) de chaque carte', { skip }, () =>
   withWidget({}, async ({ page, logs }) => {
     await waitForCards(page, DEFAULT_CARD_NAMES.length);
     assert.deepEqual(await cardNames(page), DEFAULT_CARD_NAMES);
@@ -139,7 +139,7 @@ test('affiche les contacts éligibles, avec le badge établissement (Etablisseme
     assert.equal((await page.evaluate(() => window.__gristReady)).requiredAccess, 'full', 'cohérent avec manifest.yml');
   }));
 
-test('exclut les contacts non éligibles : établissement « autres », non validé, sans Etablissement2, hors périmètre, sans nom', { skip }, () =>
+test('exclut les contacts non éligibles : établissement « autres », non validé, sans Etablissement, hors périmètre, sans nom', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const names = (await cardNames(page)).join('|');
@@ -148,13 +148,12 @@ test('exclut les contacts non éligibles : établissement « autres », non vali
     }
   }));
 
-test('affiche le contenu des cartes : initiales, fonction, téléphone formaté, tags', { skip }, () =>
+test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const ana = page.locator('.contact-card').first();
     assert.equal(await ana.locator('.avatar').textContent(), 'AM');
     assert.equal(await ana.locator('.fonction').textContent(), 'Pharmacienne');
-    assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
     assert.equal(await ana.locator('.email').getAttribute('href'), 'mailto:ana.martin@chu-bordeaux.fr');
     const tagsByGroup = await ana.locator('.tag-group').evaluateAll(groups =>
       groups.map(group => [group.querySelector('.tag-group-title').textContent,
@@ -162,16 +161,34 @@ test('affiche le contenu des cartes : initiales, fonction, téléphone formaté,
     assert.deepEqual(tagsByGroup, [
       ['Instances', ['CME']],
       ['Actions', ['Vaccination']],
-      ['Compétences', ['oncologie']],
+      ['Compétences', ['Oncologie']],
       ['Communautés', ['Réseau douleur']],
       ['Rôle PUI', ['Référent qualité']]
     ]);
+    assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
     assert.equal(await ana.locator('.tag-static').count(), 1, 'le tag Rôle PUI n\'est pas cliquable');
 
     const hugo = page.locator('.contact-card').nth(3);
-    assert.equal(await hugo.locator('.tel.visible').count(), 0, 'pas de ligne téléphone vide');
     assert.equal(await hugo.locator('.email.visible').count(), 0, 'pas de ligne email vide');
     assert.equal(await hugo.locator('.card-tags').locator('.tag').count(), 0, 'id 999 introuvable : aucun tag fantôme');
+  }));
+
+test('une carte sans téléphone ni rôle PUI n\'affiche aucune ligne vide', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    const gina = page.locator('.contact-card').nth(2);
+    assert.equal(await gina.locator('.tel.visible').count(), 0);
+    assert.equal(await gina.locator('.tag-static').count(), 0);
+  }));
+
+test('s\'affiche sans erreur si BDD n\'a pas les colonnes facultatives téléphone et rôle PUI', { skip }, () =>
+  withWidget({ tables: withoutOptionalColumns(sampleTables()) }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    const ana = page.locator('.contact-card').first();
+    assert.equal(await ana.locator('.tel.visible').count(), 0);
+    assert.equal(await ana.locator('.tag-static').count(), 0);
+    assert.equal(await page.locator('#statusBanner').isHidden(), true);
+    assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
 test('affiche en texte brut un prénom contenant du HTML (aucune injection)', { skip }, () =>
@@ -233,11 +250,12 @@ test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ;
     assert.equal(await page.locator('.filter-count:not([hidden])').count(), 0);
   }));
 
-test('le filtre Compétences retrouve une compétence saisie à la main malgré la casse', { skip }, () =>
+test('le filtre Compétences propose le libellé corrigé de la table Competences et filtre dessus', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const filter = page.locator('.filter[data-filter-key="competences"]');
     await filter.locator('.filter-button').click();
+    assert.deepEqual(await filter.locator('.option-label').allTextContents(), ['Oncologie'], 'ni libellé brut ni doublon');
     await filter.locator('.filter-option', { hasText: 'Oncologie' }).locator('input').check();
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
@@ -283,10 +301,10 @@ test('panne de lecture d\'Etablissements au démarrage : message explicite, pas 
     assert.equal(await cardCount(page), 0);
   }));
 
-test('panne de lecture d\'Annuaire au démarrage : message explicite', { skip }, () =>
-  withWidget({ failTables: ['Annuaire'] }, async ({ page }) => {
+test('panne de lecture de BDD au démarrage : message explicite', { skip }, () =>
+  withWidget({ failTables: ['BDD'] }, async ({ page }) => {
     await waitForBanner(page);
-    assert.match(await bannerText(page), /Annuaire/);
+    assert.match(await bannerText(page), /BDD/);
     assert.equal(await resultCount(page), 'Chargement impossible');
   }));
 
@@ -322,9 +340,9 @@ test('table de référence illisible : données partielles signalées, filtres e
     assert.equal(await filter.locator('.filter-option', { hasText: 'Vaccination' }).count(), 1, 'le menu garde ses options');
   }));
 
-test('acronymes en double aux statuts contradictoires : leurs contacts sont masqués et le problème est signalé', { skip }, () => {
+test('acronymes en double : chaque contact garde le statut de sa propre ligne d\'Etablissements, sans bandeau', { skip }, () => {
   const tables = sampleTables();
-  // Deuxième ligne « CHU » non validée : ambigu, donc on ne montre rien.
+  // Deuxième ligne « CHU » non validée, mais aucun contact n'y est rattaché.
   tables.Etablissements.id.push(6);
   tables.Etablissements.acronyme.push('CHU');
   tables.Etablissements.nom_complet.push('CHU (doublon)');
@@ -333,34 +351,57 @@ test('acronymes en double aux statuts contradictoires : leurs contacts sont masq
   tables.Etablissements.autres.push(false);
   tables.Etablissements.ok_pour_apparaitre.push(false);
   return withWidget({ tables }, async ({ page }) => {
-    await waitForBanner(page);
-    assert.match(await bannerText(page), /CHU/);
-    await waitForCards(page, 1);
-    assert.deepEqual(await cardNames(page), ['Gina Bergonié'], 'seuls les contacts d\'un établissement sans ambiguïté restent');
+    await waitForCards(page, 4);
+    assert.deepEqual(await cardNames(page), DEFAULT_CARD_NAMES);
+    assert.equal(await page.locator('#statusBanner').isHidden(), true);
   });
 });
 
-test('colonne Etablissement2 absente d\'Annuaire : erreur explicite au lieu de « 0 contact »', { skip }, () => {
+test('colonne Etablissement absente de BDD : erreur explicite au lieu de « 0 contact »', { skip }, () => {
   const tables = sampleTables();
-  delete tables.Annuaire.Etablissement2;
+  delete tables.BDD.Etablissement;
   return withWidget({ tables }, async ({ page }) => {
     await waitForBanner(page);
-    assert.match(await bannerText(page), /Etablissement2/);
+    assert.match(await bannerText(page), /Etablissement/);
     assert.equal(await resultCount(page), 'Chargement impossible');
   });
 });
 
-test('Etablissement2 vide pour tous les contacts : le bandeau le dit', { skip }, () => {
+test('colonne de visibilité absente d\'Etablissements : erreur explicite au lieu de « 0 contact »', { skip }, () => {
   const tables = sampleTables();
-  tables.Annuaire.Etablissement2 = tables.Annuaire.Etablissement2.map(() => '');
+  delete tables.Etablissements.ok_pour_apparaitre;
   return withWidget({ tables }, async ({ page }) => {
     await waitForBanner(page);
-    assert.match(await bannerText(page), /Etablissement2/);
+    assert.match(await bannerText(page), /ok_pour_apparaitre/);
+    assert.equal(await resultCount(page), 'Chargement impossible');
+  });
+});
+
+test('colonne de libellé introuvable dans une table de référence : le bandeau le dit, les cartes restent', { skip }, () => {
+  const tables = sampleTables();
+  delete tables.Actions.Actions;
+  delete tables.Actions.Actions_corrigees;
+  return withWidget({ tables }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await waitForBanner(page);
+    assert.match(await bannerText(page), /Actions \(Actions_corrigees ou Actions\)/);
+    assert.equal(await page.locator('.filter[data-filter-key="actions"] .filter-option').count(), 0, 'le menu Actions n\'a aucune option');
+    assert.ok(await page.locator('.filter[data-filter-key="instances"] .filter-option').count() > 0, 'les autres menus restent');
+    assert.equal(await page.locator('.contact-card').first().locator('.tag-group-title', { hasText: 'Instances' }).count(), 1);
+  });
+});
+
+test('Etablissement vide pour tous les contacts : le bandeau le dit', { skip }, () => {
+  const tables = sampleTables();
+  tables.BDD.Etablissement = tables.BDD.Etablissement.map(() => 0);
+  return withWidget({ tables }, async ({ page }) => {
+    await waitForBanner(page);
+    assert.match(await bannerText(page), /Etablissement est vide/);
     assert.equal(await cardCount(page), 0);
   });
 });
 
-test('contacts sans Etablissement2 : diagnostic console par identifiant, sans adresse email', { skip }, () =>
+test('contacts sans Etablissement : diagnostic console par identifiant, sans adresse email', { skip }, () =>
   withWidget({}, async ({ page, logs }) => {
     await waitForCards(page, 4);
     const diagnostic = (await Promise.all(logs.warnings)).find(line => line.includes('[ETABLISSEMENT]'));

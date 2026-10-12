@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadDirectory, DirectoryLoadError } from '../grist-data.js';
-import { sampleTables, DEFAULT_CARD_NAMES } from './fixtures.mjs';
+import { sampleTables, withoutOptionalColumns, DEFAULT_CARD_NAMES } from './fixtures.mjs';
 
 // ===== loadDirectory : lecture de Grist → contacts affichables =====
 
@@ -25,26 +25,53 @@ function recordingLog() {
   return log;
 }
 
-test('loadDirectory returns the displayable contacts, each with its Etablissement2 label, and reads every table exactly once', async () => {
+const load = (tables, options = {}) => loadDirectory(fakeDocApi(tables, options.docApi), { log: recordingLog(), ...options.load });
+
+// Ajoute à Etablissements une 2e ligne « CHU » validée à l'inverse de la première.
+function withDuplicateCHU(tables) {
+  const copy = structuredClone(tables);
+  copy.Etablissements.id.push(6);
+  copy.Etablissements.acronyme.push('CHU');
+  copy.Etablissements.nom_complet.push('CHU (doublon)');
+  copy.Etablissements.fondateur.push(true);
+  copy.Etablissements.partenaire.push(false);
+  copy.Etablissements.autres.push(false);
+  copy.Etablissements.ok_pour_apparaitre.push(false);
+  return copy;
+}
+
+test('loadDirectory returns the displayable contacts, each with its Etablissement label, and reads every table exactly once', async () => {
   const docApi = fakeDocApi(sampleTables());
   const { contacts, issues } = await loadDirectory(docApi, { log: recordingLog() });
-  // Contrôle demandé avant chaque changement : nombre de contacts + Etablissement2 rempli.
-  assert.deepEqual(contacts.filter(c => c.etablissement_fondateur).map(c => `${c.Prenom} ${c.Nom}`), DEFAULT_CARD_NAMES);
+  // Contrôle demandé avant chaque changement : nombre de contacts + établissement rempli.
+  assert.deepEqual(contacts.filter(c => c.etablissement_fondateur).map(c => `${c.prenom} ${c.nom}`), DEFAULT_CARD_NAMES);
   assert.equal(contacts.length, 5, '4 fondateurs + 1 partenaire (Bob), avant l\'interrupteur Partenaires de l\'UI');
-  assert.ok(contacts.every(c => c.etablissement_label), 'tous les contacts affichables ont un établissement');
+  assert.deepEqual(contacts.map(c => c.etablissement_label), ['CHU', 'UBM', 'CHU', 'Institut Bergonié', 'CHU'],
+    'tous les contacts affichables ont leur établissement');
   assert.deepEqual(issues, []);
   Object.values(docApi.calls).forEach(count => assert.equal(count, 1));
   assert.equal(docApi.calls.Etablissements, 1, 'Etablissements n\'est lu qu\'une fois (libellés ET indicateurs)');
+  assert.equal(docApi.calls.BDD, 1);
 });
 
-test('loadDirectory resolves reference tables and keeps the establishment menu data', async () => {
-  const { referenceMaps, etabFlags } = await loadDirectory(fakeDocApi(sampleTables()), { log: recordingLog() });
-  assert.deepEqual(referenceMaps.Instances, { 1: 'CME', 3: 'COVIRIS' }, 'la ligne sans libellé est ignorée');
+test('loadDirectory reads the tables of the new structure and none of the old ones', async () => {
+  const docApi = fakeDocApi(sampleTables());
+  await loadDirectory(docApi, { log: recordingLog() });
+  assert.deepEqual(Object.keys(docApi.calls).sort(), [
+    'Actions', 'BDD', 'Communautes', 'Competences', 'Etablissements', 'GT', 'INSTANCES', 'Role_Dans_le_PUI', 'Taches'
+  ]);
+});
+
+test('loadDirectory resolves reference tables, preferring the corrected label over the raw one', async () => {
+  const { referenceMaps, etabFlags } = await load(sampleTables());
+  assert.deepEqual(referenceMaps.INSTANCES, { 1: 'CME', 3: 'COVIRIS' }, 'libellé corrigé prioritaire ; la ligne sans libellé est ignorée');
+  assert.deepEqual(referenceMaps.Actions, { 1: 'Vaccination', 2: 'Audit' }, 'libellé brut quand aucun libellé corrigé n\'est rempli');
+  assert.deepEqual(referenceMaps.Competences, { 1: 'Oncologie' });
   assert.deepEqual(referenceMaps.Etablissements, { 1: 'CHU', 2: 'UBM', 3: 'Clinique', 4: 'INSERM', 5: 'Institut Bergonié' });
   assert.equal(etabFlags.byLabel['Institut Bergonié'].fondateur, true);
 });
 
-test('loadDirectory logs contacts without Etablissement2 by row id only, never by email', async () => {
+test('loadDirectory logs contacts without Etablissement by row id only, never by email', async () => {
   const log = recordingLog();
   await loadDirectory(fakeDocApi(sampleTables()), { log });
   const diagnostic = log.warnings.find(args => String(args[0]).startsWith('[ETABLISSEMENT]'));
@@ -53,79 +80,136 @@ test('loadDirectory logs contacts without Etablissement2 by row id only, never b
   assert.ok(!JSON.stringify(log.warnings).includes('@'));
 });
 
-test('loadDirectory throws a DirectoryLoadError naming the table when Annuaire or Etablissements cannot be read', async () => {
-  for (const table of ['Annuaire', 'Etablissements']) {
+test('loadDirectory throws a DirectoryLoadError naming the table when BDD or Etablissements cannot be read', async () => {
+  for (const table of ['BDD', 'Etablissements']) {
     await assert.rejects(
-      loadDirectory(fakeDocApi(sampleTables(), { failing: [table] }), { log: recordingLog() }),
+      load(sampleTables(), { docApi: { failing: [table] } }),
       error => error instanceof DirectoryLoadError && error.message.includes(table)
     );
   }
 });
 
 test('loadDirectory treats a docApi that throws synchronously like a rejected read', async () => {
-  await assert.rejects(
-    loadDirectory(fakeDocApi(sampleTables(), { throwSync: ['Etablissements'] }), { log: recordingLog() }),
-    DirectoryLoadError
-  );
-  const { issues } = await loadDirectory(fakeDocApi(sampleTables(), { throwSync: ['Actions'] }), { log: recordingLog() });
+  await assert.rejects(load(sampleTables(), { docApi: { throwSync: ['Etablissements'] } }), DirectoryLoadError);
+  const { issues } = await load(sampleTables(), { docApi: { throwSync: ['Actions'] } });
   assert.match(issues[0], /Actions/);
 });
 
 test('loadDirectory keeps going when a reference table is unreadable: previous labels are reused and the problem is reported', async () => {
   const previousMaps = { Actions: { 1: 'Vaccination', 2: 'Audit' } };
-  const withPrevious = await loadDirectory(fakeDocApi(sampleTables(), { failing: ['Actions'] }), { previousMaps, log: recordingLog() });
+  const withPrevious = await load(sampleTables(), { docApi: { failing: ['Actions'] }, load: { previousMaps } });
   assert.deepEqual(withPrevious.referenceMaps.Actions, previousMaps.Actions);
   assert.equal(withPrevious.issues.length, 1);
   assert.match(withPrevious.issues[0], /Actions/);
   assert.equal(withPrevious.contacts.length, 5, 'les contacts restent affichés');
 
-  const firstLoad = await loadDirectory(fakeDocApi(sampleTables(), { failing: ['Actions', 'GT'] }), { log: recordingLog() });
+  const firstLoad = await load(sampleTables(), { docApi: { failing: ['Actions', 'GT'] } });
   assert.deepEqual(firstLoad.referenceMaps.Actions, {});
   assert.match(firstLoad.issues[0], /Actions, GT/);
 });
 
-test('loadDirectory refuses an Annuaire table that lacks Etablissement2 or perimetre_all instead of silently showing nothing', async () => {
-  for (const column of ['Etablissement2', 'perimetre_all']) {
+test('loadDirectory refuses a BDD table that lacks a required column instead of silently showing nothing', async () => {
+  for (const column of ['nom', 'prenom', 'Etablissement', 'perimetre']) {
     const tables = sampleTables();
-    delete tables.Annuaire[column];
+    delete tables.BDD[column];
     await assert.rejects(
-      loadDirectory(fakeDocApi(tables), { log: recordingLog() }),
-      error => error instanceof DirectoryLoadError && error.message.includes(column)
+      load(tables),
+      error => error instanceof DirectoryLoadError && error.message.includes(`« ${column} »`) && error.message.includes('BDD')
     );
   }
 });
 
+test('loadDirectory refuses an Etablissements table that lacks a visibility column instead of hiding every contact', async () => {
+  for (const column of ['fondateur', 'partenaire', 'ok_pour_apparaitre']) {
+    const tables = sampleTables();
+    delete tables.Etablissements[column];
+    await assert.rejects(
+      load(tables),
+      error => error instanceof DirectoryLoadError && error.message.includes(`« ${column} »`) && error.message.includes('Etablissements')
+    );
+  }
+});
+
+test('loadDirectory reports a reference table none of whose label columns exist, and keeps the directory', async () => {
+  const tables = sampleTables();
+  delete tables.Actions.Actions;
+  delete tables.Actions.Actions_corrigees;
+  const log = recordingLog();
+  const { contacts, referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
+  assert.equal(contacts.length, 5, 'les contacts restent affichés');
+  assert.deepEqual(referenceMaps.Actions, {});
+  assert.equal(issues.length, 1);
+  assert.match(issues[0], /Actions \(Actions_corrigees ou Actions\)/);
+  assert.ok(log.warnings.some(args => String(args[0]).includes('Actions') && String(args[0]).includes('introuvable')));
+});
+
+test('loadDirectory falls back to the raw label with a console warning when only the corrected column is missing', async () => {
+  const tables = sampleTables();
+  delete tables.Actions.Actions_corrigees;
+  const log = recordingLog();
+  const { referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
+  assert.deepEqual(referenceMaps.Actions, { 1: 'Vaccination', 2: 'Audit' });
+  assert.deepEqual(issues, [], 'pas de bandeau : les libellés bruts suffisent');
+  assert.ok(log.warnings.some(args => String(args[0]).includes('Actions_corrigees')));
+});
+
+test('loadDirectory reads the phone and the PUI role that BDD now holds', async () => {
+  const { contacts } = await load(sampleTables());
+  assert.equal(contacts[0].numero_de_telephone, 556789012);
+  assert.deepEqual(contacts[0].labels.role, ['Référent qualité']);
+  assert.deepEqual(contacts[1].labels.role, []);
+});
+
+test('loadDirectory works without the optional BDD columns (Fonction, email, phone, PUI role): same contacts, no issue', async () => {
+  const bare = withoutOptionalColumns(sampleTables());
+  delete bare.BDD.Fonction;
+  delete bare.BDD.email;
+  const { contacts, issues } = await load(bare);
+  assert.equal(contacts.length, 5);
+  assert.deepEqual(issues, []);
+  assert.deepEqual(contacts.map(contact => contact.labels.role), contacts.map(() => []));
+});
+
+test('loadDirectory ignores Accepte_apparaitre for now: BDD still holds a formula that returns False for everyone', async () => {
+  const tables = sampleTables();
+  assert.ok(tables.BDD.Accepte_apparaitre.every(value => value === false));
+  const { contacts } = await load(tables);
+  assert.equal(contacts.length, 5);
+});
+
 test('loadDirectory explains an empty directory instead of leaving an unexplained « 0 contact »', async () => {
   const noEtablissement = sampleTables();
-  noEtablissement.Annuaire.Etablissement2 = noEtablissement.Annuaire.Etablissement2.map(() => '');
+  noEtablissement.BDD.Etablissement = noEtablissement.BDD.Etablissement.map(() => 0);
   const noPerimetre = sampleTables();
-  noPerimetre.Annuaire.perimetre_all = noPerimetre.Annuaire.perimetre_all.map(() => ['L']);
+  noPerimetre.BDD.perimetre = noPerimetre.BDD.perimetre.map(() => ['L']);
   const nothingValidated = sampleTables();
   nothingValidated.Etablissements.ok_pour_apparaitre = nothingValidated.Etablissements.ok_pour_apparaitre.map(() => false);
 
-  const explain = async tables => (await loadDirectory(fakeDocApi(tables), { log: recordingLog() })).issues;
-  assert.match((await explain(noEtablissement))[0], /Etablissement2 est vide/);
-  assert.match((await explain(noPerimetre))[0], /perimetre_all est vide/);
+  const explain = async tables => (await load(tables)).issues;
+  assert.match((await explain(noEtablissement))[0], /Etablissement est vide/);
+  assert.match((await explain(noPerimetre))[0], /perimetre est vide/);
   assert.match((await explain(nothingValidated))[0], /Aucun contact affichable/);
 });
 
-test('loadDirectory stays quiet when the Annuaire table is genuinely empty', async () => {
+test('loadDirectory stays quiet when the BDD table is genuinely empty', async () => {
   const tables = sampleTables();
-  Object.keys(tables.Annuaire).forEach(column => { tables.Annuaire[column] = []; });
-  const { contacts, issues } = await loadDirectory(fakeDocApi(tables), { log: recordingLog() });
+  Object.keys(tables.BDD).forEach(column => { tables.BDD[column] = []; });
+  const { contacts, issues } = await load(tables);
   assert.deepEqual([contacts, issues], [[], []]);
 });
 
-test('loadDirectory hides the contacts of an establishment whose duplicate rows disagree, and reports it', async () => {
-  const tables = sampleTables();
-  tables.Etablissements.id.push(6);
-  tables.Etablissements.acronyme.push('CHU');
-  tables.Etablissements.nom_complet.push('CHU (doublon)');
-  tables.Etablissements.fondateur.push(true);
-  tables.Etablissements.partenaire.push(false);
-  tables.Etablissements.autres.push(false);
-  tables.Etablissements.ok_pour_apparaitre.push(false);
-  const { contacts, issues } = await loadDirectory(fakeDocApi(tables), { log: recordingLog() });
-  assert.deepEqual(contacts.map(c => c.Nom), ['Durand', 'Bergonié'], 'plus aucun contact du CHU');
+test('loadDirectory: duplicate acronyms hide nobody when contacts reference their own Etablissements row', async () => {
+  const { contacts, issues } = await load(withDuplicateCHU(sampleTables()));
+  assert.deepEqual(contacts.map(c => c.nom), ['Martin', 'Durand', 'Hostile', 'Bergonié', 'Bernard'],
+    'chaque contact garde le statut de sa propre ligne (ici la ligne validée, id 1)');
+  assert.deepEqual(issues, []);
+});
+
+test('loadDirectory: when Grist sends the establishment as text, duplicate acronyms with different statuses hide their contacts and are reported', async () => {
+  const tables = withDuplicateCHU(sampleTables());
+  const textLabels = { 1: 'CHU', 2: 'UBM', 3: 'Clinique', 4: 'INSERM', 5: 'Institut Bergonié', 0: '' };
+  tables.BDD.Etablissement = tables.BDD.Etablissement.map(id => textLabels[id]);
+  const { contacts, issues } = await load(tables);
+  assert.deepEqual(contacts.map(c => c.nom), ['Durand', 'Bergonié'], 'plus aucun contact du CHU');
   assert.match(issues[0], /CHU/);
 });

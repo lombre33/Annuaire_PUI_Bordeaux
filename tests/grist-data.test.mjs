@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, normalize, compareLabels,
+  safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, compareLabels,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
   labelMapFromRows, mailtoHref
 } from '../grist-data.js';
@@ -74,27 +74,28 @@ test('referenceMapsEqual compares reference-table content regardless of key orde
   assert.equal(referenceMapsEqual({ Etablissements: { 1: 'CHU' } }, {}), false);
 });
 
-test('isInScope: regression test for the perimetre_all filter', () => {
+test('isInScope: regression test for the perimetre filter', () => {
   // Avant correction, `Array.isArray(p) && p.length > 0` était toujours vrai
   // car ['L'] (liste vide côté Grist) a une longueur de 1.
-  assert.equal(isInScope({ perimetre_all: ['L'] }), false, 'une liste Grist vide ne doit pas être "in scope"');
-  assert.equal(isInScope({ perimetre_all: ['L', 3] }), true);
-  assert.equal(isInScope({ perimetre_all: undefined }), false);
-  assert.equal(isInScope({ perimetre_all: [] }), false);
+  assert.equal(isInScope({ perimetre: ['L'] }), false, 'une liste Grist vide ne doit pas être "in scope"');
+  assert.equal(isInScope({ perimetre: ['L', 3] }), true);
+  assert.equal(isInScope({ perimetre: undefined }), false);
+  assert.equal(isInScope({ perimetre: [] }), false);
+  assert.equal(isInScope({ perimetre_all: ['L', 3] }), false, 'l\'ancienne colonne perimetre_all n\'existe plus dans BDD');
 });
 
 test('tableToRows converts a Grist column-oriented table into rows', () => {
-  const table = { id: [1, 2], Nom: ['Dupont', 'Martin'], Prenom: ['Alice', 'Bob'] };
+  const table = { id: [1, 2], nom: ['Dupont', 'Martin'], prenom: ['Alice', 'Bob'] };
   assert.deepEqual(tableToRows(table), [
-    { id: 1, Nom: 'Dupont', Prenom: 'Alice' },
-    { id: 2, Nom: 'Martin', Prenom: 'Bob' }
+    { id: 1, nom: 'Dupont', prenom: 'Alice' },
+    { id: 2, nom: 'Martin', prenom: 'Bob' }
   ]);
   assert.deepEqual(tableToRows(null), []);
   assert.deepEqual(tableToRows([{ id: 1 }]), [{ id: 1 }]);
 });
 
 test('tableToRows returns no rows when the table object has no id array (defensive default, not a crash)', () => {
-  assert.deepEqual(tableToRows({ Nom: ['Dupont'] }), []);
+  assert.deepEqual(tableToRows({ nom: ['Dupont'] }), []);
 });
 
 test('pickLabel falls back to the next field when the first is empty', () => {
@@ -125,6 +126,15 @@ test('refLabel resolves a Reference cell in any of the 3 shapes Grist can send',
   // Référence vide ou introuvable.
   assert.equal(refLabel(0, referenceMap), '');
   assert.equal(refLabel(['R', 'Etablissements', 999], referenceMap), '');
+});
+
+test('isEmptyReference is true only for a Reference that points at nothing', () => {
+  [0, null, undefined, '', '  ', [], ['R', 'Etablissements', 0]].forEach(value => {
+    assert.equal(isEmptyReference(value), true, `${JSON.stringify(value)} ne désigne rien`);
+  });
+  [3, 'UBM', ['R', 'Etablissements', 3]].forEach(value => {
+    assert.equal(isEmptyReference(value), false, `${JSON.stringify(value)} désigne un établissement`);
+  });
 });
 
 test('resolveListItem resolves a ReferenceList item whether Grist sends a raw id or already-resolved text', () => {

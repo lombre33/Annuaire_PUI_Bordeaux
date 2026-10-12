@@ -1,10 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { CATEGORIES, LIST_CATEGORIES, REFERENCE_TABLES } from './constants.js';
-
-// Nombre de colonnes competences_N dans Annuaire.
-const COMPETENCE_COLUMNS = 15;
+import { CATEGORIES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_TABLES } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -57,7 +54,7 @@ export function safeValues(value) {
   return isBlank(value) ? [] : [value];
 }
 
-// Table Grist en colonnes ({ id: [...], Nom: [...] }) → tableau de lignes.
+// Table Grist en colonnes ({ id: [...], nom: [...] }) → tableau de lignes.
 export function tableToRows(table) {
   if (!table || typeof table !== 'object') return [];
   if (Array.isArray(table)) return table;
@@ -96,6 +93,11 @@ export function refLabel(value, referenceMap) {
   if (typeof value === 'string') return text(value);
   const id = refId(value);
   return (id && referenceMap?.[String(id)]) || '';
+}
+
+// Vrai si la Référence ne pointe sur rien : ni id, ni texte déjà résolu.
+export function isEmptyReference(value) {
+  return !refId(value) && !(typeof value === 'string' && text(value));
 }
 
 // id → libellé d'une table de référence. `labelFields` : une colonne, ou
@@ -146,7 +148,7 @@ export function resolveListItem(item, referenceMap) {
   return referenceMap?.[String(item)] || '';
 }
 
-// Libellés des catégories dont Annuaire porte une ReferenceList. Un id sans
+// Libellés des catégories dont BDD porte une ReferenceList. Un id sans
 // libellé est ignoré plutôt qu'affiché brut (« 47 » n'aide personne).
 function listLabels(contact, referenceMaps) {
   return Object.fromEntries(LIST_CATEGORIES.map(({ key, column, table }) => [
@@ -157,20 +159,14 @@ function listLabels(contact, referenceMaps) {
   ]));
 }
 
-// Les compétences sont du texte libre réparti sur competences_1 … competences_15.
-function competenceLabels(contact) {
-  return Array.from({ length: COMPETENCE_COLUMNS }, (_, index) => text(contact[`competences_${index + 1}`]))
-    .filter(Boolean);
-}
-
 // Ajoute à un contact `labels` (pour chaque catégorie, la liste de ses libellés) et
 // les indicateurs de son établissement. `etabFlags` est optionnel : sans lui,
 // aucun indicateur n'est vrai et le contact n'est pas éligible.
 export function enrich(contact, referenceMaps, etabFlags) {
-  // Etablissement2 (Text, formule Grist) est la seule source de l'établissement
-  // d'un contact : une chaîne simple, sans l'ambiguïté des Références. Ne pas lui
-  // substituer une colonne Référence, dont l'encodage varie.
-  const etablissement = text(contact.Etablissement2);
+  // BDD.Etablissement est une Référence directe vers la ligne d'Etablissements
+  // (jamais le nom de domaine de l'e-mail). refLabel() en gère les formes
+  // possibles : identifiant de ligne, ['R', table, id] ou texte déjà résolu.
+  const etablissement = refLabel(contact.Etablissement, referenceMaps[CATEGORIES.etablissement.table]);
   const role = refLabel(contact.Role_dans_le_PUI, referenceMaps[CATEGORIES.role.table]);
   const flags = etablissementFlags(contact, etabFlags);
 
@@ -181,7 +177,6 @@ export function enrich(contact, referenceMaps, etabFlags) {
     // de cas particulier (le badge de la carte utilise `etablissement_label`).
     labels: {
       ...listLabels(contact, referenceMaps),
-      competences: competenceLabels(contact),
       etablissement: etablissement ? [etablissement] : [],
       role: role ? [role] : []
     },
@@ -197,21 +192,24 @@ export function labelsOf(contact, key) {
   return contact.labels?.[key] ?? [];
 }
 
-// Un contact n'est affiché que s'il a au moins une valeur dans perimetre_all
+// Un contact n'est affiché que s'il a au moins une valeur dans perimetre
 // (specs.md). Ne pas tester la longueur brute : une liste vide vaut ['L'].
 export function isInScope(record) {
-  return safeValues(record.perimetre_all).length > 0;
+  return safeValues(record.perimetre).length > 0;
 }
 
 // ===== INDICATEURS D'UN ÉTABLISSEMENT =====
 // Colonnes booléennes de la table Etablissements (specs.md) : fondateur,
 // partenaire, autres (jamais affiché) et ok_pour_apparaitre (validation, verrou
-// global). Indexées par id (menu du filtre) et par libellé acronyme-sinon-nom-
-// complet, celui que porte Etablissement2 d'un contact.
+// global). Indexées par id de ligne (byId) : c'est ainsi qu'un contact retrouve
+// son établissement via BDD.Etablissement, et que le menu du filtre se restreint.
+// byLabel (acronyme-sinon-nom-complet) ne sert que si Grist envoie la Référence
+// déjà résolue en texte.
 //
-// Deux lignes de même libellé et de statuts différents ne se départagent pas par
-// leur ordre : on garde le plus strict (vrai seulement s'il l'est partout, donc
-// contacts masqués dans le doute) et le libellé est listé dans `conflicts`.
+// Dans ce cas, deux lignes de même libellé et de statuts différents ne se
+// départagent pas par leur ordre : on garde le plus strict (vrai seulement s'il
+// l'est partout, donc contacts masqués dans le doute) et le libellé est listé
+// dans `conflicts`.
 const ETABLISSEMENT_LABEL_FIELDS = CATEGORIES.etablissement.field;
 
 const FLAG_NAMES = ['fondateur', 'partenaire', 'ok_pour_apparaitre'];
@@ -240,10 +238,15 @@ export function etablissementFlagsFromRows(rows) {
   return { byId, byLabel, conflicts: [...conflicts] };
 }
 
-// Indicateurs de l'établissement d'un contact, d'après Etablissement2 ; null si
-// elle est vide ou ne correspond à aucune ligne d'Etablissements.
+// Indicateurs de l'établissement d'un contact, d'après BDD.Etablissement : par
+// identifiant de ligne quand la Référence en donne un (cas normal avec
+// fetchTable), par libellé quand Grist l'a déjà résolue en texte. null si elle
+// est vide ou ne correspond à aucune ligne d'Etablissements.
 export function etablissementFlags(contact, etabFlags) {
-  const label = text(contact?.Etablissement2);
+  const cell = contact?.Etablissement;
+  const id = refId(cell);
+  if (id) return etabFlags?.byId?.[String(id)] || null;
+  const label = typeof cell === 'string' ? text(cell) : '';
   return (label && etabFlags?.byLabel?.[label]) || null;
 }
 
@@ -278,9 +281,15 @@ export function mailtoHref(email) {
 
 // ===== CHARGEMENT COMPLET DE L'ANNUAIRE =====
 
-// Sans l'une de ces colonnes aucun contact n'est éligible : mieux vaut une
-// erreur explicite qu'un annuaire vide.
-const REQUIRED_ANNUAIRE_COLUMNS = ['Etablissement2', 'perimetre_all'];
+// Sans l'une de ces colonnes aucun contact n'est affichable : mieux vaut une
+// erreur explicite qu'un annuaire vide. Les autres colonnes de BDD (Fonction,
+// email, numero_de_telephone, Role_dans_le_PUI…) sont facultatives : absentes,
+// elles ne s'affichent simplement pas.
+const REQUIRED_COLUMNS = ['nom', 'prenom', 'Etablissement', 'perimetre'];
+
+// Colonnes d'Etablissements dont dépend l'éligibilité des contacts (specs.md) :
+// l'une d'elles renommée, et plus aucun contact ne s'affiche.
+const REQUIRED_ETABLISSEMENT_COLUMNS = ['fondateur', 'partenaire', 'ok_pour_apparaitre'];
 
 // Lecture impossible d'une donnée indispensable. `message` est une phrase
 // française destinée au bandeau d'état.
@@ -291,11 +300,11 @@ export class DirectoryLoadError extends Error {
   }
 }
 
-// `scopedRows` : lignes d'Annuaire déjà filtrées par isInScope().
+// `scopedRows` : lignes de BDD déjà filtrées par isInScope().
 export function buildContacts(scopedRows, referenceMaps, etabFlags) {
   return scopedRows
     .map(row => enrich(row, referenceMaps, etabFlags))
-    .filter(contact => contact.Nom || contact.Prenom)
+    .filter(contact => contact.nom || contact.prenom)
     .filter(isEtablissementEligible);
 }
 
@@ -305,18 +314,18 @@ export function buildContacts(scopedRows, referenceMaps, etabFlags) {
 function describeEmptyDirectory(rowCount, scopedRows, contacts) {
   if (contacts.length > 0 || rowCount === 0) return null;
   if (scopedRows.length === 0) {
-    return 'perimetre_all est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
+    return 'perimetre est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
   }
-  if (scopedRows.every(row => !text(row.Etablissement2))) {
-    return 'Etablissement2 est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne formule dans Grist.';
+  if (scopedRows.every(row => isEmptyReference(row.Etablissement))) {
+    return 'Etablissement est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
   }
-  return 'Aucun contact affichable alors que la table Annuaire contient des lignes : vérifiez les noms, Etablissement2 '
-    + '(établissement validé, fondateur ou partenaire) et perimetre_all.';
+  return `Aucun contact affichable alors que la table ${MAIN_TABLE} contient des lignes : vérifiez les noms, Etablissement `
+    + '(établissement validé, fondateur ou partenaire) et perimetre.';
 }
 
 // Lit toutes les tables en parallèle : { nom de table → résultat de Promise.allSettled }.
 async function readAllTables(docApi) {
-  const names = ['Annuaire', ...REFERENCE_TABLES.map(([table]) => table)];
+  const names = [MAIN_TABLE, ...REFERENCE_TABLES.map(([table]) => table)];
   // async : une erreur levée de façon synchrone par docApi devient un rejet.
   const settled = await Promise.allSettled(names.map(async name => docApi.fetchTable(name)));
   return Object.fromEntries(names.map((name, index) => [name, settled[index]]));
@@ -324,62 +333,87 @@ async function readAllTables(docApi) {
 
 // Sans ces tables rien ne peut s'afficher : leur lecture ratée est une erreur.
 function requireReadable(results, log) {
-  ['Annuaire', 'Etablissements'].forEach(name => {
+  [MAIN_TABLE, 'Etablissements'].forEach(name => {
     if (results[name].status === 'fulfilled') return;
     log.warn(`[REFS] Impossible de charger ${name}`, results[name].reason);
     throw new DirectoryLoadError(`table « ${name} » illisible`, results[name].reason);
   });
 }
 
-function requireAnnuaireColumns(rows) {
-  const missing = rows.length ? REQUIRED_ANNUAIRE_COLUMNS.filter(column => !(column in rows[0])) : [];
+// Colonnes de `columns` qui manquent à la table (lue en lignes). Une table vide
+// ne permet pas de les vérifier : rien n'est signalé.
+function missingColumns(rows, columns) {
+  return rows.length ? columns.filter(column => !(column in rows[0])) : [];
+}
+
+function requireColumns(table, columns, rows) {
+  const missing = missingColumns(rows, columns);
   if (missing.length) {
-    throw new DirectoryLoadError(`colonne « ${missing.join(' », « ')} » absente de la table Annuaire`);
+    throw new DirectoryLoadError(`colonne « ${missing.join(' », « ')} » absente de la table ${table}`);
   }
 }
 
-// id → libellé d'une table de référence, ou null si sa lecture a échoué.
+// Lit la table de référence d'une catégorie : { map: id → libellé, labelColumnsMissing }
+// (aucune colonne de libellé n'existe : le menu et les tags seraient vides en
+// silence), ou null si sa lecture a échoué.
 function readReferenceMap(table, fields, result, log) {
   if (result.status === 'rejected') {
     log.warn(`[REFS] Impossible de charger ${table}`, result.reason);
     return null;
   }
   const rows = tableToRows(result.value);
-  const map = labelMapFromRows(rows, fields);
+  const labelFields = [].concat(fields);
+  const map = labelMapFromRows(rows, labelFields);
   const withoutLabel = rows.length - Object.keys(map).length;
   log.info(`[REFS] ${table}: ${Object.keys(map).length} entrées`
-    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${[].concat(fields).join('/')})` : ''));
-  return map;
+    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${labelFields.join('/')})` : ''));
+  const absent = missingColumns(rows, labelFields);
+  if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
+  return { map, labelColumnsMissing: absent.length === labelFields.length };
 }
 
-// Une table illisible garde ses libellés précédents ; `unreadable` la signale.
+// Une table illisible garde ses libellés précédents ; `unreadable` la signale,
+// `unlabeled` celles dont aucune colonne de libellé n'existe.
 function readReferenceMaps(results, previousMaps, log) {
   const referenceMaps = {};
   const unreadable = [];
+  const unlabeled = [];
   REFERENCE_TABLES.forEach(([table, fields]) => {
-    const map = readReferenceMap(table, fields, results[table], log);
-    if (!map) unreadable.push(table);
-    referenceMaps[table] = map ?? previousMaps[table] ?? {};
+    const read = readReferenceMap(table, fields, results[table], log);
+    if (!read) unreadable.push(table);
+    else if (read.labelColumnsMissing) unlabeled.push({ table, fields: [].concat(fields) });
+    referenceMaps[table] = read?.map ?? previousMaps[table] ?? {};
   });
-  return { referenceMaps, unreadable };
+  return { referenceMaps, unreadable, unlabeled };
 }
 
-// Les contacts sans Etablissement2 ne s'affichent pas. Seuls leurs identifiants
+// Les contacts sans Etablissement ne s'affichent pas. Seuls leurs identifiants
 // de ligne sont journalisés : la console peut être partagée pendant une démo.
 function warnAboutMissingEtablissement(scopedRows, log) {
-  const ids = scopedRows.filter(row => !text(row.Etablissement2)).map(row => row.id);
+  const ids = scopedRows.filter(row => isEmptyReference(row.Etablissement)).map(row => row.id);
   if (!ids.length) return;
-  log.warn(`[ETABLISSEMENT] ${ids.length}/${scopedRows.length} contact(s) sans Etablissement2 `
+  log.warn(`[ETABLISSEMENT] ${ids.length}/${scopedRows.length} contact(s) sans Etablissement `
     + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
 }
 
+// Des acronymes en double ne masquent des contacts que lorsque Grist envoie
+// l'établissement en texte : avec un identifiant de ligne, chaque contact garde
+// le statut de sa propre ligne d'Etablissements.
+function resolvedByLabel(scopedRows) {
+  return scopedRows.some(row => typeof row.Etablissement === 'string' && text(row.Etablissement));
+}
+
 // Messages du bandeau d'état pour tout ce qui rend l'annuaire incomplet.
-function directoryIssues({ unreadable, etabFlags, emptyReason }) {
+function directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason }) {
   const issues = [];
   if (unreadable.length) {
     issues.push(`Tables illisibles (${unreadable.join(', ')}) : des libellés ou des tags peuvent manquer.`);
   }
-  if (etabFlags.conflicts.length) {
+  if (unlabeled.length) {
+    const expected = unlabeled.map(({ table, fields }) => `${table} (${fields.join(' ou ')})`).join(', ');
+    issues.push(`Colonne de libellé introuvable : ${expected}. Les tags et le filtre correspondants restent vides.`);
+  }
+  if (etabFlags.conflicts.length && resolvedByLabel(scopedRows)) {
     issues.push(`Acronymes en double dans Etablissements (${etabFlags.conflicts.join(', ')}) avec des statuts `
       + 'différents : leurs contacts sont masqués.');
   }
@@ -387,10 +421,10 @@ function directoryIssues({ unreadable, etabFlags, emptyReason }) {
   return issues;
 }
 
-// Lit Annuaire et toutes les tables de référence (chacune une seule fois) et
+// Lit BDD et toutes les tables de référence (chacune une seule fois) et
 // renvoie { contacts, referenceMaps, etabFlags, issues }.
 //
-// Annuaire et Etablissements sont indispensables : leur lecture ratée lève une
+// BDD et Etablissements sont indispensables : leur lecture ratée lève une
 // DirectoryLoadError (l'appelant garde l'affichage précédent). Une autre table
 // illisible n'empêche pas l'affichage : on réutilise ses libellés précédents
 // (`previousMaps`) et on le signale dans `issues`, messages français destinés
@@ -399,16 +433,23 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   const results = await readAllTables(docApi);
   requireReadable(results, log);
 
-  const rows = tableToRows(results.Annuaire.value);
-  requireAnnuaireColumns(rows);
+  const rows = tableToRows(results[MAIN_TABLE].value);
+  requireColumns(MAIN_TABLE, REQUIRED_COLUMNS, rows);
+  const etablissementRows = tableToRows(results.Etablissements.value);
+  requireColumns('Etablissements', REQUIRED_ETABLISSEMENT_COLUMNS, etablissementRows);
 
-  const { referenceMaps, unreadable } = readReferenceMaps(results, previousMaps, log);
-  const etabFlags = etablissementFlagsFromRows(tableToRows(results.Etablissements.value));
+  const { referenceMaps, unreadable, unlabeled } = readReferenceMaps(results, previousMaps, log);
+  const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const scopedRows = rows.filter(isInScope);
   const contacts = buildContacts(scopedRows, referenceMaps, etabFlags);
   log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
   warnAboutMissingEtablissement(scopedRows, log);
 
   const emptyReason = describeEmptyDirectory(rows.length, scopedRows, contacts);
-  return { contacts, referenceMaps, etabFlags, issues: directoryIssues({ unreadable, etabFlags, emptyReason }) };
+  return {
+    contacts,
+    referenceMaps,
+    etabFlags,
+    issues: directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason })
+  };
 }

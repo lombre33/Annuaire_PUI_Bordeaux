@@ -6,46 +6,53 @@
 # et une réplique d'un système d'authentification tiers) qui n'ont RIEN à faire ici,
 # a fortiori dans un dépôt public. Si vous avez besoin du schéma complet pour du
 # debug, gardez-le en local, jamais dans git.
+#
+# Version du schéma : table BDD (remplace l'ancienne table Annuaire, qui reste
+# dans le document mais n'est plus lue).
 
-Table Annuaire (table principale, liée à la section du widget)
-  Prenom            : Text
-  Nom               : Text
-  Email             : Text
-  fonction          : Text
-  numero_de_telephone : Numeric
-  Etablissement     : Reference(Etablissements)
-    ATTENTION — encodage constaté en prod, différent de ce qu'on pourrait
-    supposer : la table Etablissements a une "visible column" configurée
-    (acronyme), donc Grist envoie DÉJÀ le texte résolu (ex: "UBM"), pas un id.
-    Une Référence unique peut en réalité arriver sous 3 formes selon la config
-    de la table liée : texte déjà résolu (string), id nu (number), ou encodée
-    ['R', tableId, rowId]. Voir refLabel()/refId() dans grist-data.js, qui
-    gèrent les 3 cas — ne jamais supposer une seule forme pour une Référence.
-  Etablissement2    : Text   (repli affiché si Etablissement n'est pas renseigné)
-  Actions           : ReferenceList(Actions)
-  Communautee_s_    : ReferenceList(Communautees)
-  Role_dans_le_PUI  : Reference(Role_Dans_le_PUI) — même ambiguïté d'encodage qu'Etablissement.
-  Taches            : ReferenceList(Taches)
-  Instances         : ReferenceList(Instances)
-  GT                : ReferenceList(GT)
-  competences_1 .. competences_15 : Text
-
-  perimetre_all : ReferenceList(Perimetres) — formule qui concatène perimetre_1..25.
-    Sert uniquement à savoir si le contact a au moins un périmètre renseigné
-    (cf. specs.md — "Nous n'afficherons QUE les contacts ayant au moins une
-    valeur dans perimètre_all"). Ne pas réutiliser les colonnes perimetre_*
-    individuelles côté widget.
+Table BDD (table principale : une ligne par personne, lue par son nom via fetchTable)
+  prenom, nom       : Text          OBLIGATOIRES (sans l'une d'elles, erreur explicite)
+  Etablissement     : Reference(Etablissements)   OBLIGATOIRE
+    Référence directe vers la ligne de l'établissement. Le widget n'utilise
+    JAMAIS la colonne nom_de_domaine (règle du projet) : ni celle de BDD, ni
+    celle d'Etablissements.
+    Avec fetchTable, une Référence arrive normalement en identifiant de ligne
+    (0 quand elle est vide). Les formes ['R', 'Etablissements', id] et « texte
+    déjà résolu » restent tolérées : ne jamais supposer une seule forme pour
+    une Référence. Voir refId() / refLabel() / etablissementFlags() dans
+    grist-data.js.
+  perimetre         : ReferenceList(REMMAPING_PERIMETRES_COMPETENCES)   OBLIGATOIRE
+    Sert uniquement à savoir si le contact a au moins une valeur (cf. specs.md —
+    « Nous n'afficherons QUE les contacts ayant au moins une valeur dans
+    perimetre »). Le widget ne lit pas la table REMMAPING_PERIMETRES_COMPETENCES.
     Encodage brut renvoyé par l'API Grist pour les colonnes liste :
     ['L', id1, id2, ...] — une liste vide est donc ['L'] (longueur 1) et non [].
     Voir isInScope() / safeValues() dans grist-data.js.
+  Actions           : ReferenceList(Actions)
+  Communautes       : ReferenceList(Communautes)
+  Taches            : ReferenceList(Taches)
+  Instances         : ReferenceList(INSTANCES)
+  GT                : ReferenceList(GT)
+  Competences       : ReferenceList(Competences)
+  email             : Text          facultative
+  Fonction          : Text          facultative
+
+  Colonnes facultatives, rajoutées dans BDD sous ces noms : le widget les
+  affiche quand elles existent, et s'en passe sinon.
+  numero_de_telephone : Numeric     (téléphone de la carte ; le 0 initial qu'un
+                                     type Numeric fait perdre est rétabli)
+  Role_dans_le_PUI    : Reference(Role_Dans_le_PUI)   (tag « Rôle PUI »)
 
 Tables de référence (id -> libellé, chargées via fetchTable)
-  Actions            : Action (Text)
-  Taches             : taches (Text)
-  Communautees       : communaute (Text)
-  GT                 : nom (Text)
-  Competances        : Competences (Text)
-  Instances          : nom_instance (Text)
+  Chaque table porte un libellé brut (issu de l'import) et un libellé corrigé :
+  le widget affiche le libellé corrigé quand il est rempli, le brut sinon.
+  Actions            : Actions_corrigees (Choice)     puis Actions (Text)
+  Taches             : Taches_corrige (Choice)        puis Taches (Text)
+  Communautes        : communautes_corrigees (Text)   puis communautes (Text)
+  GT                 : GT_corrige (Choice)            puis GT (Text)
+  Competences        : Competences_corrigees (Text)   puis Competences (Text)
+  INSTANCES          : Instances_Corrigees (Choice)   puis Instances (Text)
+                       (le nom de la table est en majuscules)
   Etablissements     : acronyme (Text), nom_complet (Text),
                        fondateur (Bool), partenaire (Bool), autres (Bool),
                        ok_pour_apparaitre (Bool)
@@ -56,5 +63,5 @@ Tables de référence (id -> libellé, chargées via fetchTable)
     contacts de cet établissement (cf. specs.md) : seul un établissement
     fondateur OU partenaire, ET ayant validé (ok_pour_apparaitre = true),
     laisse voir ses contacts — "autres" n'est jamais affiché. Voir
-    fetchEtablissementsFlags()/isEtablissementEligible() dans grist-data.js.
+    etablissementFlagsFromRows() / isEtablissementEligible() dans grist-data.js.
   Role_Dans_le_PUI   : Role (Text)

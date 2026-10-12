@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.8.0 — Nouvelle structure Grist : le widget lit la table BDD
+
+Le document Grist a été restructuré : la table principale est désormais `BDD`
+(l'ancienne `Annuaire` n'est plus lue) et plusieurs tables de référence ont
+changé de nom ou de colonnes. Le widget est remappé en conséquence, sans changer
+aucune règle d'affichage : à données équivalentes, ce sont les mêmes contacts
+(vérifié par le test navigateur, voir ci-dessous).
+
+- **Table principale** : `BDD` (constante `MAIN_TABLE` de `constants.js`). Les
+  noms de colonnes de Grist sont repris tels quels dans le code : `prenom`,
+  `nom`, `email`, `Fonction` (au lieu de `Prenom`, `Nom`, `Email`, `fonction`).
+- **Établissement** : référence directe `BDD.Etablissement`, résolue par
+  identifiant de ligne. `Etablissement2` n'existe plus, et la colonne
+  `nom_de_domaine` n'est jamais utilisée (un test le garantit). Deux lignes
+  d'Etablissements de même acronyme ne se mélangent plus : chaque contact garde
+  le statut de sa propre ligne. L'ancien bandeau « acronymes en double » ne
+  s'affiche plus que si Grist envoie la référence en texte.
+- **Périmètre** : `perimetre` remplace `perimetre_all` pour la règle « au moins
+  une valeur ».
+- **Compétences** : `BDD.Competences`, liste de références vers la table
+  `Competences`, remplace les colonnes de texte libre `competences_1` à
+  `competences_15`. Le menu et les cartes affichent les mêmes libellés.
+- **Tables de référence** : `Communautees` → `Communautes`, `Competances` →
+  `Competences`, `Instances` → `INSTANCES` (majuscules). Chaque table a un
+  libellé brut et un libellé corrigé : le corrigé est affiché quand il est
+  rempli, le brut sinon (`field` de chaque entrée de `CATEGORIES`).
+- **Colonnes obligatoires** de BDD : `nom`, `prenom`, `Etablissement`,
+  `perimetre` ; une colonne absente affiche un bandeau explicite au lieu d'un
+  « 0 contact ». `email`, `Fonction`, `numero_de_telephone` et
+  `Role_dans_le_PUI` sont facultatives : absentes, la carte ne les affiche
+  simplement pas. Le téléphone et le rôle PUI, d'abord retirés de BDD, ont été
+  rajoutés sous les mêmes noms : la carte les affiche de nouveau (téléphone, tag
+  « Rôle PUI »).
+- **Colonnes introuvables signalées** : une colonne de visibilité d'Etablissements
+  (`fondateur`, `partenaire`, `ok_pour_apparaitre`) absente provoque une erreur
+  explicite, comme pour BDD, au lieu d'un annuaire vide. Si aucune colonne de
+  libellé d'une table de référence n'existe (ex. `Actions_corrigees` et
+  `Actions`), le bandeau le dit et le filtre correspondant reste vide ; si seule
+  la colonne corrigée manque, le libellé brut est utilisé et la console avertit.
+- **Pas encore utilisée** : `Accepte_apparaitre` (aujourd'hui une formule qui
+  renvoie toujours faux) n'influence pas l'affichage.
+- **Tests** : 99 tests (74 unitaires, 1 règle du projet, 24 dans un vrai
+  navigateur). Le jeu de données `tests/fixtures.mjs` reproduit la structure BDD.
+  Nouveaux : lecture des seules tables de la nouvelle structure, libellé
+  corrigé prioritaire, colonnes obligatoires, facultatives ou introuvables,
+  doublons d'acronymes, interdiction de la colonne du nom de domaine
+  (`tests/rules.test.mjs`).
+
 ## 1.7.2 — Refactor sans changement de comportement
 
 Relecture « dev senior » de l'audit : le code est réorganisé pour se lire et se
