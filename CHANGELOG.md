@@ -100,6 +100,26 @@ ni historique), le widget ne crée aucune table et n'ajoute aucune colonne.
   et que le bandeau reste à la hauteur du titre. Un test vérifie de 280 à 1 440 px que rien ne se
   recouvre ni ne se coupe.
 
+### Écarts avec la maquette
+
+Antoine a demandé que l'implémentation finale soit comme la maquette. Comparée à elle côte à côte,
+à 1 280 et 390 px, la fenêtre de modification, la relecture, les repères, la bande « Mode admin » et
+la confirmation lui sont conformes. Restent les écarts suivants, et leur raison :
+
+- **La zone « Ma présence » de l'en-tête** garde le dessin de l'habillage de la 1.14.0 : le nom, la
+  phrase d'état et l'interrupteur avec son étiquette, sur deux rangées (« Mode admin » dans le coin de
+  la première). La maquette la montrait sur une seule rangée, avec un interrupteur sans texte. L'étiquette
+  dit ce que fait l'interrupteur, ce qu'un lecteur d'écran et une personne qui découvre l'annuaire
+  attendent ; cet en-tête est déjà en ligne.
+- **Sur téléphone, les cartes de la relecture** ont la taille des vraies cartes, un peu plus grandes que
+  sur la maquette (le texte des cartes est agrandi sous 600 px et sur écran tactile, 1.9.1) : la relecture montre exactement ce qu'on verra.
+- **Les polices.** Le widget n'en charge aucune (page de sécurité) : il prend celle du poste, Inter
+  quand elle y est installée. Les largeurs de texte varient donc légèrement d'un poste à l'autre ; les
+  tests de mise en page passent avec une police plus large (DejaVu Sans, celle de la CI).
+- **La photo de profil** (carte « Photo de profil » de la fenêtre, avatar sur les cartes) et **la fiche
+  d'un établissement** (bouton « Modifier » du responsable) de la maquette ne sont pas dans cette version :
+  elles arrivent dans les suivantes.
+
 ### Pour les développeurs
 
 `constants.js` : `fieldsFor(admin)`, champs `admin`, `labelsFrom`, `required`, genre `'email'` et
