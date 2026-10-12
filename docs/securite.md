@@ -1,6 +1,6 @@
 # Sécurité et confidentialité
 
-Cette page répond aux questions qu'on se pose avant de mettre l'annuaire entre les mains d'un public : qu'est-ce que le widget peut lire et faire, où vont les données, quels sont les risques restants et comment les réduire. Elle décrit la **version 1.9.1** ; le chantier d'édition de fiche, qui ajoutera des écritures, obligera à la compléter (voir [Évolutions en cours](#évolutions-en-cours)).
+Cette page répond aux questions qu'on se pose avant de mettre l'annuaire entre les mains d'un public : qu'est-ce que le widget peut lire et faire, où vont les données, quels sont les risques restants et comment les réduire. Elle décrit la **version 1.11.0**, première version où le widget écrit dans le document ; le chantier d'édition de fiche, qui ajoutera d'autres écritures, obligera à la compléter (voir [Évolutions en cours](#évolutions-en-cours)).
 
 Pages liées : [README](../README.md), [documentation développeur](developpeurs.md), [maintenance](maintenance.md), [guide utilisateur](utilisateurs.md).
 
@@ -11,6 +11,7 @@ Pages liées : [README](../README.md), [documentation développeur](developpeurs
 - [Niveau d'accès demandé à Grist](#niveau-daccès-demandé-à-grist)
 - [Risques et protections](#risques-et-protections)
 - [Affichage et droits d'accès](#affichage-et-droits-daccès)
+- [Écritures et règles d'accès](#écritures-et-règles-daccès)
 - [Données dans le dépôt](#données-dans-le-dépôt)
 - [Données personnelles](#données-personnelles)
 - [Recommandations](#recommandations)
@@ -19,40 +20,47 @@ Pages liées : [README](../README.md), [documentation développeur](developpeurs
 
 ## Résumé
 
-| Question | Réponse pour la version 1.9.1 |
+| Question | Réponse pour la version 1.11.0 |
 |---|---|
-| Le widget écrit-il dans le document Grist ? | **Non.** Il n'utilise que la lecture (`fetchTable`) et deux appels d'initialisation (`ready`, `onRecords`) |
+| Le widget écrit-il dans le document Grist ? | **Oui, deux choses seulement.** À chaque chargement, il ajoute puis supprime une ligne de la table-sonde `Annuaire_Sonde` pour savoir qui est connecté (sauf pour un compte Lecteur). Et quand la personne connectée actionne l'interrupteur « Ma présence », il coche ou décoche `Accepte_apparaitre` sur sa propre fiche de `BDD`. Il ne crée ni ne supprime jamais de table, de colonne ni de fiche de `BDD`. Voir [Écritures et règles d'accès](#écritures-et-règles-daccès) |
 | Où vont les données qu'il lit ? | **Nulle part ailleurs que dans la page affichée** : le code n'émet aucune requête réseau, ne stocke rien dans le navigateur (ni cookie, ni stockage local) et ne communique avec aucun service de statistiques |
-| Quelles tables lit-il ? | Celles de [`grist_structure.txt`](../grist_structure.txt) (neuf tables) |
-| Pourquoi demande-t-il l'accès complet (`full`) au document ? | **C'est un choix assumé** : le widget lit plusieurs tables et les fonctionnalités prévues écriront dans le document. Cet accès couvre **tout le document** ; trois garde-fous doivent l'encadrer, à mettre en place ou à vérifier : des règles d'accès Grist, une branche `main` protégée et des tables sensibles hors du document ou protégées (voir [le détail](#niveau-daccès-demandé-à-grist)) |
+| Quelles tables lit-il ? | Celles de [`grist_structure.txt`](../grist_structure.txt) (neuf tables), plus la table-sonde pour savoir qui est connecté. Il ne lit jamais la table `ACL` : seule la formule de la sonde la lit |
+| Pourquoi demande-t-il l'accès complet (`full`) au document ? | **C'est un choix assumé** : le widget lit plusieurs tables et écrit dans le document (la sonde, le consentement), et les fonctionnalités prévues écriront davantage. Cet accès couvre **tout le document** ; trois garde-fous doivent l'encadrer, à mettre en place ou à vérifier : des règles d'accès Grist, une branche `main` protégée et des tables sensibles hors du document ou protégées (voir [le détail](#niveau-daccès-demandé-à-grist)) |
 | Qui peut changer le code qui s'exécute ? | Toute personne qui peut publier sur la branche `main` du dépôt : GitHub Pages sert ce code à tous les documents qui utilisent le widget. **C'est le risque principal**, voir ci-dessous |
-| Les contacts que le widget masque sont-ils protégés ? | **Non.** Masquer un contact est un choix d'affichage, pas un contrôle d'accès. Seules les règles d'accès de Grist protègent une donnée |
+| Les contacts que le widget masque sont-ils protégés ? | **Non.** Masquer un contact, y compris parce que la personne a retiré son accord, est un choix d'affichage, pas un contrôle d'accès ni un effacement. Seules les règles d'accès de Grist protègent une donnée |
+| Une personne peut-elle modifier la fiche d'une autre ? | **Pas par l'interface** : l'interrupteur n'agit que sur les fiches qui portent l'adresse de la personne connectée. Mais c'est un verrou d'interface, que la console du navigateur contourne : seules des règles d'accès Grist l'empêchent vraiment. Elles sont **proposées** dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) (étape 4) mais n'ont **pas été essayées** dans un vrai document : à poser et à tester |
+| L'ouverture du widget laisse-t-elle une trace ? | **Sans doute, dans l'historique du document Grist** : la ligne de la sonde, qui porte l'adresse de la personne, y est créée puis supprimée à chaque ouverture. Qui peut voir cet historique et combien de temps il est conservé n'est pas précisé par la documentation de Grist consultée : voir [Écritures et règles d'accès](#écritures-et-règles-daccès) |
 | Y a-t-il de vraies données dans le dépôt public ? | **Non, à notre connaissance.** Le schéma est réduit et les captures comme le jeu de démonstration sont fictifs. Une recherche d'adresses e-mail et de numéros de téléphone dans tout l'historique (12 octobre 2026) n'a trouvé que des valeurs d'exemple |
 
 ## Ce que le widget lit, écrit et envoie
 
-Vérifié dans le code de la version 1.9.1 :
+Vérifié dans le code de la version 1.11.0 :
 
-- **Lecture.** `loadDirectory()` appelle `docApi.fetchTable()` une fois par table de [`grist_structure.txt`](../grist_structure.txt) à chaque chargement. C'est le seul accès aux données.
-- **Écriture.** Aucun appel d'écriture dans le document (`applyUserActions` ou équivalent) : le widget est en lecture seule.
+- **Lecture.** `loadDirectory()` appelle `docApi.fetchTable()` une fois par table de [`grist_structure.txt`](../grist_structure.txt) à chaque chargement. `readIdentity()` lit en plus la liste des tables (`listTables`) puis la table-sonde, pour savoir qui est connecté.
+- **Écriture.** Deux emplois de `docApi.applyUserActions()`, et deux seulement :
+  1. `identity.js`, à chaque chargement (sauf compte Lecteur, ou table-sonde absente) : `AddRecord` puis `RemoveRecord` dans `Annuaire_Sonde`. La ligne est ajoutée vide : c'est Grist qui y inscrit l'adresse et le droit d'administrateur ;
+  2. `presence.js`, au clic sur l'interrupteur « Ma présence » : un `UpdateRecord` de `BDD` par fiche de la personne, qui ne porte que `Accepte_apparaitre`, le tout en une seule action atomique.
+
+  Le widget ne crée, ne renomme ni ne supprime jamais de table ou de colonne, et ne supprime aucune fiche de `BDD`. `tests/identity.test.mjs` et `tests/presence.test.mjs` vérifient ce que chaque écriture envoie, et `tests/docs.test.mjs` échoue si le code emploie une autre méthode de l'API de Grist que celles qui sont citées sur cette page : `ready`, `onRecords`, `fetchTable`, `listTables` et `applyUserActions`.
 - **Réseau.** Le code du widget ne contient aucun `fetch`, `XMLHttpRequest` ni `sendBeacon`. La page charge seulement ses propres fichiers (GitHub Pages) et le script `grist-plugin-api.js` (voir plus bas). Elle ne charge ni police, ni image, ni bibliothèque externe.
 - **Stockage local.** Aucun usage de `localStorage`, `sessionStorage` ni de cookie.
-- **Journal du navigateur.** La console reçoit des diagnostics (`[GRIST]`, `[REFS]`, `[ETABLISSEMENT]`) et l'erreur brute d'un chargement raté, mais **jamais** un nom, une adresse ou un numéro de contact : seuls les identifiants de ligne Grist des contacts concernés y figurent.
+- **Journal du navigateur.** La console reçoit des diagnostics (`[GRIST]`, `[REFS]`, `[ETABLISSEMENT]`, `[CONSENTEMENT]`, `[IDENTITE]`, `[PRESENCE]`) et l'erreur brute d'un chargement raté, mais **jamais** un nom, une adresse ou un numéro de contact : seuls des nombres et les identifiants de ligne Grist des contacts concernés y figurent. La seule exception est le détail brut d'une erreur renvoyée par Grist, que le widget ne contrôle pas.
 - **Rendu.** Tout texte venu de Grist est inséré avec `textContent`, jamais comme HTML. Un lien `mailto:` n'est créé que pour une adresse simple, sans paramètre ni destinataire supplémentaire.
+- **Adresse de la personne connectée.** Le widget ne la reçoit pas de Grist : il la fait calculer par Grist, par la formule de la table-sonde. L'adresse reste dans la page le temps de la session, sans être journalisée ni envoyée ailleurs. Elle reste en revanche dans l'historique du document (voir [Écritures et règles d'accès](#écritures-et-règles-daccès)).
 
 ## Niveau d'accès demandé à Grist
 
 Le widget demande l'accès **`full`** (accès complet au document), à deux endroits : `grist.ready({ requiredAccess: 'full' })` dans `main.js` et `accessLevel: full` dans [`manifest.yml`](../manifest.yml). Ce niveau a été constaté dans le panneau d'accès du widget dans Grist lors d'un audit.
 
-**Un choix assumé, pas un défaut à corriger.** Le propriétaire du dépôt a choisi cet accès, pour deux raisons. D'une part, le widget lit plusieurs tables : le niveau `read table` ne donne accès qu'à la table liée à la section du widget, or il lit aussi les tables de référence (actions, instances, établissements…). D'autre part, les fonctionnalités prévues, à commencer par l'édition de profil, écriront dans le document. L'enjeu n'est donc pas de réduire cet accès mais de l'entourer de garde-fous.
+**Un choix assumé, pas un défaut à corriger.** Le propriétaire du dépôt a choisi cet accès, pour deux raisons. D'une part, le widget lit plusieurs tables : le niveau `read table` ne donne accès qu'à la table liée à la section du widget, or il lit aussi les tables de référence (actions, instances, établissements…). D'autre part, le widget écrit dans le document (la sonde et le consentement, depuis la 1.11.0) et les fonctionnalités prévues, à commencer par l'édition de fiche, y écriront davantage. L'enjeu n'est donc pas de réduire cet accès mais de l'entourer de garde-fous.
 
-**Ce que cela signifie.** Selon [la documentation de Grist sur les widgets personnalisés](https://grist-docs.beta.numerique.gouv.fr/widget-custom/), un widget en accès complet peut lire tout le document, le transmettre à un tiers et le modifier de n'importe quelle manière. Grist demande donc que la page du widget soit possédée et contrôlée par une personne de confiance. Le widget actuel n'en fait rien (voir ci-dessus), mais **c'est la confiance dans le code publié qui protège le document**, pas une limite technique.
+**Ce que cela signifie.** Selon [la documentation de Grist sur les widgets personnalisés](https://grist-docs.beta.numerique.gouv.fr/widget-custom/), un widget en accès complet peut lire tout le document, le transmettre à un tiers et le modifier de n'importe quelle manière. Grist demande donc que la page du widget soit possédée et contrôlée par une personne de confiance. Le widget actuel n'envoie rien à un tiers et n'écrit que ce qui est décrit ci-dessus, mais **c'est la confiance dans le code publié qui protège le document**, pas une limite technique.
 
 **Les trois garde-fous.** Ils se complètent et aucun ne remplace les autres. Leur mise en œuvre est détaillée dans les [Recommandations](#recommandations).
 
 | Garde-fou | Ce qu'il protège | Où le régler |
 |---|---|---|
-| **Règles d'accès Grist (ACL)**, appliquées par le serveur | Les données elles-mêmes : qui peut lire ou modifier quoi, côté serveur (comportement à vérifier avec un widget en accès complet : voir [Affichage et droits d'accès](#affichage-et-droits-daccès)) | Grist, document de l'annuaire |
+| **Règles d'accès Grist (ACL)**, appliquées par le serveur | Les données elles-mêmes : qui peut lire ou modifier quoi, côté serveur (comportement à vérifier avec un widget en accès complet : voir [Écritures et règles d'accès](#écritures-et-règles-daccès)) | Grist, document de l'annuaire |
 | **Branche `main` protégée**, authentification à deux facteurs | Le code qui s'exécute avec cet accès : GitHub Pages sert `main` tel quel | GitHub, dépôt |
 | **Tables sensibles hors du document, ou protégées** | Les données sans rapport avec l'annuaire que l'accès complet rend atteignables : des tables du document source qui ne concernent pas l'annuaire, dont certaines sensibles | Grist |
 
@@ -67,9 +75,11 @@ Le widget demande l'accès **`full`** (accès complet au document), à deux endr
 | **Script tiers** : `index.html` charge `grist-plugin-api.js` depuis `docs.getgrist.com`, sans version figée | Aucune | Le charger depuis l'instance Grist utilisée, à valider dans un vrai document |
 | **Injection de contenu** (une donnée Grist contenant du HTML ou un script) | `textContent` partout, aucun `innerHTML` alimenté par une donnée ; scénario de test avec un prénom piégé | Rien à faire |
 | **Lien `mailto:` piégé** (`?cc=`, `bcc`, plusieurs destinataires) | `mailtoHref()` n'accepte qu'une adresse simple, le reste s'affiche en texte ; testé | Rien à faire |
-| **Fuite par la console** (diagnostics partagés lors d'une démonstration) | Seuls les identifiants de ligne sont journalisés ; testé | Rien à faire |
-| **Affichage d'un contact qui ne devrait pas l'être** | Logique « fermée » : établissement inconnu, non validé ou « autres » = contact masqué (en cas de doublon d'acronyme transmis en texte, le statut le plus strict l'emporte) ; règles testées | Rien à faire |
-| **Écriture involontaire dans le document** | Le code n'appelle aucune méthode d'écriture | Quand les écritures arriveront : règles d'accès Grist côté serveur, et revue à part de tout ajout d'écriture (voir [Évolutions en cours](#évolutions-en-cours)) |
+| **Fuite par la console** (diagnostics partagés lors d'une démonstration) | Seuls des nombres et des identifiants de ligne sont journalisés, jamais une adresse ni un nom ; testé pour l'identité (`tests/identity.test.mjs`) et le consentement (`tests/load-directory.test.mjs`) | Rien à faire |
+| **Affichage d'un contact qui ne devrait pas l'être** | Logique « fermée » : établissement inconnu, non validé ou « autres » = contact masqué (en cas de doublon d'acronyme transmis en texte, le statut le plus strict l'emporte) ; personne qui n'a pas accepté d'apparaître = masquée, seul `true` valant accord ; colonne de consentement absente = erreur et aucune carte, jamais l'annuaire de tout le monde ; règles testées | Rien à faire |
+| **Écriture involontaire ou détournée dans le document** | Le widget n'écrit que deux choses (la ligne de la sonde, `Accepte_apparaitre` sur les fiches de la personne connectée), en une seule action atomique pour la seconde, jamais en tâche de fond ; une écriture refusée par Grist ne change rien ; testé. Aucune autre méthode d'écriture n'est employée (`tests/docs.test.mjs`) | Règles d'accès Grist côté serveur (voir [Écritures et règles d'accès](#écritures-et-règles-daccès)) : sans elles, quiconque peut modifier le document peut écrire n'importe quoi depuis la console. Revue à part de tout ajout d'écriture (voir [Évolutions en cours](#évolutions-en-cours)) |
+| **Fiche d'un tiers modifiée** : quelqu'un contourne l'interface (console du navigateur) pour écrire sur la fiche d'une autre personne | L'interrupteur n'agit que sur les fiches qui portent l'adresse de la personne connectée. C'est un verrou d'interface, pas une barrière | Règle d'accès sur `BDD.Accepte_apparaitre` qui n'autorise la modification que sur sa propre fiche (`GRIST_SETUP.md`, étape 4), **à tester sur une copie du document** |
+| **Trace des consultations** : chaque ouverture du widget laisse sans doute dans l'historique du document la création puis la suppression d'une ligne de la sonde, qui porte l'adresse de la personne | Aucune : c'est le prix de l'identification de la personne connectée | Vérifier qui peut voir l'historique de Grist (onglet Activité) et combien de temps il est conservé, puis en tenir compte dans l'information des personnes (voir [Données personnelles](#données-personnelles)) |
 | **Dépendances** | Aucune à l'exécution. En intégration continue (CI) : Node 22, `playwright@1.64.0` figé, `actions/checkout@v4` et `actions/setup-node@v4` (références par étiquette de version, non épinglées sur un identifiant de commit), droit `contents: read` seulement | Mettre à jour régulièrement (voir [maintenance](maintenance.md#dépendances-et-mises-à-jour)) |
 | **Données réelles dans le dépôt public** | Schéma réduit, données de démonstration fictives, test automatique (voir [Données dans le dépôt](#données-dans-le-dépôt)) | Vigilance à chaque commit |
 
@@ -77,12 +87,30 @@ Le widget demande l'accès **`full`** (accès complet au document), à deux endr
 
 Les règles d'affichage ([guide utilisateur](utilisateurs.md#pourquoi-une-personne-napparaît-elle-pas-)) décident **ce que le widget montre**. Elles ne décident pas **ce qui est lisible** :
 
-- une personne qui a accès au document Grist peut lire les mêmes tables directement dans Grist, y compris les contacts que le widget masque (établissement non validé, « autres », hors périmètre) ;
+- une personne qui a accès au document Grist peut lire les mêmes tables directement dans Grist, y compris les contacts que le widget masque (établissement non validé, « autres », hors périmètre, personne qui n'a pas accepté d'apparaître) ;
 - le widget lui-même lit tout ce que lui ouvre son accès `full`.
 
 Pour qu'une donnée ne soit pas lisible, il faut une **règle d'accès Grist** (ACL) sur le document. La documentation de Grist consultée ne précise pas comment ces règles s'appliquent à un widget en accès complet : **testez ce comportement dans votre instance avant de vous y fier**, par exemple en ouvrant le widget avec un compte aux droits restreints.
 
-**Un verrou dans l'interface ne protège pas.** Cela vaut aussi pour les écritures à venir : un contrôle fait seulement dans le code du widget (par exemple « le bouton n'est visible que pour certaines personnes ») n'arrête que la personne de bonne foi. Quiconque a accès au document peut contourner la page, en écrivant directement dans Grist ou en modifiant la page dans son navigateur. Seules les règles d'accès appliquées par le serveur Grist constituent une vraie barrière, sous réserve de la vérification demandée plus haut.
+**Un verrou dans l'interface ne protège pas.** Cela vaut aussi pour les écritures, celles d'aujourd'hui (« Ma présence ») comme celles à venir : un contrôle fait seulement dans le code du widget (par exemple « l'interrupteur n'agit que sur ma fiche ») n'arrête que la personne de bonne foi. Quiconque a accès au document peut contourner la page, en écrivant directement dans Grist ou en modifiant la page dans son navigateur. Seules les règles d'accès appliquées par le serveur Grist constituent une vraie barrière, sous réserve de la vérification demandée plus haut.
+
+## Écritures et règles d'accès
+
+Depuis la version 1.11.0, le widget écrit dans le document (voir [ce qu'il écrit](#ce-que-le-widget-lit-écrit-et-envoie)). Ce que le code fait pour limiter les dégâts, et ce qu'il ne peut pas garantir :
+
+**Ce que le widget fait pour s'encadrer**
+
+- **Dans le doute, il n'écrit pas.** Sans table-sonde, si la formule de la sonde ne renvoie aucune adresse, si Grist refuse l'écriture ou la relecture de la sonde, ou pour un compte Lecteur (le widget n'essaie même pas), personne n'est identifié : pas de bandeau « Ma présence », aucune modification proposée, et l'annuaire s'affiche comme avant.
+- **Il n'écrit que sur les fiches de la personne.** Elle est retrouvée par l'adresse e-mail de sa ligne de `BDD`, sans tenir compte de la casse ni des espaces. Une action atomique par clic : si Grist refuse une des lignes, aucune n'est changée.
+- **Il ne croit que Grist.** L'adresse et le droit d'administrateur viennent de formules que Grist calcule à la création de la ligne de la sonde, que le widget ajoute **vide** : il ne fournit jamais lui-même l'adresse. Une valeur `Admin` autre que `true` exactement n'ouvre aucun droit.
+- **Il montre ce que Grist a enregistré.** Après l'écriture, l'annuaire est relu : l'interrupteur et les cartes reflètent l'état réel, pas ce qu'on espérait. Un refus de Grist (règle d'accès, colonne à formule) devient un message en français, et rien ne change.
+
+**Ce qu'il ne peut pas garantir**
+
+- **Le widget n'est pas une barrière.** Tout ce qui précède se passe dans le navigateur de la personne, qui peut le contourner (console, page modifiée). L'identité que le widget a lue n'est pas une preuve : elle ne sert qu'à décider ce que l'interface propose.
+- **Seules les règles d'accès de Grist arrêtent une écriture indue.** [`GRIST_SETUP.md`](../GRIST_SETUP.md) (étape 4) propose trois règles : création, lecture et suppression des lignes de la sonde pour qui peut modifier le document ; modification de `BDD.Accepte_apparaitre` seulement sur sa propre fiche ; `ACL` masquée à tous sauf aux administrateurs. **Ces règles n'ont pas été essayées dans un vrai document Grist**, et la documentation de Grist consultée ne dit pas comment les règles d'accès s'appliquent aux écritures d'un widget : à tester sur une copie du document, avec un compte aux droits restreints, avant de s'y fier.
+- **Chaque ouverture laisse sans doute une trace.** La ligne de la sonde, créée puis supprimée à chaque ouverture, porte l'adresse e-mail de la personne. Selon la [documentation de Grist sur l'historique du document](https://grist-docs.beta.numerique.gouv.fr/document-history/), l'onglet « Activité » liste les changements récents sous forme d'extraits de tables, et la case « Toutes les tables » (« All tables ») l'étend à tout le document : l'adresse et le moment de l'ouverture devraient donc y figurer, ce qui revient à un journal des consultations. Cette page ne dit ni qui peut voir l'historique ni combien de temps il est conservé : à constater dans un document de test, puis à porter à la connaissance du responsable du traitement. Si une page se ferme entre l'ajout et la suppression, une ligne peut rester dans la sonde : on peut vider la table sans risque.
+- **Le bouton « Annuler » de Grist** défait, selon [`GRIST_SETUP.md`](../GRIST_SETUP.md), le dernier changement fait par le widget, y compris un changement de présence. Ce comportement n'a pas été constaté dans un vrai document.
 
 ## Données dans le dépôt
 
@@ -97,16 +125,18 @@ Le dépôt GitHub est **public**. Il ne doit contenir aucune donnée réelle de 
 
 L'annuaire affiche des données à caractère personnel, d'ordre professionnel : nom, prénom, fonction, établissement, adresse e-mail, téléphone et participations aux instances, actions et groupes de travail (GT). Cette page n'est pas une analyse juridique ; voici les points techniques utiles au responsable du traitement.
 
-- **Verrou de publication.** Dans la version 1.9.1, l'apparition d'un contact dépend de son **établissement** : celui-ci doit l'avoir autorisée (`ok_pour_apparaitre`) et être fondateur ou partenaire. Un consentement individuel de la personne est en préparation (voir [Évolutions en cours](#évolutions-en-cours)).
+- **Verrou de publication.** Depuis la version 1.10.0, un contact n'apparaît que si **deux accords** sont réunis, indépendants l'un de l'autre : celui de son **établissement** (`ok_pour_apparaitre`, fondateur ou partenaire) et celui de la **personne** (`Accepte_apparaitre`, une case à cocher dont seul `true` vaut accord). Depuis la 1.11.0, la personne peut donner ou retirer son accord elle-même avec l'interrupteur « Ma présence ».
+- **Retirer son accord masque, il n'efface pas.** La personne qui décoche l'interrupteur disparaît de l'annuaire, mais ses données restent dans le document Grist, lisibles par celles et ceux qui y ont accès, et dans l'historique de Grist. Le droit d'effacement s'exerce dans Grist, pas dans le widget.
 - **Minimisation.** Le widget n'affiche que les champs prévus par le [cahier des charges](../specs.md). Il lit cependant toutes les colonnes des neuf tables, y compris celles qu'il n'affiche pas, et les garde en mémoire dans le navigateur le temps de la session : seules les règles d'accès Grist peuvent restreindre ce qui est lu.
 - **Pas de copie.** Le widget ne conserve rien dans le navigateur et n'envoie rien à un autre service ; les données demeurent dans Grist, unique lieu où exercer les droits de rectification et d'effacement.
-- **À confirmer par le responsable du traitement** : information des personnes, modalités d'exercice de leurs droits, durée de conservation, liste des personnes ayant accès au document Grist.
+- **Adresse de la personne connectée.** Le widget la fait inscrire par Grist dans la table-sonde pour retrouver sa fiche. Elle reste dans la page le temps de la session et, sans doute, dans l'historique du document (voir [Écritures et règles d'accès](#écritures-et-règles-daccès)) : un journal des ouvertures du widget en est un effet de bord.
+- **À confirmer par le responsable du traitement** : information des personnes (y compris sur cette trace et sur le fait que décocher l'interrupteur masque sans effacer), modalités d'exercice de leurs droits, durée de conservation, liste des personnes ayant accès au document Grist et à son historique.
 
 ## Recommandations
 
 Classées par ordre décroissant de rapport utilité/effort. Ce sont des **propositions**, à décider par le propriétaire du dépôt et par l'administrateur de l'instance Grist. Les trois premières sont les [garde-fous](#niveau-daccès-demandé-à-grist) de l'accès complet.
 
-1. **Poser les règles d'accès Grist (ACL) du document**, au plus tard avant de livrer les écritures de l'édition de profil : qui peut lire quelles tables, qui peut modifier quelles lignes et quelles colonnes. C'est le seul contrôle qui tienne côté serveur. À tester avec un compte aux droits restreints (voir [Affichage et droits d'accès](#affichage-et-droits-daccès)).
+1. **Poser les règles d'accès Grist (ACL) du document**, dès maintenant puisque le widget écrit depuis la 1.11.0, et en tout cas avant l'édition de fiche : qui peut lire quelles tables, qui peut modifier quelles lignes et quelles colonnes (les règles utiles à « Ma présence » sont à l'étape 4 de [`GRIST_SETUP.md`](../GRIST_SETUP.md)). C'est le seul contrôle qui tienne côté serveur. À tester sur une copie du document, avec un compte aux droits restreints (voir [Écritures et règles d'accès](#écritures-et-règles-daccès)).
 2. **Protéger la branche `main` sur GitHub** (elle ne l'est pas au 12 octobre 2026). Au minimum, interdire le force-push et la suppression de la branche ; idéalement, exiger une pull request et une CI verte avant fusion. Activer l'authentification à deux facteurs sur les comptes qui ont un droit d'écriture, et limiter ces droits au strict nécessaire. C'est la protection la plus efficace contre le risque principal.
 3. **Sortir du document les tables sensibles sans rapport avec l'annuaire** ou, à défaut, les protéger par des règles d'accès : l'accès complet du widget les couvre.
 4. **Charger `grist-plugin-api.js` depuis l'instance utilisée** (`grist.numerique.gouv.fr`) plutôt que depuis `docs.getgrist.com`. Cela ne se vérifie que dans un vrai document Grist : à tester avant d'être appliqué.
@@ -120,7 +150,6 @@ Utilisez le signalement privé de vulnérabilités de GitHub (onglet Security du
 
 ## Évolutions en cours
 
-Cette page décrit la version 1.9.1. Deux chantiers la compléteront :
+Cette page décrit la version 1.11.0. Un chantier la complétera :
 
-- **Le consentement individuel** : seules les personnes dont `Accepte_apparaitre` est cochée apparaîtraient, en plus de la validation de leur établissement. C'est un verrou de publication de plus, sans nouvel accès : les paragraphes [Données personnelles](#données-personnelles) et [Affichage et droits d'accès](#affichage-et-droits-daccès) seront à jour à sa fusion.
-- **L'édition de fiche par la personne connectée** donnera au widget des **écritures** dans le document Grist, ce que permet l'accès complet, choisi pour cela. Les modifications s'appliqueront directement, sans validation par un administrateur : aucune étape ne filtrera une écriture avant qu'elle atteigne les données. Ce chantier ajoutera des opérations sensibles à vérifier, et il fera des règles d'accès Grist le vrai point de contrôle (le widget ne pouvant pas, seul, empêcher une écriture). Chaque ligne du tableau [Risques et protections](#risques-et-protections) sera revue à la fusion de ce chantier, avec la procédure de configuration côté Grist.
+- **La modification de sa fiche par la personne connectée** (1.12.0, en préparation) donnera au widget davantage d'**écritures** : la personne modifiera sa propre fiche de `BDD`, après une fenêtre de relecture qui montre sa carte avant et après. Les modifications s'appliqueront directement, sans validation par un administrateur, et sans historique des modifications tenu par le widget : aucune étape ne filtrera une écriture avant qu'elle atteigne les données. Les administrateurs pourront modifier les fiches de tout le monde. Ce chantier fait des règles d'accès Grist le vrai point de contrôle, le widget ne pouvant pas, seul, empêcher une écriture : chaque ligne du tableau [Risques et protections](#risques-et-protections) sera revue à sa fusion, avec les règles d'accès à poser.

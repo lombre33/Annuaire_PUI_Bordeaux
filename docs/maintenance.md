@@ -1,6 +1,6 @@
 # Maintenance
 
-Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.9.1**.
+Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.11.0**.
 
 Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [documentation développeur](developpeurs.md), [sécurité](securite.md).
 
@@ -24,7 +24,7 @@ Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [do
 
 | Rôle | Responsabilités | Outils |
 |---|---|---|
-| **Administrateur des données** | Contacts, établissements et leur statut, valeurs des listes de filtres, validation des apparitions | Le document Grist |
+| **Administrateur des données** | Contacts, établissements et leur statut (dont la validation `ok_pour_apparaitre`), valeurs des listes de filtres, administrateurs de l'annuaire (table `ACL`), réglages de « Ma présence » ([`GRIST_SETUP.md`](../GRIST_SETUP.md)), règles d'accès | Le document Grist |
 | **Mainteneur du code** | Widget, tests, publication, documentation | GitHub, `node --test` |
 
 Le dépôt est celui du compte GitHub `lombre33` : <https://github.com/lombre33/Annuaire_PUI_Bordeaux>.
@@ -39,22 +39,30 @@ Une personne n'est affichée que si **toutes** les conditions suivantes sont vra
 |---|---|---|
 | Un nom ou un prénom | Colonnes `nom` et `prenom` de la table `BDD` | La ligne est ignorée |
 | Au moins un périmètre | Colonne `perimetre` de `BDD` (liste de références) | Contact masqué |
+| **L'accord de la personne** | Case `Accepte_apparaitre` de sa ligne de `BDD` : elle la coche elle-même avec « Ma présence », ou un administrateur dans Grist, avec son accord | Contact masqué. Une case vide ou décochée n'est pas un accord. La console indique `[CONSENTEMENT] n/m …` : le nombre de personnes masquées pour cette raison, jamais leurs noms |
 | Un établissement | Colonne `Etablissement` de `BDD` : une référence vers une ligne d'`Etablissements`, qui ne doit pas être vide | Contact masqué. Si la colonne est vide, la console le signale (`[ETABLISSEMENT]`) ; si elle désigne une ligne qui n'existe plus, rien n'est signalé |
 | Établissement validé | Case `ok_pour_apparaitre` de la ligne d'`Etablissements` | Contacts de l'établissement masqués |
 | Établissement fondateur ou partenaire | Cases `fondateur` et `partenaire` | Un établissement ni fondateur ni partenaire (« autres ») n'est jamais affiché ; la case `autres` elle-même n'est pas lue |
 
 Côté écran, les interrupteurs **Fondateurs** et **Partenaires** affinent ensuite l'affichage ([guide utilisateur](utilisateurs.md#fondateurs-et-partenaires)). Le schéma complet des règles est dans la [documentation développeur](developpeurs.md#règles-daffichage).
 
-Deux précisions sur la version 1.9.1 :
+Trois précisions sur la version 1.11.0 :
 
 - L'établissement vient de la référence `Etablissement`, résolue par identifiant de ligne. L'ancienne colonne calculée `Etablissement2` n'est plus utilisée depuis la 1.8.0, et deux lignes d'`Etablissements` de même acronyme ne se confondent plus.
-- La colonne `Accepte_apparaitre` de `BDD` (le consentement individuel de la personne) **n'est pas encore lue** : la cocher ou non ne change rien à l'affichage pour l'instant (voir [Chantiers en cours](developpeurs.md#chantiers-en-cours)).
+- **Les deux accords sont indépendants.** Valider un établissement (`ok_pour_apparaitre`) ne fait pas apparaître une personne qui n'a pas accepté, et une personne qui a accepté n'apparaît pas tant que son établissement n'est pas validé. Seul « coché » vaut accord.
+- La colonne `Accepte_apparaitre` est **obligatoire** : si elle manque, le widget affiche une erreur et aucune carte (jamais l'annuaire de tout le monde). Elle doit être une colonne de **données** (case à cocher), pas une formule, sans quoi Grist refuse que la personne la modifie ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 1). Si **personne** n'a accepté, un bandeau le dit ; que quelques personnes aient refusé n'est pas une anomalie, et aucun bandeau ne le signale.
 
 ## Opérations courantes dans Grist
 
 Les noms de tables et de colonnes sont ceux de [`grist_structure.txt`](../grist_structure.txt).
 
-**Ajouter une personne.** Renseigner le nom, le prénom, l'établissement (en choisissant sa ligne dans la colonne `Etablissement`), au moins un périmètre, puis ses instances, actions, groupes de travail (GT), communautés, tâches et compétences, qui sont des listes de références. Vérifier que le badge de la carte affiche bien l'établissement attendu (le widget n'utilise pas la colonne `nom_de_domaine`).
+**Ajouter une personne.** Renseigner le nom, le prénom, l'adresse e-mail (elle sert aussi à retrouver la fiche quand la personne utilise « Ma présence »), l'établissement (en choisissant sa ligne dans la colonne `Etablissement`), au moins un périmètre, puis ses instances, actions, groupes de travail (GT), communautés, tâches et compétences, qui sont des listes de références. **Ne cocher `Accepte_apparaitre` qu'avec l'accord de la personne** : sans cette case, elle n'apparaît pas. Vérifier que le badge de la carte affiche bien l'établissement attendu (le widget n'utilise pas la colonne `nom_de_domaine`).
+
+**Recueillir ou retirer l'accord d'une personne.** C'est la case `Accepte_apparaitre` de sa ligne de `BDD`. La personne peut la cocher ou la décocher elle-même avec l'interrupteur « Apparaître dans l'annuaire » du bandeau « Ma présence », à condition d'être connectée à Grist avec l'adresse de sa fiche et de pouvoir modifier le document. Sinon, un administrateur coche la case dans Grist, **à la demande de la personne ou avec son accord**. Une personne qui a décoché l'interrupteur ne se recoche pas à sa place. Décocher masque la personne sans effacer ses données.
+
+**Désigner un administrateur de l'annuaire.** Dans la table `ACL`, une ligne par personne avec son adresse e-mail et la case `admin` cochée ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 3 ; l'adresse est comparée sans tenir compte de la casse ni des espaces). Dans la version 1.11.0, le widget lit ce droit et le signale dans la console (`administrateur : oui` ou `non`), mais l'interface ne s'en sert pas encore : il est prévu pour modifier les fiches de tout le monde (voir [Chantiers en cours](developpeurs.md#chantiers-en-cours)). Pour retirer un administrateur, décocher `admin` ou supprimer sa ligne.
+
+**Garder la table `Annuaire_Sonde` en l'état.** Elle sert à savoir qui est connecté ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 2). Ne la supprimer ni la renommer, ne pas toucher à ses colonnes `Email` et `Admin` ni à leurs formules de déclenchement : sans elle, plus personne n'est identifié, et l'annuaire s'affiche alors normalement, mais sans bandeau « Ma présence ». Elle est vide au repos ; une ligne restée là parce qu'une page a été fermée au mauvais moment peut être supprimée sans risque.
 
 **Ajouter ou valider un établissement.** Ajouter une ligne dans `Etablissements` avec son acronyme (ou, à défaut, son nom complet : c'est son libellé affiché) et son statut : `fondateur` (l'un des 16 établissements fondateurs du PUI), `partenaire` (un partenaire du PUI) ou `autres` (une structure extérieure au PUI qui a collaboré à certaines tâches : elle n'apparaît jamais dans l'annuaire). Cocher `ok_pour_apparaitre` une fois la validation obtenue : tant qu'elle n'est pas cochée, aucun de ses contacts n'apparaît et l'établissement n'est pas proposé dans le filtre. **Recharger ensuite la page** : Grist ne prévient pas le widget d'un changement dans cette table.
 
@@ -84,25 +92,31 @@ Après chaque changement de données (ajout, modification, import), vérifier le
 
 1. **Le nombre de contacts** affiché en haut à droite correspond à ce qu'on attend.
 2. **Chaque carte a sa pastille d'établissement** (colonne `Etablissement` correctement remplie).
-3. **La console du navigateur** (F12), sur les lignes `[GRIST] Enregistrements reçus: N (contacts affichables : M)` et `[ETABLISSEMENT] …` : N est le nombre de lignes de la table, M celui des cartes possibles, et un message `[ETABLISSEMENT]` liste (vingt au plus) les identifiants de ligne des contacts qui ont un périmètre mais pas d'établissement. Un écart entre N et M peut aussi venir d'un établissement non validé, d'un statut « autres » ou d'une référence qui ne désigne plus aucune ligne : ces cas-là ne sont pas détaillés.
+3. **La console du navigateur** (F12), sur les lignes `[GRIST] Enregistrements reçus: N (contacts affichables : M)` et `[ETABLISSEMENT] …` : N est le nombre de lignes de la table, M celui des cartes possibles, et un message `[ETABLISSEMENT]` liste (vingt au plus) les identifiants de ligne des contacts qui ont un périmètre mais pas d'établissement. Un écart entre N et M peut venir de personnes qui n'ont pas accepté d'apparaître (la ligne `[CONSENTEMENT] n/m …` en donne le nombre), d'un établissement non validé, d'un statut « autres » ou d'une référence qui ne désigne plus aucune ligne : ces derniers cas ne sont pas détaillés.
 4. **Aucun bandeau rouge** sous la barre d'outils.
 5. **Le filtre Domaines** : si l'option « Autres » apparaît, des compétences n'ont pas de domaine (voir [Opérations courantes](#opérations-courantes-dans-grist)).
+6. **« Ma présence »** : ouvert avec son propre compte (dont l'adresse figure dans `BDD.email`), le widget affiche le bandeau, la console dit `[IDENTITE] personne identifiée …` et la table `Annuaire_Sonde` est vide.
 
 ## Diagnostiquer un problème
 
-La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[REFS]` (entrées par catégorie de filtre, lectures échouées, compétences sans domaine), `[ETABLISSEMENT]` (contacts sans établissement).
+La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[REFS]` (entrées par catégorie de filtre, lectures échouées, compétences sans domaine), `[ETABLISSEMENT]` (contacts sans établissement), `[CONSENTEMENT]` (personnes masquées faute d'accord), `[IDENTITE]` (pourquoi la personne connectée n'est pas identifiée) et `[PRESENCE]` (écriture refusée). Aucune de ces lignes ne contient de nom ni d'adresse, hormis le message brut d'une erreur renvoyée par Grist.
 
 | Symptôme | Cause probable | Que faire |
 |---|---|---|
 | Bandeau « Impossible de charger l'annuaire depuis Grist (table “X” illisible) » | La table X a été renommée, supprimée ou n'est plus accessible | Vérifier son nom dans Grist, puis recharger la page |
-| Bandeau « Impossible de charger l'annuaire depuis Grist (colonne “X” absente de la table BDD) » (ou de la table `Etablissements`) | Une colonne obligatoire a été renommée ou supprimée : `nom`, `prenom`, `Etablissement` ou `perimetre` dans `BDD` ; `fondateur`, `partenaire` ou `ok_pour_apparaitre` dans `Etablissements` | La rétablir sous son nom exact, puis recharger |
+| Bandeau « Impossible de charger l'annuaire depuis Grist (colonne “X” absente de la table BDD) » (ou de la table `Etablissements`) | Une colonne obligatoire a été renommée ou supprimée : `nom`, `prenom`, `Etablissement`, `perimetre` ou `Accepte_apparaitre` dans `BDD` ; `fondateur`, `partenaire` ou `ok_pour_apparaitre` dans `Etablissements` | La rétablir sous son nom exact, puis recharger |
 | Bandeau « Tables illisibles (X) : des libellés ou des tags peuvent manquer » | Même cause pour une table de référence : les cartes restent, avec les libellés du chargement précédent s'il y en a un (sinon, le filtre et les tags concernés restent vides) | Corriger la table, recharger |
 | Bandeau « Colonne de libellé introuvable : T (A ou B) … » | Aucune des colonnes de libellé de la table T n'existe plus : les tags et le filtre correspondants restent vides. Si seule la colonne corrigée manque, le libellé brut est utilisé et seule la console avertit | Rétablir la colonne (voir le tableau des libellés dans [Opérations courantes](#opérations-courantes-dans-grist)), puis recharger |
 | Bandeau « Acronymes en double dans Etablissements (X) … » | Cas rare : deux lignes de même acronyme, statuts différents, avec un établissement transmis sous forme de texte. Le statut le plus strict est retenu : les contacts sont masqués s'il ne les rend plus éligibles | Supprimer le doublon ou harmoniser ses statuts |
 | Bandeau « perimetre est vide pour tous les contacts… » | La colonne `perimetre` ne contient plus rien | Vérifier la colonne dans Grist |
 | Bandeau « Etablissement est vide pour tous les contacts… » | La colonne `Etablissement` est vide partout | Vérifier la colonne dans Grist |
+| Bandeau « Personne n'a accepté d'apparaître : Accepte_apparaitre n'est coché pour aucun contact… » | La case n'est cochée pour personne : colonne recréée, import, ou colonne devenue une formule | Cocher la case des personnes qui ont accepté ; vérifier que c'est une colonne de données ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 1) |
 | Bandeau « Aucun contact affichable alors que la table … contient des lignes… » | Aucune ligne ne remplit toutes les conditions | Reprendre le tableau [Pourquoi un contact est visible ou non](#pourquoi-un-contact-est-visible-ou-non) |
-| Une personne manque | Une condition n'est pas remplie, ou un interrupteur est désactivé | Même tableau ; vérifier aussi Fondateurs et Partenaires |
+| Une personne manque | Une condition n'est pas remplie (dont l'accord de la personne), ou un interrupteur est désactivé | Même tableau ; vérifier aussi Fondateurs et Partenaires. La personne peut ouvrir « Ma présence » : son bandeau lui dit pourquoi |
+| Une personne ne voit pas le bandeau « Ma présence » | Elle n'est pas identifiée : table `Annuaire_Sonde` absente ou mal réglée, formule muette, compte Lecteur, écriture refusée par une règle d'accès, ou son adresse ne figure dans aucune ligne de `BDD.email` | Lire la ligne `[IDENTITE] …` de sa console : elle dit laquelle ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étapes 2 et 4) |
+| Message « Grist a refusé la modification… » sous le bandeau | Une règle d'accès interdit à cette personne de modifier sa case | Revoir la règle ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 4), ou cocher la case dans Grist à sa place, avec son accord |
+| Message « La colonne Accepte_apparaitre est une colonne à formule… » | La colonne n'est pas une colonne de données | La convertir ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 1) |
+| La table `Annuaire_Sonde` contient des lignes | Une page a été fermée entre l'ajout et la suppression de la ligne | Vider la table, sans risque |
 | Une carte n'a pas de pastille d'établissement | Ne devrait pas arriver : un contact sans établissement reconnu est masqué | Lire les lignes `[ETABLISSEMENT]` de la console |
 | Une section de tags manque sur une carte | La valeur liée n'a pas de libellé dans sa table de référence | Console : `[REFS] clé (Table): n entrées (k ligne(s) sans …)` ; renseigner le libellé |
 | Le filtre Domaines est vide, ou ne propose que « Autres » | La colonne `Macro_competences` n'existe plus (bandeau « Colonne de libellé introuvable »), ou aucune compétence n'a de domaine | Rétablir la colonne, ou renseigner les domaines, puis recharger |
@@ -167,6 +181,7 @@ L'annuaire n'a ni serveur ni base de données à lui : il tient à des comptes q
 |---|---|---|---|
 | **Les données** | Le document Grist, sur l'instance de l'État (`grist.numerique.gouv.fr`) | Les propriétaires du document, de son espace de travail et du site qui les contient : les accès se transmettent du site à l'espace de travail, puis au document | Le widget affiche toujours les données du document, mais personne ne peut plus les corriger, ni changer le partage ou les règles d'accès, réservés aux propriétaires. La documentation de Grist ne dit pas comment reprendre la main : ne pas y compter |
 | **Le code** | Le dépôt GitHub `lombre33/Annuaire_PUI_Bordeaux` | Son seul propriétaire, le compte personnel `lombre33` | Le widget continue de fonctionner, mais rien ne peut plus être corrigé ni publié. Si le compte est supprimé, GitHub supprime ses dépôts et ses sites Pages, donc le widget, et ne peut pas les restaurer |
+| **Les réglages de « Ma présence »** | Le document Grist : table `Annuaire_Sonde` et ses formules, colonne de données `Accepte_apparaitre`, table `ACL`, règles d'accès | Les propriétaires du document | Sans la sonde ou sans `ACL`, plus personne n'est identifié : l'annuaire s'affiche normalement, mais sans bandeau ni modification (le widget échoue en sécurité). Les formules ne se recréent pas seules : la marche à suivre est dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) |
 | **L'adresse du widget** | GitHub Pages, saisie dans « Enter Custom URL » du widget de chaque page Grist | Le même compte | Renommer ou transférer le dépôt change l'adresse du site **sans redirection** : à la place de l'annuaire, Grist affiche une erreur ou une zone vide, tant que l'adresse n'est pas corrigée dans chaque page |
 | **Le script de l'API Grist** | `docs.getgrist.com`, chargé par `index.html` | Grist | Sans lui, la page affiche « 0 contact » sans bandeau d'explication ; le détail est dans la console du navigateur |
 | **La connaissance** | Cette documentation, `grist_structure.txt`, `specs.md`, les tests | Quiconque peut écrire dans le dépôt | Elle se périme : `tests/docs.test.mjs` signale une partie des oublis, pas tous |
@@ -179,6 +194,8 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 |---|---|---|
 | Une personne de l'annuaire quitte le PUI ou change de structure | Sa carte reste affichée avec des coordonnées périmées : le widget ne sait rien des départs | La retirer sans attendre ([Quand quelqu'un part](#quand-quelquun-part)) |
 | L'administrateur des données part | Plus personne pour valider un établissement, ajouter une valeur de filtre ou corriger une fiche : l'annuaire se fige | Lui faire transmettre le rôle avant son départ ; avoir un suppléant |
+| Un administrateur de l'annuaire part sans que sa ligne d'`ACL` soit retirée | Son droit d'administrateur (case `admin`) subsiste tant que la ligne existe et qu'il garde son adresse | Décocher `admin` ou supprimer sa ligne dans `ACL` ([Quand quelqu'un part](#quand-quelquun-part)) |
+| La table `Annuaire_Sonde`, ses formules ou `ACL` sont supprimées ou renommées | Plus personne n'est identifié : pas de bandeau « Ma présence », plus d'administrateur reconnu. Les cartes s'affichent comme avant | Recréer la table d'après [`GRIST_SETUP.md`](../GRIST_SETUP.md), étapes 2 et 3 |
 | Le seul propriétaire du document Grist n'a plus accès à son compte | Plus personne ne peut gérer le partage ni les règles d'accès | Prévenir : au moins deux propriétaires. Sinon, demander de l'aide à l'équipe qui gère l'instance Grist, sans garantie de réponse |
 | Le compte GitHub propriétaire est inaccessible ou supprimé | Inaccessible : le widget fonctionne, mais aucune correction ni publication n'est possible. Supprimé : le dépôt, donc le widget, disparaît | Dépôt dans une organisation à deux propriétaires, copie de secours ([Reprendre l'annuaire sans son créateur](#reprendre-lannuaire-sans-son-créateur)) |
 | Le dépôt est renommé ou transféré | L'adresse du widget change, sans redirection | Corriger l'adresse dans chaque page Grist |
@@ -189,7 +206,7 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 ### Ce qu'il faut prévoir
 
 1. **Au moins deux propriétaires du document Grist**, nommés, de préférence dans des services différents. Un propriétaire ne peut pas modifier son propre accès : c'est un autre propriétaire qui le retire quand la personne part, ce qui suppose d'en avoir deux. Penser aussi à l'espace de travail et au site qui contiennent le document : leurs accès se transmettent au document.
-2. **Un administrateur des données et un suppléant**, qui savent tous deux ajouter une personne, valider un établissement et ajouter une valeur de filtre ([Opérations courantes](#opérations-courantes-dans-grist)).
+2. **Un administrateur des données et un suppléant**, qui savent tous deux ajouter une personne, valider un établissement, ajouter une valeur de filtre et désigner un administrateur de l'annuaire ([Opérations courantes](#opérations-courantes-dans-grist)).
 3. **Le dépôt dans une organisation GitHub** avec deux propriétaires au moins. GitHub le recommande : avec un seul propriétaire injoignable, les projets de l'organisation peuvent devenir inaccessibles. Un dépôt personnel n'a qu'un propriétaire ; ses collaborateurs peuvent pousser du code, mais ni supprimer le dépôt, ni changer sa visibilité, ni inviter d'autres personnes. Le transfert change l'adresse de GitHub Pages : le faire une fois, à un moment choisi, corriger l'adresse dans chaque page Grist, puis faire le [contrôle](#contrôle-après-un-changement-de-données). À défaut d'organisation, GitHub permet de désigner un **successeur** du compte personnel (réglages du compte, « Successor settings »).
 4. **Des sauvegardes hors de Grist.** Grist garde lui-même des instantanés du document (d'après sa documentation : horaires pendant environ un jour, mensuels pendant plus d'un an, à vérifier sur l'instance utilisée), mais ils disparaissent avec le document s'il est supprimé définitivement. Télécharger régulièrement le document (fichier `.grist`, qui ne contient pas la liste des personnes avec qui il est partagé : la noter à part) et ses pièces jointes éventuelles (photos, logos), puis les ranger dans un espace à accès restreint, jamais dans le dépôt public. Une sauvegarde contient des données personnelles : prévoir sa durée de conservation et sa destruction.
 5. **Une copie du code** ailleurs que sur le compte d'origine (un clone ou un fork sur un autre compte ou une autre forge) : supprimer un compte supprime ses dépôts, pas les copies faites ailleurs.
@@ -204,6 +221,7 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 |---|---|---|---|---|
 | Propriétaires du document Grist (et de son espace de travail) | | | | |
 | Administrateur des données | | | | |
+| Administrateurs de l'annuaire (cases `admin` d'`ACL`) et règles d'accès du document | | | | |
 | Mainteneur du code | | | | |
 | Propriétaires de l'organisation GitHub | | | | |
 | Pages Grist qui utilisent le widget, et adresse saisie dans chacune | | | | |
@@ -215,11 +233,13 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 **Administrateur des données**
 
 - Modifier les données **dans le document Grist seulement**, jamais dans une copie qui divergerait ensuite.
-- **Ne pas renommer ni supprimer** une table ou une colonne que le widget lit (elles sont listées dans [`grist_structure.txt`](../grist_structure.txt)) : l'annuaire affiche un bandeau rouge ou perd une information. Pour restructurer, travailler sur une copie du document, puis prévenir le mainteneur. Une règle d'accès Grist peut réserver la modification de la structure aux propriétaires (rubrique « Lock down structure » de la documentation des règles d'accès de Grist).
+- **Ne pas renommer ni supprimer** une table ou une colonne que le widget lit (elles sont listées dans [`grist_structure.txt`](../grist_structure.txt)), ni `Annuaire_Sonde`, ses colonnes `Email` et `Admin` et leurs formules : l'annuaire affiche un bandeau rouge, perd une information ou n'identifie plus personne. Pour restructurer, travailler sur une copie du document, puis prévenir le mainteneur. Une règle d'accès Grist peut réserver la modification de la structure aux propriétaires (rubrique « Lock down structure » de la documentation des règles d'accès de Grist).
 - **Retirer un établissement** en décochant `ok_pour_apparaitre`, pas en supprimant sa ligne : un contact dont l'établissement n'existe plus est masqué sans aucun message.
+- **Respecter le choix des personnes.** Ne cocher `Accepte_apparaitre` qu'avec l'accord de la personne, et ne pas recocher la case d'une personne qui l'a décochée. Décocher masque sans effacer : pour effacer, supprimer la ligne ([Quand quelqu'un part](#quand-quelquun-part)).
+- **Limiter les administrateurs de l'annuaire** (cases `admin` d'`ACL`) au strict nécessaire, et relire cette liste chaque trimestre avec celle des éditeurs du document.
 - Après chaque changement, faire le [contrôle](#contrôle-après-un-changement-de-données) ; après une modification d'une table de référence, **recharger la page**.
-- Donner le rôle **Éditeur** (Editor) à qui doit modifier les données, **Lecteur** (Viewer) aux autres, et **Propriétaire** (Owner) à très peu de personnes. Relire cette liste chaque trimestre.
-- **Vérifier qui a accès au document** : l'annuaire n'est pas mieux protégé que lui ([sécurité](securite.md#affichage-et-droits-daccès)).
+- Donner le rôle **Éditeur** (Editor) à qui doit modifier les données, **Lecteur** (Viewer) aux autres, et **Propriétaire** (Owner) à très peu de personnes. Relire cette liste chaque trimestre. Un compte Lecteur n'a pas de bandeau « Ma présence » : pour qu'une personne gère elle-même son accord, il lui faut le droit de modifier le document, restreint par des règles d'accès à sa seule fiche ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 4, à tester d'abord sur une copie).
+- **Vérifier qui a accès au document** : l'annuaire n'est pas mieux protégé que lui ([sécurité](securite.md#affichage-et-droits-daccès)). Savoir aussi qui peut voir son historique : chaque ouverture du widget par une personne qui peut écrire y laisse sans doute une trace ([sécurité](securite.md#écritures-et-règles-daccès)).
 - **Répondre sans délai** à une personne qui demande à corriger sa fiche ou à disparaître de l'annuaire ([Quand quelqu'un part](#quand-quelquun-part)).
 
 **Mainteneur du code**
@@ -235,14 +255,15 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 
 **Une personne de l'annuaire**
 
-1. Supprimer sa ligne de `BDD`. Les instantanés de Grist permettent de la retrouver pendant un temps. Le consentement individuel (`Accepte_apparaitre`, en préparation : [Chantiers en cours](developpeurs.md#chantiers-en-cours)) permettra de masquer une fiche sans l'effacer.
-2. Si elle a demandé l'effacement de ses données, purger aussi les sauvegardes qui la contiennent, selon la durée de conservation prévue.
+1. Pour la **masquer sans l'effacer**, décocher `Accepte_apparaitre` (la personne peut aussi le faire elle-même avec « Ma présence »). Pour l'**effacer**, supprimer sa ligne de `BDD` : les instantanés de Grist permettent de la retrouver pendant un temps.
+2. Si elle a accès au document Grist, retirer cet accès ; si elle figure dans `ACL`, décocher `admin` ou supprimer sa ligne.
+3. Si elle a demandé l'effacement de ses données, purger aussi les sauvegardes qui la contiennent, selon la durée de conservation prévue.
 
 **Un administrateur des données, un propriétaire ou un mainteneur**
 
-1. **Avant son départ**, ajouter son successeur comme propriétaire du document Grist (et de l'espace de travail et du site si besoin) et de l'organisation GitHub.
+1. **Avant son départ**, ajouter son successeur comme propriétaire du document Grist (et de l'espace de travail et du site si besoin) et de l'organisation GitHub, et, s'il administre l'annuaire, cocher `admin` pour son successeur dans `ACL`.
 2. Faire un **exercice à blanc** avec lui : ouvrir le document, ajouter puis retirer une valeur dans une copie, lancer `node --test`, ouvrir la dernière pull request.
-3. **Faire retirer ses accès** par un autre propriétaire, côté Grist et côté GitHub : on ne peut pas modifier son propre accès.
+3. **Faire retirer ses accès** par un autre propriétaire, côté Grist et côté GitHub : on ne peut pas modifier son propre accès. Retirer aussi sa ligne d'`ACL`.
 4. **Exporter une sauvegarde** du document, avec ses pièces jointes.
 5. **Mettre à jour la fiche de continuité**, et prévenir les personnes qui utilisent l'annuaire si l'administrateur des données change.
 
@@ -252,7 +273,7 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 |---|---|
 | À chaque changement de données | Le [contrôle](#contrôle-après-un-changement-de-données) : compteur, pastilles, bandeau |
 | Chaque mois | Relire la liste des personnes : départs, changements de fonction ou de structure. Ouvrir l'annuaire et vérifier qu'aucun bandeau rouge n'apparaît |
-| Chaque trimestre | Vérifier les propriétaires et les éditeurs du document Grist, et les propriétaires de l'organisation GitHub. Exporter une sauvegarde et la ranger. Vérifier que la dernière exécution de la CI sur `main` est verte et que l'annuaire s'ouvre depuis Grist |
+| Chaque trimestre | Vérifier les propriétaires et les éditeurs du document Grist, les administrateurs de l'annuaire (`ACL`) et les propriétaires de l'organisation GitHub. Vérifier que la table `Annuaire_Sonde` est vide. Exporter une sauvegarde et la ranger. Vérifier que la dernière exécution de la CI sur `main` est verte et que l'annuaire s'ouvre depuis Grist |
 | Chaque année, et à chaque changement d'équipe | Relire la fiche de continuité. **Tester une restauration** : importer la sauvegarde dans un nouveau document et y ouvrir l'annuaire. Relire la durée de conservation des sauvegardes et les [dépendances](#dépendances-et-mises-à-jour) |
 
 ### Reprendre l'annuaire sans son créateur
@@ -275,7 +296,10 @@ Une piste plus durable : le guide de contribution des widgets Grist.Gouv (juille
 - **Script de l'API Grist.** `index.html` charge `grist-plugin-api.js` depuis `docs.getgrist.com`, sans version figée. Le charger depuis l'instance utilisée serait plus cohérent, mais cela ne se vérifie que dans un vrai document Grist : ce changement n'a pas été fait.
 - **Accès `full`, choisi délibérément.** Le widget voit tout le document, pas seulement l'annuaire. C'est un choix assumé, que des garde-fous doivent encadrer ([sécurité](securite.md#niveau-daccès-demandé-à-grist)).
 - **Un domaine se déduit des compétences.** Une personne sans compétence n'a aucun domaine : elle n'apparaît dans aucune option du filtre « Domaines ».
-- **Consentement individuel non lu.** La colonne `Accepte_apparaitre` de `BDD` n'influence pas encore l'affichage (voir [Chantiers en cours](developpeurs.md#chantiers-en-cours)).
+- **« Ma présence » est un verrou d'interface, pas une sécurité.** L'interrupteur n'agit que sur la fiche de la personne connectée, mais la console du navigateur le contourne : seules les règles d'accès de Grist protègent vraiment la case `Accepte_apparaitre` ([sécurité](securite.md#écritures-et-règles-daccès)). Les règles proposées dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) n'ont pas été essayées dans un vrai document : à tester sur une copie.
+- **« Ma présence » suppose des réglages dans Grist** ([`GRIST_SETUP.md`](../GRIST_SETUP.md)) et un compte qui peut modifier le document : un compte Lecteur n'a pas de bandeau. La personne n'est retrouvée que si l'adresse de son compte Grist figure dans `BDD.email` (casse et espaces ignorés) ; si plusieurs lignes portent la même adresse, son choix s'applique à toutes.
+- **Chaque ouverture laisse sans doute une trace dans l'historique du document** (création puis suppression d'une ligne de `Annuaire_Sonde`, avec l'adresse de la personne) ; qui peut la voir et combien de temps elle est conservée sont à vérifier dans l'instance ([sécurité](securite.md#écritures-et-règles-daccès)).
+- **Le droit d'administrateur n'a pas encore d'usage.** Le widget le lit dans `ACL` et le signale dans la console, mais l'interface ne s'en sert pas encore (voir [Chantiers en cours](developpeurs.md#chantiers-en-cours)).
 - **Recherche par nom ou par prénom, pas les deux.** Le champ teste le nom et le prénom séparément : « Élise Marchetti » ne donne aucun résultat, « Élise » ou « Marchetti » trouvent la carte.
 - **Ordre des cartes.** Les cartes s'affichent dans l'ordre où Grist envoie les lignes de `BDD`, sans tri ; seuls les menus de filtre sont triés par ordre alphabétique.
 - **Cas que le bandeau ne signale pas.** Un contact dont l'établissement désigne une ligne qui n'existe plus est masqué sans message, et une colonne facultative supprimée de `BDD` (`email`, `Fonction`, `numero_de_telephone`, `Role_dans_le_PUI`) fait simplement disparaître l'information des cartes. Pour repérer le premier cas, comparer N et M dans la ligne `[GRIST]` de la console.
@@ -291,7 +315,7 @@ Une piste plus durable : le guide de contribution des widgets Grist.Gouv (juille
 | Une règle d'affichage | [`specs.md`](../specs.md), le schéma de la [documentation développeur](developpeurs.md#règles-daffichage), [Pourquoi un contact est visible ou non](#pourquoi-un-contact-est-visible-ou-non), le guide utilisateur, le résumé du [README](../README.md), la ligne « Affichage d'un contact » des [risques](securite.md#risques-et-protections), et le réglage par défaut des interrupteurs Fondateurs et Partenaires |
 | La structure Grist (tables, colonnes) | [`grist_structure.txt`](../grist_structure.txt), `tests/fixtures.mjs`, `docs/demo/donnees-fictives.mjs`, les noms cités dans cette page et dans la documentation développeur |
 | Le code (modules, noms de fonctions) | [Documentation développeur](developpeurs.md) : `tests/docs.test.mjs` signale un nom de fonction cité qui n'existe plus |
-| Les droits ou les écritures du widget | [Sécurité](securite.md), et toutes les mentions de « lecture seule » (README, guide utilisateur, documentation développeur) |
+| Les droits ou les écritures du widget | [Sécurité](securite.md), [`GRIST_SETUP.md`](../GRIST_SETUP.md), et toutes les mentions de ce que le widget écrit (README, guide utilisateur, documentation développeur) : `tests/docs.test.mjs` échoue si une page le dit « en lecture seule » ou si le code emploie une méthode d'écriture que la page de sécurité ne cite pas |
 | Une version | [`CHANGELOG.md`](../CHANGELOG.md), [`VERSION.md`](../VERSION.md), et les mentions de la version courante (rechercher son numéro dans `README.md` et dans `docs/`) |
 | Un message du bandeau d'état | [Guide utilisateur](utilisateurs.md#messages-du-bandeau-rouge), [Diagnostiquer un problème](#diagnostiquer-un-problème), [Fiabilité](developpeurs.md#fiabilité--que-se-passe-t-il-en-cas-de-panne-) |
 | Une version de Node, de Playwright ou d'une action CI | [Dépendances et mises à jour](#dépendances-et-mises-à-jour), [Sécurité](securite.md#risques-et-protections), [Documentation développeur](developpeurs.md#versions-déploiement-et-ci) |
@@ -306,7 +330,6 @@ Non engagées ; à décider par le propriétaire du dépôt.
 - Rattraper les étiquettes de version manquantes : seule `v1.3.1` existe aujourd'hui, alors que l'étape 4 de « Publier » demande d'étiqueter chaque version.
 - Protéger la branche `main` (voir [sécurité](securite.md#recommandations)) et activer les mises à jour automatiques des actions GitHub (Dependabot).
 - Ajouter une licence : le dépôt est public et n'en déclare aucune ; par défaut, tous les droits sont réservés.
-- Fusionner les deux simulateurs de l'API Grist ([documentation développeur](developpeurs.md#données-et-captures-de-démonstration)).
 - Paginer ou charger progressivement les cartes si l'annuaire grossit beaucoup.
 - Compléter le [lexique du PUI](utilisateurs.md#lexique-du-pui) : Instances, Actions, Communautés, Tâches, Rôle PUI et périmètre attendent une définition.
 - Déplacer le dépôt dans une organisation GitHub à deux propriétaires au moins, et choisir une licence (voir [Continuité](#continuité--départs-et-absence-dadministrateur)).

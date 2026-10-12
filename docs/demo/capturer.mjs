@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startDemoServer } from './serveur-demo.mjs';
-import { CARTES_ATTENDUES } from './donnees-fictives.mjs';
+import { CARTES_ATTENDUES, PERSONNES_DEMO } from './donnees-fictives.mjs';
 
 const DOSSIER_IMAGES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'images');
 const LARGEUR = 1440; // un écran de PC : à partir de 1400 px, la mise en page est celle de départ (style.css)
@@ -36,6 +36,14 @@ const attendreCartes = (page, nombre) =>
   page.waitForFunction(attendu => document.querySelectorAll('.contact-card').length === attendu, nombre, { timeout: 10_000 });
 const attendreBandeau = page =>
   page.waitForFunction(() => !document.getElementById('statusBanner').hidden, null, { timeout: 10_000 });
+// Le bandeau « Ma présence » est affiché, dit `extrait` et n'a plus de message
+// passager (« Enregistrement… » après un clic).
+const attendrePresence = (page, extrait) =>
+  page.waitForFunction(attendu => {
+    const bandeau = document.getElementById('accountBar');
+    return !bandeau.hidden && bandeau.querySelector('.account-detail').textContent.includes(attendu)
+      && bandeau.querySelector('.account-status').textContent === '';
+  }, extrait, { timeout: 10_000 });
 const filtre = (page, cle) => page.locator(`.filter[data-filter-key="${cle}"]`);
 
 // Ouvre le menu, coche l'option, puis le referme comme le ferait un utilisateur
@@ -51,10 +59,11 @@ async function cocher(page, cle, libelle) {
 
 const enPleineLargeur = (bas, marge = MARGE) => ({ x: 0, y: 0, width: LARGEUR, height: Math.ceil(bas + marge) });
 
-// ...le bas d'un élément.
-const jusquAu = selecteur => async page =>
+// ...le bas d'un élément (`marge` : espace gardé dessous, MARGE_RANGEE quand un autre
+// bloc suit de près et ne doit pas déborder sur la capture).
+const jusquAu = (selecteur, marge = MARGE) => async page =>
   enPleineLargeur(await page.evaluate(
-    cible => document.querySelector(cible).getBoundingClientRect().bottom, selecteur));
+    cible => document.querySelector(cible).getBoundingClientRect().bottom, selecteur), marge);
 
 // ...le bas de la n-ième rangée de cartes (les cartes d'une rangée ont le même haut).
 const jusquALaRangee = rangees => async page =>
@@ -183,6 +192,32 @@ const SCENES = [
       });
       await attendreBandeau(page);
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+    }
+  },
+  {
+    fichier: 'ma-presence.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquAu('#accountBar', MARGE_RANGEE),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      await attendrePresence(page, 'Vous apparaissez dans l\'annuaire.');
+    }
+  },
+  {
+    // Un clic sur l'interrupteur : la personne disparaît de l'annuaire, le compteur perd une carte.
+    fichier: 'ma-presence-retiree.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquAu('#accountBar', MARGE_RANGEE),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      await attendrePresence(page, 'Vous apparaissez dans l\'annuaire.');
+      await page.click('.presence-switch');
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs - 1);
+      await attendrePresence(page, 'Vous n\'apparaissez pas dans l\'annuaire.');
+    }
+  },
+  {
+    // Accord donné, mais fondateur non validé : la fiche reste masquée, et le bandeau dit pourquoi.
+    fichier: 'ma-presence-masquee.png', requete: `?connecte=${PERSONNES_DEMO.masquee}`, zone: jusquAu('#accountBar', MARGE_RANGEE),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      await attendrePresence(page, 'reste masquée : votre établissement n\'a pas encore été validé');
     }
   },
   {
