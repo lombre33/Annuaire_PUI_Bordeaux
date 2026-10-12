@@ -58,6 +58,14 @@ async function cocher(page, cle, libelle) {
   await page.mouse.click(5, 5);
 }
 
+// Le menu Compétences range ses compétences par domaine : une case par domaine, qui coche
+// toutes ses compétences, et une flèche qui en déplie le détail.
+const domaine = (page, nom) => filtre(page, 'competences').locator(`.filter-group[data-value="${nom}"]`);
+const nomsDesDomaines = page => filtre(page, 'competences').locator('.group-head .option-label').allTextContents();
+// Ce que le menu montre vraiment : une ligne repliée ou masquée n'a plus de boîte à l'écran.
+const visibles = (page, selecteur) => filtre(page, 'competences').locator(selecteur).evaluateAll(lignes =>
+  lignes.filter(ligne => ligne.getClientRects().length > 0).map(ligne => ligne.dataset.value));
+
 // ===== Modifier une fiche =====
 
 // Le brouillon de Camille Rousseau, saisi comme le ferait la personne : une fonction
@@ -206,20 +214,50 @@ const SCENES = [
     preparer: page => attendreCartes(page, CARTES_ATTENDUES.fondateurs)
   },
   {
+    // Un menu à plat : champ de recherche, cases à cocher et, à droite, le nombre de cartes.
     fichier: 'filtre-menu.png', zone: jusquAu('.filter.open .filter-menu'),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
-      await filtre(page, 'macro').locator('.filter-button').click();
+      await filtre(page, 'instances').locator('.filter-button').click();
     }
   },
   {
-    fichier: 'filtre-domaines.png', zone: jusquAu('.filter.open .filter-menu'),
+    // Le menu Compétences, rouvert : « Recherche clinique » est coché en entier, « Santé numérique
+    // et données » en partie (Open science seule) ; ce qui est coché passe devant et le groupe
+    // partiel est déplié.
+    fichier: 'filtre-competences.png', zone: jusquAu('.filter.open .filter-menu'),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
-      await cocher(page, 'macro', 'Recherche clinique');
-      await attendreCartes(page, 2);
-      // Le détail reste filtrable : les compteurs du menu « Compétences » tiennent compte du domaine.
-      await filtre(page, 'competences').locator('.filter-button').click();
+      const menu = filtre(page, 'competences');
+      await menu.locator('.filter-button').click();
+      await domaine(page, 'Recherche clinique').locator('.group-option input').check();
+      const sante = domaine(page, 'Santé numérique et données');
+      await sante.locator('.group-toggle').click();
+      await sante.locator('.filter-option', { hasText: 'Open science' }).locator('input').check();
+      await attendreCartes(page, 3);
+      await page.mouse.click(5, 5);
+      await menu.locator('.filter-button').click();
+      const noms = await nomsDesDomaines(page);
+      exiger(noms[0] === 'Recherche clinique' && noms[1] === 'Santé numérique et données',
+        `les domaines cochés ne passent pas devant : ${noms.join(', ')}`);
+      exiger(await domaine(page, 'Recherche clinique').getAttribute('data-state') === 'all', '« Recherche clinique » n\'est pas coché en entier');
+      exiger(await domaine(page, 'Santé numérique et données').getAttribute('data-state') === 'some', '« Santé numérique et données » n\'est pas coché en partie');
+      exiger((await visibles(page, '.filter-option')).join() === 'Open science,Intelligence artificielle,Santé numérique',
+        'le détail du domaine partiel n\'est pas déplié, la compétence cochée en tête');
+      exiger(await menu.locator('.filter-count').textContent() === '2', 'le bouton ne compte pas un domaine et une compétence');
+    }
+  },
+  {
+    // La recherche du menu trouve un domaine comme une compétence : « sante » donne le domaine
+    // « Santé numérique et données », avec toutes ses compétences.
+    fichier: 'filtre-competences-recherche.png', zone: jusquAu('.filter.open .filter-menu'),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      const menu = filtre(page, 'competences');
+      await menu.locator('.filter-button').click();
+      await menu.locator('.filter-search-input').fill('sante');
+      exiger((await visibles(page, '.filter-group')).join() === 'Santé numérique et données', 'la recherche ne garde pas ce seul domaine');
+      exiger((await visibles(page, '.filter-option')).length === 3, 'la recherche ne montre pas les trois compétences du domaine');
     }
   },
   {

@@ -195,105 +195,384 @@ test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ;
     assert.equal(await page.locator('.filter-count:not([hidden])').count(), 0);
   }));
 
-test('le filtre Compétences propose le libellé corrigé de la table Competences et filtre dessus', { skip }, () =>
-  withWidget({}, async ({ page }) => {
-    await waitForCards(page, 4);
-    const filter = page.locator('.filter[data-filter-key="competences"]');
-    await filter.locator('.filter-button').click();
-    assert.deepEqual(await filter.locator('.option-label').allTextContents(),
-      ['Divers', 'Hématologie', 'Oncologie', 'Pharmacovigilance'], 'libellés corrigés ou bruts, jamais les deux');
-    await filter.locator('.filter-option', { hasText: 'Oncologie' }).locator('input').check();
-    await waitForCards(page, 1);
-    assert.deepEqual(await cardNames(page), ['Ana Martin']);
-  }));
+// ===== Compétences et domaines : un seul menu =====
+// Les domaines (compétences macro) sont les groupes du menu Compétences : une case par
+// domaine, qui coche toutes ses compétences, un bouton qui déplie le détail, et une
+// recherche qui trouve un domaine comme une compétence. Avec ces données (voir
+// fixtures.mjs) : Cancérologie (Oncologie, Hématologie : Ana), Pharmacie (Pharmacovigilance :
+// Bob, partenaire) et Autres (Divers : Gina, la compétence que Macro_competences ne classe pas).
 
-// ===== Compétences macro =====
-
-const macroFilter = page => page.locator('.filter[data-filter-key="macro"]');
+const skillsFilter = page => page.locator('.filter[data-filter-key="competences"]');
+const domain = (page, label) => skillsFilter(page).locator(`.filter-group[data-value="${label}"]`);
+const domainBox = (page, label) => domain(page, label).locator('.group-option input');
+const skill = (page, label) => skillsFilter(page).locator('.filter-option', { hasText: label });
+const openSkills = page => skillsFilter(page).locator('.filter-button').click();
 const optionCounts = filter => filter.locator('.filter-option').evaluateAll(options =>
   Object.fromEntries(options.map(option => [option.querySelector('.option-label').textContent,
     option.querySelector('.option-count').textContent])));
+const domainCounts = page => skillsFilter(page).locator('.group-head').evaluateAll(heads =>
+  Object.fromEntries(heads.map(head => [head.querySelector('.option-label').textContent,
+    head.querySelector('.option-count').textContent])));
+const domainNames = page => skillsFilter(page).locator('.group-head .option-label').allTextContents();
+const visibleDomains = page => skillsFilter(page).locator('.filter-group').evaluateAll(groups =>
+  groups.filter(group => !group.hidden).map(group => group.dataset.value));
+const visibleSkills = page => skillsFilter(page).locator('.filter-option').evaluateAll(options =>
+  options.filter(option => option.getClientRects().length > 0).map(option => option.dataset.value));
+const badge = page => skillsFilter(page).locator('.filter-count');
 
-test('la barre de filtres place « Domaines » (compétences macro) juste avant « Compétences »', { skip }, () =>
+test('le filtre Compétences propose le libellé corrigé de la table Competences et filtre dessus', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    assert.deepEqual(await skillsFilter(page).locator('.filter-option .option-label').allTextContents(),
+      ['Hématologie', 'Oncologie', 'Pharmacovigilance', 'Divers'], 'libellés corrigés ou bruts, jamais les deux');
+    await openSkills(page);
+    await domain(page, 'Cancérologie').locator('.group-toggle').click();
+    await skill(page, 'Oncologie').locator('input').check();
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), ['Ana Martin']);
+  }));
+
+test('la barre de filtres compte sept boutons : « Domaines » n\'a plus le sien, ses domaines rangent le menu Compétences', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await page.locator('.filter-button > span:nth-child(2)').allTextContents(),
-      ['Actions', 'Tâches', 'Communautés', 'GT', 'Domaines', 'Compétences', 'Instances', 'Établissement']);
-    assert.match(await macroFilter(page).locator('.filter-button').getAttribute('title'), /Compétences macro/);
+      ['Actions', 'Tâches', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement']);
+    assert.equal(await page.locator('.filter[data-filter-key="macro"]').count(), 0);
+    assert.match(await skillsFilter(page).locator('.filter-button').getAttribute('title'), /domaine/);
+    assert.equal(await skillsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Domaine ou compétence…');
   }));
 
-test('le menu Domaines propose chaque domaine une fois, avec « Autres » pour les compétences non classées', { skip }, () =>
+test('le menu Compétences range les compétences par domaine, repliés, « Autres » en dernier, avec le nombre de cartes de chacun', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    await macroFilter(page).locator('.filter-button').click();
-    assert.deepEqual(await optionCounts(macroFilter(page)), { Autres: '1', 'Cancérologie': '1', Pharmacie: '0' },
-      '« cancérologie » et « Cancérologie » ne font qu\'un domaine ; Ana compte une fois malgré ses deux compétences ; Bob (Pharmacie) est masqué par défaut');
-    assert.deepEqual(await macroFilter(page).locator('.option-label').allTextContents(), ['Autres', 'Cancérologie', 'Pharmacie']);
+    await openSkills(page);
+    assert.deepEqual(await domainNames(page), ['Cancérologie', 'Pharmacie', 'Autres'],
+      '« cancérologie » et « Cancérologie » ne font qu\'un domaine ; la compétence sans domaine est sous « Autres », en dernier');
+    assert.deepEqual(await domainCounts(page), { Cancérologie: '1', Pharmacie: '0', Autres: '1' },
+      'Ana compte une fois malgré ses deux compétences ; Bob (Pharmacie) est masqué par défaut');
+    assert.deepEqual(await visibleDomains(page), ['Cancérologie', 'Pharmacie', 'Autres']);
+    assert.deepEqual(await visibleSkills(page), [], 'le détail est replié au départ');
+    assert.equal(await page.locator('.group-toggle[aria-expanded="true"]').count(), 0);
+    assert.equal(await skillsFilter(page).locator('.filter-group.open').count(), 0);
+    assert.equal(await skillsFilter(page).locator('.filter-menu').evaluate(menu => getComputedStyle(menu).display), 'block');
   }));
 
-test('cocher un domaine garde les contacts d\'une compétence de ce domaine, et le détail des compétences reste filtrable', { skip }, () =>
+test('déplier un domaine montre ses compétences et leur nombre de cartes, le replier les cache, et le menu reste ouvert', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    await macroFilter(page).locator('.filter-button').click();
-    await macroFilter(page).locator('.filter-option', { hasText: 'Cancérologie' }).locator('input').check();
+    await openSkills(page);
+    const toggle = domain(page, 'Cancérologie').locator('.group-toggle');
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
+    assert.deepEqual(await visibleSkills(page), ['Hématologie', 'Oncologie'], 'celles de ce domaine seulement, dans l\'ordre alphabétique');
+    assert.deepEqual(await optionCounts(domain(page, 'Cancérologie')), { Hématologie: '1', Oncologie: '1' });
+    assert.equal(await skillsFilter(page).evaluate(filter => filter.classList.contains('open')), true, 'cliquer dans le menu ne le referme pas');
+
+    // Deux domaines peuvent être dépliés ensemble.
+    await domain(page, 'Autres').locator('.group-toggle').click();
+    assert.deepEqual(await visibleSkills(page), ['Hématologie', 'Oncologie', 'Divers']);
+
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
+    assert.deepEqual(await visibleSkills(page), ['Divers']);
+    assert.equal(await toggle.getAttribute('aria-controls'), await domain(page, 'Cancérologie').locator('.group-options').getAttribute('id'),
+      'le bouton désigne la liste qu\'il déplie');
+  }));
+
+test('cocher un domaine coche toutes ses compétences : ses cartes, un badge à 1, et la case se décoche d\'un clic', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await openSkills(page);
+    await domainBox(page, 'Cancérologie').check();
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
-    assert.equal(await macroFilter(page).locator('.filter-count').textContent(), '1');
+    assert.equal(await badge(page).textContent(), '1', 'un domaine : « 1 », pas « 2 » comme ses deux compétences');
+    assert.equal(await domainBox(page, 'Cancérologie').isChecked(), true);
+    assert.equal(await domainBox(page, 'Cancérologie').evaluate(box => box.indeterminate), false);
+    assert.equal(await skillsFilter(page).locator('.filter-option input:checked').count(), 2, 'ses deux compétences sont cochées');
+    assert.equal(await skillsFilter(page).evaluate(filter => filter.classList.contains('open')), true);
+    assert.equal(await domain(page, 'Cancérologie').locator('.filter-option.checked').count(), 2);
+    const head = domain(page, 'Cancérologie').locator('.group-head');
+    assert.deepEqual(await head.evaluate(element => [element.classList.contains('checked'), element.classList.contains('partial')]), [true, false], 'le fond d\'un domaine entier est marqué, pas celui d\'un domaine partiel');
 
-    const detail = page.locator('.filter[data-filter-key="competences"]');
-    await detail.locator('.filter-button').click();
-    assert.deepEqual(await optionCounts(detail), { Divers: '0', 'Hématologie': '1', Oncologie: '1', Pharmacovigilance: '0' },
-      'le détail tient compte du domaine coché');
-    await detail.locator('.filter-option', { hasText: 'Hématologie' }).locator('input').check();
-    await waitForCards(page, 1);
-
-    await detail.locator('.filter-option', { hasText: 'Hématologie' }).locator('input').uncheck();
-    await macroFilter(page).locator('.filter-button').click();
-    await macroFilter(page).locator('.filter-option', { hasText: 'Autres' }).locator('input').check();
-    await waitForCards(page, 2);
-    assert.deepEqual(await cardNames(page), ['Ana Martin', 'Gina Bergonié'], 'OU entre les domaines cochés');
+    await domainBox(page, 'Cancérologie').uncheck();
+    await waitForCards(page, 4);
+    assert.equal(await badge(page).isHidden(), true);
+    assert.equal(await skillsFilter(page).locator('.filter-option input:checked').count(), 0);
   }));
 
-test('un domaine et une compétence sans rapport donnent « Aucun contact trouvé » plutôt qu\'un faux résultat', { skip }, () =>
+test('cocher une seule compétence rend la case de son domaine partielle ; un clic sur cette case complète le domaine', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    await macroFilter(page).locator('.filter-button').click();
-    await macroFilter(page).locator('.filter-option', { hasText: 'Autres' }).locator('input').check();
+    await openSkills(page);
+    await domain(page, 'Cancérologie').locator('.group-toggle').click();
+    await skill(page, 'Oncologie').locator('input').check();
     await waitForCards(page, 1);
-    const detail = page.locator('.filter[data-filter-key="competences"]');
-    await detail.locator('.filter-button').click();
-    await detail.locator('.filter-option', { hasText: 'Oncologie' }).locator('input').check();
-    await waitForCards(page, 0);
-    assert.equal(await page.locator('#emptyState').isVisible(), true);
+    assert.equal(await badge(page).textContent(), '1');
+    assert.equal(await domainBox(page, 'Cancérologie').evaluate(box => box.indeterminate), true, 'case partielle');
+    assert.equal(await domainBox(page, 'Cancérologie').isChecked(), false);
+    assert.equal(await domain(page, 'Cancérologie').locator('.group-head').evaluate(head => head.classList.contains('partial')), true);
+
+    await domainBox(page, 'Cancérologie').click(); // une case partielle se complète
+    assert.equal(await domainBox(page, 'Cancérologie').isChecked(), true);
+    assert.equal(await domainBox(page, 'Cancérologie').evaluate(box => box.indeterminate), false);
+    assert.equal(await badge(page).textContent(), '1', 'le domaine entier compte pour 1');
+
+    await skill(page, 'Hématologie').locator('input').uncheck();
+    assert.equal(await domainBox(page, 'Cancérologie').evaluate(box => box.indeterminate), true, 'décocher une compétence rend la case partielle');
+    assert.equal(await badge(page).textContent(), '1', 'une compétence restante');
+    await skill(page, 'Oncologie').locator('input').uncheck();
+    assert.equal(await domainBox(page, 'Cancérologie').evaluate(box => box.indeterminate || box.checked), false);
+    assert.equal(await badge(page).isHidden(), true);
+    await waitForCards(page, 4);
   }));
 
-test('le domaine d\'un partenaire apparaît avec l\'interrupteur Partenaires, et « Réinitialiser » vide le filtre', { skip }, () =>
+test('les domaines et les compétences s\'additionnent (OU) dans le menu, et le tout se cumule (ET) avec les autres filtres', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await openSkills(page);
+    await domainBox(page, 'Autres').check();
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), ['Gina Bergonié']);
+    await domain(page, 'Cancérologie').locator('.group-toggle').click();
+    await skill(page, 'Oncologie').locator('input').check();
+    await waitForCards(page, 2);
+    assert.deepEqual(await cardNames(page), ['Ana Martin', 'Gina Bergonié'], 'OU entre un domaine et une compétence d\'un autre domaine');
+    assert.equal(await badge(page).textContent(), '2');
+
+    await page.mouse.click(5, 5);
+    await page.locator('.contact-card').first().locator('.tag-instances').click(); // Instances : CME, que seule Ana a
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), ['Ana Martin'], 'ET avec un autre filtre');
+  }));
+
+test('les nombres des domaines tiennent compte de l\'interrupteur Partenaires et des autres filtres, pas des compétences cochées', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    assert.deepEqual(await domainCounts(page), { Cancérologie: '1', Pharmacie: '0', Autres: '1' });
+    await page.click('[data-scope="partenaire"]');
+    await waitForCards(page, 5);
+    assert.deepEqual(await domainCounts(page), { Cancérologie: '1', Pharmacie: '1', Autres: '1' }, 'Bob, partenaire, compte pour Pharmacie');
+
+    await openSkills(page);
+    await domainBox(page, 'Pharmacie').check();
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), ['Bob Durand']);
+    assert.deepEqual(await domainCounts(page), { Cancérologie: '1', Pharmacie: '1', Autres: '1' },
+      'cocher Pharmacie ne vide pas le nombre des autres domaines : ce nombre dit ce que donnerait chaque case');
+    assert.deepEqual(await optionCounts(skillsFilter(page)), { Hématologie: '1', Oncologie: '1', Pharmacovigilance: '1', Divers: '1' });
+
+    await page.locator('.contact-card').first().locator('.etablissement-tag').click(); // Établissement : UBM
+    await waitForCards(page, 1);
+    assert.deepEqual(await domainCounts(page), { Cancérologie: '0', Pharmacie: '1', Autres: '0' }, 'un autre filtre s\'applique aux domaines');
+  }));
+
+test('la recherche du menu Compétences trouve un domaine comme une compétence, sans tenir compte des accents ni de la casse', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await openSkills(page);
+    const search = skillsFilter(page).locator('.filter-search-input');
+
+    await search.fill('CANCERO'); // le nom d'un domaine : il garde toutes ses compétences
+    assert.deepEqual(await visibleDomains(page), ['Cancérologie']);
+    assert.deepEqual(await visibleSkills(page), ['Hématologie', 'Oncologie'], 'le domaine trouvé est déplié, avec tout son détail');
+
+    await search.fill('hemato'); // le nom d'une compétence : son domaine la situe, seule elle reste
+    assert.deepEqual(await visibleDomains(page), ['Cancérologie']);
+    assert.deepEqual(await visibleSkills(page), ['Hématologie']);
+
+    await search.fill('divers'); // une compétence du groupe « Autres »
+    assert.deepEqual(await visibleDomains(page), ['Autres']);
+    assert.deepEqual(await visibleSkills(page), ['Divers']);
+
+    await search.fill('zzz');
+    assert.deepEqual(await visibleDomains(page), []);
+
+    await search.fill('');
+    assert.deepEqual(await visibleDomains(page), ['Cancérologie', 'Pharmacie', 'Autres']);
+    assert.deepEqual(await visibleSkills(page), [], 'sans recherche, chaque domaine retrouve son état : tous repliés');
+    assert.equal(await badge(page).isHidden(), true, 'chercher ne coche rien');
+    assert.equal(await cardCount(page), 4);
+  }));
+
+test('pendant une recherche tout est déplié, sans le bouton de dépli ; en l\'effaçant, un domaine déplié à la main le reste', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await openSkills(page);
+    await domain(page, 'Autres').locator('.group-toggle').click(); // déplié à la main
+    const search = skillsFilter(page).locator('.filter-search-input');
+    await search.fill('o');
+    assert.equal(await skillsFilter(page).locator('.filter-menu').evaluate(menu => menu.classList.contains('searching')), true);
+    assert.equal(await domain(page, 'Cancérologie').locator('.group-toggle').isVisible(), false, 'le bouton ne sert plus pendant la recherche');
+    assert.ok((await visibleSkills(page)).includes('Oncologie'), 'un domaine replié s\'ouvre pour montrer ce qui correspond');
+    await search.fill('');
+    assert.deepEqual(await visibleSkills(page), ['Divers'], 'seul le domaine déplié à la main l\'est encore');
+    assert.equal(await domain(page, 'Cancérologie').locator('.group-toggle').isVisible(), true);
+  }));
+
+test('un tag de carte coche la compétence, et à l\'ouverture suivante son domaine passe devant', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     await page.click('[data-scope="partenaire"]');
     await waitForCards(page, 5);
-    await macroFilter(page).locator('.filter-button').click();
-    assert.equal((await optionCounts(macroFilter(page))).Pharmacie, '1');
-    await macroFilter(page).locator('.filter-option', { hasText: 'Pharmacie' }).locator('input').check();
+    await page.locator('.contact-card', { hasText: 'Bob Durand' }).locator('.tag-competences').click();
     await waitForCards(page, 1);
-    assert.deepEqual(await cardNames(page), ['Bob Durand']);
+    assert.equal(await badge(page).textContent(), '1');
+    assert.equal(await domainBox(page, 'Pharmacie').isChecked(), true, 'Pharmacovigilance est la seule compétence de son domaine : le domaine est complet');
 
-    await page.click('#resetFilters');
+    await openSkills(page);
+    assert.deepEqual(await domainNames(page), ['Pharmacie', 'Cancérologie', 'Autres'], 'le domaine qui contient une coche passe devant');
+    assert.equal(await domain(page, 'Pharmacie').evaluate(group => group.classList.contains('open')), false, 'un domaine complet reste replié : sa case dit tout');
+
+    // Une carte qui n'a plus de coche : à l'ouverture suivante, l'ordre d'origine revient.
+    await domainBox(page, 'Pharmacie').uncheck();
     await waitForCards(page, 5);
-    assert.equal(await page.locator('.filter-count:not([hidden])').count(), 0);
+    await page.mouse.click(5, 5);
+    await openSkills(page);
+    assert.deepEqual(await domainNames(page), ['Cancérologie', 'Pharmacie', 'Autres']);
   }));
 
-test('sans colonne Macro_competences : le bandeau le dit, le filtre reste vide et le détail des compétences fonctionne', { skip }, () => {
+test('rien ne bouge pendant qu\'on coche ; à la réouverture, un domaine coché en partie est déplié et ses compétences cochées passent devant', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await openSkills(page);
+    await domain(page, 'Cancérologie').locator('.group-toggle').click();
+    await skill(page, 'Oncologie').locator('input').check();
+    await waitForCards(page, 1);
+    assert.deepEqual(await visibleSkills(page), ['Hématologie', 'Oncologie'], 'la compétence qu\'on vient de cocher reste sous les yeux');
+    assert.deepEqual(await domainNames(page), ['Cancérologie', 'Pharmacie', 'Autres']);
+
+    await domainBox(page, 'Autres').check(); // un domaine complet
+    await domain(page, 'Cancérologie').locator('.group-toggle').click(); // replié à la main
+    await page.mouse.click(5, 5);
+    assert.equal(await skillsFilter(page).evaluate(filter => filter.classList.contains('open')), false, 'un clic dehors referme le menu');
+
+    await openSkills(page);
+    assert.equal(await domain(page, 'Cancérologie').locator('.group-toggle').getAttribute('aria-expanded'), 'true', 'coché en partie : déplié pour montrer lesquelles');
+    assert.deepEqual(await visibleSkills(page), ['Oncologie', 'Hématologie'], 'la compétence cochée passe devant l\'autre');
+    assert.equal(await domain(page, 'Autres').locator('.group-toggle').getAttribute('aria-expanded'), 'false', 'un domaine complet reste replié');
+    assert.deepEqual(await domainNames(page), ['Cancérologie', 'Autres', 'Pharmacie'], 'les domaines cochés d\'abord, chacun à sa place d\'origine');
+  }));
+
+test('une compétence décochée retrouve sa place alphabétique à la réouverture suivante, comme dans les autres menus', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await openSkills(page);
+    await domain(page, 'Cancérologie').locator('.group-toggle').click();
+    assert.deepEqual(await visibleSkills(page), ['Hématologie', 'Oncologie']);
+    await skill(page, 'Oncologie').locator('input').check();
+    await page.mouse.click(5, 5);
+    await openSkills(page);
+    assert.deepEqual(await visibleSkills(page), ['Oncologie', 'Hématologie'], 'cochée : en tête');
+
+    await skill(page, 'Oncologie').locator('input').uncheck();
+    assert.deepEqual(await visibleSkills(page), ['Oncologie', 'Hématologie'], 'rien ne bouge pendant qu\'on décoche');
+    await page.mouse.click(5, 5);
+    await openSkills(page);
+    assert.deepEqual(await visibleSkills(page), ['Hématologie', 'Oncologie'], 'décochée : de retour à sa place alphabétique');
+    assert.deepEqual(await domainNames(page), ['Cancérologie', 'Pharmacie', 'Autres']);
+  }));
+
+test('Réinitialiser décoche les domaines, referme le détail et vide la recherche du menu', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await openSkills(page);
+    await domainBox(page, 'Cancérologie').check();
+    await domain(page, 'Cancérologie').locator('.group-toggle').click();
+    await skillsFilter(page).locator('.filter-search-input').fill('onco');
+    await waitForCards(page, 1);
+
+    await page.click('#resetFilters');
+    await waitForCards(page, 4);
+    assert.equal(await badge(page).isHidden(), true);
+    assert.equal(await skillsFilter(page).locator('.filter-search-input').inputValue(), '');
+    await openSkills(page);
+    assert.deepEqual(await visibleDomains(page), ['Cancérologie', 'Pharmacie', 'Autres']);
+    assert.deepEqual(await visibleSkills(page), [], 'tous les domaines sont repliés');
+    assert.equal(await skillsFilter(page).locator('input:checked, input:indeterminate').count(), 0);
+  }));
+
+test('une modification dans Grist (un domaine renommé, une compétence reclassée) met le menu à jour sans perdre la sélection', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.click('[data-scope="partenaire"]');
+    await waitForCards(page, 5);
+    await openSkills(page);
+    await skill(page, 'Pharmacovigilance').evaluate(option => option.closest('.filter-group').querySelector('.group-toggle').click());
+    await skill(page, 'Pharmacovigilance').locator('input').check();
+    await waitForCards(page, 1);
+
+    await page.evaluate(() => { window.__tables.Competences.Macro_competences[2] = 'Pharmacologie'; });
+    await reload(page);
+    await page.waitForFunction(() => document.querySelector('.filter-group[data-value="Pharmacologie"]'));
+    assert.deepEqual(await domainNames(page), ['Cancérologie', 'Pharmacologie', 'Autres'], 'le domaine renommé');
+    assert.equal(await badge(page).textContent(), '1', 'la compétence cochée l\'est toujours');
+    assert.deepEqual(await cardNames(page), ['Bob Durand']);
+
+    await page.evaluate(() => { window.__tables.Competences.Macro_competences[2] = ''; });
+    await reload(page);
+    await page.waitForFunction(() => !document.querySelector('.filter-group[data-value="Pharmacologie"]'));
+    assert.deepEqual(await domainNames(page), ['Cancérologie', 'Autres'], 'plus de compétence classée Pharmacologie : plus de groupe');
+    assert.equal(await skill(page, 'Pharmacovigilance').locator('input').isChecked(), true, 'reclassée sous « Autres », toujours cochée');
+    assert.equal(await domain(page, 'Autres').locator('.filter-option', { hasText: 'Pharmacovigilance' }).count(), 1);
+    assert.deepEqual(await cardNames(page), ['Bob Durand']);
+  }));
+
+test('quand Grist change un libellé, les menus sont reconstruits : un domaine coché en entier reste coché et le badge compte toujours un', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await openSkills(page);
+    await domainBox(page, 'Cancérologie').check();
+    await waitForCards(page, 1);
+    assert.equal(await badge(page).textContent(), '1');
+
+    await page.evaluate(() => { window.__tables.Competences.Macro_competences[2] = 'Pharmacologie'; });
+    await reload(page);
+    await page.waitForFunction(() => document.querySelector('.filter-group[data-value="Pharmacologie"]'));
+    assert.equal(await badge(page).textContent(), '1', 'un domaine entier compte pour un, aussi quand le menu est reconstruit');
+    assert.equal(await domainBox(page, 'Cancérologie').isChecked(), true);
+    assert.equal(await domain(page, 'Cancérologie').locator('.group-head').evaluate(head => head.classList.contains('checked')), true);
+    assert.deepEqual(await cardNames(page), ['Ana Martin']);
+  }));
+
+test('sans colonne Macro_competences : le bandeau le dit, le menu Compétences reste plat et fonctionne', { skip }, () => {
   const tables = sampleTables();
   delete tables.Competences.Macro_competences;
   return withWidget({ tables }, async ({ page }) => {
     await waitForCards(page, 4);
     await waitForBanner(page);
     assert.match(await bannerText(page), /Competences \(Macro_competences\)/);
-    assert.equal(await macroFilter(page).locator('.filter-option').count(), 0, 'pas de faux domaine « Autres » pour tout le monde');
-    assert.equal(await page.locator('.filter[data-filter-key="competences"] .filter-option').count(), 4);
+    assert.equal(await skillsFilter(page).locator('.filter-group').count(), 0, 'pas de faux domaine « Autres » pour tout le monde');
+    assert.equal(await skillsFilter(page).locator('.filter-option').count(), 4, 'les quatre compétences, à plat');
+    await openSkills(page);
+    await skill(page, 'Oncologie').locator('input').check();
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), ['Ana Martin']);
+    assert.equal(await badge(page).textContent(), '1');
+    assert.equal(await skillsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Domaine ou compétence…');
   });
 });
+
+test('le menu Compétences reste utilisable au clavier : cases et boutons atteignables, état de dépli annoncé', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await skillsFilter(page).locator('.filter-button').focus();
+    await page.keyboard.press('Enter'); // ouvre le menu
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.className), 'filter-search-input');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.closest('.filter-group')?.dataset.value), 'Cancérologie');
+    await page.keyboard.press('Space'); // la case du domaine
+    await waitForCards(page, 1);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.className), 'group-toggle', 'puis le bouton de dépli');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-expanded')), 'true');
+    assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Détail de Cancérologie');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.closest('.filter-option')?.dataset.value), 'Hématologie', 'les compétences dépliées suivent');
+    assert.equal(await page.evaluate(() => document.activeElement.checked), true);
+  }));
 
 test('chaque option de menu affiche le nombre de cartes qu\'elle donnerait', { skip }, () =>
   withWidget({}, async ({ page }) => {

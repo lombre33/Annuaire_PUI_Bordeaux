@@ -1,6 +1,6 @@
 # Maintenance
 
-Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.12.0**.
+Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.13.0**.
 
 Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [documentation développeur](developpeurs.md), [sécurité](securite.md).
 
@@ -46,7 +46,7 @@ Une personne n'est affichée que si **toutes** les conditions suivantes sont vra
 
 Côté écran, les interrupteurs **Fondateurs** et **Partenaires** affinent ensuite l'affichage ([guide utilisateur](utilisateurs.md#fondateurs-et-partenaires)). Le schéma complet des règles est dans la [documentation développeur](developpeurs.md#règles-daffichage).
 
-Quatre précisions sur la version 1.12.0 :
+Quatre précisions sur la version 1.13.0 :
 
 - L'établissement vient de la référence `Etablissement`, résolue par identifiant de ligne. L'ancienne colonne calculée `Etablissement2` n'est plus utilisée depuis la 1.8.0, et deux lignes d'`Etablissements` de même acronyme ne se confondent plus.
 - **Les deux accords sont indépendants.** Valider un établissement (`ok_pour_apparaitre`) ne fait pas apparaître une personne qui n'a pas accepté, et une personne qui a accepté n'apparaît pas tant que son établissement n'est pas validé. Seul « coché » vaut accord.
@@ -92,7 +92,7 @@ Le widget modifie le prénom, le nom, la fonction, le téléphone, le rôle dans
 
 **Renommer une valeur.** La renommer dans sa table de référence. Les contacts qui y sont liés suivent, et une sélection de filtre qui portait l'ancien nom est retirée d'elle-même.
 
-**Compétences et domaines.** Les compétences d'une personne sont une liste de références vers la table `Competences`. Chaque compétence a un **domaine**, dans la colonne `Macro_competences` de cette table : il alimente le filtre « Domaines » (les compétences macro). Renseignez-le pour toute nouvelle compétence.
+**Compétences et domaines.** Les compétences d'une personne sont une liste de références vers la table `Competences`. Chaque compétence a un **domaine**, dans la colonne `Macro_competences` de cette table : il range le menu **Compétences** par domaine (les compétences macro) : on y coche un domaine entier ou une compétence. Renseignez-le pour toute nouvelle compétence.
 
 - Une compétence **sans domaine** est classée sous « Autres », pour que ses personnes restent trouvables. La console liste alors ses identifiants de ligne (`[REFS] Competences: n ligne(s) sans regroupement pour macro…`) : classez-la dans Grist, puis rechargez la page.
 - Écrivez un domaine toujours de la même façon : la casse et les accents sont ignorés (« Cancérologie » et « cancerologie » forment un seul domaine, écrit comme dans la plus petite ligne de la table).
@@ -107,7 +107,7 @@ Après chaque changement de données (ajout, modification, import), vérifier le
 2. **Chaque carte a sa pastille d'établissement** (colonne `Etablissement` correctement remplie).
 3. **La console du navigateur** (F12), sur les lignes `[GRIST] Enregistrements reçus: N (contacts affichables : M)` et `[ETABLISSEMENT] …` : N est le nombre de lignes de la table, M celui des cartes possibles, et un message `[ETABLISSEMENT]` liste (vingt au plus) les identifiants de ligne des contacts qui ont un périmètre mais pas d'établissement. Un écart entre N et M peut venir de personnes qui n'ont pas accepté d'apparaître (la ligne `[CONSENTEMENT] n/m …` en donne le nombre), d'un établissement non validé, d'un statut « autres » ou d'une référence qui ne désigne plus aucune ligne : ces derniers cas ne sont pas détaillés.
 4. **Aucun bandeau rouge** sous la barre d'outils.
-5. **Le filtre Domaines** : si l'option « Autres » apparaît, des compétences n'ont pas de domaine (voir [Opérations courantes](#opérations-courantes-dans-grist)).
+5. **Le menu Compétences** : s'il montre des domaines et que le dernier s'appelle « Autres », des compétences n'ont pas de domaine (voir [Opérations courantes](#opérations-courantes-dans-grist)).
 6. **« Ma présence »** : ouvert avec son propre compte (dont l'adresse figure dans `BDD.email`), le widget affiche le bandeau, la console dit `[IDENTITE] personne identifiée …` et la table `Annuaire_Sonde` est vide.
 7. **« ✎ Modifier »** : avec ce même compte, la carte de la personne porte « Votre fiche » et le bouton, et aucune autre carte n'en a ; avec un compte administrateur, toutes les cartes affichées en ont un ([`TESTING.md`](../TESTING.md), section 13).
 
@@ -145,7 +145,7 @@ La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[
 | La table `Annuaire_Sonde` contient des lignes | Une page a été fermée entre l'ajout et la suppression de la ligne | Vider la table, sans risque |
 | Une carte n'a pas de pastille d'établissement | Ne devrait pas arriver : un contact sans établissement reconnu est masqué | Lire les lignes `[ETABLISSEMENT]` de la console |
 | Une section de tags manque sur une carte | La valeur liée n'a pas de libellé dans sa table de référence | Console : `[REFS] clé (Table): n entrées (k ligne(s) sans …)` ; renseigner le libellé |
-| Le filtre Domaines est vide, ou ne propose que « Autres » | La colonne `Macro_competences` n'existe plus (bandeau « Colonne de libellé introuvable »), ou aucune compétence n'a de domaine | Rétablir la colonne, ou renseigner les domaines, puis recharger |
+| Le menu Compétences est une liste à plat, sans domaines, ou ne montre que « Autres » | La colonne `Macro_competences` n'existe plus (bandeau « Colonne de libellé introuvable »), ou aucune compétence n'a de domaine | Rétablir la colonne, ou renseigner les domaines, puis recharger |
 | Un établissement manque dans le filtre Établissement | Il n'est pas validé (`ok_pour_apparaitre`) | Le valider, puis recharger |
 | Une modification n'apparaît pas | Elle porte sur une table autre que celle des contacts | Recharger la page ([Limites connues](#limites-connues)) |
 | Un téléphone s'affiche sans son 0 ou dans un format étrange | La colonne est numérique : le widget rétablit le 0 d'un numéro de 9 chiffres et met en forme un numéro de 10 chiffres qui commence par 0 ; toute autre valeur est affichée telle quelle | Corriger la valeur dans Grist |
@@ -195,7 +195,7 @@ L'annuaire n'a ni serveur ni base de données à lui : il tient à des comptes q
 
 **L'essentiel**
 
-1. **Deux propriétaires au moins** pour le document Grist, et deux au moins pour le dépôt GitHub. Le dépôt appartient aujourd'hui à un compte personnel, qui n'a qu'un seul propriétaire : c'est le point le plus fragile.
+1. **Deux propriétaires au moins** pour le document Grist, et deux au moins pour le dépôt GitHub. Le dépôt appartient aujourd'hui à un compte personnel, qui n'a qu'un seul propriétaire : c'est le point le plus fragile ([hébergement et risques à ce jour](#hébergement-et-risques-à-ce-jour)).
 2. **Une sauvegarde régulière** du document Grist, rangée hors du dépôt public.
 3. **Une fiche de continuité** : qui possède quoi, qui remplace qui, où sont les sauvegardes.
 4. **Les personnes qui partent sont retirées** de l'annuaire, et leurs accès supprimés, dès leur départ.
@@ -206,13 +206,22 @@ L'annuaire n'a ni serveur ni base de données à lui : il tient à des comptes q
 | Élément | Où il se trouve | Qui peut le gérer | Si plus personne ne peut le gérer |
 |---|---|---|---|
 | **Les données** | Le document Grist, sur l'instance de l'État (`grist.numerique.gouv.fr`) | Les propriétaires du document, de son espace de travail et du site qui les contient : les accès se transmettent du site à l'espace de travail, puis au document | Le widget affiche toujours les données du document, mais personne ne peut plus les corriger, ni changer le partage ou les règles d'accès, réservés aux propriétaires. La documentation de Grist ne dit pas comment reprendre la main : ne pas y compter |
-| **Le code** | Le dépôt GitHub `lombre33/Annuaire_PUI_Bordeaux` | Son seul propriétaire, le compte personnel `lombre33` | Le widget continue de fonctionner, mais rien ne peut plus être corrigé ni publié. Si le compte est supprimé, GitHub supprime ses dépôts et ses sites Pages, donc le widget, et ne peut pas les restaurer |
+| **Le code** | Le dépôt GitHub `lombre33/Annuaire_PUI_Bordeaux` | Son seul propriétaire, le compte personnel `lombre33` de la personne qui a créé le widget | Le widget continue de fonctionner, mais rien ne peut plus être corrigé ni publié. Si le compte est supprimé, GitHub supprime ses dépôts et ses sites Pages, donc le widget, et ne peut pas les restaurer |
 | **Les réglages de « Ma présence » et de la modification de fiche** | Le document Grist : table `Annuaire_Sonde` et ses formules, colonnes de données que le widget écrit dans `BDD`, table `ACL`, règles d'accès | Les propriétaires du document | Sans la sonde ou sans `ACL`, plus personne n'est identifié : l'annuaire s'affiche normalement, mais sans bandeau ni modification (le widget échoue en sécurité). Les formules ne se recréent pas seules : la marche à suivre est dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) |
 | **L'adresse du widget** | GitHub Pages, saisie dans « Enter Custom URL » du widget de chaque page Grist | Le même compte | Renommer ou transférer le dépôt change l'adresse du site **sans redirection** : à la place de l'annuaire, Grist affiche une erreur ou une zone vide, tant que l'adresse n'est pas corrigée dans chaque page |
 | **Le script de l'API Grist** | `docs.getgrist.com`, chargé par `index.html` | Grist | Sans lui, la page affiche « 0 contact » sans bandeau d'explication ; le détail est dans la console du navigateur |
 | **La connaissance** | Cette documentation, `grist_structure.txt`, `specs.md`, les tests | Quiconque peut écrire dans le dépôt | Elle se périme : `tests/docs.test.mjs` signale une partie des oublis, pas tous |
 
 Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certificat), mais il suffit qu'un compte ou une adresse de messagerie disparaisse pour tout bloquer.
+
+### Hébergement et risques à ce jour
+
+État des lieux au 12 octobre 2026, tel que le propriétaire du dépôt le décrit :
+
+- **Le code est sur le compte GitHub personnel de la personne qui a créé le widget** (`lombre33`), seule propriétaire du dépôt et du site GitHub Pages qui sert le widget. C'est le point le plus fragile de l'annuaire.
+- **Une migration vers le GitLab UB n'est pas possible aujourd'hui** : il n'a pas de module « Pages », or le widget est une page statique que Grist charge par son adresse web.
+- **Piste proposée : migrer vers un GitHub DIESE.** Une migration change l'adresse du site, sans redirection : la faire une fois, puis corriger l'adresse du widget dans chaque page Grist, comme le décrit [Ce qu'il faut prévoir](#ce-quil-faut-prévoir), point 3.
+- **Dans Grist, les administrateurs sont uniquement des agents en poste à ce jour.** Si tous partent sans passation, plus personne n'administre le document : voir [Ce qui arrive si…](#ce-qui-arrive-si), et [Ce qu'il faut prévoir](#ce-quil-faut-prévoir), points 1 et 2.
 
 ### Ce qui arrive si…
 
@@ -233,7 +242,7 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 
 1. **Au moins deux propriétaires du document Grist**, nommés, de préférence dans des services différents. Un propriétaire ne peut pas modifier son propre accès : c'est un autre propriétaire qui le retire quand la personne part, ce qui suppose d'en avoir deux. Penser aussi à l'espace de travail et au site qui contiennent le document : leurs accès se transmettent au document.
 2. **Un administrateur des données et un suppléant**, qui savent tous deux ajouter une personne, valider un établissement, ajouter une valeur de filtre et désigner un administrateur de l'annuaire ([Opérations courantes](#opérations-courantes-dans-grist)).
-3. **Le dépôt dans une organisation GitHub** avec deux propriétaires au moins. GitHub le recommande : avec un seul propriétaire injoignable, les projets de l'organisation peuvent devenir inaccessibles. Un dépôt personnel n'a qu'un propriétaire ; ses collaborateurs peuvent pousser du code, mais ni supprimer le dépôt, ni changer sa visibilité, ni inviter d'autres personnes. Le transfert change l'adresse de GitHub Pages : le faire une fois, à un moment choisi, corriger l'adresse dans chaque page Grist, puis faire le [contrôle](#contrôle-après-un-changement-de-données). À défaut d'organisation, GitHub permet de désigner un **successeur** du compte personnel (réglages du compte, « Successor settings »).
+3. **Le dépôt dans une organisation GitHub** avec deux propriétaires au moins. GitHub le recommande : avec un seul propriétaire injoignable, les projets de l'organisation peuvent devenir inaccessibles. Un dépôt personnel n'a qu'un propriétaire ; ses collaborateurs peuvent pousser du code, mais ni supprimer le dépôt, ni changer sa visibilité, ni inviter d'autres personnes. Le transfert change l'adresse de GitHub Pages : le faire une fois, à un moment choisi, corriger l'adresse dans chaque page Grist, puis faire le [contrôle](#contrôle-après-un-changement-de-données). La piste proposée est un GitHub DIESE ([hébergement et risques à ce jour](#hébergement-et-risques-à-ce-jour)). À défaut d'organisation, GitHub permet de désigner un **successeur** du compte personnel (réglages du compte, « Successor settings »).
 4. **Des sauvegardes hors de Grist.** Grist garde lui-même des instantanés du document (d'après sa documentation : horaires pendant environ un jour, mensuels pendant plus d'un an, à vérifier sur l'instance utilisée), mais ils disparaissent avec le document s'il est supprimé définitivement. Télécharger régulièrement le document (fichier `.grist`, qui ne contient pas la liste des personnes avec qui il est partagé : la noter à part) et ses pièces jointes éventuelles (photos, logos), puis les ranger dans un espace à accès restreint, jamais dans le dépôt public. Une sauvegarde contient des données personnelles : prévoir sa durée de conservation et sa destruction.
 5. **Une copie du code** ailleurs que sur le compte d'origine (un clone ou un fork sur un autre compte ou une autre forge) : supprimer un compte supprime ses dépôts, pas les copies faites ailleurs.
 6. **Une licence.** Le dépôt n'en déclare aucune : par défaut, tous les droits sont réservés, et la reprise du code par d'autres suppose l'accord de son propriétaire. À décider par le propriétaire du dépôt.
@@ -324,7 +333,7 @@ Une piste plus durable : le guide de contribution des widgets Grist.Gouv (juille
 - **Établissement sans acronyme.** Le libellé d'un établissement est son acronyme, ou son nom complet quand l'acronyme est vide. Le contact y est rattaché par l'identifiant de ligne de sa référence `Etablissement`, sans dépendre de ce libellé : un établissement sans acronyme s'affiche donc avec son nom complet.
 - **Script de l'API Grist.** `index.html` charge `grist-plugin-api.js` depuis `docs.getgrist.com`, sans version figée. Le charger depuis l'instance utilisée serait plus cohérent, mais cela ne se vérifie que dans un vrai document Grist : ce changement n'a pas été fait.
 - **Accès `full`, choisi délibérément.** Le widget voit tout le document, pas seulement l'annuaire. C'est un choix assumé, que des garde-fous doivent encadrer ([sécurité](securite.md#niveau-daccès-demandé-à-grist)).
-- **Un domaine se déduit des compétences.** Une personne sans compétence n'a aucun domaine : elle n'apparaît dans aucune option du filtre « Domaines ».
+- **Un domaine se déduit des compétences.** Une personne sans compétence n'a aucun domaine : elle n'est comptée dans aucun domaine du menu Compétences.
 - **« Ma présence » et « ✎ Modifier » sont des verrous d'interface, pas une sécurité.** L'interrupteur n'agit que sur la fiche de la personne connectée et le bouton n'apparaît que sur sa carte (sur toutes les cartes affichées pour un administrateur), mais la console du navigateur les contourne : seules les règles d'accès de Grist protègent vraiment `BDD`, y compris `email`, `Etablissement` et `perimetre` ([sécurité](securite.md#écritures-et-règles-daccès)). Les règles proposées dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) n'ont pas été essayées dans un vrai document : à tester sur une copie.
 - **« Ma présence » et la modification de fiche supposent des réglages dans Grist** ([`GRIST_SETUP.md`](../GRIST_SETUP.md)) et un compte qui peut modifier le document : un compte Lecteur n'a ni bandeau ni bouton. La personne n'est retrouvée que si l'adresse de son compte Grist figure dans `BDD.email` (casse et espaces ignorés). Si plusieurs lignes portent la même adresse, son choix de présence s'applique à toutes et le bandeau ne propose pas « Modifier mon profil » (chaque carte garde son bouton « ✎ Modifier »).
 - **Chaque ouverture laisse sans doute une trace dans l'historique du document** (création puis suppression d'une ligne de `Annuaire_Sonde`, avec l'adresse de la personne) ; qui peut la voir et combien de temps elle est conservée sont à vérifier dans l'instance ([sécurité](securite.md#écritures-et-règles-daccès)).
@@ -366,4 +375,4 @@ Non engagées ; à décider par le propriétaire du dépôt.
 - Ajouter une licence : le dépôt est public et n'en déclare aucune ; par défaut, tous les droits sont réservés.
 - Paginer ou charger progressivement les cartes si l'annuaire grossit beaucoup.
 - Compléter le [lexique du PUI](utilisateurs.md#lexique-du-pui) : Instances, Actions, Communautés, Tâches, Rôle PUI et périmètre attendent une définition.
-- Déplacer le dépôt dans une organisation GitHub à deux propriétaires au moins, et choisir une licence (voir [Continuité](#continuité--départs-et-absence-dadministrateur)).
+- Déplacer le dépôt dans une organisation GitHub à deux propriétaires au moins (piste proposée : un GitHub DIESE), et choisir une licence (voir [Continuité](#continuité--départs-et-absence-dadministrateur)).

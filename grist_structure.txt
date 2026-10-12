@@ -72,8 +72,9 @@ Tables de référence (id -> libellé, chargées via fetchTable)
   GT                 : GT_corrige (Choice)            puis GT (Text)
   Competences        : Competences_corrigees (Text)   puis Competences (Text)
                        + Macro_competences (Text) : le domaine de chaque compétence.
-                       Une même table, deux lectures : le menu « Compétences »
-                       (libellé de détail) et le menu « Domaines » (Macro_competences).
+                       Une même table, deux lectures : le libellé de détail
+                       (les valeurs du menu « Compétences ») et Macro_competences
+                       (les domaines, qui rangent ce menu en groupes).
                        Une compétence sans domaine renseigné est classée sous
                        « Autres » ; deux écritures d'un même domaine (casse,
                        accents) n'en font qu'un. Le widget n'utilise pas

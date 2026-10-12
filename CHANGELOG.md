@@ -1,5 +1,80 @@
 # Changelog
 
+## 1.13.0 — Les domaines dans le menu Compétences : un seul menu, une double recherche
+
+Le filtre « Domaines » de la 1.9.0 (un second bouton à côté de « Compétences ») est
+retiré, à la demande d'Antoine : les domaines (les compétences macro) sont désormais
+les **groupes du menu « Compétences »**, qui se cherche à deux niveaux, par domaine ou
+par compétence. Les données Grist, les cartes et les tags ne changent pas.
+
+- **Un seul bouton, sept filtres.** « Domaines » disparaît de la barre d'outils. Le menu
+  « Compétences » range ses compétences par domaine (domaines triés, « Autres » en
+  dernier pour les compétences que `Macro_competences` ne classe pas), chacun replié
+  au départ. À droite d'un domaine, le nombre de cartes qui ont **au moins une**
+  compétence de ce domaine (une personne qui en a deux n'est comptée qu'une fois).
+- **Cocher un domaine coche toutes ses compétences.** La flèche à droite du domaine
+  déplie le détail, pour n'en choisir que quelques-unes ; la case du domaine est alors
+  à moitié cochée (état indéterminé), un clic la complète, un second décoche tout. La
+  case d'un domaine n'est qu'un raccourci : il n'y a qu'**une** sélection, faite de
+  compétences, et la case est déduite de ce qui est coché.
+- **Recherche à deux niveaux.** Le champ du menu (« Domaine ou compétence… ») trouve un
+  domaine comme une compétence, sans tenir compte des accents ni des majuscules : un
+  domaine dont le nom correspond reste avec **toutes** ses compétences, une compétence
+  qui correspond reste sous son domaine. Pendant la recherche tout est déplié (les
+  flèches disparaissent) ; vider le champ rétablit l'état précédent. La recherche
+  ne coche rien.
+- **À l'ouverture du menu**, les domaines qui contiennent une valeur cochée passent en
+  tête, la valeur cochée en tête de son domaine, et un domaine coché en partie s'ouvre
+  de lui-même. Rien ne se déplace pendant qu'on coche : la ligne qu'on vient de cocher
+  reste sous les yeux.
+- **Le badge du bouton compte un domaine entier pour un.** Cocher un domaine de douze
+  compétences affiche « 1 », pas « 12 » ; un domaine coché en partie compte ses
+  compétences cochées une à une, et une compétence écrite sous deux domaines une seule
+  fois.
+- **Ce qui change pour qui utilisait « Domaines ».** Tout est désormais un OU dans le
+  menu, comme dans tous les autres : un domaine et une compétence d'un **autre** domaine
+  cochés ensemble montrent les personnes de l'un *ou* de l'autre. Le cumul de la 1.9.0
+  (un domaine ET une compétence, qui ne gardait que les personnes ayant les deux) n'existe
+  plus ; pour restreindre à une compétence d'un domaine, on coche cette compétence seule.
+  Une étiquette de compétence cliquée sur une carte coche la compétence, comme avant ; le
+  domaine passe à moitié coché (ou coché si c'est sa seule compétence).
+- **Compteurs.** Le nombre d'un domaine est calculé avec le reste des critères (recherche,
+  interrupteurs Fondateurs/Partenaires, autres menus) mais sans le menu Compétences
+  lui-même, comme le nombre de chaque option : cocher une compétence ne change pas celui
+  de son domaine. Un seul passage sur les contacts compte compétences et domaines.
+- **Menu plat de repli.** Si Grist ne donne aucun domaine (colonne `Macro_competences`
+  absente ou table illisible), le menu Compétences reste complet mais à plat, sans domaines,
+  et le bandeau d'état prévient comme avant.
+- **Accessibilité.** De vraies cases à cocher (« partielle » annoncée par les lecteurs
+  d'écran), une flèche qui est un bouton (`aria-expanded`, `aria-controls`, « Détail de
+  <domaine> »), le champ de recherche annoncé « Rechercher dans Compétences ». Le repli passe
+  par une classe CSS : l'attribut `hidden` est forcé en `display: none !important`.
+- **Mise en page.** Un nom de compétence très long, sans point de coupure, passait hors du
+  menu : il passe à la ligne (`overflow-wrap: anywhere`), dans tous les menus. Au tactile,
+  la flèche et la case de domaine ont la taille des autres cibles.
+- **Pour les développeurs.** `constants.js` : `grouping` (inverse de `groups`) sur la
+  catégorie « Compétences », `macro` n'a plus de bouton. `filters.js` : `menuGroups()`,
+  `groupState()`, `toggleGroup()`, `selectionCount()` ; `computeFilterCounts()` compte
+  aussi le regroupement d'un filtre. `render.js` : `buildGroupedMenu()`, `buildGroup()`,
+  `searchGroups()`, `settleGroupedMenu()`. `main.js` : `toggleFilterGroup()`. Aucun nouveau
+  module, aucune table créée.
+- **Documentation et captures.** Le guide utilisateur passe à sept filtres et explique le
+  menu ; le guide développeur, la maintenance, `TESTING.md` (section 3, spécifique
+  Compétences par domaine), `specs.md` et `grist_structure.txt` suivent. Les captures sont
+  régénérées : la barre d'outils change, deux images nouvelles montrent le menu groupé et
+  sa recherche, `filtre-menu.png` montre un menu à plat.
+- **Tests** : 406 tests (dont 124 dans un vrai navigateur, optionnels sans Playwright) contre
+  376 (dont 110) avant ce lot. Les tests du filtre « Domaines » séparé sont remplacés par ceux
+  du menu groupé, qui couvrent le rangement des domaines (ordre, « Autres » en dernier,
+  orthographes mêlées, menu plat), les états d'un domaine, cocher un domaine entier, le badge,
+  les compteurs, et dans Chromium le parcours complet (domaine entier, détail, case partielle,
+  recherche à deux niveaux, ouverture réordonnée, étiquette de carte, Réinitialiser,
+  accessibilité, reconstruction des menus quand Grist change un libellé) et la tenue du menu de
+  280 à 1 920 px, y compris sans la police Inter, comme dans la CI. Contrôle négatif : 52 modifications du code
+  ont été essayées une à une ; les tests en ont détecté 50 (dont 3 après l'ajout de tests que
+  ce contrôle a montrés manquants) et les 2 autres sont sans effet visible, les nombres posés à
+  la construction des menus étant aussitôt recalculés à l'affichage des cartes.
+
 ## 1.12.0 — Modifier sa fiche, directement, avec une relecture avant/après
 
 Une personne connectée peut modifier sa propre fiche, et un administrateur celle de
