@@ -197,6 +197,9 @@ h1 {
 }
 .option-label {
   flex: 1;
+  /* Un libellé sans point de coupure passe à la ligne au lieu d'élargir le menu. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .option-count {
   color: var(--muted);
@@ -401,6 +404,79 @@ h1 {
 }
 .filter-option.checked {
   background: #f1f0ff;
+}
+
+/* Menu par groupe (Compétences) : chaque domaine a sa case, qui coche toutes ses
+   compétences, et un bouton qui déplie le détail. Le nom d'un domaine porte la couleur
+   du regroupement, ses compétences sont en retrait. Case partielle et fond marquent un
+   domaine dont certaines compétences seulement sont cochées. */
+.group-head {
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+.group-head.checked,
+.group-head.partial {
+  background: #f1f0ff;
+}
+.group-option {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+.group-option:hover {
+  background: #f1f0ff;
+}
+.group-option input {
+  accent-color: var(--violet);
+}
+.group-option .option-label {
+  color: var(--group-color);
+}
+.group-toggle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.group-toggle:hover {
+  background: #f1f0ff;
+  color: #443aaf;
+}
+.group-toggle:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: -2px;
+}
+.filter-group.open .group-toggle {
+  transform: none;
+}
+.group-options {
+  display: none;
+  margin: 0 0 4px 17px;
+  padding-left: 8px;
+  border-left: 2px solid var(--line);
+}
+.filter-group.open .group-options,
+.filter-menu.searching .group-options {
+  display: block;
+}
+/* Tant qu'on cherche, tout est déplié : le bouton n'a plus d'effet, il disparaît. */
+.filter-menu.searching .group-toggle {
+  visibility: hidden;
 }
 .tag-static {
   cursor: default;
@@ -655,13 +731,20 @@ h1 {
   .filter-search-input {
     height: 40px;
   }
-  .filter-option {
+  .filter-option,
+  .group-option {
     padding: 13px 8px;
     font-size: 14px;
   }
-  .filter-option input {
+  .filter-option input,
+  .group-option input {
     width: 18px;
     height: 18px;
+  }
+  .group-toggle {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
   }
   .filter-menu {
     width: 320px;
@@ -683,7 +766,9 @@ h1 {
     color: var(--ink);
     border-color: var(--line);
   }
-  .filter-option:not(.checked):hover {
+  .filter-option:not(.checked):hover,
+  .group-option:hover,
+  .group-toggle:hover {
     background: none;
   }
   .scope-btn:not(.active):hover {

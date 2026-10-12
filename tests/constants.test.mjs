@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CATEGORIES, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE } from '../constants.js';
 
-test('FILTERS lists the 8 filter buttons in display order, the macro skills just before the detailed ones', () => {
-  assert.deepEqual(FILTERS.map(f => f.key), ['actions', 'taches', 'communautes', 'gt', 'macro', 'competences', 'instances', 'etablissement']);
+test('FILTERS lists the 7 filter buttons in display order: the macro skills have no button of their own, they are the groups of the skills menu', () => {
+  assert.deepEqual(FILTERS.map(f => f.key), ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement']);
+  assert.ok(!FILTERS.some(f => f.key === 'macro'), 'plus de filtre « Domaines » séparé');
 });
 
 test('TAG_GROUPS lists the 7 tag sections of a card in display order, Rôle PUI included, Établissement and the macro skills excluded', () => {
@@ -54,10 +55,25 @@ test('the macro skills are a grouping of the detailed skills: same table and BDD
   assert.deepEqual(macro.field, ['Macro_competences']);
   assert.equal(macro.groups, 'competences');
   assert.equal(macro.fallback, 'Autres');
-  assert.notEqual(macro.color, competences.color);
+  assert.notEqual(macro.color, competences.color, 'le nom d\'un domaine se distingue d\'une compétence dans le menu');
   assert.equal(macro.label, 'Domaines');
-  assert.match(macro.hint, /Compétences macro/, 'l\'infobulle fait le lien avec le nom donné dans Grist');
   assert.equal(Object.values(CATEGORIES).filter(category => category.groups).length, 1);
+});
+
+test('a category and its grouping point at each other, and only the grouped category has a menu', () => {
+  const grouped = Object.entries(CATEGORIES).filter(([, category]) => category.grouping);
+  assert.deepEqual(grouped.map(([key]) => key), ['competences']);
+  grouped.forEach(([key, category]) => assert.equal(CATEGORIES[category.grouping].groups, key));
+  assert.ok(FILTERS.find(f => f.key === 'competences').grouping, 'le menu Compétences connaît son regroupement');
+  assert.ok(FILTERS.every(f => f.key !== CATEGORIES.competences.grouping), 'le regroupement n\'a pas de menu');
+});
+
+test('the skills button says what its menu offers: domains to tick whole, and a search over both levels', () => {
+  const { hint, placeholder } = CATEGORIES.competences;
+  assert.match(hint, /domaine/);
+  assert.match(placeholder, /domaine/i);
+  assert.match(placeholder, /compétence/i);
+  assert.ok(placeholder.length <= 28, 'le champ du menu est étroit (270px) : « Rechercher un domaine ou une compétence… » y était coupé, et au tactile le texte passe à 16px');
 });
 
 test('LIST_CATEGORIES maps each ReferenceList column of BDD to its own reference table', () => {
