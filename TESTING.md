@@ -693,6 +693,23 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
       taille normale, comme les titres de groupe et l'adresse e-mail ; on distingue encore les catégories
       d'un coup d'œil, et le point de chaque bouton de filtre a la couleur des pastilles de sa catégorie.
       À comparer avec `docs/images/carte-anatomie.png`.
+- [ ] **Interrupteur de présence au clavier** (1.16.3) : tabuler jusqu'à « Apparaître dans l'annuaire »
+      (compte identifié, fiche présente) et appuyer sur **Espace** : l'interrupteur bascule et **l'anneau
+      violet reste sur lui**, pendant « Enregistrement… » comme après ; la touche Tab suivante va au champ de
+      recherche, pas au début de la page. Espace et Entrée pressés plusieurs fois pendant l'enregistrement
+      n'écrivent qu'une fois (une seule modification de la case dans l'activité du document Grist).
+- [ ] **Lecteur d'écran, présence** (1.16.3) : après la bascule, il lit **une fois** « Modification
+      enregistrée. Vous avez accepté d'apparaître dans l'annuaire. » (ou « … Vous n'apparaissez plus dans
+      l'annuaire. »), sans que rien de nouveau n'apparaisse à l'écran. Avec une règle d'accès qui refuse
+      l'écriture : il lit le message d'erreur, qui est aussi visible sous le bandeau.
+- [ ] **Piste de l'interrupteur** (1.16.3) : éteinte (gris bleuté) comme allumée (vert profond), la piste se
+      distingue du fond gris clair du bouton et son curseur blanc se voit sur elle sans effort. À comparer
+      avec `docs/images/ma-presence.png` et `ma-presence-retiree.png`.
+- [ ] **Mode contraste élevé, présence** (1.16.3) : l'interrupteur éteint est une piste vide bordée avec le
+      curseur à gauche, l'interrupteur allumé une piste pleine avec le curseur à droite, de couleurs
+      différentes ; le curseur est centré dans la piste, bordure comprise.
+- [ ] **Animations réduites** (1.16.3) (Windows : « Afficher les animations » désactivé ; Chrome :
+      `prefers-reduced-motion` émulé dans l'onglet Rendu) : le curseur change de côté sans glisser.
 
 ## 16. Mode admin, e-mail et établissement (1.15.0)
 

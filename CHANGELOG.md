@@ -1,5 +1,86 @@
 # Changelog
 
+## 1.16.3 — Interrupteur de présence : focus gardé, réussite annoncée, contrastes
+
+Quatrième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un
+gain par version), pour les constats **U47**, **U48** et **U49** : l'interrupteur « Apparaître dans
+l'annuaire » du bandeau « Ma présence ». **Ce qui change à l'œil** : la piste de l'interrupteur est plus
+sombre (gris bleuté éteinte, vert plus profond allumée) ; le reste du bandeau, la mise en page, les
+textes et les données sont inchangés, et l'annonce faite aux lecteurs d'écran ne se voit pas. Quatre
+fichiers de code portent le changement (`account-ui.js`, `main.js`, `constants.js`, `style.css`) :
+revenir au comportement et aux couleurs d'avant, c'est `git revert` de la fusion de cette version.
+
+- **Le focus ne se perd plus (U47, WCAG 2.4.3).** Pendant l'écriture, le bouton était désactivé
+  (`disabled`), et un bouton désactivé perd le focus : au clavier, la touche Tab suivante repartait du haut
+  de la page (mesuré par l'audit : `document.activeElement` valait `BODY` pendant l'écriture et après). Le
+  bouton porte maintenant `aria-disabled="true"` : il reste grisé, avec le pointeur d'attente, mais garde le
+  focus pendant toute l'écriture et après la relecture de l'annuaire (le bandeau n'est pas reconstruit), et un
+  clic ou une touche de plus pendant l'écriture est ignoré (le verrou `togglePending` de `main.js` ne change
+  pas).
+- **La réussite est annoncée (U47, WCAG 4.1.3).** Après une écriture réussie, la région d'état du bandeau
+  (`role="status"`) dit « Modification enregistrée. Vous avez accepté d'apparaître dans l'annuaire. » ou
+  « Modification enregistrée. Vous n'apparaissez plus dans l'annuaire. », puis s'efface au bout de six
+  secondes (`PRESENCE_ANNOUNCE_MS`, dans `constants.js`) ou dès le message suivant. Avant, cette région était
+  simplement vidée : la réussite n'avait aucun message. Les lecteurs d'écran lisent la phrase, mais elle
+  n'occupe aucune place à l'écran (classe `.sr-only`), puisque la phrase du bandeau et l'interrupteur disent
+  déjà la même chose ; « Enregistrement… » et les erreurs restent visibles, comme avant. Si l'annuaire n'a pas
+  pu être relu après une écriture réussie, seul le message visible « Modification enregistrée ; l'annuaire
+  n'a pas pu être rechargé. » reste : rien n'est annoncé comme confirmé.
+- **L'état se distingue (U48, WCAG 1.4.11).** L'état de l'interrupteur ne tient qu'à sa piste et à son curseur
+  (le texte du bouton ne change pas) : il leur faut 3:1 au moins avec leur fond. Les couleurs sont celles que
+  l'audit proposait :
+
+  | | Avant | Après |
+  |---|---|---|
+  | Piste éteinte sur le fond du bouton | `#c3c9d8` (1,56:1) | `#7d879c` (3,40:1) |
+  | Curseur blanc sur la piste éteinte | 1,66:1 | 3,61:1 |
+  | Piste allumée sur le fond du bouton | `#1ba99a` (2,75:1) | `#147c72` (4,76:1) |
+  | Curseur blanc sur la piste allumée | 2,92:1 | 5,05:1 |
+
+- **Contraste élevé et mouvement réduit (U49, WCAG 1.4.11 et 2.3.3).** Dans le mode contraste élevé de
+  Windows (`forced-colors: active`), le navigateur impose ses couleurs : la piste et le curseur prenaient le
+  même fond, sans bordure ni ombre, et l'interrupteur éteint ne se distinguait plus de l'interrupteur
+  allumé. La piste a maintenant une bordure et des couleurs système (éteinte : fond `Canvas`, bordure et
+  curseur `ButtonText` ; allumée : fond et bordure `Highlight`, curseur `HighlightText`), et le curseur
+  reste centré malgré la bordure. Quand le système demande de réduire les animations
+  (`prefers-reduced-motion: reduce`), la piste et le curseur changent d'état sans la transition de 0,15 s.
+- **Reste ouvert dans l'audit.** U48 demandait aussi une bordure du bouton à 3:1 : elle fait 1,23:1 sur le
+  bandeau blanc, comme celle du champ de recherche et des filtres (constat U25), et la relever changerait
+  l'aspect de tous les contrôles : non traité dans ce lot. U46 (bandeau écrasé de 380 à 510 px) est le
+  sixième gain du lot ; U54 (ordre de tabulation de la barre d'outils) n'en fait pas partie.
+- **Correction de la 1.16.2.** Cette version annonçait que l'« interrupteur inactif à 4,49:1 » du constat
+  U19 serait traité avec l'interrupteur de présence. C'était une erreur de lecture : ce 4,49:1 est le texte
+  des boutons Fondateurs et Partenaires quand ils sont inactifs (`--muted` sur `#f7f8fc`, soit 4,49:1 au lieu
+  de 4,5:1). Le texte de l'interrupteur de présence fait plus de 15:1 dans les deux états. Ce contraste reste
+  ouvert pour un autre lot ; la phrase de la 1.16.2 est corrigée plus bas.
+- **Pour les développeurs** : `account-ui.js` expose `announce()` en plus de `setBusy()` et `setStatus()` ;
+  `setBusy()` pose `aria-disabled` et non `disabled` (la raison est dans le code) ; le module importe
+  maintenant `constants.js` (le schéma des imports de `docs/developpeurs.md` en tient compte). La section
+  « Accessibilité » de `docs/developpeurs.md` a une règle de plus sur l'interrupteur, `TESTING.md`
+  (section 15) cinq contrôles à l'œil pour un vrai Grist, et le guide utilisateur dit ce qui change au
+  clavier et avec un lecteur d'écran.
+- **Tests** : 650 tests (227 dans un vrai navigateur, optionnels sans Playwright), 7 de plus qu'à la
+  1.16.2. Dans `tests/e2e.test.mjs` : l'interrupteur garde le focus pendant et après l'écriture, grisé avec
+  le pointeur d'attente, et les touches de plus pressées pendant l'écriture n'écrivent rien ; la réussite est
+  dite par la région d'état (phrase exacte, boîte réduite et rognée, délai relancé par une deuxième bascule,
+  effacement au bout de six secondes sur une horloge simulée) ; une écriture réussie suivie d'une relecture
+  ratée laisse le message visible, sans annonce de réussite ; « Enregistrement… » et une erreur sont vérifiés
+  à l'écran (une erreur garde ses marges et sa bordure même rognée : le test regarde le rognage, pas
+  seulement la taille de la boîte). Dans `tests/accessibility.test.mjs` : la piste et le curseur gardent 3:1
+  avec leur fond, éteints puis allumés, lus dans `style.css` (sans navigateur) puis sur la page rendue ;
+  avec `forced-colors` émulé, la piste a une bordure visible, un curseur distinct d'elle, un état éteint et un
+  état allumé différents et un curseur centré ; avec `prefers-reduced-motion`, plus de transition.
+  `tests/docs.test.mjs` exige les deux nouvelles phrases dans le guide et l'arête
+  `account-ui.js → constants.js` dans le schéma. Vingt-six variantes fautives du code, de la feuille de
+  style et des documents ont été essayées une à une, le code étant remis en état après chacune : vingt-cinq
+  font échouer au moins un test ; la vingt-sixième, qui retire la seule garde de clic de `account-ui.js`, ne
+  change rien tant que `togglePending` (`main.js`) bloque aussi le deuxième envoi, et retirer les deux
+  gardes à la fois fait échouer le test du double clic.
+- **Documentation** : les quatre captures où la piste de l'interrupteur se voit (`ma-presence`,
+  `ma-presence-retiree`, `ma-presence-masquee`, `mode-admin`) sont refaites ; les dix-neuf autres sont celles
+  de la 1.16.2. Dans `mode-admin`, les logos des cartes sont aussi pleinement affichés : la capture
+  précédente les avait pris en plein fondu.
+
 ## 1.16.2 — Pastilles et lien e-mail plus foncés, lisibles (WCAG 1.4.3)
 
 Troisième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un
@@ -35,7 +116,8 @@ d'avant, c'est `git revert` de la fusion de cette version.
   avatar, piste de l'interrupteur de présence, ✦ de l'état vide, icône de confirmation).
 - **Reste ouvert dans U19, pour d'autres lots** : le sous-titre de la page sur son dégradé (4,03:1),
   les invites des champs (4,34:1), le nombre à droite d'une option de menu sous le survol (4,22:1) et
-  l'interrupteur de présence éteint (4,49:1, traité avec les autres constats de l'interrupteur).
+  le texte des boutons Fondateurs et Partenaires quand ils sont inactifs (`--muted` sur `#f7f8fc`, 4,49:1 ;
+  la première rédaction de cette phrase l'attribuait à tort à l'interrupteur de présence, corrigé en 1.16.3).
 - **Pour les développeurs** : `constants.js` dit que la couleur d'une catégorie doit garder 4,5:1 avec
   le blanc et comment en choisir une autre (la foncer à teinte constante) ; la recette « Ajouter une
   catégorie » de `docs/developpeurs.md` et la section « Accessibilité » en parlent, et `TESTING.md`
