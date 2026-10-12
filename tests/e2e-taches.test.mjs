@@ -458,6 +458,28 @@ test('le menu Tâches reste utilisable au clavier : cases et boutons atteignable
     assert.equal(await page.evaluate(() => document.activeElement.checked), true);
   }));
 
+// Les lignes de l'instantané d'accessibilité (`- checkbox "Nom" [états]`) dont le rôle exige un
+// nom (WCAG 4.1.2) et qui n'en ont pas : le même contrôle que tests/accessibility.test.mjs fait
+// sur le menu Compétences.
+const NAMED_ROLES = 'button|link|checkbox|switch|radio|searchbox|textbox|combobox|menuitem|option';
+const unnamedControls = snapshot => snapshot.split('\n')
+  .map(line => new RegExp(`^\\s*- (${NAMED_ROLES})\\b(.*)$`).exec(line))
+  .filter(match => match && !match[2].startsWith(' "'))
+  .map(match => match[0].trim());
+
+test('le menu Tâches ouvert n\'a aucun contrôle sans nom : recherche, case d\'action, flèche de détail, tâches', { skip }, () =>
+  withWidget({ tables: withTaskActions() }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await tasks.open(page);
+    await tasks.toggle(page, VACCINATION).click();
+    const snapshot = await tasks.filter(page).locator('.filter-menu').ariaSnapshot();
+    assert.ok(snapshot.includes('textbox "Rechercher dans Tâches"'), 'la recherche du menu est nommée');
+    assert.ok(snapshot.includes(`button "Détail de ${VACCINATION}" [expanded]`), 'la flèche d\'une action dépliée porte son nom et son état');
+    assert.ok(snapshot.includes(`button "Détail de ${AUDIT}"`), 'celle d\'une action repliée aussi');
+    assert.ok(snapshot.includes(`checkbox "${RELECTURE} 1"`), 'une tâche dépliée est une case nommée');
+    assert.deepEqual(unnamedControls(snapshot), []);
+  }));
+
 // ===== Le formulaire de profil range aussi les tâches par action =====
 
 // Ana n'administre pas : elle ne modifie que sa fiche, par le bandeau « Ma présence ».
