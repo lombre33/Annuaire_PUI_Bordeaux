@@ -6,7 +6,7 @@ import {
 } from '../profile.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
-import { sampleTables, withoutOptionalColumns } from './fixtures.mjs';
+import { sampleTables, withoutOptionalColumns, withTaskActions } from './fixtures.mjs';
 
 // ===== profile : qui peut modifier une fiche, ce qu'on peut y changer, et ce qui change =====
 
@@ -73,6 +73,38 @@ test('profileFormModel offers the competences ungrouped when the document has no
   const options = field(profileFormModel(row(1), referenceMaps), 'Competences').options;
   assert.deepEqual(options.map(option => option.label), ['Divers', 'Hématologie', 'Oncologie', 'Pharmacovigilance']);
   assert.ok(options.every(option => !('group' in option)));
+});
+
+test('profileFormModel groups the tasks by action, « Sans action » last, once the tasks and the actions are numbered', async () => {
+  const { referenceMaps, row } = await setup(withTaskActions());
+  const model = profileFormModel(row(1), referenceMaps);
+  assert.deepEqual(field(model, 'Taches').options.map(option => [option.group, option.label]), [
+    ['Action 1 : Vaccination', '1.1 Relecture'],
+    ['Action 1 : Vaccination', '1.2 Rappel vaccinal'],
+    ['Action 2 : Audit', '2.1 Inspection'],
+    ['Sans action', 'Veille']
+  ]);
+  assert.deepEqual(field(model, 'Taches').value, [1, 3], 'les tâches de la fiche restent cochées, rangées ou non');
+  assert.ok(field(model, 'Actions').options.every(option => !('group' in option)), 'la liste des actions reste à plat');
+  assert.ok(field(model, 'Competences').options.every(option => option.group), 'les compétences gardent leurs domaines');
+});
+
+test('profileFormModel offers the tasks ungrouped when none is tied to an action', async () => {
+  const { referenceMaps, row } = await setup();
+  assert.deepEqual(field(profileFormModel(row(1), referenceMaps), 'Taches').options, [{ id: 1, label: 'Relecture' }]);
+
+  const tables = withTaskActions();
+  tables.Actions.Actions = ['Vaccination', 'Audit']; // des actions sans numéro
+  const unnumbered = await setup(tables);
+  const options = field(profileFormModel(unnumbered.row(1), unnumbered.referenceMaps), 'Taches').options;
+  assert.deepEqual(options.map(option => option.label), ['1.1 Relecture', '1.2 Rappel vaccinal', '2.1 Inspection', 'Veille']);
+  assert.ok(options.every(option => !('group' in option)));
+});
+
+test('an action never leaks into the changes: champs keep only id and label', async () => {
+  const { referenceMaps, row } = await setup(withTaskActions());
+  const result = diffProfile(row(1), { Taches: [1, 2, 3] }, referenceMaps);
+  assert.deepEqual(result.champs.Taches, { ajout: [{ id: 2, label: '1.2 Rappel vaccinal' }], retrait: [] });
 });
 
 test('a group never leaks into the changes: champs keep only id and label', async () => {

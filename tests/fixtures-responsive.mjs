@@ -92,3 +92,30 @@ export function crowdedTables(count = CROWDED_CONTACT_COUNT) {
     Role_Dans_le_PUI: { id: [1], Role: ['Référent innovation et valorisation'] }
   };
 }
+
+// La même foule avec des tâches rangées par action : le numéro avant le point d'une tâche
+// (« 2.1 ») est celui de son action (« Action 2 : … »). Six actions aux libellés longs, dont un
+// sans point de coupure, douze tâches (dont une sans point de coupure) et une sans numéro,
+// rangée sous « Sans action » : sept groupes dans le menu Tâches.
+const ACTIONS_NUMEROTEES = [
+  'Action 1 : Vaccination', 'Action 2 : Audit des pratiques', 'Action 3 : Veille réglementaire et normative',
+  'Action 4 : Formation des équipes soignantes, administratives et techniques', `Action 5 : ${'v'.repeat(48)}`, 'Action 6 : Valorisation'
+];
+const TACHES_NUMEROTEES = [
+  '1.1 Relecture', '1.2 Rédaction du protocole de vaccination', '2.1 Audit', '3.1 Veille', '3.2 Veille réglementaire européenne',
+  '4.1 Animation', `4.2 ${'w'.repeat(48)}`, '5.1 Suivi budgétaire', '5.2 Accompagnement des équipes', '6.1 Valorisation',
+  '6.2 Dépôt de brevet', 'Coordination'
+];
+
+export function crowdedTablesByAction(count = CROWDED_CONTACT_COUNT) {
+  const tables = crowdedTables(count);
+  tables.Actions.Actions = ACTIONS_NUMEROTEES;
+  tables.Taches = {
+    id: ids(TACHES_NUMEROTEES),
+    Taches: TACHES_NUMEROTEES,
+    Taches_corrige: TACHES_NUMEROTEES.map(() => ''),
+    Taches_role: TACHES_NUMEROTEES.map(() => '')
+  };
+  tables.BDD.Taches = Array.from({ length: count }, (_, i) => list(i, TACHES_NUMEROTEES.length, i % 5));
+  return tables;
+}

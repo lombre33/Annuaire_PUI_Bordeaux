@@ -11,7 +11,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 - [Découvrir l'écran](#découvrir-lécran)
 - [Lire une carte](#lire-une-carte)
 - [Rechercher une personne](#rechercher-une-personne)
-- [Filtrer](#filtrer), dont [Domaines et compétences](#domaines-et-compétences)
+- [Filtrer](#filtrer), dont [Domaines et compétences](#domaines-et-compétences) et [Actions et tâches](#actions-et-tâches)
 - [Gagner du temps : cliquer sur une étiquette](#gagner-du-temps--cliquer-sur-une-étiquette)
 - [Fondateurs et Partenaires](#fondateurs-et-partenaires)
 - [Réinitialiser](#réinitialiser)
@@ -43,6 +43,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Établissement partenaire** | Un partenaire du PUI |
 | **Structure « autres »** | Une structure extérieure au PUI, qui a collaboré à certaines tâches. Son statut est « autres » : ses contacts n'apparaissent pas dans l'annuaire |
 | **Domaine (compétences macro)** | Un regroupement de compétences. Le menu Compétences range les compétences par domaine ([Domaines et compétences](#domaines-et-compétences)) |
+| **Action d'une tâche** | L'action dont une tâche porte le numéro : « 2.1 Suivi de projets » est une tâche de l'« Action 2 ». Le menu Tâches range les tâches par action ([Actions et tâches](#actions-et-tâches)) |
 | **Accord d'apparaître** | Le choix de chaque personne de figurer ou non dans l'annuaire. Sans son accord, une personne n'apparaît pas, même si son établissement a validé son apparition |
 | **Instances** | *À compléter* |
 | **Actions** | *À compléter* |
@@ -60,7 +61,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Compteur** (en haut à droite, « 14 contacts ») | Indique combien de cartes sont affichées avec la recherche et les filtres actuels |
 | **Bandeau « Ma présence »** (au-dessus de la recherche, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
-| **Actions, Tâches, Communautés, GT, Compétences, Instances, Établissement** | Sept filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine |
+| **Actions, Tâches, Communautés, GT, Compétences, Instances, Établissement** | Sept filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine, et le menu **Tâches** par action |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
 | **Réinitialiser** | Efface la recherche et décoche tous les filtres |
 | **Cartes** | Une carte par personne, trois par ligne, dans l'ordre de la liste des contacts dans Grist (sans tri) |
@@ -82,7 +83,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 Sur une carte que vous pouvez modifier, une ligne s'ajoute en bas : la mention **Votre fiche** (sur la vôtre) et le bouton **✎ Modifier** ([Modifier ma fiche](#modifier-ma-fiche)).
 
-Une information absente n'est pas remplacée par une ligne vide : elle n'apparaît simplement pas. Les **domaines** de compétences ne figurent pas sur la carte, qui garde le détail des compétences : ils rangent le menu Compétences et permettent de filtrer par domaine (voir [Domaines et compétences](#domaines-et-compétences)).
+Une information absente n'est pas remplacée par une ligne vide : elle n'apparaît simplement pas. Les **domaines** de compétences et les **actions des tâches** ne figurent pas sur la carte, qui garde le détail des compétences et des tâches : ils rangent les menus Compétences et Tâches et permettent de filtrer par domaine ou par action (voir [Domaines et compétences](#domaines-et-compétences) et [Actions et tâches](#actions-et-tâches)).
 
 ## Rechercher une personne
 
@@ -132,6 +133,23 @@ Le menu **Compétences** range les compétences par **domaine** (on parle aussi 
 - Si le mot figure dans le **nom d'un domaine**, le domaine reste avec **toutes** ses compétences : « sante » garde « Santé numérique et données » et ses trois compétences, dont deux ne contiennent pas le mot.
 - Si le mot figure dans le **nom d'une compétence**, elle reste sous son domaine : « contrat » garde « Droit des contrats » sous « Valorisation et partenariats », sans les autres compétences du domaine.
 - La recherche ne coche rien : il faut cocher ensuite. Videz le champ pour retrouver la liste complète.
+
+### Actions et tâches
+
+Le menu **Tâches** range lui aussi ses valeurs par groupe, ici par **action**. Il fonctionne comme le menu Compétences ([Domaines et compétences](#domaines-et-compétences)) : par action, quand on ne connaît pas chaque tâche, ou par tâche, quand on sait laquelle on veut. Un seul bouton sert aux deux.
+
+![Le menu Tâches ouvert : l'action « Action 2: Maturation de projets » est cochée, l'action « Action 1: Valorisation de la recherche » est cochée en partie (« 1.1 Animation de réseau » seule), le bouton affiche 2 et neuf contacts restent affichés](images/filtre-taches.png)
+
+- Chaque ligne en brun orangé est une **action**. Le nombre à sa droite est celui des cartes qui ont **au moins une tâche** de cette action : une personne qui en a deux n'est comptée qu'une fois.
+- **Cocher une action** coche d'un coup toutes ses tâches. La **flèche** déplie ses tâches : cochez-en une, et la case de l'action passe à moitié cochée (un tiret). Un clic sur la case d'une action à moitié cochée la complète, un clic de plus décoche tout.
+- Tout s'additionne (**ou**) : avec « Action 2 » et « 1.1 Animation de réseau » cochées, on voit les personnes de l'une ou de l'autre. Le chiffre du bouton compte une action cochée en entier pour **un**, quel que soit le nombre de ses tâches.
+- **Le numéro d'une tâche donne son action.** Une tâche dont le libellé commence par « 2.1 » est rangée sous l'action dont le libellé commence par « Action 2 » : le chiffre avant le point est celui de l'action.
+- Une tâche sans numéro, ou dont le numéro ne correspond à aucune action, est rangée sous **Sans action**, en fin de liste : ses personnes restent ainsi trouvables. Une action qui n'a aucune tâche ne figure pas dans le menu.
+- Si aucune tâche ne peut être rangée (aucun libellé de tâche ne porte de numéro d'action), le menu reste une simple liste de tâches, sans actions.
+
+**La recherche du menu trouve une action comme une tâche, et un numéro aussi.** Elle se comporte comme celle du menu Compétences : le nom d'une action garde l'action avec **toutes** ses tâches, le nom d'une tâche garde cette tâche sous son action, et « 2.1 » retrouve la tâche qui porte ce numéro.
+
+**Le filtre Actions ne change pas.** Il liste toujours les actions inscrites sur les cartes des personnes, et se cumule (**et**) avec le menu Tâches : cocher une action dans le menu Tâches ne coche pas le filtre Actions, et inversement. Les deux ne disent pas la même chose : le filtre Actions retrouve les personnes qui participent à une action, le menu Tâches celles qui ont une tâche de cette action.
 
 ## Gagner du temps : cliquer sur une étiquette
 
@@ -229,7 +247,7 @@ Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, votre t
 |---|---|
 | Prénom, nom, fonction, téléphone | Oui, en saisissant le texte |
 | Rôle PUI | Oui, dans une liste déroulante (une valeur, ou « Non renseigné ») |
-| Instances, Actions, GT, Compétences, Communautés, Tâches | Oui, en cochant ou en décochant des pastilles. Les compétences sont rangées par domaine, mais seules les compétences se cochent |
+| Instances, Actions, GT, Compétences, Communautés, Tâches | Oui, en cochant ou en décochant des pastilles. Les compétences sont rangées par domaine et les tâches par action, mais seules les compétences et les tâches se cochent |
 | Adresse e-mail | **Non** : c'est elle qui relie votre compte à votre fiche. À demander à l'administrateur des données |
 | Établissement et périmètre | **Non** : ils décident de qui apparaît dans l'annuaire. À demander à l'administrateur des données |
 | Le choix d'apparaître | **Non**, pas ici : c'est l'interrupteur « Apparaître dans l'annuaire » du bandeau [Ma présence](#ma-présence--apparaître-ou-non) |

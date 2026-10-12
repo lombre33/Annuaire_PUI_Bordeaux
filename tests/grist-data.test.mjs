@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, compareLabels,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
-  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName
+  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName, taskActionNumber, actionNumber
 } from '../grist-data.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
@@ -36,6 +36,51 @@ test('compareLabels sorts using French locale rules, not raw UTF-16 order', () =
   // .sort() par défaut classerait "UBM" avant "chu" (majuscules d'abord) —
   // ce n'est pas l'ordre alphabétique attendu par un utilisateur francophone.
   assert.deepEqual(['UBM', 'chu', 'Anap'].sort(compareLabels), ['Anap', 'chu', 'UBM']);
+});
+
+test('compareLabels puts numbers in numeric order: « 1.2 » before « 1.10 », « Action 2 » before « Action 10 »', () => {
+  assert.deepEqual(['1.10 Clôture', '1.2 Suivi', '1.1 Cadrage'].sort(compareLabels), ['1.1 Cadrage', '1.2 Suivi', '1.10 Clôture']);
+  assert.deepEqual(['Action 10: C', 'Action 2: B', 'Action 1: A'].sort(compareLabels), ['Action 1: A', 'Action 2: B', 'Action 10: C']);
+  assert.deepEqual(['b', 'A', 'é', 'e'].sort(compareLabels), ['A', 'b', 'e', 'é'], 'sans nombre, l\'ordre alphabétique français ne change pas');
+});
+
+// Aucune colonne ne relie une tâche à son action : le numéro avant le point du libellé de la
+// tâche (« 1.3 Animer le réseau ») est celui de son action, que la table Actions numérote
+// (« Action 1: Gouvernance »).
+test('taskActionNumber reads the action of a task before the dot of its number', () => {
+  const numbers = [
+    ['1.3 Animer le réseau', 1], ['1.3', 1], ['  1.3 - Animer', 1], ['1.3. Animer', 1], ['5.4 Veille', 5], ['12.5 Veille', 12],
+    ['01.3 Animer', 1], ['1 . 3 Animer', 1], ['2.10 Clôture', 2], ['3.2.1 Détail', 3], ['0.1 Coordination', 0],
+    ['T1.3 Animer', 1], ['t 1.3 Animer', 1], ['Tâche 1.3 : Animer', 1], ['TACHE 4.2', 4], ['Tâche n° 2.1', 2], ['N°3.2 Animer', 3]
+  ];
+  numbers.forEach(([label, number]) => assert.equal(taskActionNumber(label), number, label));
+});
+
+test('taskActionNumber finds no action in a label that does not start with a number of the form 1.3', () => {
+  ['Veille', '', '   ', null, undefined, 0, '2 formations', '12 réunions par an', '2024 Bilan', '1 3 Suivi', '1. Gouvernance', '1', '1.', '.3',
+    '1,3 Animer', 'Version 2.0', 'Tests 1.3', 'Tâches 1.3', 'Animer le réseau (1.3)', 'Action 1: Gouvernance'
+  ].forEach(label => assert.equal(taskActionNumber(label), null, JSON.stringify(label)));
+});
+
+test('actionNumber reads the number an action starts with: « Action 1: », « Action n° 1 », « A1 », « 1. », « 1 - »', () => {
+  const numbers = [
+    ['Action 1: Gouvernance', 1], ['Action 1 : Gouvernance', 1], ['Action 1:Gouvernance', 1], ['Action 1', 1], ['action 2 - Pilotage', 2],
+    ['ACTION 10: Évaluation', 10], ['  Action 3: Veille', 3], ['Action n° 4', 4], ['Action n°5', 5], ['A6 Veille', 6], ['A 7 Veille', 7],
+    ['8. Gouvernance', 8], ['9 - Pilotage', 9], ['10) Évaluation', 10], ['11', 11], ['Action 012: x', 12],
+    ['Action 0: Coordination', 0]
+  ];
+  numbers.forEach(([label, number]) => assert.equal(actionNumber(label), number, label));
+});
+
+test('actionNumber finds no number in a label that has none, or whose number is the one of a task', () => {
+  ['Gouvernance', 'Audit', 'Action', 'Actions 3', 'Axe 1', '', null, undefined, '1.3 Animer', 'Action 1.3', 'Action 12.5', 'Action 1,5 M€',
+    'Ancienne action 2', 'Vaccination 2030'
+  ].forEach(label => assert.equal(actionNumber(label), null, JSON.stringify(label)));
+});
+
+test('the number of a task and the number of an action are read by two rules that never both apply to the same label', () => {
+  ['1.3 Animer le réseau', 'T1.3', 'Tâche 2.1 : x', 'Action 1: Gouvernance', '1. Gouvernance', 'A1 Pilotage', 'Veille'].forEach(label =>
+    assert.ok(taskActionNumber(label) === null || actionNumber(label) === null, label));
 });
 
 test('formatPhone restores the French leading 0 lost by Grist\'s Numeric column type', () => {

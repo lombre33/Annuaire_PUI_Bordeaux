@@ -58,12 +58,12 @@ async function cocher(page, cle, libelle) {
   await page.mouse.click(5, 5);
 }
 
-// Le menu Compétences range ses compétences par domaine : une case par domaine, qui coche
-// toutes ses compétences, et une flèche qui en déplie le détail.
-const domaine = (page, nom) => filtre(page, 'competences').locator(`.filter-group[data-value="${nom}"]`);
-const nomsDesDomaines = page => filtre(page, 'competences').locator('.group-head .option-label').allTextContents();
+// Les menus Compétences (par domaine) et Tâches (par action) rangent leurs valeurs par groupe :
+// une case par groupe, qui coche toutes ses valeurs, et une flèche qui en déplie le détail.
+const rubrique = (page, cle, nom) => filtre(page, cle).locator(`.filter-group[data-value="${nom}"]`);
+const nomsDesRubriques = (page, cle) => filtre(page, cle).locator('.group-head .option-label').allTextContents();
 // Ce que le menu montre vraiment : une ligne repliée ou masquée n'a plus de boîte à l'écran.
-const visibles = (page, selecteur) => filtre(page, 'competences').locator(selecteur).evaluateAll(lignes =>
+const visibles = (page, cle, selecteur) => filtre(page, cle).locator(selecteur).evaluateAll(lignes =>
   lignes.filter(ligne => ligne.getClientRects().length > 0).map(ligne => ligne.dataset.value));
 
 // ===== Modifier une fiche =====
@@ -75,7 +75,7 @@ const visibles = (page, selecteur) => filtre(page, 'competences').locator(select
 const BROUILLON = {
   fonction: 'Responsable de l\'innovation',
   listes: [
-    { groupe: 'Actions', ajout: 'Formation à l\'innovation', retrait: 'Recherche de financements' },
+    { groupe: 'Actions', ajout: 'Action 3: Formation à l\'innovation', retrait: 'Action 6: Recherche de financements' },
     { groupe: 'Compétences', ajout: 'Intelligence artificielle', retrait: 'Gestion de projet' }
   ]
 };
@@ -230,19 +230,19 @@ const SCENES = [
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       const menu = filtre(page, 'competences');
       await menu.locator('.filter-button').click();
-      await domaine(page, 'Recherche clinique').locator('.group-option input').check();
-      const sante = domaine(page, 'Santé numérique et données');
+      await rubrique(page, 'competences', 'Recherche clinique').locator('.group-option input').check();
+      const sante = rubrique(page, 'competences', 'Santé numérique et données');
       await sante.locator('.group-toggle').click();
       await sante.locator('.filter-option', { hasText: 'Open science' }).locator('input').check();
       await attendreCartes(page, 3);
       await page.mouse.click(5, 5);
       await menu.locator('.filter-button').click();
-      const noms = await nomsDesDomaines(page);
+      const noms = await nomsDesRubriques(page, 'competences');
       exiger(noms[0] === 'Recherche clinique' && noms[1] === 'Santé numérique et données',
         `les domaines cochés ne passent pas devant : ${noms.join(', ')}`);
-      exiger(await domaine(page, 'Recherche clinique').getAttribute('data-state') === 'all', '« Recherche clinique » n\'est pas coché en entier');
-      exiger(await domaine(page, 'Santé numérique et données').getAttribute('data-state') === 'some', '« Santé numérique et données » n\'est pas coché en partie');
-      exiger((await visibles(page, '.filter-option')).join() === 'Open science,Intelligence artificielle,Santé numérique',
+      exiger(await rubrique(page, 'competences', 'Recherche clinique').getAttribute('data-state') === 'all', '« Recherche clinique » n\'est pas coché en entier');
+      exiger(await rubrique(page, 'competences', 'Santé numérique et données').getAttribute('data-state') === 'some', '« Santé numérique et données » n\'est pas coché en partie');
+      exiger((await visibles(page, 'competences', '.filter-option')).join() === 'Open science,Intelligence artificielle,Santé numérique',
         'le détail du domaine partiel n\'est pas déplié, la compétence cochée en tête');
       exiger(await menu.locator('.filter-count').textContent() === '2', 'le bouton ne compte pas un domaine et une compétence');
     }
@@ -256,8 +256,35 @@ const SCENES = [
       const menu = filtre(page, 'competences');
       await menu.locator('.filter-button').click();
       await menu.locator('.filter-search-input').fill('sante');
-      exiger((await visibles(page, '.filter-group')).join() === 'Santé numérique et données', 'la recherche ne garde pas ce seul domaine');
-      exiger((await visibles(page, '.filter-option')).length === 3, 'la recherche ne montre pas les trois compétences du domaine');
+      exiger((await visibles(page, 'competences', '.filter-group')).join() === 'Santé numérique et données', 'la recherche ne garde pas ce seul domaine');
+      exiger((await visibles(page, 'competences', '.filter-option')).length === 3, 'la recherche ne montre pas les trois compétences du domaine');
+    }
+  },
+  {
+    // Le menu Tâches, rangé par action (le numéro d'une tâche est celui de son action) : l'action 2
+    // est cochée en entier, l'action 1 en partie (« 1.1 Animation de réseau » seule) ; les deux
+    // passent devant et l'action partielle est dépliée. « Sans action » reste en dernier.
+    fichier: 'filtre-taches.png', zone: jusquAu('.filter.open .filter-menu'),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      const menu = filtre(page, 'taches');
+      await menu.locator('.filter-button').click();
+      await rubrique(page, 'taches', 'Action 2: Maturation de projets').locator('.group-option input').check();
+      const valorisation = rubrique(page, 'taches', 'Action 1: Valorisation de la recherche');
+      await valorisation.locator('.group-toggle').click();
+      await valorisation.locator('.filter-option', { hasText: '1.1 Animation de réseau' }).locator('input').check();
+      await attendreCartes(page, 9);
+      await page.mouse.click(5, 5);
+      await menu.locator('.filter-button').click();
+      const noms = await nomsDesRubriques(page, 'taches');
+      exiger(noms.join() === 'Action 1: Valorisation de la recherche,Action 2: Maturation de projets,'
+        + 'Action 3: Formation à l\'innovation,Action 4: Veille et propriété intellectuelle,Sans action',
+        `les actions cochées ne passent pas devant, « Sans action » n'est pas en dernier : ${noms.join(', ')}`);
+      exiger(await rubrique(page, 'taches', 'Action 2: Maturation de projets').getAttribute('data-state') === 'all', 'l\'action 2 n\'est pas cochée en entier');
+      exiger(await valorisation.getAttribute('data-state') === 'some', 'l\'action 1 n\'est pas cochée en partie');
+      exiger((await visibles(page, 'taches', '.filter-option')).join() === '1.1 Animation de réseau,1.2 Organisation d\'événements',
+        'le détail de l\'action partielle n\'est pas déplié, la tâche cochée en tête');
+      exiger(await menu.locator('.filter-count').textContent() === '2', 'le bouton ne compte pas une action et une tâche');
     }
   },
   {
