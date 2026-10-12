@@ -1,5 +1,5 @@
 // Accessibilité du widget : noms accessibles, anneau de focus au clavier et contrastes
-// (WCAG 2.2 AA). Les mesures viennent de l'audit UI/UX (constats U13 et U14) ; chaque
+// (WCAG 2.2 AA). Les mesures viennent de l'audit UI/UX (constats U13, U14 et U19) ; chaque
 // test ci-dessous échoue sur le code d'avant leur correction.
 //
 // Les tests de contraste et de feuille de style ne demandent aucun navigateur ; les
@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CATEGORIES } from '../constants.js';
 import { sampleTables, withIdentity, ANA_EMAIL } from './fixtures.mjs';
 import { skip, waitForCards, withWidget } from './support/browser.mjs';
 import { parseColor, contrastRatio, WHITE } from './support/contrast.mjs';
@@ -59,6 +60,32 @@ test('aucune règle ne supprime l’anneau de focus sans le remplacer (WCAG 2.4.
     const rule = rules.find(candidate => candidate.selector === replacement);
     assert.ok(rule && /outline:\s*2px solid/.test(rule.body), `${selector} : la règle de remplacement ${replacement} manque`);
   }
+});
+
+// ===== Couleurs de catégorie et lien e-mail (sans navigateur) =====
+
+// Texte courant : 4,5:1 au moins, quelle que soit sa taille (WCAG 1.4.3) ; les pastilles sont à
+// 8,5 px. Avant leur correction (audit U19), les cinq couleurs de catégorie les plus claires
+// faisaient de 2,16:1 (Tâches) à 3,56:1 (Communautés), et le lien e-mail 3,30:1.
+const MIN_TEXT_CONTRAST = 4.5;
+
+test('chaque couleur de catégorie garde 4,5:1 avec le blanc : pastille à texte blanc, titre de groupe sur fond blanc (WCAG 1.4.3)', () => {
+  const tooPale = Object.entries(CATEGORIES)
+    .map(([key, { color }]) => ({ key, color, ratio: contrastRatio(color, WHITE) }))
+    .filter(({ ratio }) => ratio < MIN_TEXT_CONTRAST)
+    .map(({ key, color, ratio }) => `${key} ${color} : ${ratio.toFixed(2)}:1`);
+  assert.deepEqual(tooPale, [], 'couleurs à foncer à teinte constante (constants.js) pour atteindre 4,5:1');
+});
+
+test('le lien e-mail d’une carte garde 4,5:1 sur le fond blanc de la carte (WCAG 1.4.3)', () => {
+  const css = readCss('style.css');
+  const rule = cssRules(css).find(candidate => candidate.selector === '.email');
+  const variable = /(?:^|[;\s])color:\s*var\((--[\w-]+)\)/.exec(rule?.body ?? '')?.[1];
+  assert.ok(variable, 'la couleur de `.email` vient d’une variable de :root');
+  const color = new RegExp(`${variable}:\\s*(#[0-9a-f]{3,8})`, 'i').exec(css)?.[1];
+  assert.ok(color, `${variable} est déclarée en hexadécimal dans :root`);
+  const ratio = contrastRatio(color, WHITE);
+  assert.ok(ratio >= MIN_TEXT_CONTRAST, `${variable} ${color} : ${ratio.toFixed(2)}:1 au lieu de 4,5:1`);
 });
 
 // ===== Navigateur =====
@@ -175,5 +202,40 @@ test('le menu ouvert a aussi un anneau de focus visible : recherche, cases et fl
     const stops = (await tabStops(page, { limit: 12, from: '.filter.open .filter-button' })).filter(stop => stop.inMenu);
     assert.ok(stops.length >= 5, `la recherche, des cases de domaine et de compétence, des flèches (${stops.length})`);
     assertFocusRings(stops, ['Rechercher dans Compétences', 'Détail de']);
+  });
+});
+
+// Le texte d'un élément de la page rendue : sa couleur, et le premier fond opaque qui le porte
+// (le sien, ou celui de la carte). C'est ce que voit la personne, après les règles de style et
+// les couleurs posées par render.js.
+const renderedText = (page, selector) => page.locator(selector).evaluateAll(elements => elements.map(element => {
+  const style = getComputedStyle(element);
+  let background = style.backgroundColor;
+  for (let node = element.parentElement; node && /^(rgba\(.*, 0\)|transparent)$/.test(background); node = node.parentElement) {
+    background = getComputedStyle(node).backgroundColor;
+  }
+  return { label: element.textContent.trim(), classes: element.className, color: style.color, background, size: style.fontSize };
+}));
+
+test('pastilles, titres de groupe et lien e-mail d’une carte gardent 4,5:1 sur la page rendue (WCAG 1.4.3)', { skip }, async () => {
+  const tables = sampleTables();
+  // Ana porte une pastille de chaque catégorie : GT et Tâches sont vides dans le jeu de base.
+  tables.BDD.GT[0] = ['L', 1];
+  tables.BDD.Taches[0] = ['L', 1];
+  await withWidget({ tables }, async ({ page }) => {
+    await waitForCards(page, 4);
+    const pills = await renderedText(page, '.contact-card .tag');
+    const titles = await renderedText(page, '.contact-card .tag-group-title');
+    const links = await renderedText(page, '.contact-card a.email');
+    const categories = new Set(pills.map(pill => /\btag-(\w+)/.exec(pill.classes)?.[1]));
+    for (const key of ['actions', 'communautes', 'gt', 'instances', 'taches']) {
+      assert.ok(categories.has(key), `une pastille « ${key} » est mesurée (sinon le test ne prouve rien pour elle)`);
+    }
+    assert.ok(titles.length >= 7 && links.length >= 1, `titres et liens mesurés (${titles.length}, ${links.length})`);
+    const tooPale = [...pills, ...titles, ...links]
+      .map(item => ({ ...item, ratio: contrastRatio(parseColor(item.color), parseColor(item.background)) }))
+      .filter(item => item.ratio < MIN_TEXT_CONTRAST)
+      .map(item => `${item.classes} « ${item.label} » ${item.size} : ${item.ratio.toFixed(2)}:1`);
+    assert.deepEqual(tooPale, []);
   });
 });

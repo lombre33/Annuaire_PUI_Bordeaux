@@ -1,4 +1,4 @@
-# Version 1.16.1 — Cartes triées par nom, recherche « prénom nom » (voir CHANGELOG.md)
+# Version 1.16.2 — Pastilles et lien e-mail plus foncés (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -15,5 +15,6 @@ un anneau violet montre le contrôle actif au clavier (1.14.1, audit UI/UX). Dep
 e-mail et établissement compris, et la fenêtre de modification suit la maquette validée
 par Antoine. Depuis la 1.16.1, les cartes sont triées par nom de famille puis par prénom et
 la recherche trouve « prénom nom » dans n'importe quel ordre, tirets, apostrophes et « œ » compris
-(audit UI/UX).
-640 tests (dont 220 dans un vrai navigateur, optionnels sans Playwright).
+(audit UI/UX). Depuis la 1.16.2, les pastilles de catégorie, les titres de groupe et le lien e-mail
+sont assez foncés pour être lus (4,5:1 au moins avec le blanc, audit UI/UX).
+643 tests (dont 221 dans un vrai navigateur, optionnels sans Playwright).
