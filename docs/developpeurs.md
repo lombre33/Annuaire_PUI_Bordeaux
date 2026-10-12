@@ -4,7 +4,7 @@ Cette page explique comment le widget est construit et comment le modifier sans 
 
 Pages liées : [README](../README.md) (présentation et installation), [guide utilisateur](utilisateurs.md), [sécurité](securite.md), [maintenance](maintenance.md).
 
-> **Cette page décrit la version 1.9.0** : le widget lit la table `BDD` (1.8.0) et propose le filtre « Domaines » (1.9.0). D'autres évolutions vont encore en modifier une partie (consentement individuel, identité de la personne connectée, édition de fiche). Elles sont résumées dans [Chantiers en cours](#chantiers-en-cours) et la page sera mise à jour à chaque fusion.
+> **Cette page décrit la version 1.9.1** : le widget lit la table `BDD` (1.8.0), propose le filtre « Domaines » (1.9.0) et s'adapte à la largeur de son cadre (1.9.1). D'autres évolutions vont encore en modifier une partie (consentement individuel, identité de la personne connectée, édition de fiche). Elles sont résumées dans [Chantiers en cours](#chantiers-en-cours) et la page sera mise à jour à chaque fusion.
 
 ## Sommaire
 
@@ -56,7 +56,7 @@ flowchart LR
 | `grist-plugin-api.js` | API de widget de Grist. `index.html` la charge depuis `docs.getgrist.com`, sans version figée | `index.html` |
 | GitHub Actions | Exécute `node --test` à chaque pull request et à chaque push sur `main` | `.github/workflows/tests.yml` |
 
-Ce que le widget fait, dans la version 1.9.0 :
+Ce que le widget fait, dans la version 1.9.1 :
 
 - il **lit** les tables du document Grist (neuf lectures `fetchTable` par chargement) ;
 - il n'**écrit** rien dans Grist, ne stocke rien dans le navigateur et n'émet lui-même aucune requête réseau ;
@@ -350,14 +350,15 @@ Règles :
 
 ## Chantiers en cours
 
-Au 12 octobre 2026, `main` est en version 1.9.0. Cette documentation décrit `main` et sera mise à jour à chaque fusion.
+Au 12 octobre 2026, `main` est en version 1.9.1. Cette documentation décrit `main` et sera mise à jour à chaque fusion.
 
 **Déjà fusionné**
 
 1. **Nouvelle structure Grist** (1.8.0) : la table principale est `BDD`, avec des références directes (établissement, compétences, instances, actions…) et des tables de référence renommées. Le [CHANGELOG](../CHANGELOG.md) liste chaque changement.
 2. **Filtre « Domaines »** (1.9.0) : la recherche par compétences macro, décrite dans [Filtres, compteurs et recherche](#filtres-compteurs-et-recherche).
+3. **Mise en page adaptative** (1.9.1) : le widget s'adapte à la largeur de son cadre, d'un téléphone à un grand écran, comme le décrit [Rendu des cartes et des menus](#rendu-des-cartes-et-des-menus).
 
 **À venir**
 
-3. **Consentement individuel** (1.10.0) : seules les personnes dont `BDD.Accepte_apparaitre` est coché apparaîtraient, en plus de la validation de leur établissement. La colonne deviendrait obligatoire et un annuaire vide serait expliqué par le bandeau. Les [règles d'affichage](#règles-daffichage), le guide utilisateur et la page de maintenance changeront en conséquence.
-4. **Édition de fiche par la personne connectée** : identité de la personne connectée, interrupteur de présence, modale d'édition de sa fiche. Les modifications s'appliqueront directement : aucune validation par un administrateur n'est prévue. Le widget ne sera plus en lecture seule : ce changement modifie le modèle de sécurité décrit dans [sécurité](securite.md), et un guide de configuration côté Grist accompagnera ce chantier.
+4. **Consentement individuel** (1.10.0) : seules les personnes dont `BDD.Accepte_apparaitre` est coché apparaîtraient, en plus de la validation de leur établissement. La colonne deviendrait obligatoire et un annuaire vide serait expliqué par le bandeau. Les [règles d'affichage](#règles-daffichage), le guide utilisateur et la page de maintenance changeront en conséquence.
+5. **Édition de fiche par la personne connectée** : identité de la personne connectée, interrupteur de présence, modale d'édition de sa fiche. Les modifications s'appliqueront directement : aucune validation par un administrateur n'est prévue. Le widget ne sera plus en lecture seule : ce changement modifie le modèle de sécurité décrit dans [sécurité](securite.md), et un guide de configuration côté Grist accompagnera ce chantier.
