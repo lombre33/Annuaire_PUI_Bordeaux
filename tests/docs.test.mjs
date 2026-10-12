@@ -30,6 +30,8 @@ import { loadDirectory } from '../grist-data.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
 import { readIdentity } from '../identity.js';
 import { describePresence, setPresence, explainWriteError } from '../presence.js';
+import { rightsFor, profileFormModel, draftOf } from '../profile.js';
+import { prepareReview, saveProfile } from '../profile-save.js';
 import { tablesFictives, CARTES_ATTENDUES, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
 
@@ -331,6 +333,78 @@ test('?refus=BDD simule une règle d\'accès : l\'écriture est refusée, avec u
   await assert.rejects(setPresence(page.grist.docApi, people.findByEmail(email), false, { log: QUIET_LOG }),
     error => error.name === 'PresenceError' && /Grist a refusé la modification/.test(error.message));
   assert.equal(describePresence((await demoDirectory(page)).people.findByEmail(email)).tone, 'ok', 'la personne est toujours visible');
+});
+
+// Modifier sa fiche (1.12.0) : la personne de démonstration change sa fonction, comme le
+// guide le raconte. Les écritures reçues par le faux document sont dans __demo.actions.
+const bddWrites = page => page.__demo.actions.filter(call => call.table === 'BDD' && call.ok);
+
+async function openProfileDemo(email) {
+  const page = await openDemoPage(`?connecte=${email}`);
+  const directory = await demoDirectory(page);
+  const identity = await readIdentity(page.grist.docApi, { log: QUIET_LOG });
+  const [mine] = directory.people.findByEmail(email);
+  const options = { referenceMaps: directory.referenceMaps, etabFlags: directory.etabFlags, log: QUIET_LOG };
+  const draft = draftOf(profileFormModel(mine.row, directory.referenceMaps));
+  return { page, directory, identity, mine, options, draft };
+}
+
+test('dans la démonstration, chacun ne peut modifier que sa fiche, et un administrateur toutes les fiches', async () => {
+  const { identity, directory, mine } = await openProfileDemo(PERSONNES_DEMO.visible);
+  const other = directory.people.findByEmail(PERSONNES_DEMO.partenaire)[0];
+  assert.equal(rightsFor(identity)(mine.row), 'own', 'sa propre fiche');
+  assert.equal(rightsFor(identity)(other.row), null, 'la fiche d\'une autre personne : aucun droit');
+  assert.equal(rightsFor({ status: 'viewer', email: '', admin: false })(mine.row), null, 'un compte Lecteur ne modifie rien');
+
+  const admin = await openProfileDemo(PERSONNES_DEMO.administrateur);
+  assert.equal(admin.identity.admin, true);
+  assert.equal(rightsFor(admin.identity)(other.row), 'admin', 'un administrateur modifie la fiche de tout le monde');
+  assert.equal(rightsFor(admin.identity)(admin.mine.row), 'own');
+});
+
+test('dans la démonstration, la relecture n\'écrit rien, puis une seule action ne change que la colonne modifiée', async () => {
+  const { page, mine, options, draft } = await openProfileDemo(PERSONNES_DEMO.visible);
+  draft.Fonction = 'Directrice du numérique';
+
+  const review = await prepareReview(page.grist.docApi, mine.row, draft, options);
+  assert.deepEqual(review.lines.map(line => line.label), ['Fonction'], 'la liste « Ce qui change » ne montre que la fonction');
+  assert.equal(bddWrites(page).length, 0, 'la relecture n\'écrit rien dans Grist');
+
+  const result = await saveProfile(page.grist.docApi, review, { log: QUIET_LOG });
+  assert.equal(result.status, 'saved');
+  const writes = bddWrites(page);
+  assert.equal(writes.length, 1, 'une seule action Grist');
+  assert.equal(writes[0].action, 'UpdateRecord');
+  assert.equal(writes[0].rowId, mine.row.id, 'sur la seule fiche de la personne');
+  assert.deepEqual(Object.keys(writes[0].values), ['Fonction'], 'et seule la colonne modifiée est envoyée');
+
+  const { contacts } = await demoDirectory(page);
+  assert.ok(contacts.some(contact => contact.Fonction === 'Directrice du numérique'), 'la carte montre la nouvelle fonction');
+});
+
+test('dans la démonstration, une fiche modifiée entre-temps par quelqu\'un d\'autre n\'est pas écrasée', async () => {
+  const { page, mine, options, draft } = await openProfileDemo(PERSONNES_DEMO.visible);
+  draft.Fonction = 'Directrice du numérique';
+  const review = await prepareReview(page.grist.docApi, mine.row, draft, options);
+
+  await page.grist.docApi.applyUserActions([['UpdateRecord', 'BDD', mine.row.id, { Fonction: 'Changée par un autre' }]]);
+  const result = await saveProfile(page.grist.docApi, review, { log: QUIET_LOG });
+  assert.equal(result.status, 'changed', 'rien n\'est écrit : la personne relit d\'abord ce que Grist contient');
+  assert.equal(bddWrites(page).length, 1, 'seule l\'écriture de l\'autre personne a eu lieu');
+  assert.equal(result.row.Fonction, 'Changée par un autre');
+});
+
+test('?refus=BDD : la modification de fiche est refusée avec un message en français, et rien ne change', async () => {
+  const email = PERSONNES_DEMO.visible;
+  const page = await openDemoPage(`?connecte=${email}&refus=BDD`);
+  const directory = await demoDirectory(page);
+  const [mine] = directory.people.findByEmail(email);
+  const draft = draftOf(profileFormModel(mine.row, directory.referenceMaps));
+  draft.Fonction = 'Directrice du numérique';
+  const review = await prepareReview(page.grist.docApi, mine.row, draft, { referenceMaps: directory.referenceMaps, etabFlags: directory.etabFlags, log: QUIET_LOG });
+  await assert.rejects(saveProfile(page.grist.docApi, review, { log: QUIET_LOG }),
+    error => error.name === 'ProfileSaveError' && /Grist a refusé la modification/.test(error.message));
+  assert.equal(bddWrites(page).length, 0);
 });
 
 test('les personnes fictives citées dans le guide sont masquées, ou visibles, pour la raison qu\'il donne', async () => {
