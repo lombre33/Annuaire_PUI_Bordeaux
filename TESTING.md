@@ -119,6 +119,9 @@ Sans dépendance, un fichier de tests par module :
   réponse sans en-têtes d'autorisation entre sites.
 - `tests/support/contrast.mjs` — le rapport de contraste WCAG (`contrastRatio`, `parseColor`) à
   partir des couleurs calculées par le navigateur, pour les tests d'accessibilité.
+- `tests/support/card-metrics.mjs` — la taille du texte et des cibles des cartes sur la page rendue
+  (`measureCards` : texte sous 12px, pastilles ou boutons sous 24px de haut, petites cibles trop près
+  d'une autre), pour `tests/responsive.test.mjs` et `tests/accessibility.test.mjs`.
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
@@ -182,7 +185,7 @@ serveur, réponse illisible, jeton refusé), le fichier resté sans servir, le r
 pendant que la fenêtre est ouverte, Échap, le double clic, le clavier et les noms accessibles, la
 mise en page de 320 à 1280px et l'absence de tout appel réseau autre que l'API simulée.
 
-`tests/responsive.test.mjs` y ajoute 19 scénarios (et 1 test sans navigateur : le jeu de
+`tests/responsive.test.mjs` y ajoute 23 scénarios (et 1 test sans navigateur : le jeu de
 données de la mise en page ne contient que des coordonnées fictives) sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
@@ -190,7 +193,8 @@ coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
 d'outils, menus de filtres (les menus Compétences et Tâches dépliés compris) entièrement
 dans le cadre, cibles tactiles (écran
-tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
+tactile émulé), taille du texte des cartes (12px au moins à toute largeur, souris ou doigt), pastilles de
+24px de haut et petites cibles isolées (WCAG 2.5.8), bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
 
@@ -202,17 +206,17 @@ supprimé ou illisible, aucune trace du jeton dans la console, relecture d'une f
 `tests/branding-layout.test.mjs` y ajoute 13 scénarios sur la mise en page de l'habillage, de
 320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case,
 bandeau du bas qui se replie, rien qui dépasse du cadre.
-`tests/accessibility.test.mjs` y ajoute 8 scénarios (et 5 tests sans navigateur : les rapports de
+`tests/accessibility.test.mjs` y ajoute 9 scénarios (et 5 tests sans navigateur : les rapports de
 contraste de référence, une garde sur les feuilles de style qui refuse tout `outline: 0` ou
-`outline: none` non justifié, le contraste de chaque couleur de catégorie et du lien e-mail, et celui de
-la piste et du curseur de l'interrupteur de présence) sur le clavier, le lecteur d'écran et les couleurs :
-le champ de recherche nommé par son rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au
-repos, menu ouvert), le parcours complet à la tabulation (page, puis menu ouvert) où chaque arrêt change
-de capture avec et sans focus, avec un anneau plein de 2 px au moins et de 3:1 au moins, les pastilles,
-les titres de groupe et le lien e-mail d'une carte mesurés sur la page rendue (4,5:1 au moins), et la
-piste et le curseur de l'interrupteur de présence mesurés eux aussi (3:1 au moins, éteint et allumé),
-en contraste forcé émulé (bordure, curseur distinct de la piste, états différents) et sans transition
-quand on réduit les animations.
+`outline: none` non justifié, le contraste de chaque couleur de catégorie et du lien e-mail, et celui de la
+piste et du curseur de l'interrupteur de présence) sur le clavier, le lecteur d'écran et les couleurs : le
+champ de recherche nommé par son rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au repos,
+menu ouvert), le parcours complet à la tabulation (page, puis menu ouvert) où chaque arrêt change de capture
+avec et sans focus, avec un anneau plein de 2 px au moins et de 3:1 au moins, les pastilles, les titres de
+groupe et le lien e-mail d'une carte mesurés sur la page rendue (4,5:1 au moins), la piste et le curseur
+de l'interrupteur (3:1 au moins, en contraste forcé et sans transition quand on réduit les animations), et,
+sur la carte de la personne connectée, « Votre fiche » et les boutons « Modifier » (le sien et celui de son
+établissement) à 12px, ces boutons à 24px de haut et le lien e-mail à l'écart d'eux.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -584,6 +588,15 @@ iOS, Chrome Android) que les tests ne couvrent pas :
 - [ ] Téléphone ou tablette : toucher le champ de recherche ne zoome pas la page
       (champs à 16px), les badges, tags et le lien e-mail se touchent sans
       viser, et un filtre touché ne reste pas coloré une fois relâché.
+- [ ] **Texte des cartes** (1.17.1) : à 1 440 px comme à 390 px, étiquettes, titres de groupe, fonction, e-mail,
+      téléphone, « Votre fiche », « Modifier » et, pour un responsable d'établissement, le « Modifier » sous le
+      logo de son établissement ont la même taille (12px) et se lisent sans effort ; seul le nom grossit sous
+      600 px. Une étiquette a une hauteur confortable à viser (24px) et deux étiquettes voisines ne se touchent
+      pas. Les cartes sont plus hautes qu'avant la 1.17.1 (un tiers environ à 1 440 px) : faire défiler une
+      longue liste et juger si le défilement reste agréable. Comparer à `docs/images/apercu.png`.
+- [ ] **Badge de l'établissement en texte** (1.17.1) (un établissement sans logo, ou `?sanslogos` dans la
+      démonstration) : l'acronyme est lu en 12px, entier, à droite du nom sans passer dessous ; un nom
+      plus long que 136px est coupé par « … ».
 
 ## 13. Modifier sa fiche (1.12.0, reprise en 1.15.0)
 
@@ -739,6 +752,10 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
       taille normale, comme les titres de groupe et l'adresse e-mail ; on distingue encore les catégories
       d'un coup d'œil, et le point de chaque bouton de filtre a la couleur des pastilles de sa catégorie.
       À comparer avec `docs/images/carte-anatomie.png`.
+- [ ] **Cibles à la souris** (1.17.1) : cliquer sur une étiquette de carte (elle ajoute le filtre correspondant),
+      sur le bouton « Modifier » de sa propre carte, sur celui de son établissement sous le logo (pour un
+      responsable) et sur le lien e-mail : chaque clic touche la bonne cible du premier coup, sans toucher la
+      voisine ; passer de l'une à l'autre à la souris ne donne pas l'impression de viser trop petit.
 - [ ] **Interrupteur de présence au clavier** (1.16.3) : tabuler jusqu'à « Apparaître dans l'annuaire »
       (compte identifié, fiche présente) et appuyer sur **Espace** : l'interrupteur bascule et **l'anneau
       violet reste sur lui**, pendant « Enregistrement… » comme après ; la touche Tab suivante va au champ de

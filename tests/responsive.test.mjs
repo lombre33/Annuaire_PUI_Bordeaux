@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crowdedTables, crowdedTablesByAction } from './fixtures-responsive.mjs';
+import { measureCards } from './support/card-metrics.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
@@ -554,19 +555,60 @@ test('le survol colore filtre, option de menu et interrupteur à la souris, et n
     { filterBorder: 'rgb(228, 232, 240)', optionBackground: 'rgba(0, 0, 0, 0)', scopeText: 'rgb(104, 115, 138)' }, 'tactile : rien ne reste coloré');
 });
 
-test('les textes ne grossissent que sous 600px ou au tactile : le bureau garde ses tailles', { skip }, () =>
+test('le texte des cartes fait 12px à toute largeur, souris ou doigt : seuls le nom et le titre changent sous 600px', { skip }, () =>
   withWidget({}, async ({ page }) => {
     const sizes = () => page.evaluate(() => {
       const font = selector => getComputedStyle(document.querySelector(selector)).fontSize;
       return { tag: font('.tag'), name: font('.name'), email: font('.email.visible'), search: font('#searchInput'), title: font('h1') };
     });
     await atEachWidth(page, [600, 768, 1024, 1480], async width => {
-      assert.deepEqual(await sizes(), { tag: '8.5px', name: '14px', email: '10.5px', search: '13px', title: '34px' }, `à ${width}px, souris`);
+      assert.deepEqual(await sizes(), { tag: '12px', name: '14px', email: '12px', search: '13px', title: '34px' }, `à ${width}px, souris`);
     });
-    // Sous 600px sans écran tactile : texte de carte plus grand, titre plus petit, champ de recherche inchangé.
+    // Sous 600px sans écran tactile : nom plus grand, titre plus petit, texte de carte et champ de recherche inchangés.
     await atEachWidth(page, [320, 360, 599], async width => {
-      assert.deepEqual(await sizes(), { tag: '11px', name: '15px', email: '12px', search: '13px', title: '28px' }, `à ${width}px, souris`);
+      assert.deepEqual(await sizes(), { tag: '12px', name: '15px', email: '12px', search: '13px', title: '28px' }, `à ${width}px, souris`);
     });
+  }));
+
+test('à la souris, tout le texte des cartes fait 12px au moins et chaque pastille ou badge 24px de haut au moins, à toute largeur', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await atEachWidth(page, [320, 360, 599, 600, 768, 1024, 1480, 1920], async width => {
+      const { texts, targets, smallText, shortTargets } = await measureCards(page);
+      assert.ok(texts > 100 && targets > 100, `à ${width}px, des textes et des cibles sont mesurés (${texts}, ${targets}) : sinon ce test ne prouve rien`);
+      assert.deepEqual([...new Set(smallText)].slice(0, 5), [], `à ${width}px, du texte de carte sous 12px`);
+      assert.deepEqual([...new Set(shortTargets)].slice(0, 5), [], `à ${width}px, des pastilles ou badges sous 24px de haut`);
+    });
+  }));
+
+test('toute cible de carte de moins de 24px, le lien e-mail, est isolée des autres cibles (WCAG 2.5.8), à toute largeur', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await atEachWidth(page, [320, 360, 599, 600, 768, 1024, 1480, 1920], async width => {
+      const { smallTargets, crowdedSmall } = await measureCards(page);
+      assert.ok(smallTargets >= 10, `à ${width}px, des petites cibles sont mesurées (${smallTargets}) : les liens e-mail`);
+      assert.deepEqual([...new Set(crowdedSmall)].slice(0, 5), [], `à ${width}px, des petites cibles trop près d'une autre cible`);
+    });
+  }));
+
+test('au doigt aussi : texte de carte de 12px au moins, pastilles et badges de 24px de haut au moins', { skip }, () =>
+  withWidget({ width: 414, touch: true }, async ({ page }) => {
+    await atEachWidth(page, [414, 820], async width => {
+      const { texts, smallText, shortTargets } = await measureCards(page);
+      assert.ok(texts > 100, `à ${width}px, des textes sont mesurés (${texts})`);
+      assert.deepEqual([...new Set(smallText)].slice(0, 5), [], `à ${width}px, du texte de carte sous 12px`);
+      assert.deepEqual([...new Set(shortTargets)].slice(0, 5), [], `à ${width}px, des pastilles ou badges sous 24px de haut`);
+    });
+  }));
+
+test('les nombres des filtres (celui du bouton, celui de chaque option) font 12px', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    const filter = page.locator('.filter[data-filter-key="actions"]');
+    await filter.locator('.filter-button').click();
+    await filter.locator('.filter-option').first().locator('input').check();
+    const sizes = await page.evaluate(() => ({
+      option: getComputedStyle(document.querySelector('.filter.open .option-count')).fontSize,
+      button: getComputedStyle(document.querySelector('.filter-count:not([hidden])')).fontSize
+    }));
+    assert.deepEqual(sizes, { option: '12px', button: '12px' });
   }));
 
 test('le compteur de résultats reste à côté du titre quand il y a la place, passe dessous sinon au lieu de le comprimer', { skip }, () =>
