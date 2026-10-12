@@ -262,5 +262,6 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       « ok_pour_apparaitre » absente de la table Etablissements »), pas un
       annuaire vide. Remettre son nom ensuite.
 - [ ] Après modification de `ok_pour_apparaitre` dans `Etablissements`,
-      **recharger le widget** (Grist ne le prévient pas, voir README « Limites
-      connues ») puis vérifier le nombre de contacts et le badge de chaque carte.
+      **recharger le widget** (Grist ne le prévient pas, voir « Limites connues »
+      dans [`docs/maintenance.md`](docs/maintenance.md#limites-connues)) puis
+      vérifier le nombre de contacts et le badge de chaque carte.
