@@ -1,6 +1,6 @@
 # Sécurité et confidentialité
 
-Cette page répond aux questions qu'on se pose avant de mettre l'annuaire entre les mains d'un public : qu'est-ce que le widget peut lire et faire, où vont les données, quels sont les risques restants et comment les réduire. Elle décrit la **version 1.12.0**. Le widget écrit dans le document depuis la 1.11.0 (la table-sonde, le choix de présence) ; la 1.12.0 y ajoute la **modification d'une fiche**, directe, sans validation par un administrateur et sans historique tenu par le widget. Plus que jamais, seules les règles d'accès de Grist protègent vraiment les données.
+Cette page répond aux questions qu'on se pose avant de mettre l'annuaire entre les mains d'un public : qu'est-ce que le widget peut lire et faire, où vont les données, quels sont les risques restants et comment les réduire. Elle décrit la **version 1.13.0**. Le widget écrit dans le document depuis la 1.11.0 (la table-sonde, le choix de présence) ; la 1.12.0 y ajoute la **modification d'une fiche**, directe, sans validation par un administrateur et sans historique tenu par le widget. Plus que jamais, seules les règles d'accès de Grist protègent vraiment les données.
 
 Pages liées : [README](../README.md), [documentation développeur](developpeurs.md), [maintenance](maintenance.md), [guide utilisateur](utilisateurs.md).
 
@@ -20,7 +20,7 @@ Pages liées : [README](../README.md), [documentation développeur](developpeurs
 
 ## Résumé
 
-| Question | Réponse pour la version 1.12.0 |
+| Question | Réponse pour la version 1.13.0 |
 |---|---|
 | Le widget écrit-il dans le document Grist ? | **Oui, dans trois cas seulement.** (1) À chaque chargement, il ajoute puis supprime une ligne de la table-sonde `Annuaire_Sonde` pour savoir qui est connecté (sauf pour un compte Lecteur). (2) Quand la personne connectée actionne l'interrupteur « Ma présence », il coche ou décoche `Accepte_apparaitre` sur sa propre fiche de `BDD`. (3) Depuis la 1.12.0, quand une personne valide la modification d'une fiche (la sienne, ou n'importe quelle carte affichée pour un administrateur), il met à jour **une** ligne de `BDD`, en une seule action atomique, avec détection d'un changement concurrent mais **sans validation par un administrateur et sans historique tenu par le widget**. Il ne crée ni ne supprime jamais de table, de colonne ni de fiche de `BDD`, et n'écrit jamais `email`, `Etablissement` ni `perimetre`. Voir [Écritures et règles d'accès](#écritures-et-règles-daccès) |
 | Où vont les données qu'il lit ? | **Nulle part ailleurs que dans la page affichée** : le code n'émet aucune requête réseau, ne stocke rien dans le navigateur (ni cookie, ni stockage local) et ne communique avec aucun service de statistiques |
@@ -36,7 +36,7 @@ Pages liées : [README](../README.md), [documentation développeur](developpeurs
 
 ## Ce que le widget lit, écrit et envoie
 
-Vérifié dans le code de la version 1.12.0 :
+Vérifié dans le code de la version 1.13.0 :
 
 - **Lecture.** `loadDirectory()` appelle `docApi.fetchTable()` une fois par table de [`grist_structure.txt`](../grist_structure.txt) à chaque chargement. `readIdentity()` lit en plus la liste des tables (`listTables`) puis la table-sonde, pour savoir qui est connecté. Pour une modification de fiche, `readRow()` (`profile-save.js`) relit la table `BDD` au moment de la relecture puis juste avant d'écrire, et `readColumnTypes()` (`schema.js`) lit les métadonnées `_grist_Tables` et `_grist_Tables_column` pour connaître le type des colonnes de `BDD` : le widget n'en tire qu'une information, la forme (nombre ou texte) dans laquelle écrire un téléphone.
 - **Écriture.** Trois emplois de `docApi.applyUserActions()`, et trois seulement :
