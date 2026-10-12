@@ -50,12 +50,28 @@ input {
   margin: auto;
 }
 
-/* En-tête */
+/* En-tête : le titre à gauche, les financeurs au centre, la zone profil à droite
+   (voir « Écrans étroits » pour les largeurs où ils s'empilent). */
 .page-header {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "title"
+    "funders"
+    "me";
+  align-items: center;
+  gap: 12px 24px;
   margin-bottom: 24px;
+}
+.page-title {
+  grid-area: title;
+  min-width: 0;
+}
+.title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
 }
 h1 {
   margin-top: 0;
@@ -81,6 +97,161 @@ h1 {
   border-radius: 999px;
   font-size: 13px;
   font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Financeurs : une légende et leurs logos, discrets. */
+.funders {
+  grid-area: funders;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+}
+.funders[hidden] {
+  display: none;
+}
+.funders-label {
+  max-width: 142px;
+  color: #566177;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.funders-logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  list-style: none;
+}
+.funder {
+  display: flex;
+  align-items: center;
+}
+.funder .logo-img {
+  display: block;
+  width: auto;
+  height: 32px;
+  max-width: 110px;
+  object-fit: contain;
+  /* Discrets en haut de page, comme sur la maquette, quelle que soit la version du logo
+     déposée dans Grist : le rond du bandeau du bas, lui, garde ses couleurs. */
+  filter: grayscale(1);
+}
+/* Dimensions calculées à partir des proportions du fichier (--w et --h, en pixels :
+   voir logoSize() dans branding.js) ; --scale les réduit sur téléphone. */
+.funder .logo-img.sized {
+  width: calc(var(--w) * 1px * var(--scale, 1));
+  height: calc(var(--h) * 1px * var(--scale, 1));
+  max-width: none;
+}
+.funder-name {
+  color: #566177;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* « Ma présence » (voir plus bas) vit dans l'en-tête, à droite : la zone « me ». */
+.page-header > .account-bar {
+  grid-area: me;
+  margin-bottom: 0;
+}
+
+/* Le cadre est assez large pour mettre le titre et, à sa droite, les financeurs
+   au-dessus de la zone profil, qui devient compacte : sans fond, sur deux rangées
+   (l'avatar et le message, puis l'interrupteur et le bouton). La zone est une grille, pas
+   une ligne qui se replie : avec une police plus large que prévue, l'étiquette de
+   l'interrupteur passe sur deux lignes au lieu de rejeter le bouton sur une troisième
+   rangée, et le bandeau garde la hauteur du titre. */
+@media (min-width: 860px) {
+  .page-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title funders"
+      "title me";
+  }
+  .funders,
+  .page-header > .account-bar {
+    justify-self: end;
+  }
+  .page-header > .account-bar {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 8px;
+    width: 380px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .page-header > .account-bar .avatar {
+    grid-column: 1;
+    grid-row: 1;
+    width: 34px;
+    height: 34px;
+    font-size: 11px;
+  }
+  .page-header > .account-bar .account-identity {
+    grid-column: 2 / 4;
+    grid-row: 1;
+  }
+  .page-header > .account-bar .presence-switch {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    gap: 8px;
+    min-width: 0;
+  }
+  .page-header > .account-bar .presence-label {
+    line-height: 1.15;
+  }
+  .page-header > .account-bar .account-actions {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .page-header > .account-bar .account-status {
+    grid-column: 1 / -1;
+  }
+  .page-header > .account-bar .presence-switch,
+  .page-header > .account-bar .account-edit {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+}
+/* Plus large encore : les financeurs passent au centre, entre le titre et le profil. Les
+   seuils laissent de la marge avec une police plus large que la police prévue (DejaVu Sans,
+   celle de la CI : le titre y prend 392 px, le profil 380 px) pour que les financeurs restent
+   exactement au centre. Leur légende est trop large pour y tenir tout de suite : elle ne
+   s'affiche qu'à partir de 1320 px (elle reste lue par les lecteurs d'écran). */
+@media (min-width: 1180px) {
+  .page-header {
+    grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+    grid-template-areas: "title funders me";
+  }
+  .funders {
+    justify-self: center;
+  }
+  .funders-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (min-width: 1320px) {
+  .funders-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
 }
 
 /* Barre d'outils : recherche, filtres, réinitialisation */
@@ -285,13 +456,27 @@ h1 {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.etablissement-tag {
+/* Troisième colonne de la carte : l'établissement (son logo, ou son nom à défaut) puis,
+   dessous, la place des actions qui le concernent (le bouton « Modifier » d'un responsable). */
+.etab-col {
   grid-column: 3;
   grid-row: 1;
   align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin: -4px -4px 0 0;
+}
+.etab-actions {
+  margin: 2px 0 0 8px;
+}
+.etab-actions:empty {
+  display: none;
+}
+.etablissement-tag {
   display: none;
   max-width: 96px;
-  margin: -4px -4px 0 8px;
+  margin: 0 0 0 8px;
   padding: 3px 7px;
   color: #fff;
   background: #147c72;
@@ -306,6 +491,59 @@ h1 {
 }
 .etablissement-tag.visible {
   display: block;
+}
+/* Avec un logo (plus haut que la pastille), la colonne de droite couvre les deux rangées du
+   nom et de la fonction, comme l'avatar : le nom reste centré sur l'avatar. La fonction
+   reste alors sous le nom, sans passer sous le logo. */
+.card-body.with-logo .etab-col {
+  grid-row: 1 / span 2;
+}
+.card-body.with-logo .fonction {
+  grid-column: 2;
+}
+/* Le logo seul : ni fond ni pastille, un cadre léger au survol et au clavier. */
+.etablissement-tag.visible.has-logo {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 108px;
+  height: 36px;
+  padding: 2px 4px;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+.etablissement-tag.has-logo:hover,
+.etablissement-tag.has-logo:focus-visible {
+  border-color: var(--line);
+}
+/* Dimensions calculées d'après les proportions du fichier (--w et --h, voir sizeLogo() dans
+   branding-ui.js) ; à défaut, 32 px de haut et la largeur que donnent ses proportions. */
+.etablissement-tag .logo-img {
+  display: block;
+  width: auto;
+  height: 32px;
+  max-width: 92px;
+  object-fit: contain;
+  object-position: right center;
+}
+.etablissement-tag .logo-img.sized {
+  width: calc(var(--w) * 1px);
+  height: calc(var(--h) * 1px);
+}
+/* Un logo n'apparaît qu'une fois chargé. */
+.logo-img {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.logo-img.loaded {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-img {
+    transition: none;
+  }
 }
 .details {
   grid-column: 1/-1;
@@ -641,7 +879,6 @@ h1 {
     padding: 14px 12px 28px;
   }
   .page-header {
-    flex-wrap: wrap;
     gap: 10px 12px;
     margin-bottom: 16px;
   }
@@ -891,6 +1128,143 @@ h1 {
   border: 1px solid #f5c2c2;
   border-radius: 10px;
 }
+
+/* Bandeau des fondateurs, tout en bas : leurs logos en rangées de huit, puis le logo de
+   France 2030 à droite et la phrase de financement dessous. Les tailles se règlent en
+   % et en cqw du bloc de logos, si bien que l'ensemble change d'échelle d'un bloc ;
+   chaque logo garde ses proportions dans une case de même taille, quelle que soit sa
+   forme. Sous 560 px de large il passe à quatre colonnes et la pastille France 2030
+   descend sous les logos. */
+.page-footer {
+  margin-top: 40px;
+}
+.band {
+  container: band / inline-size;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 26px 30px 22px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 6px 16px #252a4d0f;
+}
+.band[hidden] {
+  display: none;
+}
+.band-grid {
+  display: grid;
+  grid-template-columns: 1014fr 137fr;
+  column-gap: 1.97%;
+  align-items: center;
+}
+.band-main {
+  container-type: inline-size;
+}
+.band-logos {
+  --columns: 8;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2.07cqw 0;
+  list-style: none;
+}
+.band-item {
+  flex: 0 0 calc(100% / var(--columns));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100cqw / var(--columns) * 0.46);
+  padding: 0 0.8cqw;
+}
+.band-item .logo-img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+/* --w : largeur voulue en millièmes de la largeur du bloc de logos pour huit colonnes
+   (1 014 = le bandeau fourni) ; avec moins de colonnes, les cases sont plus larges et
+   les logos grandissent d'autant. */
+.band-item .logo-img.sized {
+  width: calc(var(--w) * 1cqw / 10.14 * 8 / var(--columns));
+}
+.logo-holder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+.band-name {
+  color: #566177;
+  font-size: clamp(9px, 1.45cqw, 14px);
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+}
+.band-roundel {
+  justify-self: end;
+  width: 100%;
+  max-width: 120px;
+}
+.band-roundel .logo-holder {
+  height: auto;
+}
+.band-roundel .logo-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.band-sentence {
+  margin-top: 20px;
+  color: #263473;
+  font-size: clamp(11px, 1.55cqw, 17px);
+  line-height: 1.35;
+  text-align: center;
+}
+.band-sentence a {
+  color: inherit;
+  text-decoration: none;
+}
+.band-sentence a:hover,
+.band-sentence a:focus-visible {
+  text-decoration: underline;
+}
+@container band (max-width: 559px) {
+  .band-grid {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 14px;
+  }
+  .band-logos {
+    --columns: 4;
+  }
+  .band-roundel {
+    justify-self: center;
+    max-width: 88px;
+  }
+}
+@media (max-width: 599px) {
+  .funders {
+    --scale: 0.8;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .funders-label {
+    max-width: none;
+  }
+  .band {
+    padding: 18px 14px 16px;
+    border-radius: 14px;
+  }
+  .page-footer {
+    margin-top: 28px;
+  }
+}
+
 .account-edit {
   height: 46px;
   padding: 0 16px;

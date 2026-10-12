@@ -20,10 +20,14 @@ Features
   * Avatar : Pas d'avatar mais à la rigueur les initiales de la personne joliment indiquées dans une bulle. 
   * Nom Prénom 
   * Fonction (si renseignée, vide sinon)
-  * Établissement
+  * Établissement : son logo, seul (son nom ne s'affiche, dans une pastille, que si Grist n'a pas de logo pour lui) (1.14.0)
   *  Email
   *  Tel si renseigné
   *  Les Instances, Actions, GT, communautés Role dans le PUI auxquelles la personne fait partie (le cas échéant)
+* En-tête et pied de page (décisions d'Antoine du 12/10/2026, 1.14.0) : le PUI est le consortium de tous ses établissements fondateurs et n'a pas d'identité graphique propre, ce sont leurs logos qui l'habillent.
+  * Un seul bandeau d'en-tête, pour limiter la place prise : le titre en haut à gauche, les financeurs (ANR, France 2030…) discrets au centre, la zone du profil à droite.
+  * Un bandeau tout en bas avec les logos des établissements fondateurs, dans l'ordre et à la position du bandeau fourni par le PUI, fermé par le rond « France 2030 » et la phrase de financement.
+  * Les logos sont stockés dans le document Grist (pièces jointes), jamais dans le dépôt, et sont facultatifs : sans eux, les noms s'affichent.
 * Filtres
   * Un champs de texte libre qui recherche sur le nom prénom
   * 6 filtres pour les instances, actions, GT, Taches compétances et communauté

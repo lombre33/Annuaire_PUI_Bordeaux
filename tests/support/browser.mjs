@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sampleTables } from '../fixtures.mjs';
+import { routeAttachments } from './fake-attachments.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
@@ -23,8 +24,10 @@ const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 // (tests/support/fake-grist.js, `export` retiré), branché sur des variables que le
 // test pose avant le chargement et peut modifier ensuite (relues à chaque appel) :
 // __tables, __failTables, __user (la personne connectée), __denyWrites (tables dont
-// l'écriture est refusée), __denyRows (lignes protégées), __delay. __triggerRecords
-// rejoue un onRecords (édition Grist) ; __fake.calls liste les actions envoyées à Grist.
+// l'écriture est refusée), __denyRows (lignes protégées), __delay, __accessToken (la
+// réponse de getAccessToken), __withoutMethods (méthodes que cette version de Grist n'a
+// pas). __triggerRecords rejoue un onRecords (édition Grist) ; __fake.calls liste les
+// actions envoyées à Grist, __fake.tokenRequests les demandes de jeton.
 const FAKE_GRIST = fs.readFileSync(path.join(ROOT, 'tests/support/fake-grist.js'), 'utf8').replace(/^export /gm, '');
 const GRIST_MOCK = `${FAKE_GRIST}
 window.__fake = createFakeGrist({
@@ -33,8 +36,10 @@ window.__fake = createFakeGrist({
   user: () => window.__user,
   denyWrites: () => window.__denyWrites,
   denyRows: () => window.__denyRows,
-  delay: () => window.__delay
+  delay: () => window.__delay,
+  accessToken: () => window.__accessToken
 });
+(window.__withoutMethods || []).forEach(name => { delete window.__fake.docApi[name]; });
 window.grist = {
   ready(options) { window.__gristReady = options; },
   onRecords(callback) { window.__triggerRecords = callback; setTimeout(callback, 0); },
@@ -81,20 +86,27 @@ after(async () => {
 
 // `user` : l'adresse de la personne connectée (null : compte anonyme) ; `readOnly` :
 // le cadre d'un compte Lecteur (?readonly=true) ; `denyRows` : { table: [identifiants] }.
+// Les logos sont des pièces jointes : `files` (tests/support/fake-attachments.mjs) compte les
+// fichiers qui ont été téléchargés et les jetons employés ; `accessToken` est la réponse de
+// getAccessToken (null : Grist refuse), `withoutMethods` les méthodes de docApi qu'une
+// vieille version de Grist n'a pas.
 export async function openWidget({
-  tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false
+  tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false,
+  accessToken, withoutMethods = []
 } = {}) {
   const context = await browser.newContext();
-  // Hermétique : seul le serveur local et l'API Grist simulée répondent.
+  // Hermétique : seuls le serveur local, l'API Grist simulée et ses pièces jointes répondent.
   await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
   await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));
+  const files = await routeAttachments(context);
   const page = await context.newPage();
   const logs = { errors: [], warnings: [], infos: [] };
   page.on('pageerror', error => logs.errors.push(error.message));
   page.on('console', message => {
-    // text() réduit un objet à « JSHandle@object » : on relit les arguments.
+    // text() réduit un objet à « JSHandle@object » : on relit les arguments. Un message du
+    // navigateur lui-même (un fichier introuvable) n'en a pas : on garde son texte.
     const readable = async () => (await Promise.all(message.args().map(arg => arg.jsonValue())))
-      .map(value => (typeof value === 'string' ? value : JSON.stringify(value))).join(' ');
+      .map(value => (typeof value === 'string' ? value : JSON.stringify(value))).join(' ') || message.text();
     if (message.type() === 'error') logs.errors.push(readable());
     if (message.type() === 'warning') logs.warnings.push(readable());
     if (message.type() === 'info') logs.infos.push(readable());
@@ -106,9 +118,11 @@ export async function openWidget({
     window.__denyWrites = values.denyWrites;
     window.__denyRows = values.denyRows;
     window.__delay = values.delay;
-  }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, delay });
+    window.__accessToken = values.accessToken;
+    window.__withoutMethods = values.withoutMethods;
+  }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, delay, accessToken, withoutMethods });
   await page.goto(`${baseUrl}/index.html${readOnly ? '?readonly=true' : ''}`);
-  return { page, context, logs };
+  return { page, context, logs, files };
 }
 
 // Rejoue un onRecords (comme une édition dans Grist) et attend la fin du debounce.

@@ -6,8 +6,8 @@
 //   node docs/demo/capturer.mjs
 //
 // À relancer, puis à committer, après toute modification de l'interface.
-// Chaque capture est précédée d'une vérification (nombre de cartes, bandeau,
-// boutons « Modifier », étape de la fenêtre de modification) : si le widget
+// Chaque capture est précédée d'une vérification (nombre de cartes, logos chargés,
+// bandeau, boutons « Modifier », étape de la fenêtre de modification) : si le widget
 // n'affiche pas ce qui est attendu, le script échoue au lieu de photographier un
 // écran faux.
 
@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startDemoServer } from './serveur-demo.mjs';
-import { CARTES_ATTENDUES, PERSONNES_DEMO } from './donnees-fictives.mjs';
+import { CARTES_ATTENDUES, HABILLAGE_ATTENDU, PERSONNES_DEMO } from './donnees-fictives.mjs';
 
 const DOSSIER_IMAGES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'images');
 const LARGEUR = 1440; // un écran de PC : à partir de 1400 px, la mise en page est celle de départ (style.css)
@@ -23,6 +23,7 @@ const HAUTEUR_FENETRE = 2200; // grande : chaque capture est rognée sur ce qui 
 const FACTEUR_ECHELLE = 1.5; // captures nettes sur écran à haute densité sans alourdir le dépôt
 const MARGE = 28; // espace gardé sous l'élément qui borne la capture
 const MARGE_RANGEE = 8; // plus petite que l'écart entre deux rangées de cartes (14 px) : la rangée suivante ne déborde pas sur la capture
+const MARGE_ENTETE = 12; // sous l'en-tête : moins que l'écart qui le sépare de la barre de recherche, qui ne déborde donc pas sur la capture
 const HAUTEUR_FENETRE_MODIFICATION = 1000; // la fenêtre de modification mesure au plus 900 px (dialogs.css) : elle tient en entier à l'écran
 const MARGE_FENETRE = 12; // fond assombri gardé autour de la fenêtre de modification
 
@@ -35,8 +36,19 @@ try {
   process.exit(1);
 }
 
-const attendreCartes = (page, nombre) =>
-  page.waitForFunction(attendu => document.querySelectorAll('.contact-card').length === attendu, nombre, { timeout: 10_000 });
+// Les logos sont des images que le widget demande à Grist : une capture prise trop tôt montrerait
+// des cadres vides ou à demi transparents (un logo apparaît en fondu). On attend que chaque logo
+// soit chargé et pleinement visible (ou remplacé par le nom de l'établissement quand Grist refuse
+// le fichier), sauf ceux des cartes hors de l'écran, que le navigateur ne charge pas avant d'en
+// approcher (loading="lazy").
+const attendreLogos = page =>
+  page.waitForFunction(() => [...document.querySelectorAll('img.logo-img')]
+    .filter(image => image.loading === 'eager' || image.getBoundingClientRect().top < window.innerHeight)
+    .every(image => image.classList.contains('loaded') && getComputedStyle(image).opacity === '1'), null, { timeout: 10_000 });
+const attendreCartes = async (page, nombre) => {
+  await page.waitForFunction(attendu => document.querySelectorAll('.contact-card').length === attendu, nombre, { timeout: 10_000 });
+  await attendreLogos(page);
+};
 const attendreBandeau = page =>
   page.waitForFunction(() => !document.getElementById('statusBanner').hidden, null, { timeout: 10_000 });
 // Le bandeau « Ma présence » est affiché, dit `extrait` et n'a plus de message
@@ -91,6 +103,35 @@ const pastille = (page, titre, libelle) =>
 // Une vérification qui ne se règle pas en attendant : le script s'arrête sur un écran faux.
 function exiger(condition, message) {
   if (!condition) throw new Error(`Écran inattendu : ${message}`);
+}
+
+// ===== L'habillage : logos des financeurs, des fondateurs et des cartes =====
+
+// Ce que la page montre de l'habillage, lu dans le DOM : le logo chargé de chaque emplacement
+// (son texte alternatif ou l'infobulle de l'établissement), ou « texte : … » quand le nom
+// remplace le logo.
+const lireHabillage = page => page.evaluate(() => {
+  const emplacement = (item, nom) => (item.querySelector('img.loaded') ? nom : `texte : ${item.textContent}`);
+  return {
+    financeurs: [...document.querySelectorAll('#fundersLogos .funder')].map(item => emplacement(item, item.querySelector('img')?.alt)),
+    bandeau: [...document.querySelectorAll('#bandLogos .band-item')].map(item => emplacement(item, item.title)),
+    rond: [...document.querySelectorAll('#bandRoundel img.loaded')].length,
+    cartesAvecLogo: document.querySelectorAll('.contact-card .etablissement-tag.has-logo').length,
+    cartesSansLogo: document.querySelectorAll('.contact-card .etablissement-tag.visible:not(.has-logo)').length
+  };
+});
+
+// Les logos sont affichés comme le jeu de démonstration les décrit : les financeurs et les
+// fondateurs dans leur ordre, le rond du bandeau, un logo sur chaque carte sauf `sansLogo`.
+async function exigerHabillage(page, { cartes, sansLogo = 0 }) {
+  const habillage = await lireHabillage(page);
+  exiger(JSON.stringify(habillage.financeurs) === JSON.stringify(HABILLAGE_ATTENDU.financeurs),
+    `les financeurs sont « ${habillage.financeurs.join(' | ')} »`);
+  exiger(JSON.stringify(habillage.bandeau) === JSON.stringify(HABILLAGE_ATTENDU.bandeau),
+    `le bandeau des fondateurs est « ${habillage.bandeau.join(' | ')} »`);
+  exiger(habillage.rond === 1, 'le rond qui ferme le bandeau est absent');
+  exiger(habillage.cartesSansLogo === sansLogo && habillage.cartesAvecLogo === cartes - sansLogo,
+    `${habillage.cartesAvecLogo} cartes ont un logo et ${habillage.cartesSansLogo} le nom de l'établissement, au lieu de ${cartes - sansLogo} et ${sansLogo}`);
 }
 
 // Le bandeau propose « Modifier mon profil » et la carte de la personne, la seule à avoir
@@ -154,6 +195,17 @@ const jusquALaRangee = rangees => async page =>
     return Math.max(...boites.filter(boite => hauts.includes(Math.round(boite.top))).map(boite => boite.bottom));
   }, rangees), MARGE_RANGEE);
 
+// ...ou : un élément, sur toute la largeur de la page, avec un peu de marge au-dessus et au-dessous
+// (coordonnées de la page entière : la scène demande `pagePleine`).
+const autourDe = (selecteur, marge = MARGE) => async page => {
+  const { haut, bas } = await page.evaluate(cible => {
+    const boite = document.querySelector(cible).getBoundingClientRect();
+    return { haut: boite.top + window.scrollY, bas: boite.bottom + window.scrollY };
+  }, selecteur);
+  const debut = Math.max(0, Math.floor(haut - marge));
+  return { x: 0, y: debut, width: LARGEUR, height: Math.ceil(bas + marge) - debut };
+};
+
 // ...ou : la fenêtre de modification d'une fiche, avec un peu du fond assombri autour.
 const autourDeLaFenetre = async page => {
   const boite = await fenetre(page).boundingBox();
@@ -169,7 +221,7 @@ const REPERES = [
   { numero: 1, selecteur: '.avatar', placement: 'coin' },
   { numero: 2, selecteur: '.name', texte: true },
   { numero: 3, selecteur: '.fonction', texte: true },
-  { numero: 4, selecteur: '.etablissement-tag', placement: 'gauche' },
+  { numero: 4, selecteur: '.etablissement-tag .logo-img', placement: 'gauche' },
   { numero: 5, selecteur: '.email', texte: true },
   { numero: 6, selecteur: '.tel', texte: true },
   { numero: 7, selecteur: '.tag-group-title', texte: true },
@@ -208,10 +260,39 @@ async function poserReperes(page) {
 // Chaque scène : fichier produit, adresse à ouvrir (`requete`), mise en situation
 // vérifiée par `preparer`, zone rognée (par défaut toute la fenêtre) et, si elle doit
 // différer de HAUTEUR_FENETRE, hauteur de la fenêtre du navigateur (`hauteur`).
+// `pagePleine` : la zone se mesure sur la page entière (le bas de la page, hors de la fenêtre).
 const SCENES = [
   {
     fichier: 'apercu.png', zone: jusquALaRangee(2),
-    preparer: page => attendreCartes(page, CARTES_ATTENDUES.fondateurs)
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      await exigerHabillage(page, { cartes: CARTES_ATTENDUES.fondateurs });
+    }
+  },
+  {
+    // Le bas de la page : les logos des fondateurs dans l'ordre de la colonne ordre_bandeau, le rond
+    // des financeurs, et la phrase qui renvoie à la page du PUI.
+    fichier: 'bandeau-fondateurs.png', pagePleine: true, zone: autourDe('#foundersBand'),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      await exigerHabillage(page, { cartes: CARTES_ATTENDUES.fondateurs });
+      exiger(await page.locator('#bandLink').getAttribute('href') !== null, 'le lien du bandeau ne mène nulle part');
+    }
+  },
+  {
+    // Grist ne donne pas le jeton d'accès aux pièces jointes : les noms remplacent les logos partout.
+    fichier: 'sans-logos.png', requete: '?sanslogos', zone: jusquALaRangee(1),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      const habillage = await lireHabillage(page);
+      exiger(habillage.financeurs.length === HABILLAGE_ATTENDU.financeurs.length && habillage.financeurs.every(nom => nom.startsWith('texte : ')),
+        'les financeurs ne sont pas écrits en toutes lettres');
+      exiger(habillage.bandeau.length === HABILLAGE_ATTENDU.bandeau.length && habillage.bandeau.every(nom => nom.startsWith('texte : ')),
+        'les fondateurs du bandeau ne sont pas écrits en toutes lettres');
+      exiger(habillage.cartesAvecLogo === 0 && habillage.cartesSansLogo === CARTES_ATTENDUES.fondateurs,
+        'toutes les cartes doivent porter le nom de l\'établissement');
+      exiger(await page.evaluate(() => window.__demo.demandesJeton.length) >= 1, 'le widget n\'a pas demandé de jeton');
+    }
   },
   {
     // Un menu à plat : champ de recherche, cases à cocher et, à droite, le nombre de cartes.
@@ -284,7 +365,10 @@ const SCENES = [
       await page.click('[data-scope="partenaire"]');
       await attendreCartes(page, CARTES_ATTENDUES.fondateursEtPartenaires);
       await page.click('[data-scope="fondateur"]');
-      await attendreCartes(page, CARTES_ATTENDUES.fondateursEtPartenaires - CARTES_ATTENDUES.fondateurs);
+      const partenaires = CARTES_ATTENDUES.fondateursEtPartenaires - CARTES_ATTENDUES.fondateurs;
+      await attendreCartes(page, partenaires);
+      // Un établissement partenaire sans logo garde son nom écrit sur ses cartes.
+      await exigerHabillage(page, { cartes: partenaires, sansLogo: HABILLAGE_ATTENDU.cartesPartenairesSansLogo });
     }
   },
   {
@@ -313,7 +397,7 @@ const SCENES = [
     }
   },
   {
-    fichier: 'ma-presence.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquAu('#accountBar', MARGE_RANGEE),
+    fichier: 'ma-presence.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquAu('.page-header', MARGE_ENTETE),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       await attendrePresence(page, 'Vous apparaissez dans l\'annuaire.');
@@ -321,7 +405,7 @@ const SCENES = [
   },
   {
     // Un clic sur l'interrupteur : la personne disparaît de l'annuaire, le compteur perd une carte.
-    fichier: 'ma-presence-retiree.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquAu('#accountBar', MARGE_RANGEE),
+    fichier: 'ma-presence-retiree.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquAu('.page-header', MARGE_ENTETE),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       await attendrePresence(page, 'Vous apparaissez dans l\'annuaire.');
@@ -332,7 +416,7 @@ const SCENES = [
   },
   {
     // Accord donné, mais fondateur non validé : la fiche reste masquée, et le bandeau dit pourquoi.
-    fichier: 'ma-presence-masquee.png', requete: `?connecte=${PERSONNES_DEMO.masquee}`, zone: jusquAu('#accountBar', MARGE_RANGEE),
+    fichier: 'ma-presence-masquee.png', requete: `?connecte=${PERSONNES_DEMO.masquee}`, zone: jusquAu('.page-header', MARGE_ENTETE),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       await attendrePresence(page, 'reste masquée : votre établissement n\'a pas encore été validé');
@@ -427,7 +511,7 @@ try {
     await scene.preparer(page);
     await page.mouse.move(0, 0); // pas de survol parasite sur la capture
     const fichier = path.join(DOSSIER_IMAGES, scene.fichier);
-    await page.screenshot({ path: fichier, clip: scene.zone ? await scene.zone(page) : undefined });
+    await page.screenshot({ path: fichier, clip: scene.zone ? await scene.zone(page) : undefined, fullPage: scene.pagePleine });
     await page.close();
     console.log(`${path.relative(process.cwd(), fichier)}  ${(fs.statSync(fichier).size / 1024).toFixed(0)} Ko`);
   }
