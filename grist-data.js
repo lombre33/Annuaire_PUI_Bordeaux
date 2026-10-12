@@ -287,6 +287,10 @@ export function mailtoHref(email) {
 // elles ne s'affichent simplement pas.
 const REQUIRED_COLUMNS = ['nom', 'prenom', 'Etablissement', 'perimetre'];
 
+// Colonnes d'Etablissements dont dépend l'éligibilité des contacts (specs.md) :
+// l'une d'elles renommée, et plus aucun contact ne s'affiche.
+const REQUIRED_ETABLISSEMENT_COLUMNS = ['fondateur', 'partenaire', 'ok_pour_apparaitre'];
+
 // Lecture impossible d'une donnée indispensable. `message` est une phrase
 // française destinée au bandeau d'état.
 export class DirectoryLoadError extends Error {
@@ -336,37 +340,51 @@ function requireReadable(results, log) {
   });
 }
 
-function requireMainTableColumns(rows) {
-  const missing = rows.length ? REQUIRED_COLUMNS.filter(column => !(column in rows[0])) : [];
+// Colonnes de `columns` qui manquent à la table (lue en lignes). Une table vide
+// ne permet pas de les vérifier : rien n'est signalé.
+function missingColumns(rows, columns) {
+  return rows.length ? columns.filter(column => !(column in rows[0])) : [];
+}
+
+function requireColumns(table, columns, rows) {
+  const missing = missingColumns(rows, columns);
   if (missing.length) {
-    throw new DirectoryLoadError(`colonne « ${missing.join(' », « ')} » absente de la table ${MAIN_TABLE}`);
+    throw new DirectoryLoadError(`colonne « ${missing.join(' », « ')} » absente de la table ${table}`);
   }
 }
 
-// id → libellé d'une table de référence, ou null si sa lecture a échoué.
+// Lit la table de référence d'une catégorie : { map: id → libellé, labelColumnsMissing }
+// (aucune colonne de libellé n'existe : le menu et les tags seraient vides en
+// silence), ou null si sa lecture a échoué.
 function readReferenceMap(table, fields, result, log) {
   if (result.status === 'rejected') {
     log.warn(`[REFS] Impossible de charger ${table}`, result.reason);
     return null;
   }
   const rows = tableToRows(result.value);
-  const map = labelMapFromRows(rows, fields);
+  const labelFields = [].concat(fields);
+  const map = labelMapFromRows(rows, labelFields);
   const withoutLabel = rows.length - Object.keys(map).length;
   log.info(`[REFS] ${table}: ${Object.keys(map).length} entrées`
-    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${[].concat(fields).join('/')})` : ''));
-  return map;
+    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${labelFields.join('/')})` : ''));
+  const absent = missingColumns(rows, labelFields);
+  if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
+  return { map, labelColumnsMissing: absent.length === labelFields.length };
 }
 
-// Une table illisible garde ses libellés précédents ; `unreadable` la signale.
+// Une table illisible garde ses libellés précédents ; `unreadable` la signale,
+// `unlabeled` celles dont aucune colonne de libellé n'existe.
 function readReferenceMaps(results, previousMaps, log) {
   const referenceMaps = {};
   const unreadable = [];
+  const unlabeled = [];
   REFERENCE_TABLES.forEach(([table, fields]) => {
-    const map = readReferenceMap(table, fields, results[table], log);
-    if (!map) unreadable.push(table);
-    referenceMaps[table] = map ?? previousMaps[table] ?? {};
+    const read = readReferenceMap(table, fields, results[table], log);
+    if (!read) unreadable.push(table);
+    else if (read.labelColumnsMissing) unlabeled.push({ table, fields: [].concat(fields) });
+    referenceMaps[table] = read?.map ?? previousMaps[table] ?? {};
   });
-  return { referenceMaps, unreadable };
+  return { referenceMaps, unreadable, unlabeled };
 }
 
 // Les contacts sans Etablissement ne s'affichent pas. Seuls leurs identifiants
@@ -386,10 +404,14 @@ function resolvedByLabel(scopedRows) {
 }
 
 // Messages du bandeau d'état pour tout ce qui rend l'annuaire incomplet.
-function directoryIssues({ unreadable, etabFlags, scopedRows, emptyReason }) {
+function directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason }) {
   const issues = [];
   if (unreadable.length) {
     issues.push(`Tables illisibles (${unreadable.join(', ')}) : des libellés ou des tags peuvent manquer.`);
+  }
+  if (unlabeled.length) {
+    const expected = unlabeled.map(({ table, fields }) => `${table} (${fields.join(' ou ')})`).join(', ');
+    issues.push(`Colonne de libellé introuvable : ${expected}. Les tags et le filtre correspondants restent vides.`);
   }
   if (etabFlags.conflicts.length && resolvedByLabel(scopedRows)) {
     issues.push(`Acronymes en double dans Etablissements (${etabFlags.conflicts.join(', ')}) avec des statuts `
@@ -412,10 +434,12 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   requireReadable(results, log);
 
   const rows = tableToRows(results[MAIN_TABLE].value);
-  requireMainTableColumns(rows);
+  requireColumns(MAIN_TABLE, REQUIRED_COLUMNS, rows);
+  const etablissementRows = tableToRows(results.Etablissements.value);
+  requireColumns('Etablissements', REQUIRED_ETABLISSEMENT_COLUMNS, etablissementRows);
 
-  const { referenceMaps, unreadable } = readReferenceMaps(results, previousMaps, log);
-  const etabFlags = etablissementFlagsFromRows(tableToRows(results.Etablissements.value));
+  const { referenceMaps, unreadable, unlabeled } = readReferenceMaps(results, previousMaps, log);
+  const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const scopedRows = rows.filter(isInScope);
   const contacts = buildContacts(scopedRows, referenceMaps, etabFlags);
   log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
@@ -426,6 +450,6 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
     contacts,
     referenceMaps,
     etabFlags,
-    issues: directoryIssues({ unreadable, etabFlags, scopedRows, emptyReason })
+    issues: directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason })
   };
 }

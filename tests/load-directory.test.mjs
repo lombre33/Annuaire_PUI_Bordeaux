@@ -119,6 +119,40 @@ test('loadDirectory refuses a BDD table that lacks a required column instead of 
   }
 });
 
+test('loadDirectory refuses an Etablissements table that lacks a visibility column instead of hiding every contact', async () => {
+  for (const column of ['fondateur', 'partenaire', 'ok_pour_apparaitre']) {
+    const tables = sampleTables();
+    delete tables.Etablissements[column];
+    await assert.rejects(
+      load(tables),
+      error => error instanceof DirectoryLoadError && error.message.includes(`« ${column} »`) && error.message.includes('Etablissements')
+    );
+  }
+});
+
+test('loadDirectory reports a reference table none of whose label columns exist, and keeps the directory', async () => {
+  const tables = sampleTables();
+  delete tables.Actions.Actions;
+  delete tables.Actions.Actions_corrigees;
+  const log = recordingLog();
+  const { contacts, referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
+  assert.equal(contacts.length, 5, 'les contacts restent affichés');
+  assert.deepEqual(referenceMaps.Actions, {});
+  assert.equal(issues.length, 1);
+  assert.match(issues[0], /Actions \(Actions_corrigees ou Actions\)/);
+  assert.ok(log.warnings.some(args => String(args[0]).includes('Actions') && String(args[0]).includes('introuvable')));
+});
+
+test('loadDirectory falls back to the raw label with a console warning when only the corrected column is missing', async () => {
+  const tables = sampleTables();
+  delete tables.Actions.Actions_corrigees;
+  const log = recordingLog();
+  const { referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
+  assert.deepEqual(referenceMaps.Actions, { 1: 'Vaccination', 2: 'Audit' });
+  assert.deepEqual(issues, [], 'pas de bandeau : les libellés bruts suffisent');
+  assert.ok(log.warnings.some(args => String(args[0]).includes('Actions_corrigees')));
+});
+
 test('loadDirectory works without the optional BDD columns (Fonction, email, phone, PUI role) and uses them when they come back', async () => {
   const bare = sampleTables();
   delete bare.BDD.Fonction;

@@ -31,15 +31,15 @@ Sans dépendance, un fichier de tests par module :
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
   (une lecture par table, aucune ancienne table lue, libellé corrigé
   prioritaire, tables indispensables illisibles, table de référence illisible,
-  colonnes obligatoires ou facultatives, annuaire vide expliqué, doublons
-  d'acronymes).
+  colonnes obligatoires, facultatives ou introuvables, annuaire vide expliqué,
+  doublons d'acronymes).
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 21
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 23
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
 Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
@@ -242,6 +242,10 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       fois la table remise sous son nom, recharger : le bandeau disparaît.
 - [ ] Renommer temporairement la table `Actions`, recharger : les cartes
       restent affichées et le bandeau signale « Tables illisibles (Actions) ».
+- [ ] Renommer temporairement la colonne `ok_pour_apparaitre` d'`Etablissements`,
+      recharger : bandeau d'erreur qui nomme la colonne (« colonne
+      « ok_pour_apparaitre » absente de la table Etablissements »), pas un
+      annuaire vide. Remettre son nom ensuite.
 - [ ] Après modification de `ok_pour_apparaitre` dans `Etablissements`,
       **recharger le widget** (Grist ne le prévient pas, voir README « Limites
       connues ») puis vérifier le nombre de contacts et le badge de chaque carte.

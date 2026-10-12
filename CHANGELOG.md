@@ -32,13 +32,19 @@ aucune règle d'affichage : à données équivalentes, ce sont les mêmes contac
   `Role_dans_le_PUI` sont facultatives : BDD n'a plus de téléphone ni de rôle
   PUI, la carte ne les affiche donc plus, et les reprendrait si ces colonnes
   revenaient sous les mêmes noms.
+- **Colonnes introuvables signalées** : une colonne de visibilité d'Etablissements
+  (`fondateur`, `partenaire`, `ok_pour_apparaitre`) absente provoque une erreur
+  explicite, comme pour BDD, au lieu d'un annuaire vide. Si aucune colonne de
+  libellé d'une table de référence n'existe (ex. `Actions_corrigees` et
+  `Actions`), le bandeau le dit et le filtre correspondant reste vide ; si seule
+  la colonne corrigée manque, le libellé brut est utilisé et la console avertit.
 - **Pas encore utilisée** : `Accepte_apparaitre` (aujourd'hui une formule qui
   renvoie toujours faux) n'influence pas l'affichage.
-- **Tests** : 92 tests (70 unitaires, 1 règle du projet, 21 dans un vrai
+- **Tests** : 97 tests (73 unitaires, 1 règle du projet, 23 dans un vrai
   navigateur). Le jeu de données `tests/fixtures.mjs` reproduit la structure BDD.
   Nouveaux : lecture des seules tables de la nouvelle structure, libellé
-  corrigé prioritaire, colonnes obligatoires et facultatives, doublons
-  d'acronymes, interdiction de la colonne du nom de domaine
+  corrigé prioritaire, colonnes obligatoires, facultatives ou introuvables,
+  doublons d'acronymes, interdiction de la colonne du nom de domaine
   (`tests/rules.test.mjs`).
 
 ## 1.7.2 — Refactor sans changement de comportement

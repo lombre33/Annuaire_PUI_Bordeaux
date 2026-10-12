@@ -358,6 +358,30 @@ test('colonne Etablissement absente de BDD : erreur explicite au lieu de « 0 co
   });
 });
 
+test('colonne de visibilité absente d\'Etablissements : erreur explicite au lieu de « 0 contact »', { skip }, () => {
+  const tables = sampleTables();
+  delete tables.Etablissements.ok_pour_apparaitre;
+  return withWidget({ tables }, async ({ page }) => {
+    await waitForBanner(page);
+    assert.match(await bannerText(page), /ok_pour_apparaitre/);
+    assert.equal(await resultCount(page), 'Chargement impossible');
+  });
+});
+
+test('colonne de libellé introuvable dans une table de référence : le bandeau le dit, les cartes restent', { skip }, () => {
+  const tables = sampleTables();
+  delete tables.Actions.Actions;
+  delete tables.Actions.Actions_corrigees;
+  return withWidget({ tables }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await waitForBanner(page);
+    assert.match(await bannerText(page), /Actions \(Actions_corrigees ou Actions\)/);
+    assert.equal(await page.locator('.filter[data-filter-key="actions"] .filter-option').count(), 0, 'le menu Actions n\'a aucune option');
+    assert.ok(await page.locator('.filter[data-filter-key="instances"] .filter-option').count() > 0, 'les autres menus restent');
+    assert.equal(await page.locator('.contact-card').first().locator('.tag-group-title', { hasText: 'Instances' }).count(), 1);
+  });
+});
+
 test('Etablissement vide pour tous les contacts : le bandeau le dit', { skip }, () => {
   const tables = sampleTables();
   tables.BDD.Etablissement = tables.BDD.Etablissement.map(() => 0);
