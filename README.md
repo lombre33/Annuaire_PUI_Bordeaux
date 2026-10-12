@@ -171,7 +171,7 @@ Le détail, avec les cas que le bandeau ne signale pas, est dans [Maintenance](d
 ## Usage de l'IA et hébergement
 
 - **Aucune IA en temps réel.** Le widget n'appelle aucun service d'IA, et le PUI indique qu'aucune IA ne traite le document Grist en temps réel ni n'y a d'accès MCP (Model Context Protocol).
-- **Les compétences passent par une IA à l'export seulement**, au moment de leur export depuis Résana, via [Mammouth AI](https://mammouth.ai) avec le modèle Claude Opus 5.0, en mode « no log » d'après le PUI. Ce mode est à vérifier : la [politique de confidentialité de Mammouth AI](https://info.mammouth.ai/docs/privacy-policy/) n'en décrit pas, au 12 octobre 2026.
+- **Les compétences passent par une IA à l'export seulement**, au moment de leur export depuis Résana, via [Mammouth AI](https://mammouth.ai) avec le modèle Claude Opus 5.0. D'après le PUI, aucune donnée personnelle n'est transmise et la conversation est supprimée après usage (mode « no log ») ; selon la [politique de confidentialité de Mammouth AI](https://info.mammouth.ai/docs/privacy-policy/), des données supprimées peuvent être conservées jusqu'à 30 jours.
 - **Le code est co-créé avec Claude Code**, un assistant de programmation fondé sur l'IA. Les tests automatiques sont son filet de sécurité.
 - **Un hébergement fragile à ce jour.** Le dépôt et le site GitHub Pages appartiennent au compte personnel de la personne qui a créé le widget ; une migration vers le GitLab UB est impossible, faute de module « Pages », et la piste proposée est un GitHub DIESE. Dans Grist, les administrateurs sont uniquement des agents en poste.
 
