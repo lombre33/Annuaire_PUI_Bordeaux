@@ -1,4 +1,4 @@
-# Version 1.16.2 — Pastilles et lien e-mail plus foncés (voir CHANGELOG.md)
+# Version 1.16.3 — Interrupteur de présence accessible (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -16,5 +16,7 @@ e-mail et établissement compris, et la fenêtre de modification suit la maquett
 par Antoine. Depuis la 1.16.1, les cartes sont triées par nom de famille puis par prénom et
 la recherche trouve « prénom nom » dans n'importe quel ordre, tirets, apostrophes et « œ » compris
 (audit UI/UX). Depuis la 1.16.2, les pastilles de catégorie, les titres de groupe et le lien e-mail
-sont assez foncés pour être lus (4,5:1 au moins avec le blanc, audit UI/UX).
-643 tests (dont 221 dans un vrai navigateur, optionnels sans Playwright).
+sont assez foncés pour être lus (4,5:1 au moins avec le blanc, audit UI/UX). Depuis la 1.16.3,
+l'interrupteur de présence garde le focus pendant l'écriture, annonce sa réussite aux lecteurs d'écran,
+a une piste à 3:1 au moins de son fond et reste lisible en contraste élevé (audit UI/UX).
+652 tests (dont 227 dans un vrai navigateur, optionnels sans Playwright).

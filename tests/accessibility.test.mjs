@@ -1,6 +1,6 @@
 // Accessibilité du widget : noms accessibles, anneau de focus au clavier et contrastes
-// (WCAG 2.2 AA). Les mesures viennent de l'audit UI/UX (constats U13, U14 et U19) ; chaque
-// test ci-dessous échoue sur le code d'avant leur correction.
+// (WCAG 2.2 AA). Les mesures viennent de l'audit UI/UX (constats U13, U14, U19 et U47 à U49) ;
+// chaque test ci-dessous échoue sur le code d'avant leur correction.
 //
 // Les tests de contraste et de feuille de style ne demandent aucun navigateur ; les
 // autres chargent le vrai index.html dans Chromium (optionnel : voir TESTING.md).
@@ -11,9 +11,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATEGORIES } from '../constants.js';
-import { sampleTables, withIdentity, ANA_EMAIL } from './fixtures.mjs';
+import { sampleTables, withIdentity, ANA_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 import { skip, waitForCards, withWidget } from './support/browser.mjs';
-import { parseColor, contrastRatio, WHITE } from './support/contrast.mjs';
+import { parseColor, blend, contrastRatio, WHITE } from './support/contrast.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readCss = name => fs.readFileSync(path.join(ROOT, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -86,6 +86,41 @@ test('le lien e-mail d’une carte garde 4,5:1 sur le fond blanc de la carte (WC
   assert.ok(color, `${variable} est déclarée en hexadécimal dans :root`);
   const ratio = contrastRatio(color, WHITE);
   assert.ok(ratio >= MIN_TEXT_CONTRAST, `${variable} ${color} : ${ratio.toFixed(2)}:1 au lieu de 4,5:1`);
+});
+
+// ===== Interrupteur de présence (sans navigateur) =====
+
+// L'état de l'interrupteur « Apparaître dans l'annuaire » ne tient qu'à sa piste et à son curseur (le
+// texte du bouton ne change pas) : 3:1 au moins avec leur fond (WCAG 1.4.11). Avant leur correction
+// (audit U48), la piste éteinte faisait 1,56:1 avec le fond du bouton et son curseur 1,66:1, la piste
+// allumée 2,75:1 et son curseur 2,92:1.
+const MIN_INTERFACE_CONTRAST = 3;
+
+// Le fond en hexadécimal que style.css donne à `selector` (la première règle qui en pose un, donc
+// pas celle du mode contraste forcé, qui vient après et n'emploie que des couleurs système).
+function cssBackground(selector) {
+  const rule = cssRules(readCss('style.css')).find(candidate => candidate.selector === selector
+    && /(?:^|[;\s])background(?:-color)?:\s*#/.test(candidate.body));
+  const value = /(?:^|[;\s])background(?:-color)?:\s*(#[0-9a-f]{3,8})\b/i.exec(rule?.body ?? '')?.[1];
+  assert.ok(value, `${selector} : un fond en hexadécimal dans style.css`);
+  return value;
+}
+
+test('la piste et le curseur de l’interrupteur de présence gardent 3:1 avec leur fond, éteint et allumé (WCAG 1.4.11)', () => {
+  const button = cssBackground('.presence-switch');
+  const thumb = cssBackground('.presence-thumb');
+  const offTrack = cssBackground('.presence-track');
+  const onTrack = cssBackground('.presence-switch[aria-checked="true"] .presence-track');
+  const tooWeak = Object.entries({
+    'piste éteinte sur le bouton': [offTrack, button],
+    'curseur sur la piste éteinte': [thumb, offTrack],
+    'piste allumée sur le bouton': [onTrack, button],
+    'curseur sur la piste allumée': [thumb, onTrack]
+  })
+    .map(([label, [foreground, background]]) => ({ label, ratio: contrastRatio(foreground, background) }))
+    .filter(({ ratio }) => ratio < MIN_INTERFACE_CONTRAST)
+    .map(({ label, ratio }) => `${label} : ${ratio.toFixed(2)}:1`);
+  assert.deepEqual(tooWeak, [], 'foncer la piste (style.css) pour atteindre 3:1');
 });
 
 // ===== Navigateur =====
@@ -237,5 +272,95 @@ test('pastilles, titres de groupe et lien e-mail d’une carte gardent 4,5:1 sur
       .filter(item => item.ratio < MIN_TEXT_CONTRAST)
       .map(item => `${item.classes} « ${item.label} » ${item.size} : ${item.ratio.toFixed(2)}:1`);
     assert.deepEqual(tooPale, []);
+  });
+});
+
+// ===== Interrupteur de présence (navigateur) =====
+
+// Les couleurs et les rectangles de la piste et du curseur, une fois leurs transitions terminées
+// (sans cela on lirait une couleur à mi-chemin entre l'ancien état et le nouveau).
+async function switchLook(page) {
+  await page.waitForFunction(() => [...document.querySelectorAll('#accountBar .presence-track, #accountBar .presence-thumb')]
+    .every(element => element.getAnimations().length === 0));
+  return page.evaluate(() => {
+    const button = document.querySelector('#accountBar .presence-switch');
+    const track = button.querySelector('.presence-track');
+    const thumb = button.querySelector('.presence-thumb');
+    const [buttonStyle, trackStyle, thumbStyle] = [button, track, thumb].map(element => getComputedStyle(element));
+    const box = element => { const { left, top, right, bottom } = element.getBoundingClientRect(); return { left, top, right, bottom }; };
+    return {
+      checked: button.getAttribute('aria-checked') === 'true',
+      button: buttonStyle.backgroundColor,
+      track: trackStyle.backgroundColor,
+      border: { width: parseFloat(trackStyle.borderTopWidth), style: trackStyle.borderTopStyle, color: trackStyle.borderTopColor },
+      thumb: thumbStyle.backgroundColor,
+      trackBox: box(track),
+      thumbBox: box(thumb)
+    };
+  });
+}
+
+// L'interrupteur éteint (Iris n'a pas accepté d'apparaître) puis allumé (Ana apparaît), tel que le
+// rend la page sous les préférences d'affichage `media` (emulateMedia).
+async function switchLooks(media = {}) {
+  const looks = [];
+  for (const user of [IRIS_EMAIL, ANA_EMAIL]) {
+    await withWidget({ tables: withIdentity(), user }, async ({ page }) => {
+      await waitForCards(page, 4);
+      await page.waitForFunction(() => !document.getElementById('accountBar').hidden);
+      await page.emulateMedia(media);
+      looks.push(await switchLook(page));
+    });
+  }
+  return looks;
+}
+
+test('sur la page rendue, la piste et le curseur gardent 3:1 avec leur fond, éteint et allumé (WCAG 1.4.11)', { skip }, async () => {
+  const looks = await switchLooks();
+  assert.deepEqual(looks.map(look => look.checked), [false, true], 'les deux états sont mesurés');
+  const tooWeak = looks.flatMap(({ checked, button, track, thumb }) => {
+    const state = checked ? 'allumé' : 'éteint';
+    return [
+      { label: `${state} : piste sur le bouton`, ratio: contrastRatio(track, button) },
+      { label: `${state} : curseur sur la piste`, ratio: contrastRatio(thumb, track) }
+    ];
+  }).filter(({ ratio }) => ratio < MIN_INTERFACE_CONTRAST).map(({ label, ratio }) => `${label} ${ratio.toFixed(2)}:1`);
+  assert.deepEqual(tooWeak, []);
+});
+
+// Le mode contraste élevé impose ses couleurs : un fond de piste et de curseur posés en hexadécimal
+// y deviennent tous deux « Canvas », la bordure et l'ombre disparaissent, et l'interrupteur n'est
+// plus qu'un rectangle vide (audit U49). Chromium émule le mode avec la palette claire par défaut.
+test('en contraste forcé, l’interrupteur garde un contour, un curseur visible et un état lisible (WCAG 1.4.11)', { skip }, async () => {
+  const looks = await switchLooks({ forcedColors: 'active' });
+  assert.deepEqual(looks.map(look => look.checked), [false, true]);
+  // Une couleur système translucide se pose sur le fond du bouton, comme à l'écran.
+  const opaque = (color, backdrop) => blend(parseColor(color), blend(parseColor(backdrop)));
+  const problems = [];
+  for (const { checked, button, track, border, thumb, trackBox, thumbBox } of looks) {
+    const state = checked ? 'allumé' : 'éteint';
+    const fill = opaque(track, button);
+    const outline = opaque(border.color, button);
+    if (border.style === 'none' || border.width < 1) problems.push(`${state} : la piste n’a pas de bordure`);
+    if (contrastRatio(outline, opaque(button, button)) < MIN_INTERFACE_CONTRAST) problems.push(`${state} : contour de la piste trop proche du bouton`);
+    if (contrastRatio(opaque(thumb, button), fill) < MIN_INTERFACE_CONTRAST) problems.push(`${state} : curseur confondu avec la piste`);
+    // Le curseur reste centré dans la piste, bordure comprise (2 px de chaque côté, pas 3 puis 1).
+    const gaps = [thumbBox.top - trackBox.top, trackBox.bottom - thumbBox.bottom, thumbBox.left - trackBox.left, trackBox.right - thumbBox.right];
+    const end = checked ? gaps[3] : gaps[2];
+    if (Math.abs(gaps[0] - gaps[1]) > 0.5 || Math.abs(gaps[0] - end) > 0.5) problems.push(`${state} : curseur décentré (${gaps.map(gap => gap.toFixed(1)).join(', ')} px)`);
+  }
+  const [off, on] = looks;
+  if (off.track === on.track) problems.push('la piste a la même couleur éteinte et allumée');
+  assert.deepEqual(problems, []);
+});
+
+test('avec « réduire les animations », la piste et le curseur changent sans transition (WCAG 2.3.3)', { skip }, async () => {
+  await withWidget({ tables: withIdentity(), user: IRIS_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    const durations = () => page.evaluate(() => ['.presence-track', '.presence-thumb']
+      .map(selector => getComputedStyle(document.querySelector(selector)).transitionDuration));
+    assert.deepEqual(await durations(), ['0.15s', '0.15s'], 'sans préférence, le curseur glisse (sinon ce test ne prouve rien)');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.deepEqual(await durations(), ['0s', '0s']);
   });
 });
