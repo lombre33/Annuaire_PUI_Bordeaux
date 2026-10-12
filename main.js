@@ -43,9 +43,14 @@ function toggleFilter(filterKey, value) {
   refreshCards();
 }
 
+// Chaque option de menu affiche le nombre de cartes qu'elle donnerait si on la
+// cochait, compte tenu des autres filtres actifs : recalculé à chaque changement.
+function currentCounts() {
+  return computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
+}
+
 function rebuildFilterUI() {
-  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter,
-    computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
+  createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters, toggleFilter, currentCounts());
 }
 
 function refreshCards() {
@@ -53,10 +58,7 @@ function refreshCards() {
   renderCards(elements.grid, elements.template, filtered, toggleFilter);
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
-  // Chaque option de menu affiche le nombre de cartes qu'elle donnerait si on la
-  // cochait, compte tenu des autres filtres actifs : recalculé à chaque changement.
-  const counts = computeFilterCounts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
-  updateFilterCounts(elements.filtersContainer, counts);
+  updateFilterCounts(elements.filtersContainer, currentCounts());
 }
 
 elements.searchInput.addEventListener('input', event => {
@@ -130,7 +132,7 @@ function applyDirectory({ contacts, referenceMaps, etabFlags }) {
   state.filterReferenceMaps = filterReferenceMaps;
 
   // Une sélection dont le libellé a disparu côté Grist est purgée avant de filtrer.
-  pruneStaleFilters(state.activeFilters, filterReferenceMaps);
+  state.activeFilters = pruneStaleFilters(state.activeFilters, filterReferenceMaps);
 
   state.allContacts = contacts;
   if (referenceMapsChanged) rebuildFilterUI();

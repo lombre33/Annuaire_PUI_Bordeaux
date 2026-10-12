@@ -166,16 +166,18 @@ test('pruneStaleFilters drops a selected label that no longer exists in its refe
   activeFilters.etablissement.add('CHU');
   activeFilters.etablissement.add('UBM');
   const referenceMaps = { Etablissements: { 1: 'CHU-Bordeaux', 2: 'UBM' } };
-  pruneStaleFilters(activeFilters, referenceMaps);
-  assert.deepEqual([...activeFilters.etablissement], ['UBM'], 'CHU a été renommé en CHU-Bordeaux : la sélection orpheline doit disparaître, UBM doit rester');
+  const pruned = pruneStaleFilters(activeFilters, referenceMaps);
+  assert.deepEqual([...pruned.etablissement], ['UBM'], 'CHU a été renommé en CHU-Bordeaux : la sélection orpheline doit disparaître, UBM doit rester');
+  assert.deepEqual([...activeFilters.etablissement], ['CHU', 'UBM'], 'l\'état d\'origine n\'est pas modifié');
 });
 
 test('pruneStaleFilters leaves selections untouched when nothing changed, even if temporarily no contact matches', () => {
   const activeFilters = createEmptyFilterState();
   activeFilters.instances.add('CME');
   const referenceMaps = { Instances: { 7: 'CME' } };
-  pruneStaleFilters(activeFilters, referenceMaps);
-  assert.deepEqual([...activeFilters.instances], ['CME'], 'CME reste une option valide du menu, donc pas une sélection périmée');
+  const pruned = pruneStaleFilters(activeFilters, referenceMaps);
+  assert.deepEqual([...pruned.instances], ['CME'], 'CME reste une option valide du menu, donc pas une sélection périmée');
+  assert.deepEqual(Object.keys(pruned), Object.keys(createEmptyFilterState()), 'une entrée par catégorie, même sans sélection');
 });
 
 test('pickLabel falls back to the next field when the first is empty', () => {

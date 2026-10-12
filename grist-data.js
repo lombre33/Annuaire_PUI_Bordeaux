@@ -310,9 +310,77 @@ function describeEmptyDirectory(rowCount, scopedRows, contacts) {
     + '(établissement validé, fondateur ou partenaire) et perimetre_all.';
 }
 
-function readTables(docApi, names) {
+// Lit toutes les tables en parallèle : { nom de table → résultat de Promise.allSettled }.
+async function readAllTables(docApi) {
+  const names = ['Annuaire', ...REFERENCE_TABLES.map(([table]) => table)];
   // async : une erreur levée de façon synchrone par docApi devient un rejet.
-  return Promise.allSettled(names.map(async name => docApi.fetchTable(name)));
+  const settled = await Promise.allSettled(names.map(async name => docApi.fetchTable(name)));
+  return Object.fromEntries(names.map((name, index) => [name, settled[index]]));
+}
+
+// Sans ces tables rien ne peut s'afficher : leur lecture ratée est une erreur.
+function requireReadable(results, log) {
+  ['Annuaire', 'Etablissements'].forEach(name => {
+    if (results[name].status === 'fulfilled') return;
+    log.warn(`[REFS] Impossible de charger ${name}`, results[name].reason);
+    throw new DirectoryLoadError(`table « ${name} » illisible`, results[name].reason);
+  });
+}
+
+function requireAnnuaireColumns(rows) {
+  const missing = rows.length ? REQUIRED_ANNUAIRE_COLUMNS.filter(column => !(column in rows[0])) : [];
+  if (missing.length) {
+    throw new DirectoryLoadError(`colonne « ${missing.join(' », « ')} » absente de la table Annuaire`);
+  }
+}
+
+// id → libellé d'une table de référence, ou null si sa lecture a échoué.
+function readReferenceMap(table, fields, result, log) {
+  if (result.status === 'rejected') {
+    log.warn(`[REFS] Impossible de charger ${table}`, result.reason);
+    return null;
+  }
+  const rows = tableToRows(result.value);
+  const map = labelMapFromRows(rows, fields);
+  const withoutLabel = rows.length - Object.keys(map).length;
+  log.info(`[REFS] ${table}: ${Object.keys(map).length} entrées`
+    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${[].concat(fields).join('/')})` : ''));
+  return map;
+}
+
+// Une table illisible garde ses libellés précédents ; `unreadable` la signale.
+function readReferenceMaps(results, previousMaps, log) {
+  const referenceMaps = {};
+  const unreadable = [];
+  REFERENCE_TABLES.forEach(([table, fields]) => {
+    const map = readReferenceMap(table, fields, results[table], log);
+    if (!map) unreadable.push(table);
+    referenceMaps[table] = map ?? previousMaps[table] ?? {};
+  });
+  return { referenceMaps, unreadable };
+}
+
+// Les contacts sans Etablissement2 ne s'affichent pas. Seuls leurs identifiants
+// de ligne sont journalisés : la console peut être partagée pendant une démo.
+function warnAboutMissingEtablissement(scopedRows, log) {
+  const ids = scopedRows.filter(row => !text(row.Etablissement2)).map(row => row.id);
+  if (!ids.length) return;
+  log.warn(`[ETABLISSEMENT] ${ids.length}/${scopedRows.length} contact(s) sans Etablissement2 `
+    + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
+}
+
+// Messages du bandeau d'état pour tout ce qui rend l'annuaire incomplet.
+function directoryIssues({ unreadable, etabFlags, emptyReason }) {
+  const issues = [];
+  if (unreadable.length) {
+    issues.push(`Tables illisibles (${unreadable.join(', ')}) : des libellés ou des tags peuvent manquer.`);
+  }
+  if (etabFlags.conflicts.length) {
+    issues.push(`Acronymes en double dans Etablissements (${etabFlags.conflicts.join(', ')}) avec des statuts `
+      + 'différents : leurs contacts sont masqués.');
+  }
+  if (emptyReason) issues.push(emptyReason);
+  return issues;
 }
 
 // Lit Annuaire et toutes les tables de référence (chacune une seule fois) et
@@ -324,60 +392,19 @@ function readTables(docApi, names) {
 // (`previousMaps`) et on le signale dans `issues`, messages français destinés
 // au bandeau d'état.
 export async function loadDirectory(docApi, { previousMaps = {}, log = console } = {}) {
-  const referenceNames = REFERENCE_TABLES.map(([table]) => table);
-  const names = ['Annuaire', ...referenceNames];
-  const settled = await readTables(docApi, names);
-  const results = Object.fromEntries(names.map((name, index) => [name, settled[index]]));
-
-  ['Annuaire', 'Etablissements'].forEach(name => {
-    if (results[name].status === 'fulfilled') return;
-    log.warn(`[REFS] Impossible de charger ${name}`, results[name].reason);
-    throw new DirectoryLoadError(`table « ${name} » illisible`, results[name].reason);
-  });
+  const results = await readAllTables(docApi);
+  requireReadable(results, log);
 
   const rows = tableToRows(results.Annuaire.value);
-  const missingColumns = rows.length ? REQUIRED_ANNUAIRE_COLUMNS.filter(column => !(column in rows[0])) : [];
-  if (missingColumns.length) {
-    throw new DirectoryLoadError(`colonne « ${missingColumns.join(' », « ')} » absente de la table Annuaire`);
-  }
+  requireAnnuaireColumns(rows);
 
-  const unreadable = [];
-  const referenceMaps = {};
-  REFERENCE_TABLES.forEach(([table, fields]) => {
-    if (results[table].status === 'rejected') {
-      log.warn(`[REFS] Impossible de charger ${table}`, results[table].reason);
-      unreadable.push(table);
-      referenceMaps[table] = previousMaps[table] ?? {};
-      return;
-    }
-    const tableRows = tableToRows(results[table].value);
-    referenceMaps[table] = labelMapFromRows(tableRows, fields);
-    const withoutLabel = tableRows.length - Object.keys(referenceMaps[table]).length;
-    log.info(`[REFS] ${table}: ${Object.keys(referenceMaps[table]).length} entrées`
-      + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${[].concat(fields).join('/')})` : ''));
-  });
-
+  const { referenceMaps, unreadable } = readReferenceMaps(results, previousMaps, log);
   const etabFlags = etablissementFlagsFromRows(tableToRows(results.Etablissements.value));
   const scopedRows = rows.filter(isInScope);
   const contacts = buildContacts(scopedRows, referenceMaps, etabFlags);
   log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
+  warnAboutMissingEtablissement(scopedRows, log);
 
-  const withoutEtablissement = scopedRows.filter(row => !text(row.Etablissement2)).map(row => row.id);
-  if (withoutEtablissement.length) {
-    log.warn(`[ETABLISSEMENT] ${withoutEtablissement.length}/${scopedRows.length} contact(s) sans Etablissement2 `
-      + 'renseigné (identifiants de ligne Grist) :', withoutEtablissement.slice(0, 20));
-  }
-
-  const issues = [];
-  if (unreadable.length) {
-    issues.push(`Tables illisibles (${unreadable.join(', ')}) : des libellés ou des tags peuvent manquer.`);
-  }
-  if (etabFlags.conflicts.length) {
-    issues.push(`Acronymes en double dans Etablissements (${etabFlags.conflicts.join(', ')}) avec des statuts `
-      + 'différents : leurs contacts sont masqués.');
-  }
   const emptyReason = describeEmptyDirectory(rows.length, scopedRows, contacts);
-  if (emptyReason) issues.push(emptyReason);
-
-  return { contacts, referenceMaps, etabFlags, issues };
+  return { contacts, referenceMaps, etabFlags, issues: directoryIssues({ unreadable, etabFlags, emptyReason }) };
 }
