@@ -1,5 +1,79 @@
 # Changelog
 
+## 1.17.2 — Bandeau « Ma présence » : le texte garde 200 px, l'interrupteur passe dessous
+
+Sixième et dernier des « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un gain
+par version), pour le constat **U46** (bandeau « Ma présence » écrasé). **Seul le bandeau replié change** (un
+cadre de moins de 860 px : téléphone, panneau étroit, tablette en portrait) : à partir de 860 px, où l'en-tête
+est une grille, rien ne bouge, à 6 px près pour un compte sans fiche (voir plus bas). Le changement tient en
+trois règles de `style.css` et une ligne d'`account-ui.js` ; revenir en arrière, c'est `git revert` de la
+fusion de cette version. Ce bandeau replié n'est pas dessiné sur la maquette v5 (elle montre l'en-tête large) :
+le gain n'ajoute aucun écart avec elle.
+
+- **Où en était U46.** L'audit mesurait le bandeau de la 1.11.0 : de 380 à 510 px de large, le texte était
+  écrasé (3 à 119 px) par l'interrupteur de 250 px. La 1.14.0 avait déjà corrigé ce défaut-là (une base de
+  150 px sur `.account-identity`, quand l'en-tête a été remanié) : de 320 à 520 px, l'interrupteur passe sous le
+  texte. Restaient trois défauts, que cette version corrige.
+- **Le texte serré à côté de l'interrupteur.** Avec une base de 150 px, l'interrupteur se plaçait à côté du texte
+  dès qu'il restait 150 px : de 530 à 570 px et de 600 à 620 px (et à 760 et 780 px pour le plus long des
+  messages), le texte tenait dans une colonne de 153 à 199 px, et le message de la fiche masquée pour trois
+  raisons (« Vous avez accepté d'apparaître, mais votre fiche reste masquée : … ») prenait neuf lignes, un
+  bandeau de 249 px. La base passe à 200 px, le seuil que se fixait l'audit : l'interrupteur passe sous le
+  texte dès que celui-ci n'aurait plus 200 px.
+- **Le bloc des boutons vide.** Pour un compte qui n'a ni fiche, ni droit d'administrateur, ni établissement,
+  les trois boutons sont cachés mais leur conteneur (`.account-actions`) restait un élément de la ligne, qui
+  coûtait un écart de 14 px au texte (et, dans l'en-tête large, une rangée de grille de 6 px). `placeButtons()`
+  (`account-ui.js`) cache maintenant le conteneur quand aucun de ses boutons n'est montré.
+- **Un mot sans coupure.** Un prénom de 35 lettres sans trait d'union, ou une adresse sans coupure possible,
+  dépassait de son bloc : de 42 px hors du bandeau à 320 px, et sous l'interrupteur de 530 à 620 px.
+  `overflow-wrap: anywhere` sur le nom et le message.
+- **Écart avec l'audit.** L'audit recommandait `flex: 1 1 15rem` (240 px). Cette valeur laisse l'avatar seul
+  sur sa ligne à 320 px, où il ne reste que 207 px à côté de lui : 46 px de plus pour rien. 200 px tient le
+  même critère (le texte garde 200 px au moins) sans ce défaut ; un test le garde.
+
+  | Règle | Avant | Après |
+  |---|---|---|
+  | Base du texte (`.account-identity`) | `flex: 1 1 150px` | `flex: 1 1 200px` |
+  | Nom et message (`.account-name`, `.account-detail`) | un mot trop long déborde | `overflow-wrap: anywhere` |
+  | Bloc des boutons (`.account-actions`) | toujours dans la ligne, même vide | caché quand aucun bouton n'est montré |
+
+- **Ce que ça donne.** Mesuré de 320 à 620 px (pas de 10 px) pour quatre comptes, avant et après :
+
+  | Cas (cadre) | Largeur du texte | Hauteur du bandeau |
+  |---|---|---|
+  | Fiche masquée pour trois raisons, 530 px | 153 → 417 px (9 → 3 lignes) | 249 → 144 px |
+  | Fiche masquée pour trois raisons, 620 px | 199 → 463 px (6 → 3 lignes) | 204 → 144 px |
+  | Nom de 47 caractères, 530 px | 153 → 417 px (3 → 1 ligne) | 163 → 172 px |
+  | Administratrice et responsable (trois boutons), de 530 à 570 px et de 600 à 620 px | 153 à 199 → 417 à 463 px | 126 ou 129 → 172 px (+43 à +46 px) |
+  | Compte absent de l'annuaire, 320 px | 193 → 207 px | 137 → 120 px |
+  | Compte absent de l'annuaire, à partir de 860 px | | 70 → 64 px |
+
+  Le texte du bandeau ne descend plus sous 203 px (153 px avant). Ce que ça coûte : à ces largeurs, une
+  personne qui cumule l'interrupteur et trois boutons a un bandeau de 172 px au lieu de 126 ou 129 ; elle y
+  gagne un texte sur une ligne. Pour les trois premiers comptes, rien d'autre ne change : ni de 320 à 520 px, ni
+  à 580 et 590 px (le texte y fait 203 et 213 px, à côté de l'interrupteur), ni à partir de 630 px.
+- **Reste ouvert.** La hauteur du bandeau d'une personne qui cumule l'interrupteur et trois boutons (jusqu'à
+  280 px à 320 px, les boutons les uns sous les autres) ; la largeur réelle des sections de Grist (panneau
+  latéral, tablette en portrait) : elle n'est pas mesurable d'ici, `TESTING.md` (section 12) a un contrôle à
+  l'œil pour un vrai Grist.
+- **Pour les développeurs** : `placeButtons()` (`account-ui.js`) cache aussi `.account-actions` ; la section
+  « Mise en page de l'en-tête » de `docs/developpeurs.md` décrit la règle et son test.
+- **Tests** : 800 tests (283 dans un vrai navigateur, optionnels sans Playwright), 1 de plus qu'à la 1.17.1,
+  dans `tests/e2e-profile.test.mjs` : de 320 à 840 px (onze largeurs, dont celles où la 1.17.1 serrait le
+  texte), pour sept comptes (l'administratrice et responsable aux trois boutons, un nom de 47 caractères, un nom
+  sans coupure possible, la fiche masquée pour trois raisons, un compte sans fiche à l'adresse sans coupure,
+  un administrateur sans fiche et un responsable sans fiche), le texte du bandeau garde 200 px au moins, l'avatar
+  reste à côté du texte, rien n'est coupé ni ne dépasse du bandeau, l'interrupteur ne recouvre rien, il n'y a
+  pas de défilement horizontal, chaque compte a le bon nombre de boutons et le bloc des boutons est caché
+  quand il est vide. Il échoue sur le code de la 1.17.1 (« … à 530 px : le texte du bandeau garde 200 px au
+  moins (153 px) »). Neuf variantes fautives (la base de 150 px, la base de 15rem, le nom ou le message sans
+  `overflow-wrap`, le bloc jamais ou toujours caché, caché sans regarder l'un des trois boutons) ont été
+  essayées une à une, les fichiers étant remis en état après chacune : toutes font échouer ce test.
+- **Documentation** : aucune capture à refaire (celles du bandeau sont prises à plus de 860 px, où rien ne
+  change) ; `TESTING.md` (63 scénarios pour `tests/e2e-profile.test.mjs`, un contrôle à l'œil en section 12),
+  `docs/developpeurs.md` (la section « Mise en page de l'en-tête »), `docs/utilisateurs.md` (la question sur le
+  téléphone), `specs.md` (la ligne sur les cadres étroits) et `VERSION.md`.
+
 ## 1.17.1 — Texte de 12 px au moins, pastilles de 24 px de haut
 
 Cinquième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un gain
@@ -64,8 +138,9 @@ pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) e
   Fondateurs / Partenaires (36 px).
 - **Pour les développeurs** : `tests/support/card-metrics.mjs` (nouveau) mesure la page rendue : taille du
   texte, hauteur des pastilles, isolement des petites cibles. La section « Accessibilité » de
-  `docs/developpeurs.md` a une règle de plus (le plancher de 12 px et les 24 px), `TESTING.md` (sections 12
-  et 15) deux contrôles à l'œil pour un vrai Grist, et `specs.md` une exigence de lisibilité.
+  `docs/developpeurs.md` a une règle de plus (le plancher de 12 px et les 24 px), `TESTING.md` trois contrôles à l'œil
+  pour un vrai Grist (« Texte des cartes » et « Badge de l'établissement en texte » en section 12, « Cibles à la
+  souris » en section 15), et `specs.md` une exigence de lisibilité.
 - **Tests** : 799 tests (282 dans un vrai navigateur, optionnels sans Playwright), 5 de plus qu'à la
   1.17.0 (4 dans `tests/responsive.test.mjs`, 1 dans `tests/accessibility.test.mjs`). Dans
   `tests/responsive.test.mjs` : le test des tailles de texte « le bureau garde ses tailles » est remplacé
@@ -90,6 +165,7 @@ pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) e
   s'adapte aux cartes plus hautes : la légende demande une fenêtre de 3 600 px (la carte de Camille Rousseau est
   loin dans la liste) et la relecture lève le plafond de 900 px de la fenêtre le temps de la capture, puisqu'elle
   le dépasse maintenant.
+
 ## 1.17.0 — La fiche d'un établissement, modifiée par son responsable
 
 Une demande d'Antoine, validée sur la maquette v5 le 12 octobre 2026 (« Go pour tout implémenter »,

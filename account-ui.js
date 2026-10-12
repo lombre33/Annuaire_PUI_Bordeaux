@@ -22,6 +22,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop,
   const editButton = part('.account-edit');
   const etabButton = part('.account-etab');
   const adminButton = part('.account-admin');
+  const actions = part('.account-actions');
   const status = part('.account-status');
 
   // L'avatar n'est refait que si les initiales ou la photo changent : la rafraîchir à chaque lecture
@@ -45,6 +46,9 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop,
     if (corner) root.dataset.corner = corner;
     else delete root.dataset.corner;
     root.classList.toggle('no-switch', !withSwitch);
+    // Le bloc des boutons, vide, ne prend aucune place : même sans rien dedans, un élément de la
+    // ligne ou de la grille coûte un écart (audit UI/UX, U46).
+    actions.hidden = editButton.hidden && etabButton.hidden && adminButton.hidden;
   };
 
   // Message passager sous le bandeau ('' l'efface) ; `tone` : 'info', 'error' pour un échec, ou

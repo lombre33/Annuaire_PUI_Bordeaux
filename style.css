@@ -1079,19 +1079,24 @@ button.avatar:hover {
   display: none;
 }
 .account-identity {
-  /* Une largeur de départ : sans elle le texte, dont la base est 0, se laisserait écraser
-     par l'interrupteur au lieu de le faire passer à la ligne. */
-  flex: 1 1 150px;
+  /* Une largeur de départ de 200px : sans elle le texte, dont la base est 0, se laisserait écraser
+     par l'interrupteur ; avec elle, l'interrupteur passe sous le texte dès que celui-ci n'aurait
+     plus 200px, au lieu de le serrer dans une colonne de 150px où le message de trois raisons prend
+     neuf lignes (audit UI/UX, U46). Pas plus : à 320px il reste 207px à côté de l'avatar, et une
+     base de 15rem le renverrait seul sur sa ligne. */
+  flex: 1 1 200px;
   min-width: 0;
 }
 .account-name {
   font-size: 14px;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 .account-detail {
   margin-top: 2px;
   color: var(--muted);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 .account-detail[data-tone="ok"] {
   color: #147c72;

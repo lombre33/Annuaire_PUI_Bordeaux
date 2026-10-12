@@ -281,6 +281,101 @@ test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le t
   }
 });
 
+// Le bandeau « Ma présence » de 320 à 840 px (audit U46). Sous 860 px il se range en lignes qui se
+// replient : avec une base de 150 px le texte se retrouvait serré à 153-199 px à côté de l'interrupteur
+// (le message de trois raisons prenait neuf lignes), et le bloc des boutons, vide, comptait quand même
+// pour un écart de 14 px. La base est de 200 px : l'interrupteur passe sous le texte dès que celui-ci
+// n'aurait plus 200 px (pas 15rem, que l'audit proposait : à 320 px l'avatar resterait seul sur sa ligne).
+// Sept comptes : le plus chargé (administratrice et responsable : trois boutons),
+// un nom de 47 caractères, le message de trois raisons, un nom et une adresse sans aucune coupure
+// possible, un compte sans fiche (aucun bouton : le bloc des boutons est vide), un administrateur sans
+// fiche et un responsable sans fiche (un seul bouton chacun).
+test('le bandeau « Ma présence » de 320 à 840 px : le texte garde 200 px au moins, rien ne le recouvre ni ne le coupe, et le bloc des boutons vide ne prend aucune place (audit U46)', { skip }, async () => {
+  const unbreakableAddress = `${'a'.repeat(60)}@example.test`;
+  const accounts = [
+    { label: 'administratrice et responsable', user: ANA_EMAIL, ready: '.account-admin', buttons: 3, patch: () => {} },
+    { label: 'nom de 47 caractères', user: ANA_EMAIL, ready: '.account-admin', buttons: 3, patch: tables => {
+      tables.BDD.prenom[0] = 'Marie-Christine';
+      tables.BDD.nom[0] = 'de La Rochefoucauld-Montmorency';
+    } },
+    { label: 'nom sans coupure possible', user: ANA_EMAIL, ready: '.account-admin', buttons: 3, patch: tables => {
+      tables.BDD.prenom[0] = 'Wolfeschlegelsteinhausenbergerdorff';
+      tables.BDD.nom[0] = 'Sanspaceniarretpossibleaecrire';
+    } },
+    // Eve (ligne 5) devient Zoé, sans prénom, nom, établissement ni périmètre : fiche masquée pour trois raisons.
+    { label: 'fiche masquée pour trois raisons', user: 'zoe.eluard@example.test', ready: '.account-edit', buttons: 1, patch: tables => {
+      Object.assign(tables.BDD.email, { 4: 'zoe.eluard@example.test' });
+      tables.BDD.prenom[4] = '';
+      tables.BDD.nom[4] = '';
+      tables.BDD.Etablissement[4] = 0;
+      tables.BDD.perimetre[4] = ['L'];
+    } },
+    { label: 'compte sans fiche, adresse sans coupure possible', user: unbreakableAddress, ready: '.account-name', buttons: 0, patch: () => {} },
+    // Administrateur sans fiche : ni interrupteur ni « Modifier mon profil », le seul bouton est « Mode admin ».
+    { label: 'administrateur sans fiche', user: ADMIN_EMAIL, ready: '.account-admin', buttons: 1, patch: () => {} },
+    // Responsable du CHU, sans fiche ni droit d'administrateur (une ligne de plus dans ACL) : le seul bouton est « Mon établissement ».
+    { label: 'responsable sans fiche', user: 'responsable@example.test', ready: '.account-etab', buttons: 1, patch: tables => {
+      tables.ACL.id.push(4);
+      tables.ACL.email.push('responsable@example.test');
+      tables.ACL.Responsable_de_l_Etablissement.push(1);
+      tables.ACL.admin.push(false);
+    } }
+  ];
+  const measure = () => {
+    const bar = document.getElementById('accountBar');
+    const part = selector => bar.querySelector(selector);
+    const textBox = element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getBoundingClientRect();
+    };
+    const barBox = bar.getBoundingClientRect();
+    const switchBox = part('.presence-switch').getBoundingClientRect();
+    const identity = part('.account-identity');
+    const identityBox = identity.getBoundingClientRect();
+    const avatarBox = part('.account-avatar').getBoundingClientRect();
+    let overlap = 0;
+    let outside = 0;
+    for (const selector of ['.account-name', '.account-detail']) {
+      const text = textBox(part(selector));
+      if (switchBox.width > 0 && Math.min(text.right, switchBox.right) - Math.max(text.left, switchBox.left) > 0.5
+        && Math.min(text.bottom, switchBox.bottom) - Math.max(text.top, switchBox.top) > 0.5) overlap += 1;
+      outside = Math.max(outside, text.right - barBox.right, barBox.left - text.left);
+    }
+    return {
+      identityWidth: identityBox.width,
+      avatarBeside: avatarBox.top < identityBox.bottom - 1 && avatarBox.bottom > identityBox.top + 1,
+      identityClipped: identity.scrollWidth > identity.clientWidth + 1,
+      overlap,
+      outside,
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      actionsDisplay: getComputedStyle(part('.account-actions')).display,
+      buttonsShown: [...bar.querySelectorAll('.account-actions button')].filter(button => button.getClientRects().length > 0).length
+    };
+  };
+  for (const { label, user, ready, buttons, patch } of accounts) {
+    const tables = withIdentity();
+    patch(tables);
+    await withWidget({ tables, user }, async ({ page }) => {
+      await page.locator('#accountBar:not([hidden])').waitFor();
+      await page.locator(`#accountBar ${ready}`).waitFor();
+      for (const width of [320, 360, 390, 480, 530, 570, 600, 620, 760, 780, 840]) {
+        await page.setViewportSize({ width, height: 900 });
+        const box = await page.evaluate(measure);
+        const where = `${label}, ${width} px`;
+        assert.ok(box.identityWidth >= 200, `${where} : le texte du bandeau garde 200 px au moins (${Math.round(box.identityWidth)} px)`);
+        assert.equal(box.avatarBeside, true, `${where} : l'avatar reste à côté du texte, pas seul sur sa ligne`);
+        assert.equal(box.identityClipped, false, `${where} : le nom et le message ne sont pas coupés`);
+        assert.ok(box.outside <= 0.5, `${where} : le texte reste dans le bandeau (${Math.round(box.outside)} px de trop)`);
+        assert.equal(box.overlap, 0, `${where} : l'interrupteur ne recouvre pas le texte`);
+        assert.ok(box.pageOverflow <= 0, `${where} : pas de défilement horizontal (${box.pageOverflow} px)`);
+        assert.equal(box.buttonsShown, buttons, `${where} : ${buttons} bouton(s) de profil affiché(s)`);
+        assert.equal(box.actionsDisplay === 'none', buttons === 0, `${where} : le bloc des boutons ${buttons === 0 ? 'vide ne prend aucune place' : 'est affiché'} (display: ${box.actionsDisplay})`);
+      }
+    });
+  }
+});
+
 test('le mode admin s\'allume au clavier, annonce son état, et garde le focus quand les cartes sont redessinées', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
