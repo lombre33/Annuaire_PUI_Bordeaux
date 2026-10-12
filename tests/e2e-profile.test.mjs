@@ -213,6 +213,37 @@ test('le bouton « Modifier » est rangé sous la fonction, dans la colonne du n
   }
 });
 
+test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le texte passe à la ligne au lieu de se laisser écraser par l\'interrupteur', { skip }, async () => {
+  const parts = ['.account-avatar', '.account-identity', '.presence-switch', '.account-edit', '.account-admin'];
+  for (const width of [280, 320, 390, 560, 768, 1280]) {
+    await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await waitForCards(page, 4);
+      await adminToggle(page).waitFor();
+      const { bar, boxes, clipped } = await page.evaluate(selectors => {
+        const rect = element => { const { x, y, width, height } = element.getBoundingClientRect(); return { x, y, width, height }; };
+        const identity = document.querySelector('.account-identity');
+        return {
+          bar: rect(document.getElementById('accountBar')),
+          boxes: Object.fromEntries(selectors.map(selector => [selector, rect(document.querySelector(selector))])),
+          clipped: identity.scrollWidth > identity.clientWidth + 1
+        };
+      }, parts);
+      for (const selector of parts) {
+        const box = boxes[selector];
+        assert.ok(box.x >= bar.x - 0.5 && box.x + box.width <= bar.x + bar.width + 0.5, `${selector} à ${width} px : dans le bandeau`);
+      }
+      for (let i = 0; i < parts.length; i += 1) {
+        for (let j = i + 1; j < parts.length; j += 1) {
+          assert.equal(overlaps(boxes[parts[i]], boxes[parts[j]]), false, `à ${width} px : ${parts[i]} et ${parts[j]} se recouvrent`);
+        }
+      }
+      assert.equal(clipped, false, `à ${width} px : le nom et le message de la personne ne sont pas coupés`);
+      assert.ok(boxes['.account-identity'].width >= 120, `à ${width} px : le texte garde de la largeur (${Math.round(boxes['.account-identity'].width)} px)`);
+    });
+  }
+});
+
 test('le mode admin s\'allume au clavier, annonce son état, et garde le focus quand les cartes sont redessinées', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);

@@ -431,6 +431,7 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
 
   const code = widgetCode();
   const known = fragment => code.includes(fragment) || code.includes(fragment.replace(/\.$/, '')) // le point final est ajouté à l'affichage
+    || code.includes(fragment.charAt(0).toLowerCase() + fragment.slice(1).replace(/\.$/, '')) // et la majuscule (sentence() dans profile.js)
     || composed.includes(fragment) || /^\d+ champs? modifiés?$/.test(fragment);
   const fragments = [...section.matchAll(/«\s?([^»]+?)\s?»/g)]
     .flatMap(match => match[1].split(/…|\.\.\./))

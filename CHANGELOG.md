@@ -1,5 +1,155 @@
 # Changelog
 
+## 1.14.0 — Le mode admin, et la modification de fiche fidèle à la maquette
+
+Deux choses dans cette version, toutes deux demandées par Antoine le 12 octobre 2026 :
+
+1. un administrateur modifie la fiche de n'importe qui **depuis un « mode admin »** qu'il allume
+   lui-même, et peut alors changer l'adresse e-mail et l'établissement d'une autre personne ;
+2. la fenêtre de modification, sa relecture, les repères sur les cartes et la confirmation sont
+   **alignés sur la maquette v5** qu'il a validée (« Go pour tout implémenter », puis « j'attends à
+   ce que l'implémentation finale soit comme la maquette présentée »). La 1.12.0 en était une
+   première version : elle est reprise ici, écart par écart.
+
+Rien d'autre ne change : les modifications restent directes (ni validation par un administrateur,
+ni historique), le widget ne crée aucune table et n'ajoute aucune colonne.
+
+### Le mode admin
+
+- **Un bouton « Mode admin » dans le bandeau « Ma présence »**, réservé aux administrateurs (case
+  `admin` de la table `ACL`). Il est **éteint à chaque ouverture** : un administrateur qui n'y touche
+  pas se comporte comme tout le monde et ne voit « Modifier » que sur sa propre fiche. Avant, en
+  1.12.0, il voyait « Modifier » sur toutes les cartes dès l'ouverture, ce qui l'exposait à
+  ouvrir la fiche d'un autre par mégarde.
+- **Allumé**, il ajoute « ✎ Modifier la fiche » sur toutes les cartes affichées et montre, sous la
+  barre d'outils, une bande qui rappelle le mode (« Mode admin : un bouton « Modifier la fiche »
+  apparaît sur chaque carte. Vos changements sont relus avant d'être validés. »). Un second clic
+  l'éteint.
+- **Un administrateur sans fiche** (son adresse ne figure pas dans `BDD`) voit maintenant un
+  bandeau qui le dit (« Administrateur », « Connecté avec … : cette adresse ne figure pas dans
+  l'annuaire »), au lieu d'un bandeau absent sans explication, et y trouve quand même son mode
+  admin. Un compte ordinaire sans fiche reçoit le même constat, sans interrupteur.
+- **Sur sa propre fiche, un administrateur reste comme tout le monde** : le titre « Modifier mon
+  profil », l'e-mail et l'établissement verrouillés.
+
+### L'administrateur change l'e-mail et l'établissement
+
+- **Deux champs de plus**, seulement quand un administrateur en mode admin modifie la fiche **d'une
+  autre personne** : « E-mail » et « Établissement ». Une personne ne les change jamais sur sa
+  fiche (l'e-mail la désigne, l'établissement décide de ce qui s'affiche), et le périmètre comme
+  le choix de présence restent hors du widget.
+- **L'adresse** est nettoyée et mise en minuscules ; elle doit avoir la forme d'une adresse e-mail
+  (le même lien `mailto:` que celui des cartes doit pouvoir la porter) et **ne figurer sur aucune
+  autre fiche** : l'adresse retrouve la personne, deux fiches ne la partagent pas. Le message
+  nomme la personne quand sa fiche est visible dans l'annuaire (« Cette adresse est déjà utilisée
+  par Camille Rousseau. »), sinon dit seulement « une autre fiche » : le nom d'une fiche masquée
+  ne se dévoile pas. La règle est revérifiée à l'enregistrement, sur les lignes lues à ce
+  moment-là (une adresse prise entre-temps : « Cette adresse e-mail est maintenant celle d'une
+  autre fiche : rien n'a été modifié »).
+- **L'établissement** se choisit parmi les **noms complets** (`Etablissements.nom_complet`, l'acronyme
+  à défaut), obligatoire. Choisir un établissement qui n'a pas validé sa présence
+  (`ok_pour_apparaitre`) affiche sous le champ : « Cet établissement n'a pas validé sa présence :
+  la fiche ne sera pas visible dans l'annuaire », et la relecture le répète.
+- **La relecture prévient** que l'adresse change dans `BDD`, pas dans la table `ACL` : une personne
+  administratrice ou responsable d'établissement garde ses droits sur son ancienne adresse
+  jusqu'à ce que `ACL` soit corrigée (le widget n'écrit jamais dans `ACL`).
+- **Fermé par défaut.** `saveProfile()` refuse d'écrire l'e-mail ou l'établissement si la
+  relecture n'a pas été préparée par un administrateur. Comme tout le mode admin, ce n'est qu'un
+  verrou d'interface : seules les règles d'accès de Grist protègent les données
+  (`GRIST_SETUP.md`, section 3).
+
+### La modification de fiche, comme la maquette
+
+- **La fenêtre.** Un bloc d'identité en tête (initiales, nom, e-mail, puis l'établissement en
+  pastille) qui dit, pour une personne ordinaire, que son e-mail et son établissement ne se
+  changent pas ici (« Verrouillé : l'e-mail et l'établissement sont liés à votre compte. Pour les
+  corriger, contactez un administrateur. »), les champs dans l'ordre de la maquette
+  (« Rôle dans le PUI » remplace « Rôle PUI »), un pied de fenêtre qui dit en une ligne ce qui
+  va changer ou ce qui bloque, et le récapitulatif « Ce qui va changer » sous le formulaire.
+  Les messages des champs commencent par une majuscule et disent quoi faire (« Un numéro
+  français compte 10 chiffres, par exemple 05 56 78 90 12. »). Un brouillon sans prénom ni nom est
+  refusé, et le dit sur les deux champs.
+- **La relecture.** Une fenêtre plus large, avec la légende des repères, la carte « Avant » (« telle
+  qu'elle est aujourd'hui ») et la carte « Après » (« telle qu'elle apparaîtra ») côte à côte, l'une
+  sous l'autre dans un cadre étroit, puis un « Détail des changements ». Les repères de la carte
+  « Après » sont ceux de la maquette : contour vert et pastille pour une ligne ajoutée ou modifiée,
+  texte barré en rouge pour une ligne retirée, « + » devant un tag ajouté, tag retiré barré, contour
+  autour du badge d'établissement qui change. Les pastilles et les mots cachés (« ajouté »,
+  « retiré ») restent du texte, lu par les lecteurs d'écran.
+- **Les avis de la relecture** ont les phrases de la maquette : « Votre établissement n'a pas validé
+  sa présence : votre fiche reste masquée dans l'annuaire. », « Votre fiche est masquée de
+  l'annuaire : vous n'avez pas accepté d'apparaître (interrupteur en haut de page). », et pour un
+  administrateur qui déplace une fiche, « <Établissement> n'a pas validé sa présence : après
+  cette modification, la fiche ne sera plus visible dans l'annuaire. ».
+- **Les cartes.** Le bouton « ✎ Modifier » et l'étiquette « Votre fiche » passent sous la fonction,
+  dans la colonne du nom, et ne touchent plus le badge d'établissement. Un titre (infobulle) dit
+  à qui sert chaque bouton.
+- **La confirmation.** Quand tout est enregistré, la fenêtre **se ferme** et un message apparaît en
+  bas de l'écran six secondes (« Vos modifications sont enregistrées. », ou « La fiche de … est
+  enregistrée. » pour un administrateur). Il est annoncé aux lecteurs d'écran par une zone `status`
+  toujours présente, le message visible leur étant caché pour ne pas être lu deux fois. La
+  fenêtre ne reste ouverte (« Fiche enregistrée ») que s'il reste quelque chose à lire : un champ
+  que Grist n'a pas gardé, ou un annuaire qui n'a pas pu être rechargé.
+
+- **Le bandeau « Ma présence » à 390 px.** Sur un téléphone, le texte du bandeau (le nom et
+  « Vous apparaissez dans l'annuaire ») se laissait écraser par l'interrupteur « Apparaître dans
+  l'annuaire » et se lisait mal. Le texte garde une largeur de départ (150 px) : c'est
+  l'interrupteur, puis les boutons, qui passent à la ligne. Le bandeau est inchangé sur un
+  écran large.
+
+### Pour les développeurs
+
+`constants.js` : `fieldsFor(admin)`, champs `admin`, `labelsFrom`, `required`, genre `'email'` et
+`ETABLISSEMENT_NAMES` (les noms complets, lus par `grist-data.js` avec les autres libellés).
+`profile.js` : `rightsFor(identity, { adminMode })`, `profileFormModel`/`diffProfile`/`rebaseChanges`
+avec `{ admin }`, `diffProfile(…, { emailTaken })`, `NAME_REQUIRED`. `profile-save.js` :
+`prepareReview(…, { admin })`, une seule lecture de `BDD` pour la relecture, `saveProfile()` fermé
+par défaut. `presence.js` : `describeUnknownAccount()`, `describeHiddenFiche(status, { own,
+etablissement })`. `account-ui.js` : bouton « Mode admin » (`aria-pressed`), `switchable: false`.
+`preview.js` : l'établissement et l'e-mail font partie des lignes comparées. `main.js` : `toggleAdminMode()`,
+`showToast()`, `emailTakenElsewhere()`. `profile-ui.js` : la fenêtre unique, ses étapes
+(`editing`, `preparing`, `reviewing`, `saving`, `saved`) et `finish()`. Aucun nouveau module, aucune
+table créée.
+
+### Documentation et captures
+
+Le guide utilisateur (« Modifier ma fiche », avec le mode admin), `GRIST_SETUP.md` (section 3 :
+le mode admin, l'e-mail et l'établissement, la table `ACL`), `specs.md`, le guide développeur, la
+sécurité, la maintenance et `TESTING.md` suivent. Les captures de la modification de fiche sont
+refaites d'après la nouvelle fenêtre, et trois s'ajoutent : la confirmation, le mode admin et la
+fiche d'une autre personne modifiée par un administrateur.
+
+### Tests
+
+**453 tests** (dont 142 dans un vrai navigateur, optionnels sans Playwright) contre 406 (dont 124)
+avant ce lot.
+
+- *Mode admin* : éteint à l'ouverture, un administrateur ne voit « Modifier » que sur sa fiche ; allumé,
+  sur toutes les cartes ; le bouton s'actionne au clavier, annonce son état (`aria-pressed`) et garde
+  le focus quand les cartes sont redessinées ; il reste allumé quand l'annuaire est relu ; un
+  administrateur sans fiche le trouve dans un bandeau sans interrupteur de présence ; un bouton
+  « Modifier » forcé à la main sur la fiche d'un autre, mode éteint, n'ouvre rien. `rightsFor()` :
+  le droit d'administrateur n'existe qu'avec un mode exactement `true` et un compte qui est
+  administrateur.
+- *E-mail et établissement* : les deux champs n'existent que pour un administrateur qui modifie la
+  fiche d'une autre personne (`profileFormModel`, `diffProfile`, `rebaseChanges`, `prepareReview`,
+  `saveProfile` les ignorent ou les refusent sinon, quoi que contienne le brouillon) ; adresse mal
+  formée, trop longue, prise par une autre fiche (en ignorant la casse, y compris quand le formulaire
+  ne le savait pas), vidée, lue comme une formule par un tableur ; établissement jamais vidé ni
+  inconnu ; une adresse prise entre la relecture et l'enregistrement n'est pas écrite ; un
+  changement concurrent de ces colonnes ramène à la relecture ; tout s'écrit en **une seule**
+  `UpdateRecord` ; un établissement qui n'a pas validé sa présence retire la fiche de l'annuaire, ce
+  que la relecture dit d'abord.
+- *Fidélité à la maquette* : confirmation par message (délai de six secondes mesuré avec l'horloge du
+  navigateur, remplacée et relancée par un second enregistrement, annoncée aux lecteurs d'écran), la
+  fenêtre qui reste ouverte quand Grist n'a pas tout gardé ou que l'annuaire ne se recharge pas, les
+  phrases de chaque message, la légende, les deux colonnes, les repères de la carte « Après », le
+  bouton « Modifier » rangé sous la fonction sans toucher le badge d'établissement, le titre « Modifier
+  mon profil » conservé sur sa propre fiche, et `describeUnknownAccount()` (adresse inconnue,
+  administrateur sans fiche, colonne `email` absente de `BDD`).
+- Les tests de la 1.12.0 qui décrivaient l'ancienne fenêtre (textes, étapes, sélecteurs) sont
+  réécrits pour la nouvelle ; aucun n'a été supprimé sans remplaçant.
+
 ## 1.13.0 — Les domaines dans le menu Compétences : un seul menu, une double recherche
 
 Le filtre « Domaines » de la 1.9.0 (un second bouton à côté de « Compétences ») est

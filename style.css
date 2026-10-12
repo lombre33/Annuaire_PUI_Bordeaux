@@ -760,7 +760,9 @@ h1 {
   display: none;
 }
 .account-identity {
-  flex: 1;
+  /* Une largeur de départ : sans elle le texte, dont la base est 0, se laisserait écraser
+     par l'interrupteur au lieu de le faire passer à la ligne. */
+  flex: 1 1 150px;
   min-width: 0;
 }
 .account-name {
