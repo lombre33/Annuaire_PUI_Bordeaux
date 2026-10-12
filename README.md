@@ -27,9 +27,10 @@ L'annuaire affiche les accompagnateurs de l'innovation du PUI sous forme de **ca
 - 🙋 **Chacun décide s'il apparaît** : une personne n'est affichée que si elle a accepté d'apparaître. Connectée à Grist, elle voit un bandeau « Ma présence » et active ou retire son accord d'un clic.
 - 📇 **Cartes de contact** : identité, fonction, e-mail, téléphone, établissement et participations. Un clic sur une étiquette filtre sur sa valeur.
 - ✏️ **Chacun peut modifier sa fiche** : une personne connectée corrige sa propre fiche ; un administrateur qui allume le « mode admin » corrige celle de toute personne affichée dans l'annuaire, adresse e-mail et établissement compris. Avant d'enregistrer, une fenêtre de relecture montre la carte « Avant » et la carte « Après », avec ce qui change repéré. Les modifications s'appliquent ensuite tout de suite, sans validation par un administrateur. Le périmètre ne se modifie pas depuis le widget.
+- 🏢 **Chaque établissement tient sa fiche** : un responsable, désigné dans Grist, modifie le logo, le nom complet, la visibilité dans l'annuaire et la liste des responsables de son établissement, par le bouton « Modifier » sous le logo de ses cartes ou par « Mon établissement » dans le bandeau. Comme pour une fiche de personne, tout s'applique tout de suite, sans validation par un administrateur.
 - 🖼️ **Habillé aux couleurs du consortium** : le logo de chaque établissement sur ses cartes, les financeurs au centre de l'en-tête et les établissements fondateurs dans un bandeau en bas de page. Les logos sont des pièces jointes du document Grist (facultatives : sans elles, les noms s'affichent à leur place).
 - 🛡️ **Fiable** : si Grist ne répond pas, si une table est illisible ou si une colonne indispensable manque, un bandeau le dit. Un annuaire vide alors que la table contient des lignes est toujours expliqué.
-- 🔒 **Sobre et encadré** : aucune dépendance à l'exécution, rien de stocké dans le navigateur, aucune requête réseau émise par le widget lui-même (le navigateur télécharge seulement les logos, des pièces jointes du document Grist, avec un jeton de lecture seule que Grist donne au widget). Le widget n'écrit dans Grist que trois choses : une ligne de service, qui lui fait connaître la personne connectée, le choix d'apparaître de celle qui actionne son interrupteur, et la modification d'une fiche que la personne valide après relecture.
+- 🔒 **Sobre et encadré** : aucune dépendance à l'exécution, rien de stocké dans le navigateur, une seule requête réseau émise par le widget lui-même : l'envoi d'un nouveau logo à l'API du document Grist, quand un responsable d'établissement le remplace (le widget demande alors à Grist un jeton d'accès en écriture, pour cet envoi seul et sans le garder ; le reste du temps le navigateur télécharge seulement les logos, des pièces jointes du document, avec un jeton de lecture seule). Le widget n'écrit dans Grist que quatre choses : une ligne de service, qui lui fait connaître la personne connectée, le choix d'apparaître de celle qui actionne son interrupteur, la modification d'une fiche que la personne valide après relecture, et la fiche d'un établissement que son responsable enregistre.
 
 ## En images
 
@@ -65,12 +66,12 @@ Prérequis : un document Grist qui contient les tables décrites dans [`grist_st
    https://lombre33.github.io/Annuaire_PUI_Bordeaux/index.html
    ```
 4. Accordez l'accès **Full document access** quand Grist le demande : le widget lit plusieurs tables, pas seulement celle de sa section, et il écrit dans le document.
-5. Pour que chaque personne puisse gérer sa présence et modifier sa fiche, suivez [`GRIST_SETUP.md`](GRIST_SETUP.md) : la case `Accepte_apparaitre` en colonne de données, la table `Annuaire_Sonde`, les administrateurs, les règles d'accès. Sans la table-sonde, l'annuaire s'affiche normalement, mais personne n'est identifié : ni bandeau ni bouton « Modifier ».
+5. Pour que chaque personne puisse gérer sa présence et modifier sa fiche, suivez [`GRIST_SETUP.md`](GRIST_SETUP.md) : la case `Accepte_apparaitre` en colonne de données, la table `Annuaire_Sonde`, les administrateurs, les règles d'accès. Sans la table-sonde, l'annuaire s'affiche normalement, mais personne n'est identifié : ni bandeau ni bouton « Modifier ». Pour que les responsables d'établissement modifient la fiche de leur établissement, ajoutez la colonne `Responsable_de` de la sonde et leurs lignes dans `ACL` (mêmes réglages).
 6. Pour afficher les logos (facultatif), suivez l'étape 5 de [`GRIST_SETUP.md`](GRIST_SETUP.md) : les colonnes `logo` et `ordre_bandeau` d'`Etablissements` et la table `Financeurs`. Sans elles, le widget affiche les noms à la place des logos.
 
 Les libellés ci-dessus sont ceux de l'interface anglaise de Grist ; ils peuvent différer dans une autre langue. Le widget est déclaré dans [`manifest.yml`](manifest.yml) (nom, adresse, niveau d'accès).
 
-> **Accès complet, un choix assumé.** Le widget demande l'accès complet au document : il lit plusieurs tables et il y écrit. Selon la documentation de Grist, un tel widget peut lire et modifier tout le document ; celui-ci n'écrit que les trois choses décrites plus haut, mais c'est la confiance dans le code publié et les règles d'accès de Grist qui protègent vraiment le document. Trois garde-fous sont à mettre en place ou à vérifier : des règles d'accès Grist, une branche `main` protégée et des tables sensibles sorties du document ou protégées. Lisez la page [Sécurité et confidentialité](docs/securite.md) avant d'installer le widget.
+> **Accès complet, un choix assumé.** Le widget demande l'accès complet au document : il lit plusieurs tables et il y écrit. Selon la documentation de Grist, un tel widget peut lire et modifier tout le document ; celui-ci n'écrit que les quatre choses décrites plus haut, mais c'est la confiance dans le code publié et les règles d'accès de Grist qui protègent vraiment le document. Trois garde-fous sont à mettre en place ou à vérifier : des règles d'accès Grist, une branche `main` protégée et des tables sensibles sorties du document ou protégées. Lisez la page [Sécurité et confidentialité](docs/securite.md) avant d'installer le widget.
 
 ## Essayer sans Grist
 
@@ -83,7 +84,7 @@ node docs/demo/serveur-demo.mjs
 # puis ouvrir http://127.0.0.1:8080
 ```
 
-Ajoutez `?panne=Actions` à l'adresse pour simuler une table de référence illisible et voir le bandeau d'état, ou `?connecte=camille.rousseau@chd.example` pour ouvrir le widget comme cette personne fictive : le bandeau « Ma présence » apparaît, son interrupteur fonctionne, et le bouton « Modifier » de sa carte ouvre la modification de sa fiche, avec sa relecture avant/après (en mémoire, rien n'est enregistré). Avec `?connecte=mehdi.bensaid@udd.example`, le widget s'ouvre comme un administrateur fictif, qui peut modifier toutes les fiches affichées une fois son « mode admin » allumé. Les logos de la démonstration sont des dessins inventés ; `?sanslogos` simule un Grist qui refuse de les donner, et montre les noms à leur place.
+Ajoutez `?panne=Actions` à l'adresse pour simuler une table de référence illisible et voir le bandeau d'état, ou `?connecte=camille.rousseau@chd.example` pour ouvrir le widget comme cette personne fictive : le bandeau « Ma présence » apparaît, son interrupteur fonctionne, et le bouton « Modifier » de sa carte ouvre la modification de sa fiche, avec sa relecture avant/après (en mémoire, rien n'est enregistré). Avec `?connecte=mehdi.bensaid@udd.example`, le widget s'ouvre comme un administrateur fictif, qui peut modifier toutes les fiches affichées une fois son « mode admin » allumé. Avec `?connecte=lea.fontaine@chd.example`, c'est une responsable d'établissement fictive : « ✎ Modifier » apparaît sous le logo du CHD et « Mon établissement » dans le bandeau (l'envoi d'un logo y est simulé aussi). Les logos de la démonstration sont des dessins inventés ; `?sanslogos` simule un Grist qui refuse de les donner, et montre les noms à leur place.
 
 ## Comment ça marche
 
@@ -93,11 +94,12 @@ flowchart LR
     pages["GitHub Pages<br/>le widget : HTML, CSS, JS natif"]
     cards["Cartes filtrables<br/>dans la page Grist"]
     pages -->|"chargé dans une iframe"| cards
-    grist <-->|"API de widget : lecture, et trois écritures (sonde, présence, fiche)"| cards
+    grist <-->|"API de widget : lecture, et quatre écritures (sonde, présence, fiche, établissement)"| cards
     grist -->|"logos : pièces jointes"| cards
+    cards -->|"nouveau logo : un seul envoi, jeton en écriture"| grist
 ```
 
-Le widget est une page statique : pas de compilation, pas de dépendance npm à l'exécution. Il lit les tables du document Grist, applique les règles d'affichage (accord de la personne, périmètre, établissement validé, fondateur ou partenaire), puis construit les cartes et les menus de filtre. Il n'écrit dans le document que trois choses : une ligne de service, ajoutée puis supprimée à chaque ouverture, qui lui fait connaître la personne connectée ; le choix d'apparaître de cette personne quand elle actionne l'interrupteur « Ma présence » ; et la modification d'une fiche, quand la personne la valide après avoir relu la carte avant et après. Le widget ne crée aucune table et ne tient aucun historique. Les logos sont lus comme des pièces jointes : le widget demande à Grist un jeton de lecture seule et le navigateur télécharge les images. Les détails sont dans la [documentation développeur](docs/developpeurs.md).
+Le widget est une page statique : pas de compilation, pas de dépendance npm à l'exécution. Il lit les tables du document Grist, applique les règles d'affichage (accord de la personne, périmètre, établissement validé, fondateur ou partenaire), puis construit les cartes et les menus de filtre. Il n'écrit dans le document que quatre choses : une ligne de service, ajoutée puis supprimée à chaque ouverture, qui lui fait connaître la personne connectée ; le choix d'apparaître de cette personne quand elle actionne l'interrupteur « Ma présence » ; la modification d'une fiche, quand la personne la valide après avoir relu la carte avant et après ; et la fiche d'un établissement (nom, visibilité, logo, responsables), quand un de ses responsables l'enregistre. Le widget ne crée aucune table et ne tient aucun historique. Les logos sont lus comme des pièces jointes : le widget demande à Grist un jeton de lecture seule et le navigateur télécharge les images. Pour un nouveau logo, il redessine l'image choisie, demande un jeton en écriture et l'envoie à l'API du document : c'est sa seule requête réseau. Les détails sont dans la [documentation développeur](docs/developpeurs.md).
 
 ## Documentation
 
@@ -116,22 +118,27 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 
 ```
 .
-├── index.html            Page du widget : en-tête, cartes, bandeau des fondateurs, modèle de carte, fenêtre de modification
+├── index.html            Page du widget : en-tête, cartes, bandeau des fondateurs, modèle de carte, fenêtres de modification
 ├── style.css             Feuille de style
-├── dialogs.css           Feuille de style de la fenêtre de modification
+├── dialogs.css           Feuille de style des fenêtres de modification
 ├── main.js               Point d'entrée : état, événements, câblage Grist
 ├── grist-data.js         Lecture et enrichissement des données Grist
 ├── filters.js            Filtrage et compteurs (fonctions pures)
-├── render.js             Construction du DOM : menus, cartes (logo de l'établissement), bouton « Modifier »
+├── render.js             Construction du DOM : menus, cartes (logo de l'établissement), boutons « Modifier »
 ├── identity.js           Qui est connecté ? (table-sonde dont Grist calcule l'adresse)
 ├── presence.js           « Ma présence » : message à la personne et écriture de son choix
-├── account-ui.js         Bandeau « Ma présence » (dans l'en-tête), boutons « Modifier mon profil » et « Mode admin »
+├── account-ui.js         Bandeau « Ma présence » (dans l'en-tête), boutons « Modifier mon profil », « Mon établissement » et « Mode admin »
 ├── profile.js            Modifier une fiche : droits, formulaire, changements (sans DOM)
 ├── profile-save.js       Relire puis écrire une fiche, en une seule action Grist
 ├── preview.js            Cartes « avant » et « après » d'une modification
 ├── schema.js             Type des colonnes de BDD, lu dans les métadonnées de Grist
 ├── profile-ui.js         Fenêtre de modification : formulaire, relecture, confirmation
 ├── changes-ui.js         Liste « Ce qui change » de la relecture
+├── etablissement.js      Fiche d'un établissement : droits, brouillon, changements (sans DOM)
+├── etablissement-save.js Relire puis écrire la fiche d'un établissement et ses responsables, en une seule action Grist
+├── etablissement-ui.js   Fenêtre « Fiche de l'établissement »
+├── image-prep.js         Prépare le logo choisi : contrôle, redessin, PNG
+├── upload.js             Envoie le logo à Grist : la seule requête réseau du widget
 ├── branding.js           Habillage : fondateurs, financeurs, logo de chaque établissement (sans DOM)
 ├── attachments.js        Pièces jointes de Grist : jeton en lecture seule et adresse des logos
 ├── branding-ui.js        Images des logos, financeurs de l'en-tête, bandeau des fondateurs
@@ -169,9 +176,10 @@ Ces tests ne remplacent pas un essai dans un vrai document Grist : voir [`TESTIN
 
 - **Une modification d'une table de référence n'apparaît pas toute seule.** Grist ne prévient le widget que des changements de la table des contacts (`BDD`). Après avoir modifié `Etablissements` (par exemple `ok_pour_apparaitre`) ou une table de valeurs de filtre, rechargez la page.
 - **Mise en page éprouvée dans Chromium seulement** : le widget s'adapte à la largeur de son cadre, d'un téléphone à un grand écran, mais les tests automatiques couvrent Chromium (écran tactile émulé compris), pas Safari, Firefox ni un vrai Grist sur téléphone. Le protocole de [`TESTING.md`](TESTING.md) (section 12) couvre ce reste.
-- **La modification d'une fiche est immédiate, sans validation ni historique du widget.** Dès que la personne valide la relecture, la fiche change dans Grist : aucun administrateur ne la valide et le widget ne garde aucune trace de qui a changé quoi (seul le journal du document Grist en garde sans doute une). Un administrateur ne modifie pas, depuis le widget, les fiches que l'annuaire masque, ni le périmètre d'une fiche : cela se fait dans Grist.
-- **Les écritures sont encadrées par l'interface, pas par le serveur.** « Ma présence » n'agit que sur la fiche de la personne connectée, et la modification de fiche que sur la sienne (ou, pour un administrateur qui a allumé le « mode admin », sur celle d'une personne affichée), mais seules les règles d'accès de Grist empêchent vraiment une écriture indue : celles que propose [`GRIST_SETUP.md`](GRIST_SETUP.md) n'ont pas été essayées dans un vrai document. Chaque ouverture laisse en outre sans doute une trace dans l'historique du document ([Sécurité et confidentialité](docs/securite.md#écritures-et-règles-daccès)).
+- **La modification d'une fiche est immédiate, sans validation ni historique du widget.** Dès que la personne valide la relecture, la fiche change dans Grist : aucun administrateur ne la valide et le widget ne garde aucune trace de qui a changé quoi (seul le journal du document Grist en garde sans doute une). Il en va de même de la fiche d'un établissement, que son responsable enregistre sans relecture. Un administrateur ne modifie pas, depuis le widget, les fiches que l'annuaire masque, ni le périmètre d'une fiche : cela se fait dans Grist.
+- **Les écritures sont encadrées par l'interface, pas par le serveur.** « Ma présence » n'agit que sur la fiche de la personne connectée, la modification de fiche que sur la sienne (ou, pour un administrateur qui a allumé le « mode admin », sur celle d'une personne affichée) et la fiche d'un établissement que pour ses responsables, mais seules les règles d'accès de Grist empêchent vraiment une écriture indue : celles que propose [`GRIST_SETUP.md`](GRIST_SETUP.md) n'ont pas été essayées dans un vrai document. Chaque ouverture laisse en outre sans doute une trace dans l'historique du document ([Sécurité et confidentialité](docs/securite.md#écritures-et-règles-daccès)).
 - **Les logos n'ont pas été essayés dans un vrai Grist** : le widget suit la méthode que documente Grist pour afficher une pièce jointe (un jeton en lecture seule, valable quelques minutes, dans l'adresse de l'image), mais les tests simulent sa réponse. Section 14 de [`TESTING.md`](TESTING.md) ; ce que permet le jeton est expliqué dans [Sécurité et confidentialité](docs/securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes).
+- **L'envoi d'un logo n'a pas été essayé dans un vrai Grist** : le widget demande un jeton en écriture et poste le fichier à l'API du document, comme le documente Grist, mais les tests simulent sa réponse (acceptation de l'envoi, réponse lisible par le navigateur, règles d'accès). Si l'envoi échoue, le widget le dit et le logo se change dans Grist. Section 17 de [`TESTING.md`](TESTING.md) ; ce que permet le jeton est expliqué dans [Sécurité et confidentialité](docs/securite.md#lenvoi-dun-logo-et-le-jeton-en-écriture).
 - **Script de l'API Grist** : `index.html` charge `grist-plugin-api.js` depuis `docs.getgrist.com`, sans version figée ([Sécurité et confidentialité](docs/securite.md#risques-et-protections)).
 - **Pas de test contre un vrai Grist** : les tests simulent l'API, et seul le protocole de [`TESTING.md`](TESTING.md) valide le comportement dans Grist.
 

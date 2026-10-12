@@ -32,6 +32,9 @@ import { readIdentity } from '../identity.js';
 import { describePresence, describeHiddenFiche, setPresence, explainWriteError } from '../presence.js';
 import { rightsFor, profileFormModel, draftOf } from '../profile.js';
 import { prepareReview, saveProfile } from '../profile-save.js';
+import { diffEtablissement, draftOfEtablissement, etablissementRightsFor, nominate, toggleResponsable } from '../etablissement.js';
+import { readEtablissement, savePlanOf, saveEtablissement } from '../etablissement-save.js';
+import { checkImageFile } from '../image-prep.js';
 import { tablesFictives, CARTES_ATTENDUES, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
 
@@ -255,6 +258,7 @@ test('la démonstration connecte la personne passée dans l\'adresse (?connecte=
     assert.equal(identity.status, 'ready', `${role} : ${identity.reason}`);
     assert.equal(identity.email, email);
     assert.equal(identity.admin, role === 'administrateur', `${role} : le droit d'administrateur vient de la table ACL`);
+    assert.equal(identity.etablissements.length, role === 'responsable' ? 1 : 0, `${role} : les établissements dont on est responsable viennent de la table ACL`);
     await new Promise(resolve => setTimeout(resolve, 0)); // le widget n'attend pas la suppression de la ligne de la sonde
     assert.equal((await page.grist.docApi.fetchTable('Annuaire_Sonde')).id.length, 0, `${role} : la ligne de la sonde doit être supprimée`);
   }
@@ -267,7 +271,7 @@ test('sans ?connecte=, la démonstration est un compte anonyme : personne n\'est
 
 test('pour chaque personne de démonstration, le bandeau « Ma présence » dit ce que le guide utilisateur annonce', async () => {
   const guide = read('docs/utilisateurs.md');
-  const expectedTone = { visible: 'ok', partenaire: 'ok', refus: 'off', masquee: 'warn', administrateur: 'ok' };
+  const expectedTone = { visible: 'ok', partenaire: 'ok', refus: 'off', masquee: 'warn', administrateur: 'ok', responsable: 'ok' };
   assert.deepEqual(Object.keys(PERSONNES_DEMO).sort(), Object.keys(expectedTone).sort(), 'Une personne de démonstration est à décrire ici.');
   for (const [role, email] of Object.entries(PERSONNES_DEMO)) {
     const { people } = await demoDirectory(await openDemoPage());
@@ -364,6 +368,90 @@ test('dans la démonstration, chacun ne peut modifier que sa fiche, et un admini
   assert.equal(rightsFor(admin.identity, { adminMode: true })(admin.mine.row), 'own', 'sa propre fiche reste la sienne, mode admin ou non');
 });
 
+// La fiche d'un établissement (1.17.0) : la responsable de démonstration (Léa Fontaine, CHD) modifie
+// son établissement, comme le guide le raconte.
+const aclWrites = page => page.__demo.actions.filter(call => call.table === 'ACL' && call.ok);
+
+test('dans la démonstration, une responsable modifie la fiche de son établissement, et personne d\'autre', async () => {
+  const page = await openDemoPage(`?connecte=${PERSONNES_DEMO.responsable}`);
+  const identity = await readIdentity(page.grist.docApi, { log: QUIET_LOG });
+  const [chd] = identity.etablissements;
+  assert.ok(chd > 0, 'la responsable de démonstration a un établissement');
+  const rights = etablissementRightsFor(identity);
+  assert.equal(rights(chd), true);
+  assert.equal(rights(chd + 1), false, 'un autre établissement : aucun droit');
+  assert.equal(etablissementRightsFor((await readIdentity((await openDemoPage(`?connecte=${PERSONNES_DEMO.administrateur}`)).grist.docApi, { log: QUIET_LOG })))(chd), false,
+    'un administrateur n\'est pas responsable pour autant');
+
+  const fiche = await readEtablissement(page.grist.docApi, chd, { log: QUIET_LOG });
+  assert.equal(fiche.etablissement.acronym, 'CHD');
+  assert.deepEqual(fiche.responsables.map(entry => entry.email).sort(), [PERSONNES_DEMO.responsable, 'sofia.almeida@chd.example'].sort(),
+    'deux responsables au CHD, lues dans la table ACL');
+
+  // Elle change le nom, retire sa collègue et en nomme une autre : une seule action Grist.
+  const draft = draftOfEtablissement(fiche.etablissement, fiche.responsables);
+  draft.name = 'Centre Hospitalier de Démonstration - Site principal';
+  toggleResponsable(draft, 'sofia.almeida@chd.example');
+  assert.equal(nominate(draft, 'Paul.Girard@chd.example'), '');
+  const diff = diffEtablissement(fiche.etablissement, draft);
+  assert.deepEqual(diff.errors, []);
+  const before = page.__demo.actions.length;
+  const result = await saveEtablissement(page.grist.docApi, savePlanOf(fiche.row, diff.champs, { responsable: rights(chd) }), { log: QUIET_LOG });
+  assert.deepEqual(result, { status: 'saved', unsaved: [], attachmentId: null });
+  assert.equal(page.__demo.actions.slice(before).filter(call => call.ok && call.table).length >= 1, true);
+  const after = await readEtablissement(page.grist.docApi, chd, { log: QUIET_LOG });
+  assert.equal(after.etablissement.name, draft.name);
+  assert.deepEqual(after.responsables.map(entry => entry.email).sort(), ['paul.girard@chd.example', PERSONNES_DEMO.responsable].sort());
+  assert.ok(aclWrites(page).length >= 1, 'la liste des responsables est dans la table ACL');
+});
+
+test('?refus=Etablissements : la fiche d\'un établissement est refusée avec un message en français, et rien ne change', async () => {
+  const page = await openDemoPage(`?connecte=${PERSONNES_DEMO.responsable}&refus=Etablissements`);
+  const identity = await readIdentity(page.grist.docApi, { log: QUIET_LOG });
+  const [chd] = identity.etablissements;
+  const fiche = await readEtablissement(page.grist.docApi, chd, { log: QUIET_LOG });
+  const draft = draftOfEtablissement(fiche.etablissement, fiche.responsables);
+  draft.visible = false;
+  const diff = diffEtablissement(fiche.etablissement, draft);
+  await assert.rejects(saveEtablissement(page.grist.docApi, savePlanOf(fiche.row, diff.champs, { responsable: true }), { log: QUIET_LOG }),
+    error => error.name === 'EtablissementSaveError' && /Grist a refusé la modification/.test(error.message));
+  assert.equal((await readEtablissement(page.grist.docApi, chd, { log: QUIET_LOG })).etablissement.visible, true);
+});
+
+test('le serveur de démonstration reçoit le logo qu\'un responsable envoie, puis le sert comme les autres pièces jointes', async () => {
+  const { server, url } = await startDemoServer();
+  try {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    const envoyer = (jeton, octets = png) => {
+      const form = new FormData();
+      form.append('upload', new Blob([octets], { type: 'image/png' }), 'logo.png');
+      return fetch(`${url}/__pieces-jointes/attachments${jeton === null ? '' : `?auth=${jeton}`}`, { method: 'POST', body: form });
+    };
+    const jeton = 'jeton-de-demonstration';
+
+    assert.equal((await envoyer(null)).status, 403, 'sans le jeton que Grist délivre, pas d\'envoi');
+    assert.equal((await envoyer('autre')).status, 403);
+    assert.equal((await envoyer(jeton, Buffer.alloc(3 * 1024 * 1024))).status, 413, 'un fichier trop gros est refusé');
+
+    const answer = await envoyer(jeton);
+    assert.equal(answer.status, 200);
+    const [first] = await answer.json();
+    assert.ok(Number.isSafeInteger(first) && first >= 5000, 'un identifiant qui ne rencontre aucun dessin inventé');
+    const [second] = await (await envoyer(jeton)).json();
+    assert.equal(second, first + 1, 'chaque envoi reçoit l\'identifiant suivant');
+
+    const download = await fetch(`${url}/__pieces-jointes/attachments/${first}/download?auth=${jeton}`);
+    assert.equal(download.status, 200);
+    assert.equal(download.headers.get('content-type'), 'image/png');
+    assert.deepEqual(Buffer.from(await download.arrayBuffer()), png, 'le fichier envoyé est rendu tel quel');
+    assert.equal((await fetch(`${url}/__pieces-jointes/attachments/${first}/download`)).status, 403, 'sans jeton, pas de téléchargement');
+    assert.equal((await fetch(`${url}/__pieces-jointes/attachments/99999/download?auth=${jeton}`)).status, 404);
+  } finally {
+    server.close();
+    server.closeAllConnections?.();
+  }
+});
+
 test('dans la démonstration, la relecture n\'écrit rien, puis une seule action ne change que la colonne modifiée', async () => {
   const { page, mine, options, draft } = await openProfileDemo(PERSONNES_DEMO.visible);
   draft.Fonction = 'Directrice du numérique';
@@ -440,6 +528,38 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
   assert.ok(fragments.length >= 15, 'Ce test ne vérifie plus assez de messages : la section a-t-elle changé de forme ?');
   assert.deepEqual(fragments.filter(fragment => !known(fragment)), [],
     'Ces citations du guide ne figurent pas dans le code : recopiez le message tel qu\'il s\'affiche.');
+});
+
+test('les messages cités dans « La fiche de mon établissement » sont ceux du code', () => {
+  const guide = read('docs/utilisateurs.md');
+  const start = guide.indexOf('\n## La fiche de mon établissement');
+  assert.ok(start >= 0, 'Le guide utilisateur doit avoir une section « La fiche de mon établissement ».');
+  const section = guide.slice(start, guide.indexOf('\n## ', start + 1));
+
+  // Les messages d'échec d'un envoi sont composés dans upload.js : une consigne commune, écrite une
+  // seule fois, termine chacun d'eux. On la recompose ici, comme le fait le code.
+  const rawCode = widgetCode();
+  const byHand = /const BY_HAND = '([^']+)';/.exec(rawCode)?.[1];
+  assert.ok(byHand, 'upload.js doit définir la consigne commune des échecs d\'envoi (BY_HAND).');
+  const code = rawCode
+    .replaceAll('${BY_HAND.charAt(0).toLowerCase()}${BY_HAND.slice(1)}', byHand.charAt(0).toLowerCase() + byHand.slice(1))
+    .replaceAll('${BY_HAND}', byHand);
+  // Le refus d'un format liste les formats acceptés : on le demande à la fonction qui le compose.
+  const composed = [checkImageFile({ type: 'application/pdf', size: 10 })];
+  const known = fragment => code.includes(fragment) || code.includes(fragment.replace(/\.$/, '')) || composed.includes(fragment)
+    || code.includes(fragment.replace(/ : [A-Z]{2,}$/, ' : '))                // le sigle de l'établissement est ajouté à l'affichage
+    || /^\d+ modifications? : .+$/.test(fragment) || /^\d+,\d Mo$/.test(fragment) || /^Cette image pèse \d+,\d Mo : choisissez-en une de 1 Mo au plus\.$/.test(fragment)
+    || /^La fiche de \w+ est enregistrée\.$/.test(fragment);
+  const fragments = [...section.matchAll(/«\s?([^»]+?)\s?»/g)]
+    .flatMap(match => match[1].split(/…|\.\.\./))
+    .map(fragment => fragment.trim())
+    .filter(fragment => fragment.length >= 15);
+  assert.ok(fragments.length >= 20, 'Ce test ne vérifie plus assez de messages : la section a-t-elle changé de forme ?');
+  assert.deepEqual(fragments.filter(fragment => !known(fragment)), [],
+    'Ces citations du guide ne figurent pas dans le code : recopiez le message tel qu\'il s\'affiche.');
+
+  // Les limites annoncées sont celles du code.
+  assert.ok(section.includes('1 Mo au plus') && section.includes('480 pixels'), 'Le guide doit dire la taille maximale d\'un logo et celle de l\'image envoyée.');
 });
 
 test('les personnes fictives citées dans le guide sont masquées, ou visibles, pour la raison qu\'il donne', async () => {
@@ -552,10 +672,10 @@ test('la page de maintenance donne la table et les colonnes de libellé de chaqu
 
 const WIDGET_SOURCES = () => fs.readdirSync(ROOT).filter(name => name.endsWith('.js')).map(name => ({ name, code: read(name) }));
 
-// docs/securite.md affirme : peu de méthodes de l'API de Grist, aucune requête réseau,
-// aucun stockage dans le navigateur, aucun texte de Grist inséré comme HTML, un seul
-// script externe. Ces affirmations sont vraies tant que ce test passe.
-test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Grist, aucun réseau, aucun stockage, aucun HTML injecté', () => {
+// docs/securite.md affirme : peu de méthodes de l'API de Grist, une seule requête réseau (l'envoi
+// d'un logo, testé plus bas), aucun stockage dans le navigateur, aucun texte de Grist inséré
+// comme HTML, un seul script externe. Ces affirmations sont vraies tant que ce test passe.
+test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Grist, aucun autre réseau, aucun stockage, aucun HTML injecté', () => {
   const sources = WIDGET_SOURCES();
   const used = new Set(sources.flatMap(({ code }) => [...code.matchAll(/\b(?:grist|docApi)\.([A-Za-z_$][\w$]*)/g)].map(match => match[1])));
   used.delete('docApi'); // `grist.docApi` est l'objet qui porte les méthodes, pas une méthode
@@ -565,9 +685,13 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
   const security = read('docs/securite.md');
   assert.deepEqual(cited.filter(name => !security.includes(`\`${name}\``)), [], 'docs/securite.md doit citer chacune de ces méthodes entre accents graves.');
 
-  const banned = /\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|EventSource|localStorage|sessionStorage|indexedDB|document\.cookie|\beval\s*\(|new Function|insertAdjacentHTML|outerHTML|document\.write/;
+  const banned = /XMLHttpRequest|sendBeacon|WebSocket|EventSource|localStorage|sessionStorage|indexedDB|document\.cookie|\beval\s*\(|new Function|insertAdjacentHTML|outerHTML|document\.write/;
   assert.deepEqual(sources.filter(({ code }) => banned.test(code)).map(({ name }) => name), [],
     'Ces fichiers emploient une API réseau, de stockage ou d\'injection de HTML que docs/securite.md dit absente.');
+  // `fetch` n'est admis que dans upload.js (voir le test suivant) : ni `fetch(`, ni `globalThis.fetch`, ni un
+  // paramètre qui le porte (`fetchImpl`) ailleurs.
+  assert.deepEqual(sources.filter(({ code }) => /\bfetch(?:Impl)?\b/.test(withoutComments(code))).map(({ name }) => name), ['upload.js'],
+    'Seul upload.js émet une requête réseau (docs/securite.md, « L\'envoi d\'un logo et le jeton en écriture ») : un autre fichier en émet une.');
   const injected = sources.flatMap(({ name, code }) => [...code.matchAll(/\.innerHTML\s*=\s*([^\n]*)/g)]
     .filter(([, value]) => value.trim().replace(/;$/, '') !== '\'\'').map(([line]) => `${name} : ${line}`));
   assert.deepEqual(injected, [], 'innerHTML ne sert qu\'à vider un conteneur : tout texte venu de Grist passe par textContent.');
@@ -575,6 +699,42 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
   const external = [...read('index.html').matchAll(/\b(?:src|href)="(https?:\/\/[^"]+)"/g)].map(match => match[1]);
   assert.deepEqual(external, ['https://docs.getgrist.com/grist-plugin-api.js'], 'index.html ne doit charger que le script de l\'API Grist.');
   assert.doesNotMatch(read('style.css'), /@import|url\(\s*["']?https?:/, 'style.css ne doit rien charger d\'externe.');
+});
+
+// Le code sans ses commentaires de ligne : de quoi chercher un appel sans tomber sur un commentaire qui
+// le nomme. Une adresse (`https://…`) n'est pas un commentaire : on ne coupe qu'un `//` précédé d'une espace.
+const withoutComments = code => code.split('\n')
+  .filter(line => !/^\s*\/\//.test(line))
+  .map(line => line.replace(/\s\/\/\s.*$/, ''))
+  .join('\n');
+
+// La seule requête réseau du widget, l'envoi du fichier d'un logo (docs/securite.md, « L'envoi d'un logo et le
+// jeton en écriture ») : ses protections sont écrites dans le code et dites dans la page. Perdre l'une d'elles
+// ou en ajouter une autre sans toucher à la page est une erreur que ce test attrape.
+test('l\'envoi d\'un logo garde ses protections, et la page de sécurité les décrit', () => {
+  const upload = withoutComments(read('upload.js'));
+  assert.equal([...upload.matchAll(/\bfetchImpl\s*\(/g)].length, 1, 'upload.js émet une seule requête.');
+  const request = upload.slice(upload.indexOf('fetchImpl('));
+  assert.match(request, /method:\s*'POST'/, 'L\'envoi est un POST.');
+  assert.match(request, /credentials:\s*'omit'/, 'Aucun cookie n\'accompagne l\'envoi.');
+  assert.match(request, /referrerPolicy:\s*'no-referrer'/, 'L\'adresse de la page n\'est pas transmise.');
+  assert.match(request, /signal\b/, 'L\'envoi a un délai maximal (AbortController).');
+  assert.match(upload, /new AbortController\(\)/, 'L\'envoi a un délai maximal (AbortController).');
+  assert.ok(upload.indexOf('trusted(') < upload.indexOf('fetchImpl('), 'L\'adresse d\'envoi est vérifiée avant la requête.');
+  assert.match(upload, /protocol === 'https:'/, 'L\'envoi exige https (sauf poste local).');
+  assert.match(upload, /getAccessToken\(\{ readOnly: false \}\)/, 'Le jeton en écriture est demandé pour l\'envoi.');
+  assert.doesNotMatch(upload, /\b(?:cache|sessionStorage|localStorage)\b/i, 'Le jeton en écriture n\'est jamais gardé.');
+
+  // Le jeton en écriture n'est demandé que là ; celui des logos, en lecture seule, que par attachments.js.
+  const sources = WIDGET_SOURCES().map(({ name, code }) => ({ name, code: withoutComments(code) }));
+  assert.deepEqual(sources.filter(({ code }) => /readOnly:\s*false/.test(code)).map(({ name }) => name), ['upload.js']);
+  assert.deepEqual(sources.filter(({ code }) => /getAccessToken\(\{ readOnly: true \}\)/.test(code)).map(({ name }) => name), ['attachments.js']);
+
+  const security = read('docs/securite.md');
+  const missing = ['`upload.js`', 'getAccessToken({ readOnly: false })', '`credentials: \'omit\'`', '`referrerPolicy: \'no-referrer\'`', '`AbortController`', '30 secondes', 'image-prep.js', 'PNG']
+    .filter(phrase => !security.includes(phrase));
+  assert.deepEqual(missing, [], 'docs/securite.md (« L\'envoi d\'un logo et le jeton en écriture ») doit décrire ces éléments de l\'envoi.');
+  assert.match(security, /seule requête réseau/, 'docs/securite.md doit dire que l\'envoi est la seule requête réseau du code.');
 });
 
 // Une adresse web écrite en dur dans le code est une porte vers l'extérieur : le test précédent

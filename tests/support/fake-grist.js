@@ -7,7 +7,8 @@
 //   - applyUserActions pour AddRecord, UpdateRecord et RemoveRecord, atomique (un
 //     lot refusé ne change rien) et qui renvoie retValues comme Grist ;
 //   - les formules déclenchées de la table-sonde (GRIST_SETUP.md) : Email prend
-//     l'adresse de la personne connectée, Admin se déduit de la table ACL ;
+//     l'adresse de la personne connectée, Admin et Responsable_de se déduisent de la
+//     table ACL ;
 //   - des pannes de lecture (failTables) et des écritures refusées (denyWrites),
 //     comme le ferait une règle d'accès ;
 //   - getAccessToken, le jeton qui donne accès aux pièces jointes (logos).
@@ -51,6 +52,17 @@ export function createFakeGrist(options = {}) {
         const acl = tables.ACL;
         if (!mail || !acl) return false;
         return acl.id.some((_, index) => normalize(acl.email[index]) === mail && acl.admin[index] === true);
+      },
+      // Les établissements dont la personne est responsable : identifiants de ligne, triés, séparés
+      // par des virgules (la formule de GRIST_SETUP.md, étape 2).
+      Responsable_de: ({ user, tables }) => {
+        const mail = normalize(user?.email);
+        const acl = tables.ACL;
+        if (!mail || !acl) return '';
+        const ids = acl.id.map((_, index) => index)
+          .filter(index => normalize(acl.email[index]) === mail && acl.Responsable_de_l_Etablissement[index] > 0)
+          .map(index => acl.Responsable_de_l_Etablissement[index]);
+        return [...new Set(ids)].sort((a, b) => a - b).join(',');
       }
     }
   };

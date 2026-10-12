@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withIdentity, withSchema, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL } from './fixtures.mjs';
-import { skip, reload, waitForCards, withWidget } from './support/browser.mjs';
+import { assertFooterWraps, skip, reload, waitForCards, withWidget } from './support/browser.mjs';
 
 // ===== Outils =====
 
@@ -188,6 +188,22 @@ test('une administratrice ne modifie que sa fiche tant que le mode admin est ét
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
+// Sur téléphone, la maquette met le résumé du pied sur la ligne des boutons quand ils tiennent : le
+// résumé ne réserve aucune largeur (1.17.0 ; avant, il en réservait 220 px et passait toujours au-dessus).
+test('le résumé du pied du formulaire et de la relecture partage la ligne des boutons dès que tout tient', { skip }, () =>
+  withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openOwn(page);
+    await field(page, 'Fonction').fill('Cheffe de service');
+    assert.equal(await dialog(page).locator('.dlg-summary').textContent(), '1 champ modifié');
+    await assertFooterWraps(page, '#profileDialog');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await review(page);
+    assert.equal(await dialog(page).locator('.dlg-summary').textContent(), '1 champ modifié');
+    await assertFooterWraps(page, '#profileDialog');
+  }));
+
 // Les rectangles qui se recouvrent : la ligne d'actions ne doit jamais passer sous le badge.
 const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
@@ -215,8 +231,13 @@ test('le bouton « Modifier » est rangé sous la fonction, dans la colonne du n
 
 test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le texte passe à la ligne au lieu de se laisser écraser par l\'interrupteur, et le bouton « Mode admin » ne le serre pas', { skip }, async () => {
   const parts = ['.account-avatar', '.account-identity', '.presence-switch', '.account-edit', '.account-admin'];
+  // Ana n'est pas responsable d'établissement ici : le bandeau garde ses trois éléments (interrupteur,
+  // « Modifier mon profil », « Mode admin »). Celui à quatre éléments, avec « Mon établissement », est
+  // mesuré dans tests/e2e-etablissement.test.mjs.
+  const adminOnly = withIdentity();
+  adminOnly.ACL.Responsable_de_l_Etablissement[0] = 0;
   for (const width of [280, 320, 390, 560, 768, 860, 1000, 1180, 1280, 1440]) {
-    await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await withWidget({ tables: adminOnly, user: ANA_EMAIL }, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await waitForCards(page, 4);
       await adminToggle(page).waitFor();

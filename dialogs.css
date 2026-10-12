@@ -1,6 +1,6 @@
-/* Fenêtre de modification d'une fiche (profile-ui.js) : le formulaire, la relecture
-   avant/après et la confirmation. Les couleurs de base (--ink, --violet…) viennent de
-   style.css. */
+/* Fenêtres de modification : celle d'une fiche (profile-ui.js : le formulaire, la relecture
+   avant/après et la confirmation) et celle d'un établissement (etablissement-ui.js). Les
+   couleurs de base (--ink, --violet…) viennent de style.css. */
 
 :root {
   --field: #f7f8fc;
@@ -108,9 +108,10 @@ textarea {
 }
 .dlg-status {
   display: flex;
-  flex: 1 1 220px;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 .dlg-summary {
   color: var(--muted);
@@ -681,12 +682,284 @@ textarea {
   text-align: left;
 }
 
+/* Fiche de l'établissement (etablissement-ui.js) : enregistrement direct, sans relecture. Les
+   classes en « es- » sont celles de cette fenêtre ; le reste (champs, boutons, encadrés) est commun. */
+.dlg-etab {
+  width: min(660px, calc(100vw - 32px));
+}
+.es-wait {
+  padding: 24px 0;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+}
+.es-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+.es-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  width: 100%;
+  padding: 12px 14px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.es-choice:hover {
+  border-color: var(--violet);
+}
+.es-choice-name {
+  font-size: 14px;
+  font-weight: 800;
+}
+.es-choice-full {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.es-logo {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.es-tile {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 152px;
+  height: 88px;
+  padding: 10px;
+  background: repeating-conic-gradient(var(--field) 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.es-tile img,
+.es-tile .logo-img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.es-logo-info {
+  flex: 1;
+  min-width: 0;
+}
+.es-logo-title {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.es-logo-help {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.es-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.es-logo-actions .btn {
+  height: 34px;
+  font-size: 12.5px;
+}
+.es-logo-status {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.es-logo-status:empty {
+  display: none;
+}
+.es-logo-info .fld-err {
+  margin-top: 8px;
+}
+.fld input[readonly] {
+  color: var(--muted);
+  background: #f3f4fa;
+  cursor: not-allowed;
+}
+.es-chk {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.es-chk input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  accent-color: var(--teal-deep);
+}
+.es-chk-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+}
+.es-chk-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.es-note {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+.es-note[hidden] {
+  display: none;
+}
+.es-sec {
+  margin-top: 20px;
+}
+.es-sec-title {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.es-sec-help {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.es-resp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  list-style: none;
+}
+.es-resp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.es-resp .avatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  font-size: 11.5px;
+}
+.es-resp[data-state="added"] {
+  background: #f3fbf8;
+  border-color: #8fd3b8;
+}
+.es-resp[data-state="removed"] {
+  background: #fdf6f6;
+  border-style: dashed;
+}
+.es-resp[data-state="removed"] .es-resp-name {
+  color: #566177;
+  text-decoration: line-through;
+}
+.es-resp-main {
+  flex: 1;
+  min-width: 0;
+}
+.es-resp-name {
+  font-size: 13px;
+  font-weight: 800;
+}
+.es-resp-mail {
+  color: #566177;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.es-tag {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.es-tag-you {
+  color: var(--violet-ink);
+  background: var(--violet-wash);
+}
+.es-tag-new {
+  color: #0b6b4f;
+  background: #e6f6f0;
+}
+.es-tag-gone {
+  color: #9b2226;
+  background: #fdecec;
+}
+.es-resp .btn {
+  height: 32px;
+  font-size: 12px;
+}
+.es-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.es-add select,
+.es-add input {
+  flex: 1 1 200px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+.es-add select:focus,
+.es-add input:focus {
+  background: #fff;
+  border-color: var(--violet);
+}
+.es-add select:disabled,
+.es-add input:disabled {
+  opacity: 0.5;
+}
+.es-err {
+  margin-top: 6px;
+}
+.es-err[hidden] {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .rv-cols {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 560px) {
+  .es-logo {
+    flex-direction: column;
+  }
   .fld-grid {
     grid-template-columns: minmax(0, 1fr);
   }

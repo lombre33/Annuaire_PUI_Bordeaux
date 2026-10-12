@@ -10,9 +10,19 @@
 //   UNSIZED_FILE   un SVG qui n'a qu'un viewBox, sans width ni height (100 x 50)
 //   MISSING_FILE   le serveur répond 404 (fichier supprimé)
 //   BROKEN_FILE    le serveur répond 200 mais le contenu n'est pas une image
+//
+// Il reçoit aussi les envois de fichiers (POST <adresse>/attachments?auth=<jeton>, le logo d'un
+// établissement) : le fichier est gardé, reçoit l'identifiant suivant (à partir de FIRST_UPLOAD_ID)
+// et se télécharge ensuite comme les autres. `upload` règle la réponse du serveur :
+//   mode   'ok' (défaut), 'denied' (403), 'too-large' (413), 'error' (500), 'bad-answer' (200 sans
+//          identifiant), 'unreachable' (la connexion échoue)
+//   cors   faux : la réponse n'a pas les en-têtes CORS, le navigateur la refuse au widget (le fichier
+//          est pourtant gardé par le serveur : `uploads[n].id` et les téléchargements le montrent)
+//   delay  millisecondes d'attente avant de répondre
 
 import { FAKE_ATTACHMENTS_URL } from './fake-grist.js';
 
+export const FIRST_UPLOAD_ID = 2000;
 export const MISSING_FILE = 999;
 export const BROKEN_FILE = 998;
 export const TALL_FILE = 997;
@@ -38,20 +48,79 @@ function logoSvg(id) {
     + `<text x="50%" y="55%" fill="#fff" font-family="sans-serif" font-size="14" text-anchor="middle">${id}</text></svg>`;
 }
 
+const ORIGIN = new URL(FAKE_ATTACHMENTS_URL).origin;
 const PATH = new URL(FAKE_ATTACHMENTS_URL).pathname;
 
-// Répond aux téléchargements de pièces jointes d'un contexte Playwright. Renvoie
-// { hits } : le nombre de téléchargements demandés par fichier, et les jetons reçus.
+// Le fichier d'un envoi multipart : { field, fileName, contentType, bytes }. Les octets sont lus en
+// latin1 pour que la position dans le texte soit celle dans le fichier.
+function readUpload(request) {
+  const boundary = /boundary=(.+)$/.exec(request.headers()['content-type'] ?? '')?.[1];
+  const body = request.postDataBuffer();
+  if (!boundary || !body) return null;
+  const text = body.toString('latin1');
+  const start = text.indexOf(`--${boundary}`);
+  const headerEnd = text.indexOf('\r\n\r\n', start);
+  const end = text.indexOf(`\r\n--${boundary}`, headerEnd + 4);
+  if (start < 0 || headerEnd < 0 || end < 0) return null;
+  const head = text.slice(start, headerEnd);
+  return {
+    field: /name="([^"]*)"/.exec(head)?.[1] ?? '',
+    fileName: /filename="([^"]*)"/.exec(head)?.[1] ?? '',
+    contentType: /content-type:\s*([^\r\n]+)/i.exec(head)?.[1] ?? '',
+    bytes: body.subarray(headerEnd + 4, end)
+  };
+}
+
+// Répond aux téléchargements et aux envois de pièces jointes d'un contexte Playwright. Renvoie :
+//   hits      le nombre de téléchargements demandés par fichier
+//   tokens    les jetons reçus (téléchargements)
+//   uploads   les envois reçus : { token, method, referrer, cookie, field, fileName, contentType, bytes, id }
+//             (`id` : l'identifiant donné au fichier, null quand le serveur refuse)
+//   upload    la réponse du serveur aux envois, modifiable par le test (voir plus haut)
 export async function routeAttachments(context) {
-  const record = { hits: {}, tokens: [] };
-  await context.route(url => url.origin === new URL(FAKE_ATTACHMENTS_URL).origin && url.pathname.startsWith(`${PATH}/attachments/`), route => {
+  const record = { hits: {}, tokens: [], uploads: [], stored: {}, upload: { mode: 'ok', cors: true, delay: 0 } };
+  const cors = { 'access-control-allow-origin': '*' };
+
+  await context.route(url => url.origin === ORIGIN && url.pathname.startsWith(`${PATH}/attachments/`), route => {
     const url = new URL(route.request().url());
     const id = Number(url.pathname.split('/').at(-2));
     record.hits[id] = (record.hits[id] ?? 0) + 1;
     record.tokens.push(url.searchParams.get('auth'));
     if (id === MISSING_FILE) return route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not found' });
     if (id === BROKEN_FILE) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: 'ceci n\'est pas une image' });
+    const stored = record.stored[id];
+    if (stored) return route.fulfill({ status: 200, contentType: stored.contentType, body: stored.bytes });
     return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: logoSvg(id) });
+  });
+
+  await context.route(url => url.origin === ORIGIN && url.pathname === `${PATH}/attachments`, async route => {
+    const request = route.request();
+    const { mode, cors: allowed, delay } = record.upload;
+    const sent = readUpload(request);
+    const headers = cors;
+    const entry = {
+      token: new URL(request.url()).searchParams.get('auth'),
+      method: request.method(),
+      referrer: request.headers().referer ?? null,
+      cookie: request.headers().cookie ?? null,
+      ...sent,
+      id: null
+    };
+    record.uploads.push(entry);
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    if (mode === 'unreachable') return route.abort('connectionfailed');
+    if (mode === 'denied') return route.fulfill({ status: 403, headers, contentType: 'text/plain', body: 'Forbidden' });
+    if (mode === 'too-large') return route.fulfill({ status: 413, headers, contentType: 'text/plain', body: 'Payload too large' });
+    if (mode === 'error') return route.fulfill({ status: 500, headers, contentType: 'text/plain', body: 'Server error' });
+    if (mode === 'bad-answer') return route.fulfill({ status: 200, headers, contentType: 'application/json', body: '{}' });
+    entry.id = FIRST_UPLOAD_ID + Object.keys(record.stored).length;
+    record.stored[entry.id] = { contentType: entry.contentType || 'application/octet-stream', bytes: entry.bytes };
+    // Sans en-têtes CORS, le serveur a bien reçu et gardé le fichier mais le navigateur refuse d'en
+    // donner la réponse au widget : fetch échoue comme pour une panne de réseau. Playwright ne
+    // bloque pas de lui-même une réponse sans ces en-têtes ; on reproduit donc ce que fait un vrai
+    // navigateur.
+    if (!allowed) return route.abort('failed');
+    return route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify([entry.id]) });
   });
   return record;
 }

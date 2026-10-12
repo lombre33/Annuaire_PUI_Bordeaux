@@ -1,7 +1,7 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
 import { CATEGORIES, TAG_GROUPS, FILTERS, CARD_LOGO } from './constants.js';
-import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, sortWithCheckedFirst, normalize } from './grist-data.js';
 import { el } from './dom.js';
 import { groupState, menuGroups, selectionCount } from './filters.js';
 import { createLogoImage, sizeLogo } from './branding-ui.js';
@@ -505,12 +505,25 @@ function fillActions(box, contact, rights) {
   edit.setAttribute('aria-label', `Modifier la fiche de ${displayName(contact)}`);
 }
 
+// Le bouton « Modifier » d'un responsable, sous le logo (ou le sigle) de son établissement : il ouvre la
+// fiche de l'établissement. Le clic est écouté une seule fois par main.js, sur la grille.
+function fillEtablissementEdit(box, etablissementId, contactId, label) {
+  const edit = el('button', 'etab-edit', '✎ Modifier');
+  edit.type = 'button';
+  edit.dataset.etabId = String(etablissementId);
+  edit.dataset.rowId = String(contactId);
+  edit.title = `Modifier la fiche de l’établissement : ${label}`;
+  edit.setAttribute('aria-label', `Modifier l’établissement ${label}`);
+  edit.setAttribute('aria-haspopup', 'dialog');
+  box.append(edit);
+}
+
 // `view` : { rights } pour la grille ('own', 'admin' ou rien), { marks } pour une
 // carte de relecture (voir renderPreviewCard), { logos } de quoi montrer le logo de
 // l'établissement : { attachments, logoFor(contact) } (attachments.js, branding.js) ;
 // sans eux la carte garde la pastille texte.
 function buildCard(template, contact, onToggle, view = {}) {
-  const { rights = null, marks = null, logos = null } = view;
+  const { rights = null, marks = null, logos = null, etabRights = null } = view;
   const card = template.content.cloneNode(true);
   card.querySelector('.avatar').textContent = initials(contact);
 
@@ -545,15 +558,22 @@ function buildCard(template, contact, onToggle, view = {}) {
 
   fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags);
   if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);
+  // Fermé par défaut : seul un établissement dont la personne est responsable (et dont la carte
+  // porte la référence) montre le bouton.
+  const etablissementId = refId(contact.Etablissement);
+  if (etabRights && etablissementId && contact.etablissement_label && etabRights(etablissementId)) {
+    fillEtablissementEdit(card.querySelector('.etab-actions'), etablissementId, contact.id, contact.etablissement_label);
+  }
   return card;
 }
 
 // `rightsOf(contact)` (facultatif) dit ce que la personne connectée peut faire de la
 // fiche : 'own', 'admin' ou rien. `logos` (facultatif) : de quoi montrer le logo de
-// l'établissement, voir buildCard.
-export function renderCards(grid, template, contacts, onToggle, rightsOf = () => null, logos = null) {
+// l'établissement, voir buildCard. `etabRights(identifiant)` (facultatif) : vrai pour un
+// établissement dont la personne est responsable (etablissementRightsFor).
+export function renderCards(grid, template, contacts, onToggle, rightsOf = () => null, logos = null, etabRights = null) {
   grid.innerHTML = '';
-  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle, { rights: rightsOf(contact), logos })));
+  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle, { rights: rightsOf(contact), logos, etabRights })));
 }
 
 // Une carte pour la relecture d'une modification : même gabarit et mêmes classes que

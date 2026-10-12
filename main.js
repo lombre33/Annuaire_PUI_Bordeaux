@@ -3,11 +3,12 @@
 // (construction du DOM), identity.js et presence.js (la personne connectée et
 // son choix d'apparaître), account-ui.js (son bandeau), pour la modification d'une
 // fiche, profile.js / profile-save.js / preview.js (la logique) avec profile-ui.js (la
-// fenêtre), et branding.js, attachments.js et branding-ui.js (les logos : cartes,
-// financeurs, fondateurs).
+// fenêtre), pour celle d'un établissement etablissement.js / etablissement-save.js (la
+// logique), upload.js et image-prep.js (le logo) avec etablissement-ui.js (la fenêtre), et
+// branding.js, attachments.js et branding-ui.js (les logos : cartes, financeurs, fondateurs).
 
 import { CARD_LOGO, ETABLISSEMENT_NAMES } from './constants.js';
-import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, refId, text } from './grist-data.js';
+import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
@@ -16,6 +17,10 @@ import { createAccountBar } from './account-ui.js';
 import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges } from './profile.js';
 import { ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
 import { createProfileDialog } from './profile-ui.js';
+import { diffEtablissement, etablissementOf, etablissementRightsFor, peopleOfEtablissement, responsablesOf } from './etablissement.js';
+import { EtablissementSaveError, readEtablissement, saveEtablissement, savePlanOf } from './etablissement-save.js';
+import { createEtablissementDialog } from './etablissement-ui.js';
+import { uploadAttachment } from './upload.js';
 import { buildBranding, logoForContact } from './branding.js';
 import { createAttachments } from './attachments.js';
 import { createBrandingUI, createLogoImage, sizeLogo } from './branding-ui.js';
@@ -44,6 +49,9 @@ const state = {
   // des autres que lorsqu'il a allumé le « mode admin » (adminMode).
   rightsOf: () => null,
   adminMode: false,
+  // Les établissements dont la personne connectée est responsable (etablissement.js) : aucun tant
+  // qu'elle n'est pas identifiée. Leur fiche est la seule que le mode admin ne touche pas.
+  etabRights: () => false,
   // Indicateurs des établissements, pour montrer la fiche « après » telle que
   // l'annuaire la présentera.
   etabFlags: null
@@ -69,10 +77,12 @@ const elements = {
 const accountBar = createAccountBar(document.getElementById('accountBar'), {
   onToggle: togglePresence,
   onEdit: openOwnProfile,
+  onEtab: openMyEtablissement,
   onAdminMode: toggleAdminMode
 });
 
 const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
+const etablissementDialog = createEtablissementDialog(document.getElementById('etabDialog'));
 
 // Les logos sont des pièces jointes de Grist : leurs adresses demandent un jeton,
 // réclamé à Grist seulement quand un logo est à afficher.
@@ -122,7 +132,7 @@ function rebuildFilterUI() {
 
 function refreshCards() {
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
-  renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos());
+  renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights);
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
   updateFilterCounts(elements.filtersContainer, currentCounts());
@@ -133,9 +143,16 @@ function refreshCards() {
 // au bouton de la même fiche et non à celui, disparu, qui a ouvert la fenêtre.
 elements.grid.addEventListener('click', event => {
   const edit = event.target.closest('.card-edit');
-  if (!edit) return;
-  const rowId = Number(edit.dataset.rowId);
-  openProfile(rowId, () => elements.grid.querySelector(`.card-edit[data-row-id="${rowId}"]`)?.focus());
+  if (edit) {
+    const rowId = Number(edit.dataset.rowId);
+    openProfile(rowId, () => elements.grid.querySelector(`.card-edit[data-row-id="${rowId}"]`)?.focus());
+    return;
+  }
+  const etabEdit = event.target.closest('.etab-edit');
+  if (etabEdit) {
+    const etabId = Number(etabEdit.dataset.etabId);
+    openEtablissement([etabId], returnToEtablissementButton(etabId, Number(etabEdit.dataset.rowId)));
+  }
 });
 
 elements.searchInput.addEventListener('input', event => {
@@ -274,6 +291,9 @@ function warnOnce(key, message) {
 
 const isAdmin = () => state.identity?.status === 'ready' && state.identity.admin === true;
 
+// Les établissements dont la personne connectée est responsable (identifiants de ligne).
+const myEtablissements = () => (state.identity?.status === 'ready' ? state.identity.etablissements : []);
+
 // Le bandeau de la personne connectée. Sans identité (pas de table-sonde, compte Lecteur…)
 // ou tant que l'annuaire n'est pas lu, il reste masqué. Une adresse qui ne figure pas dans
 // BDD le dit, au lieu de disparaître sans explication : un administrateur y trouve quand
@@ -290,7 +310,7 @@ function refreshAccount() {
       ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bouton « Modifier mon profil ».'
       : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
     accountBar.show(describeUnknownAccount({ email: state.identity.email, admin, emailColumn: state.people.hasEmailColumn }));
-    accountBar.setActions({ admin, adminMode: state.adminMode });
+    accountBar.setActions({ etab: myEtablissements().length > 0, admin, adminMode: state.adminMode });
     return;
   }
   if (persons.length > 1) {
@@ -300,7 +320,7 @@ function refreshAccount() {
   }
   accountBar.show({ name: persons[0].name || 'Ma fiche', initials: initials(persons[0].row), ...describePresence(persons) });
   // Plusieurs fiches pour la même adresse : on ne sait pas laquelle ouvrir depuis le bandeau.
-  accountBar.setActions({ edit: persons.length === 1, admin, adminMode: state.adminMode });
+  accountBar.setActions({ edit: persons.length === 1, etab: myEtablissements().length > 0, admin, adminMode: state.adminMode });
 }
 
 // Allume ou éteint le « mode admin » : les boutons « Modifier la fiche » des autres cartes
@@ -340,12 +360,15 @@ async function togglePresence() {
 // L'identité ne retarde jamais l'annuaire : lue à part, elle ajoute le bandeau
 // quand elle arrive. Sans elle (pas de table-sonde, compte Lecteur…), personne
 // n'est identifié et aucune modification n'est proposée.
-readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(identity => {
+function applyIdentity(identity) {
   state.identity = identity;
   state.rightsOf = rightsFor(identity, { adminMode: state.adminMode });
+  state.etabRights = etablissementRightsFor(identity);
   refreshAccount();
   refreshCards(); // les boutons « Modifier » apparaissent sur les cartes concernées
-});
+}
+
+readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(applyIdentity);
 
 // ===== Modifier une fiche =====
 
@@ -490,4 +513,139 @@ function openProfile(rowId, returnFocus) {
 function openOwnProfile() {
   const persons = myPersons();
   if (persons.length === 1) openProfile(persons[0].row.id, () => accountBar.focusEdit());
+}
+
+// ===== Modifier un établissement =====
+
+// Une erreur attendue (EtablissementSaveError) porte une phrase française ; toute autre est consignée
+// dans la console et remplacée par une phrase générale. Un fichier de logo envoyé pour rien est dit.
+function userFacingEtab(error) {
+  if (error instanceof EtablissementSaveError) {
+    if (!error.leftover) return error;
+    return new Error(`${error.message} Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.`);
+  }
+  console.error('[FICHE-ETAB] Erreur inattendue :', error);
+  return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
+}
+
+// La personne qui porte cette adresse, pour la liste des responsables : son nom seulement si sa fiche
+// figure dans l'annuaire (un nom qu'on voit déjà ne dévoile rien), sinon on dit juste qu'elle existe.
+function lookupPerson(email) {
+  const found = state.people?.findByEmail(email) ?? [];
+  if (found.length === 0) return null;
+  const shown = found.find(person => person.status.visible && person.name);
+  return shown ? { name: shown.name, initials: initials(shown.row) } : { hidden: true };
+}
+
+// Ce que la fenêtre montre de l'établissement : la fiche lue dans Grist (readEtablissement) et, de
+// l'annuaire, les personnes qu'on peut nommer et ce que cacherait un établissement décoché.
+function ficheOf({ row, etablissement, responsables }) {
+  const meEmail = state.identity?.status === 'ready' ? normalizeEmail(state.identity.email) : '';
+  const { candidates, hidden, includesMe } = peopleOfEtablissement(state.allContacts, etablissement.id, meEmail, initials);
+  return {
+    row,
+    etablissement,
+    responsables: responsables === null ? null : responsables.map(({ email }) => ({ email })),
+    candidates,
+    warning: { hidden, includesMe },
+    meEmail
+  };
+}
+
+async function loadFiche(id) {
+  try {
+    return ficheOf(await readEtablissement(window.grist.docApi, id));
+  } catch (error) {
+    throw userFacingEtab(error);
+  }
+}
+
+// Le logo actuel de l'établissement, comme sur ses cartes ; le sigle en pastille quand le fichier ne
+// se charge pas.
+function etablissementLogo({ etablissement }) {
+  const id = etablissement.logo[0];
+  if (!id) return null;
+  const pill = document.createElement('span');
+  pill.className = 'et-pill';
+  pill.textContent = etablissement.acronym;
+  const image = createLogoImage(attachments, id, `Logo de ${etablissement.name || etablissement.acronym}`, () => image.replaceWith(pill), { eager: true });
+  return image;
+}
+
+// Relit l'identité après un changement de responsables : les droits en dépendent. Une relecture qui
+// échoue laisse l'identité d'avant, que Grist a bien reconnue.
+async function refreshIdentity() {
+  const identity = await readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) });
+  if (identity.status === 'ready') applyIdentity(identity);
+}
+
+// Écrit ce que la personne a changé (etablissement-save.js). Si la fiche a changé dans Grist depuis
+// l'ouverture de la fenêtre, rien n'est écrit : la fenêtre reprend l'état actuel en gardant la saisie.
+async function saveFiche(draft, fiche) {
+  const { id } = fiche.etablissement;
+  const diff = diffEtablissement(fiche.etablissement, draft, { readable: fiche.responsables !== null });
+  if (diff.errors.length > 0 || diff.labels.length === 0) {
+    throw new Error('Il n\'y a rien à enregistrer : corrigez les champs signalés ou modifiez la fiche.');
+  }
+  const file = draft.logo.action === 'replace' ? draft.logo.file : null;
+  const plan = savePlanOf(fiche.row, diff.champs, { file, responsable: state.etabRights(id) });
+  let result;
+  try {
+    result = await saveEtablissement(window.grist.docApi, plan, { upload: sent => uploadAttachment(window.grist.docApi, sent) });
+  } catch (error) {
+    throw userFacingEtab(error);
+  }
+  if (result.status === 'changed') {
+    const { row, acl } = result.state;
+    return {
+      status: 'changed',
+      fiche: ficheOf({ row, etablissement: etablissementOf(row), responsables: acl === null ? null : responsablesOf(acl, id) }),
+      notice: `La fiche a changé dans Grist pendant que la fenêtre était ouverte (${result.moved.join(', ')}). `
+        + 'Ce que vous avez saisi est conservé : relisez-le, puis enregistrez à nouveau.'
+        + (result.leftover ? ' Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.' : '')
+    };
+  }
+  if (diff.champs.responsables) await refreshIdentity();
+  const outcome = await reloadDirectory();
+  return { status: 'saved', unsaved: result.unsaved ?? [], reloaded: outcome !== 'failed' };
+}
+
+// Où rendre le focus quand la fenêtre se ferme : le bouton de la même carte (les cartes sont
+// redessinées après un enregistrement), sinon un autre bouton du même établissement, le raccourci du
+// bandeau ou, à défaut, la recherche (un responsable qui s'est retiré n'a plus de bouton).
+const returnToEtablissementButton = (etabId, rowId) => () => {
+  const buttons = elements.grid.querySelectorAll(`.etab-edit[data-etab-id="${etabId}"]`);
+  const target = [...buttons].find(node => node.dataset.rowId === String(rowId)) ?? buttons[0];
+  if (target) target.focus();
+  else if (!accountBar.focusEtab()) elements.searchInput.focus();
+};
+
+// Ouvre la fiche d'un établissement, ou la liste de ceux qu'il faut départager. Fermé par défaut :
+// seuls les établissements dont la personne est responsable.
+function openEtablissement(ids, onClose) {
+  const names = state.referenceMaps[ETABLISSEMENT_NAMES] || {};
+  const labels = state.referenceMaps.etablissement || {};
+  const choices = ids.filter(id => state.etabRights(id)).map(id => ({
+    id,
+    acronym: labels[String(id)] || names[String(id)] || `Établissement ${id}`,
+    name: names[String(id)] || ''
+  }));
+  if (choices.length === 0) return;
+  etablissementDialog.open({
+    choices,
+    load: loadFiche,
+    lookup: lookupPerson,
+    renderLogo: etablissementLogo,
+    save: saveFiche,
+    notify: showToast,
+    onClose
+  });
+}
+
+// Le bouton « Mon établissement » du bandeau : la fiche de l'établissement dont la personne est
+// responsable (elle choisit quand ils sont plusieurs), que sa carte soit affichée ou non.
+function openMyEtablissement() {
+  openEtablissement(myEtablissements(), () => {
+    if (!accountBar.focusEtab()) elements.searchInput.focus();
+  });
 }

@@ -1,33 +1,43 @@
 // Bandeau « Ma présence » : la personne connectée voit sa situation dans
 // l'annuaire et la change d'un clic ; elle ouvre de là la modification de sa fiche.
-// Un administrateur y allume aussi le « mode admin ». DOM seulement ; presence.js
-// décrit la situation et décide du message.
+// Un responsable d'établissement y trouve le raccourci « Mon établissement », un administrateur
+// le « mode admin ». DOM seulement ; presence.js décrit la situation et décide du message.
 
 const noop = () => {};
 
 // `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
 // personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
-// par le bouton « Modifier mon profil ». `onAdminMode` : appelé par le bouton « Mode admin ».
-export function createAccountBar(root, { onToggle, onEdit = noop, onAdminMode = noop }) {
+// par le bouton « Modifier mon profil ». `onEtab` : appelé par le bouton « Mon établissement ».
+// `onAdminMode` : appelé par le bouton « Mode admin ».
+export function createAccountBar(root, { onToggle, onEdit = noop, onEtab = noop, onAdminMode = noop }) {
   const part = selector => root.querySelector(selector);
   const avatar = part('.account-avatar');
   const name = part('.account-name');
   const detail = part('.account-detail');
   const switchButton = part('.presence-switch');
   const editButton = part('.account-edit');
+  const etabButton = part('.account-etab');
   const adminButton = part('.account-admin');
   const status = part('.account-status');
 
-  // Dans l'en-tête compact, « Mode admin » prend le coin de la première rangée quand
-  // l'interrupteur occupe la deuxième : la feuille de style en a besoin pour placer le nom.
-  const placeAdminButton = () => {
-    root.classList.toggle('admin-corner', !adminButton.hidden && !switchButton.hidden);
+  // Dans l'en-tête compact, l'interrupteur et « Modifier mon profil » occupent la deuxième
+  // rangée ; « Mode admin », sinon « Mon établissement », prend le coin de la première, à droite du
+  // nom. Le second de ces deux boutons, s'ils sont là tous deux, passe sur une troisième rangée.
+  // Sans interrupteur (un compte qui n'a pas de fiche), les boutons se rangent sur la deuxième
+  // rangée. La feuille de style lit `data-corner` et `no-switch` pour placer le nom et les boutons.
+  const placeButtons = () => {
+    const withSwitch = !switchButton.hidden;
+    const corner = !withSwitch ? '' : !adminButton.hidden ? 'admin' : !etabButton.hidden ? 'etab' : '';
+    if (corner) root.dataset.corner = corner;
+    else delete root.dataset.corner;
+    root.classList.toggle('no-switch', !withSwitch);
   };
 
   switchButton.addEventListener('click', () => {
     if (!switchButton.disabled) onToggle();
   });
   editButton.addEventListener('click', () => onEdit());
+  etabButton.addEventListener('click', () => onEtab());
   adminButton.addEventListener('click', () => onAdminMode());
 
   return {
@@ -40,7 +50,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onAdminMode = 
       detail.dataset.tone = view.tone;
       switchButton.setAttribute('aria-checked', String(view.accepted));
       switchButton.hidden = view.switchable === false;
-      placeAdminButton();
+      placeButtons();
       root.hidden = false;
     },
 
@@ -49,12 +59,14 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onAdminMode = 
     },
 
     // Les boutons du bandeau. « Modifier mon profil » : montré seulement quand la fiche de
-    // la personne est identifiée sans ambiguïté. « Mode admin » : montré aux seuls
-    // administrateurs ; `adminMode` dit s'il est allumé.
-    setActions({ edit = false, admin = false, adminMode = false } = {}) {
+    // la personne est identifiée sans ambiguïté. « Mon établissement » : montré aux responsables
+    // d'au moins un établissement, que sa carte soit affichée ou non. « Mode admin » : montré aux
+    // seuls administrateurs ; `adminMode` dit s'il est allumé.
+    setActions({ edit = false, etab = false, admin = false, adminMode = false } = {}) {
       editButton.hidden = !edit;
+      etabButton.hidden = !etab;
       adminButton.hidden = !admin;
-      placeAdminButton();
+      placeButtons();
       adminButton.setAttribute('aria-pressed', String(admin && adminMode));
       adminButton.title = adminMode
         ? 'Quitter le mode admin'
@@ -64,6 +76,14 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onAdminMode = 
     // Rend le focus au bouton « Modifier mon profil » quand la fenêtre qu'il a ouverte se ferme.
     focusEdit() {
       if (!editButton.hidden) editButton.focus();
+    },
+
+    // Rend le focus au bouton « Mon établissement » quand la fenêtre qu'il a ouverte se ferme ;
+    // faux quand le bouton n'est pas là.
+    focusEtab() {
+      if (etabButton.hidden) return false;
+      etabButton.focus();
+      return true;
     },
 
     // Pendant une écriture l'interrupteur est gelé : un deuxième clic ne doit pas

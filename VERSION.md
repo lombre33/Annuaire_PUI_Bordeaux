@@ -1,4 +1,4 @@
-# Version 1.15.0 — Le mode admin, et la modification de fiche fidèle à la maquette (voir CHANGELOG.md)
+# Version 1.17.0 — La fiche d'un établissement, modifiée par son responsable (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -12,5 +12,8 @@ jointes du document lues avec un jeton d'accès en lecture seule (1.14.0, facult
 un anneau violet montre le contrôle actif au clavier (1.14.1, audit UI/UX). Depuis la
 1.15.0, un administrateur allume un « mode admin » pour modifier la fiche de n'importe qui,
 e-mail et établissement compris, et la fenêtre de modification suit la maquette validée
-par Antoine. 555 tests (dont 187 dans un vrai navigateur, optionnels sans
-Playwright).
+par Antoine. Depuis la 1.17.0, le responsable d'un établissement (une ligne d'`ACL`)
+modifie la fiche de son établissement (logo, nom complet, visibilité, responsables) ; le
+widget envoie lui-même le fichier du logo à Grist (réglages dans `GRIST_SETUP.md`,
+non essayés dans un vrai Grist). 692 tests (dont 234 dans un vrai navigateur,
+optionnels sans Playwright).

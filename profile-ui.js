@@ -7,7 +7,7 @@
 
 import { CATEGORIES } from './constants.js';
 import { formatPhone, normalize } from './grist-data.js';
-import { el } from './dom.js';
+import { button, el, notice } from './dom.js';
 import { frenchPhoneDigits, NAME_REQUIRED } from './profile.js';
 import { renderChangeList } from './changes-ui.js';
 
@@ -15,20 +15,6 @@ import { renderChangeList } from './changes-ui.js';
 const SEARCH_FROM = 12;
 
 const fieldsChanged = count => `${count} champ${count > 1 ? 's' : ''} modifié${count > 1 ? 's' : ''}`;
-
-function button(label, className, onClick) {
-  const node = el('button', className, label);
-  node.type = 'button';
-  if (onClick) node.addEventListener('click', onClick);
-  return node;
-}
-
-function notice(kind, text, role) {
-  const box = el('div', `notice notice-${kind}`);
-  if (role) box.setAttribute('role', role);
-  box.append(el('p', '', text));
-  return box;
-}
 
 // `dialog` : le <dialog> de index.html.
 //
