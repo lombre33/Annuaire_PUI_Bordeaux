@@ -62,8 +62,8 @@ const ROLES = {
   libelles: ['Référent établissement', 'Coordinateur', 'Membre du comité', 'Animation de communauté']
 };
 
-// Les compétences alimentent deux filtres : « Compétences » (le libellé) et
-// « Domaines » (Macro_competences, le regroupement par domaine). Une
+// Les compétences alimentent un seul menu, « Compétences » (le libellé), que
+// Macro_competences (le regroupement par domaine) range en domaines. Une
 // compétence sans domaine est classée sous « Autres » par le widget.
 const COMPETENCES = [
   { libelle: 'Propriété intellectuelle', domaine: 'Valorisation et partenariats' },
