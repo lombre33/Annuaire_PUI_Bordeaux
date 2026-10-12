@@ -19,6 +19,9 @@ la recherche trouve « prénom nom » dans n'importe quel ordre, tirets, apostro
 sont assez foncés pour être lus (4,5:1 au moins avec le blanc, audit UI/UX). Depuis la 1.16.3,
 l'interrupteur de présence garde le focus pendant l'écriture, annonce sa réussite aux lecteurs d'écran,
 a une piste à 3:1 au moins de son fond et reste lisible en contraste élevé (audit UI/UX).
+Depuis la 1.17.0, le responsable d'un établissement (une ligne d'`ACL`) modifie la fiche de son
+établissement (logo, nom complet, visibilité, responsables) ; le widget envoie lui-même le fichier
+du logo à Grist (réglages dans `GRIST_SETUP.md`, non essayés dans un vrai Grist).
 Depuis la 1.17.1, tout le texte des cartes fait 12 px au moins et les pastilles 24 px de haut : les cartes
 sont plus hautes d'un tiers environ, un écart voulu avec la maquette v5 (audit UI/UX).
-657 tests (dont 232 dans un vrai navigateur, optionnels sans Playwright).
+TESTS_TOTAL tests (dont TESTS_BROWSER dans un vrai navigateur, optionnels sans Playwright).

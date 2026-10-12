@@ -34,6 +34,7 @@
         </button>
         <div class="account-actions">
           <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
+          <button type="button" class="account-etab" aria-haspopup="dialog" hidden>Mon établissement</button>
           <button type="button" class="account-admin" aria-pressed="false" hidden>Mode admin</button>
         </div>
         <p class="account-status" role="status" data-tone="info"></p>
@@ -81,6 +82,20 @@
       <header class="dlg-head">
         <div>
           <h2 id="profileTitle" tabindex="-1">Modifier mon profil</h2>
+          <p class="dlg-sub"></p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>
+      </header>
+      <div class="dlg-body"></div>
+      <footer class="dlg-foot"></footer>
+    </div>
+  </dialog>
+
+  <dialog id="etabDialog" class="dlg dlg-etab" aria-labelledby="etabTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="etabTitle" tabindex="-1">Fiche de l’établissement</h2>
           <p class="dlg-sub"></p>
         </div>
         <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>

@@ -216,22 +216,36 @@ h1 {
     line-height: 1.15;
   }
   /* Les boutons deviennent des éléments de la grille : « Modifier mon profil » sous le nom,
-     à droite de l'interrupteur, et « Mode admin » (réservé aux administrateurs) dans le coin
-     de la première rangée, à droite du nom, pour que l'interrupteur garde sa largeur. Sans
-     interrupteur (un administrateur qui n'a pas de fiche), il reprend la deuxième rangée. */
+     à droite de l'interrupteur, et « Mode admin » (réservé aux administrateurs), sinon « Mon
+     établissement » (réservé aux responsables), dans le coin de la première rangée, à droite du
+     nom, pour que l'interrupteur garde sa largeur ; s'ils sont là tous deux, le second passe sur
+     une troisième rangée. Sans interrupteur (un compte qui n'a pas de fiche), les boutons se
+     rangent côte à côte sur la deuxième rangée. */
   .page-header > .account-bar .account-actions {
     display: contents;
   }
+  .page-header > .account-bar.no-switch .account-actions {
+    display: flex;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-end;
+    gap: 8px;
+  }
   .page-header > .account-bar .account-edit,
+  .page-header > .account-bar .account-etab,
   .page-header > .account-bar .account-admin {
     grid-column: 3;
     grid-row: 2;
     justify-self: end;
   }
-  .page-header > .account-bar.admin-corner .account-admin {
+  .page-header > .account-bar[data-corner="admin"] .account-admin,
+  .page-header > .account-bar[data-corner="etab"] .account-etab {
     grid-row: 1;
   }
-  .page-header > .account-bar.admin-corner .account-identity {
+  .page-header > .account-bar[data-corner="admin"] .account-etab {
+    grid-row: 3;
+  }
+  .page-header > .account-bar[data-corner] .account-identity {
     grid-column: 2;
   }
   .page-header > .account-bar .account-status {
@@ -239,6 +253,7 @@ h1 {
   }
   .page-header > .account-bar .presence-switch,
   .page-header > .account-bar .account-edit,
+  .page-header > .account-bar .account-etab,
   .page-header > .account-bar .account-admin {
     height: 36px;
     padding: 0 10px;
@@ -824,6 +839,30 @@ h1 {
   outline: 2px solid var(--violet);
   outline-offset: 2px;
 }
+/* Le bouton « Modifier » d'un responsable, sous le logo de son établissement : il ouvre la fiche de
+   l'établissement, pas celle de la personne de la carte. */
+.etab-edit {
+  min-height: 24px;
+  margin: 0 -4px 0 0;
+  padding: 2px 5px;
+  color: #443aaf;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+.etab-edit:hover {
+  background: #f1f0ff;
+}
+.etab-edit:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
 
 .etablissement-tag:disabled {
   cursor: default;
@@ -957,7 +996,8 @@ h1 {
   }
   button.tag,
   .etablissement-tag,
-  .card-edit {
+  .card-edit,
+  .etab-edit {
     min-height: 28px;
   }
   .etablissement-tag {
@@ -1270,7 +1310,8 @@ h1 {
   }
 }
 
-.account-edit {
+.account-edit,
+.account-etab {
   height: 46px;
   padding: 0 16px;
   color: #443aaf;
@@ -1282,10 +1323,12 @@ h1 {
   font-weight: 800;
   white-space: nowrap;
 }
-.account-edit:hover {
+.account-edit:hover,
+.account-etab:hover {
   border-color: var(--violet);
 }
-.account-edit:focus-visible {
+.account-edit:focus-visible,
+.account-etab:focus-visible {
   outline: 2px solid var(--violet);
   outline-offset: 2px;
 }

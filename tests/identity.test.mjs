@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readIdentity, isReadOnlyAddress } from '../identity.js';
+import { readIdentity, isReadOnlyAddress, responsableIds } from '../identity.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { withIdentity, ANA_EMAIL, BOB_EMAIL, ADMIN_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 
@@ -26,7 +26,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 test('readIdentity returns the e-mail Grist stamped on the probe row, and no administrator rights for an ordinary user', async () => {
   const s = session(BOB_EMAIL);
   const identity = await identify(s);
-  assert.deepEqual(identity, { status: 'ready', email: BOB_EMAIL, admin: false, reason: '' });
+  assert.deepEqual(identity, { status: 'ready', email: BOB_EMAIL, admin: false, etablissements: [2], reason: '' });
 });
 
 test('readIdentity reports administrator rights from the ACL table, ignoring case and spaces in both addresses', async () => {
@@ -46,13 +46,70 @@ test('readIdentity grants administrator rights only for a probe Admin value that
   }
 });
 
+// ===== Les établissements dont la personne est responsable (colonne Responsable_de de la sonde) =====
+
+test('readIdentity lists the establishments the person is responsible for, from the probe column Responsable_de', async () => {
+  const forEtab = async email => (await identify(session(email))).etablissements;
+  assert.deepEqual(await forEtab(ANA_EMAIL), [1], 'Ana : responsable du CHU (ACL l\'écrit avec des majuscules)');
+  assert.deepEqual(await forEtab(BOB_EMAIL), [2], 'Bob : responsable de son établissement, sans être administrateur');
+  assert.deepEqual(await forEtab(ADMIN_EMAIL), [], 'un administrateur n\'est pas responsable pour autant');
+  assert.deepEqual(await forEtab(IRIS_EMAIL), []);
+});
+
+test('readIdentity lists several establishments once each, in order, whatever the ACL rows look like', async () => {
+  const tables = withIdentity();
+  tables.ACL.id.push(4, 5, 6);
+  tables.ACL.email.push(` ${BOB_EMAIL.toUpperCase()} `, BOB_EMAIL, BOB_EMAIL);
+  tables.ACL.Responsable_de_l_Etablissement.push(5, 2, 0);
+  tables.ACL.admin.push(false, false, true);
+  assert.deepEqual((await identify(session(BOB_EMAIL, tables))).etablissements, [2, 5], 'doublon écarté, ligne sans établissement ignorée');
+});
+
+test('readIdentity has no establishment when the probe has no Responsable_de column, and says so without any address', async () => {
+  const tables = withIdentity();
+  delete tables.Annuaire_Sonde.Responsable_de;
+  const s = session(ANA_EMAIL, tables);
+  const identity = await identify(s);
+  assert.equal(identity.status, 'ready');
+  assert.equal(identity.admin, true, 'le reste de l\'identité ne dépend pas de cette colonne');
+  assert.deepEqual(identity.etablissements, []);
+  assert.match(JSON.stringify(s.log.infos), /Responsable_de.*GRIST_SETUP\.md/);
+  assert.ok(!JSON.stringify(s.log.infos).includes('@'));
+});
+
+test('readIdentity ignores a Responsable_de value that is not a list of row numbers', async () => {
+  for (const stamped of [null, '', 'oui', true, '0', -3, {}]) {
+    const s = session(ANA_EMAIL, withIdentity(), { triggers: { Annuaire_Sonde: { Responsable_de: () => stamped } } });
+    assert.deepEqual((await identify(s)).etablissements, [], `${JSON.stringify(stamped)} ne désigne aucun établissement`);
+  }
+  const listed = session(ANA_EMAIL, withIdentity(), { triggers: { Annuaire_Sonde: { Responsable_de: () => ['L', 4, 9] } } });
+  assert.deepEqual((await identify(listed)).etablissements, [4, 9], 'une colonne de références (liste d\'identifiants) est lue de même');
+});
+
+test('responsableIds reads row numbers from text, from a list of references, or from nothing', () => {
+  assert.deepEqual(responsableIds('1,3'), [1, 3]);
+  assert.deepEqual(responsableIds('1, 3 ; 3'), [1, 3]);
+  assert.deepEqual(responsableIds(['L', 2, 5]), [2, 5]);
+  assert.deepEqual(responsableIds(['L']), []);
+  assert.deepEqual(responsableIds(''), []);
+  assert.deepEqual(responsableIds(null), []);
+  assert.deepEqual(responsableIds(undefined), []);
+  assert.deepEqual(responsableIds('0,7,7'), [7]);
+  assert.deepEqual(responsableIds([1.5, 'x', 2]), [2]);
+});
+
+test('a viewer and an unidentified account are responsible for nothing', async () => {
+  assert.deepEqual((await identify(session(ANA_EMAIL), { readOnly: true })).etablissements, []);
+  assert.deepEqual((await identify(session(null))).etablissements, []);
+});
+
 test('readIdentity leaves the probe table empty: the row it adds is removed', async () => {
   const s = session(ANA_EMAIL);
   await identify(s);
   await settle();
   assert.deepEqual(s.calls.map(call => [call.action, call.table]),
     [['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
-  assert.deepEqual(s.tables.Annuaire_Sonde, { id: [], Email: [], Admin: [] });
+  assert.deepEqual(s.tables.Annuaire_Sonde, { id: [], Email: [], Admin: [], Responsable_de: [] });
 });
 
 test('readIdentity writes only to the probe table, never to the directory', async () => {

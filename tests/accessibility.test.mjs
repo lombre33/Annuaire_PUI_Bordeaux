@@ -368,19 +368,21 @@ test('avec « réduire les animations », la piste et le curseur changent sans t
 
 // ===== Taille du texte et des cibles de la carte de la personne connectée =====
 
-// « Votre fiche » et le bouton « Modifier » n'apparaissent que sur la carte de la personne connectée
-// (le jeu de test de la mise en page, tests/responsive.test.mjs, n'a pas d'identité) : même mesure que
-// pour les autres éléments des cartes, 12px de texte au moins et 24px de haut pour le bouton. Le
-// lien e-mail, qui n'a pas 24px de haut, doit rester assez loin de ce bouton (WCAG 2.5.8).
-test('sur la carte de la personne connectée, « Votre fiche » et « Modifier » font 12px, le bouton 24px de haut au moins, et le lien e-mail reste à l’écart (audit U08, U20)', { skip }, async () => {
+// « Votre fiche » et les boutons « Modifier » (celui de la personne, celui de l'établissement dont elle
+// est responsable, sous son logo) n'apparaissent que pour la personne connectée (le jeu de test de la
+// mise en page, tests/responsive.test.mjs, n'a pas d'identité) : même mesure que pour les autres
+// éléments des cartes, 12px de texte au moins et 24px de haut pour les boutons. Le lien e-mail, qui
+// n'a pas 24px de haut, doit rester assez loin d'eux (WCAG 2.5.8).
+test('sur la carte de la personne connectée, « Votre fiche » et les boutons « Modifier » font 12px et 24px de haut au moins, et le lien e-mail reste à l’écart (audit U08, U20)', { skip }, async () => {
   await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
     await page.locator('.contact-card .card-actions:not([hidden]) .card-edit').waitFor();
+    await page.locator('.contact-card .etab-edit').first().waitFor();
     for (const width of [320, 600, 1480]) {
       await page.setViewportSize({ width, height: 1200 });
       const { smallText, shortTargets, smallTargets, crowdedSmall } = await measureCards(page);
-      const own = await page.locator('.contact-card .own-flag:visible, .contact-card .card-edit:visible').count();
-      assert.ok(own >= 2, `à ${width}px, « Votre fiche » et « Modifier » sont affichés et mesurés (${own})`);
+      const own = await page.locator('.contact-card .own-flag:visible, .contact-card .card-edit:visible, .contact-card .etab-edit:visible').count();
+      assert.ok(own >= 3, `à ${width}px, « Votre fiche », « Modifier » et le « Modifier » de l’établissement sont affichés et mesurés (${own})`);
       assert.ok(smallTargets >= 1, `à ${width}px, un lien e-mail est mesuré (${smallTargets})`);
       assert.deepEqual([...new Set(smallText)], [], `à ${width}px, du texte de carte sous 12px`);
       assert.deepEqual([...new Set(shortTargets)], [], `à ${width}px, des boutons ou pastilles sous 24px de haut`);

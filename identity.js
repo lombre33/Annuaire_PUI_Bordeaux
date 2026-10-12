@@ -12,7 +12,7 @@
 // répond, ou si Grist refuse l'écriture (compte Lecteur, règle d'accès), le
 // widget n'offre simplement aucune modification.
 
-import { PROBE_TABLE } from './constants.js';
+import { PROBE_RESPONSABLE_COLUMN, PROBE_TABLE } from './constants.js';
 import { tableToRows, text } from './grist-data.js';
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/;
@@ -31,16 +31,27 @@ export function isReadOnlyAddress(search) {
   return values.length > 0 && values[values.length - 1] === 'true';
 }
 
-const unavailable = reason => ({ status: 'unavailable', email: '', admin: false, reason });
+const unavailable = reason => ({ status: 'unavailable', email: '', admin: false, etablissements: [], reason });
 
-// Lit l'identité de la personne : { status, email, admin, reason }.
-//   status 'ready'        email et admin sont fiables (admin vient de la formule
-//                         de la sonde, jamais de ce que le navigateur prétend)
+// Les établissements dont la personne est responsable : la colonne `Responsable_de` de la sonde
+// donne leurs identifiants de ligne (« 1,3 », ou une liste de références). Tout ce qui n'est pas un
+// identifiant entier positif est ignoré.
+export function responsableIds(cell) {
+  const items = Array.isArray(cell) ? cell : String(cell ?? '').split(/[\s,;]+/).map(token => token.replace(/^\[|\]$/g, ''));
+  return [...new Set(items.filter(item => typeof item === 'number' || /^\d+$/.test(item)).map(Number)
+    .filter(id => Number.isSafeInteger(id) && id > 0))];
+}
+
+// Lit l'identité de la personne : { status, email, admin, etablissements, reason }.
+//   status 'ready'        email, admin et etablissements sont fiables (ils viennent des formules
+//                         de la sonde, jamais de ce que le navigateur prétend) ; `etablissements`
+//                         liste les identifiants des établissements dont la personne est
+//                         responsable (vide sans la colonne `Responsable_de`)
 //   status 'viewer'       compte Lecteur : aucune écriture possible
 //   status 'unavailable'  `reason` dit pourquoi (pour la console)
 // Ne lève jamais : une identité introuvable n'est pas une panne du widget.
 export async function readIdentity(docApi, { readOnly = false, log = console } = {}) {
-  if (readOnly) return { status: 'viewer', email: '', admin: false, reason: 'document ouvert en lecture seule' };
+  if (readOnly) return { status: 'viewer', email: '', admin: false, etablissements: [], reason: 'document ouvert en lecture seule' };
 
   let rowId = null;
   try {
@@ -60,8 +71,13 @@ export async function readIdentity(docApi, { readOnly = false, log = console } =
       return reportUnavailable(log, `la formule user.Email de ${PROBE_TABLE} n'a renvoyé aucune adresse`);
     }
     const admin = row.Admin === true;
-    log.info(`[IDENTITE] personne identifiée (administrateur : ${admin ? 'oui' : 'non'})`);
-    return { status: 'ready', email, admin, reason: '' };
+    const etablissements = responsableIds(row[PROBE_RESPONSABLE_COLUMN]);
+    if (!(PROBE_RESPONSABLE_COLUMN in row)) {
+      log.info(`[IDENTITE] la sonde n'a pas de colonne « ${PROBE_RESPONSABLE_COLUMN} » : pas de fiche d'établissement (GRIST_SETUP.md).`);
+    }
+    log.info(`[IDENTITE] personne identifiée (administrateur : ${admin ? 'oui' : 'non'}, `
+      + `responsable de ${etablissements.length} établissement${etablissements.length > 1 ? 's' : ''})`);
+    return { status: 'ready', email, admin, etablissements, reason: '' };
   } catch (error) {
     return reportUnavailable(log, `lecture impossible : ${error?.message || error}`);
   } finally {

@@ -84,6 +84,188 @@ pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) e
   s'adapte aux cartes plus hautes : la légende demande une fenêtre de 3 600 px (la carte de Camille Rousseau est
   loin dans la liste) et la relecture lève le plafond de 900 px de la fenêtre le temps de la capture, puisqu'elle
   le dépasse maintenant.
+## 1.17.0 — La fiche d'un établissement, modifiée par son responsable
+
+Une demande d'Antoine, validée sur la maquette v5 le 12 octobre 2026 (« Go pour tout implémenter »,
+puis « j'attends à ce que l'implémentation finale soit comme la maquette présentée ») : le
+**responsable d'un établissement** modifie lui-même, depuis l'annuaire, la fiche de son établissement,
+sans passer par un administrateur.
+
+Comme pour les fiches de personnes, les modifications sont **directes** (ni validation par un
+administrateur, ni historique) et le widget ne crée aucune table ni aucune colonne. Une nouveauté
+technique : pour changer un logo, le widget **envoie lui-même le fichier à Grist** (c'est la première
+requête réseau que son code émet) ; elle est cadrée par des protections décrites plus bas et dans
+`docs/securite.md`.
+
+### Ce que fait un responsable
+
+- **Qui.** Une personne est **responsable** d'un établissement quand la table `ACL` a une ligne qui
+  porte son adresse et cet établissement (colonne `Responsable_de_l_Etablissement`). Être
+  administrateur ne suffit pas : le mode admin ne concerne que les fiches de personnes. Grist rapproche
+  l'adresse de la personne connectée de `ACL` dans une nouvelle colonne **facultative** de la table-sonde,
+  `Responsable_de` (formule dans `GRIST_SETUP.md`, étape 2) ; sans elle, tout fonctionne sauf cette
+  fiche.
+- **Où cliquer.** « **✎ Modifier** » sous le logo de l'établissement (ou sous son sigle) sur chaque
+  carte de cet établissement, et « **Mon établissement** » dans le bandeau « Ma présence » : ce second
+  bouton marche même sans carte, ou quand l'établissement est masqué de l'annuaire. Un responsable de
+  plusieurs établissements choisit d'abord lequel ouvrir.
+- **Ce qu'on modifie.** Le **logo** (« Ajouter un logo », « Remplacer le logo », « Retirer le logo »), le
+  **nom complet**, la case « **Établissement visible dans l'annuaire** » (colonne `ok_pour_apparaitre` :
+  décochée, aucune fiche de l'établissement n'apparaît, et un avis dit combien disparaissent avant
+  l'enregistrement) et la liste des **responsables** (« Retirer », « Rétablir », « Nommer » une personne
+  choisie ou une adresse saisie). Le sigle et le statut sont montrés en lecture seule : seule l'équipe du
+  PUI les règle.
+- **Enregistrer.** Comme sur la maquette, il n'y a **pas de fenêtre de relecture** : le pied de la
+  fenêtre dit ce qui va changer (« 2 modifications : nom, visibilité ») et « Enregistrer » écrit **tout
+  en une seule action Grist** (le nom, la visibilité, le logo et les lignes d'`ACL`) : Grist refuse un
+  des changements, aucun n'est appliqué. Ensuite l'annuaire est relu, la fenêtre se ferme et un
+  message le confirme (« La fiche de CHD est enregistrée. »).
+- **Un établissement garde toujours au moins un responsable** (le dernier ne se retire pas). Se retirer
+  soi-même est possible, avec un avertissement. Nommer quelqu'un ne le rend pas administrateur : le
+  widget **n'écrit jamais la colonne `admin`** ; retirer un responsable qui est aussi administrateur lui
+  laisse sa ligne et son droit, seul l'établissement en est retiré.
+- **Deux responsables à la fois.** Si le nom, la visibilité ou le logo ont changé dans Grist depuis
+  l'ouverture, rien n'est écrit : la fenêtre reprend la fiche actuelle, garde la saisie et le dit. Des
+  champs différents se cumulent, et les responsables nommés par un autre entre-temps restent.
+- **Après l'écriture,** le widget relit tout et nomme ce que Grist n'aurait pas gardé. Chaque échec
+  (droits refusés, colonne à formule, fiche disparue, panne…) a sa phrase en français.
+
+### L'envoi du logo
+
+- **Rien n'est envoyé avant « Enregistrer ».** L'image choisie s'affiche aussitôt en aperçu, sans quitter
+  le navigateur.
+- **Le fichier n'est jamais envoyé tel quel.** Le navigateur le décode, le redessine (480 pixels de
+  large au plus) et le ré-encode en **PNG** : plus de métadonnées, plus de script (un SVG peut en
+  contenir), une taille bornée. Formats acceptés : PNG, JPG, WebP, SVG ; 1 Mo au plus ; une image de
+  plus de 40 millions de pixels est refusée avant d'être décodée.
+- **Un jeton d'écriture demandé pour chaque envoi, et jamais gardé** (celui des logos affichés reste en
+  lecture seule). Une seule requête (`POST …/attachments`), en `https` (ou le poste local pour la
+  démonstration), sans cookie ni adresse de la page, qui s'arrête au bout de 30 secondes. Aucun jeton
+  ni aucune adresse dans les messages ni dans la console.
+- **Si l'envoi échoue,** rien n'est écrit et la fenêtre dit quoi faire (« Déposez le fichier directement
+  dans Grist »). Si l'écriture de la fiche échoue après un envoi réussi, le fichier reste dans les pièces
+  jointes du document sans servir : le widget le dit, il ne sait pas supprimer une pièce jointe.
+
+### Ce qui n'a pas pu être essayé
+
+Les tests simulent la réponse de Grist ; trois points ne se constatent que dans un vrai document :
+que Grist **accepte l'envoi** avec ce jeton, que le navigateur **laisse le widget lire la réponse** de
+l'envoi (en-têtes d'autorisation entre sites de l'instance), et que les **règles d'accès** laissent un
+responsable écrire dans `Etablissements` et `ACL` et ajouter une pièce jointe. La formule de la colonne
+`Responsable_de` n'a pas non plus été essayée. Si l'un manque, rien n'est cassé : la fenêtre le dit et le
+logo se change dans Grist, comme avant. Le protocole d'essai est la section 17 de `TESTING.md`.
+**Point à ne pas oublier :** sans règle d'accès qui réserve la colonne `admin` d'`ACL` aux
+administrateurs, un responsable pourrait se donner le droit d'administrateur depuis la console
+(`GRIST_SETUP.md`, étape 4). Un responsable peut aussi cocher lui-même `ok_pour_apparaitre` de son
+établissement (la case « visible dans l'annuaire ») : la validation n'est plus réservée à l'équipe du PUI,
+sauf règle d'accès qui la lui réserve.
+
+### Écarts avec la maquette
+
+Antoine a demandé que l'implémentation finale soit comme la maquette. Comparée à elle côte à côte, à
+1 280 et 390 px, la fenêtre de la fiche d'un établissement (écran D1) et les boutons des cartes (écran
+D0) lui sont conformes dans leur disposition, leurs textes et leurs états. Restent les écarts
+suivants, et leur raison :
+
+- **La zone « Ma présence » de l'en-tête** garde le dessin de l'habillage de la 1.14.0 (le nom, la
+  phrase d'état et l'interrupteur avec son étiquette sur deux rangées) ; « Mon établissement » prend le
+  coin de la première rangée, comme « Mode admin ». Une personne à la fois administratrice, responsable
+  et propriétaire d'une carte a trois rangées de boutons. La maquette montre une seule rangée, avec un
+  interrupteur sans texte : l'étiquette dit ce que fait l'interrupteur, et cet en-tête est déjà en ligne.
+- **Les logos d'exemple de la maquette** (« Maquette, essayer avec : ESTIA, IOGS, Technowest ») servaient
+  à essayer sans fichier : le vrai widget choisit un fichier, ils ne sont pas reproduits.
+- **Les responsables ont leurs initiales, pas une photo.** La photo de profil arrive dans la version
+  suivante.
+- **Un nom n'est montré que si la fiche est dans l'annuaire.** Pour une adresse dont la fiche est masquée
+  ou absente, la liste écrit « Fiche masquée de l'annuaire » ou « Adresse sans fiche dans l'annuaire », et
+  la liste des personnes qu'on peut nommer ne propose que des fiches visibles (une autre personne se nomme
+  par son adresse) : l'annuaire ne dévoile pas le nom d'une personne qui a choisi de ne pas y figurer,
+  ce que la maquette (où tout le monde apparaît) ne distinguait pas.
+- **La phrase sous la case de visibilité** change quand l'établissement est déjà masqué (« Cet
+  établissement est masqué de l'annuaire : aucune de ses fiches n'y apparaît. ») : la maquette dirait que
+  les fiches « seront masquées » alors qu'elles le sont déjà.
+- **Les refus d'un logo sont plus précis** que le message unique de la maquette : format non accepté,
+  poids avec celui du fichier choisi (« Cette image pèse 1,4 Mo… »), fichier vide ou image illisible.
+- **Un SVG est redessiné en PNG** comme les autres formats, alors que la maquette le garde tel quel : le
+  widget n'envoie jamais un fichier qui peut contenir du code.
+- **Les polices** : inchangé depuis la 1.15.0 (le widget ne charge aucune police).
+
+### Un pied de fenêtre comme sur la maquette, sur téléphone
+
+La comparaison a aussi relevé un écart qui datait de la 1.12.0 : sur 390 px, le pied des fenêtres
+(modification de fiche, relecture) mettait le résumé sur une ligne et les boutons sur la suivante,
+parce que le résumé réservait 220 px. La maquette les met sur **une seule ligne** quand ils tiennent
+(« 1 champ modifié | Retour | Valider », « Aucune modification | Annuler | Enregistrer »). Le résumé
+prend maintenant sa largeur naturelle ; il passe toujours à la ligne quand le texte ou les boutons
+ne tiennent pas. Cela change les trois fenêtres.
+
+### Réglages dans Grist
+
+À faire une fois, à la main (`GRIST_SETUP.md`) : la colonne `Responsable_de` de la table-sonde
+(étape 2, facultative) ; une ligne d'`ACL` par responsable et par établissement, le premier étant
+nommé dans Grist (étape 3) ; `nom_complet`, `ok_pour_apparaitre` et `logo` d'`Etablissements`, ainsi
+que `email` et `Responsable_de_l_Etablissement` d'`ACL`, en colonnes de **données** (étape 1) ; les
+règles d'accès de l'étape 4, dont celle qui réserve `admin` aux administrateurs.
+
+### Pour les développeurs
+
+Cinq modules nouveaux, sans dépendance : `etablissement.js` (droits `etablissementRightsFor()`, brouillon,
+delta `diffEtablissement()`, phrases), `etablissement-save.js` (`readEtablissement()`, `savePlanOf()`,
+`saveEtablissement()` : relecture, détection par champ, une action atomique, vérification),
+`etablissement-ui.js` (la fenêtre `createEtablissementDialog()`), `upload.js` (`uploadAttachment()`) et
+`image-prep.js` (`prepareImage()`, `checkImageFile()`). `identity.js` : `identity.etablissements` et
+`responsableIds()`. `constants.js` : `PROBE_RESPONSABLE_COLUMN`, `ETABLISSEMENT_COLUMNS`, `ACL_COLUMNS`,
+`IMAGE_RULES`. `dom.js` : `button()` et `notice()` (partagés avec `profile-ui.js`). `render.js` :
+`fillEtablissementEdit()`. `account-ui.js` : le bouton « Mon établissement » (`etab`). `main.js` :
+`openEtablissement()`, `loadFiche()`, `ficheOf()`, `saveFiche()`, `lookupPerson()`, `refreshIdentity()`.
+`profile.js` : `isEmailAddress()` ; `attachments.js` : `readTokenInfo()` exporté. Préfixes de la console :
+`[FICHE-ETAB]`, `[ENVOI]`, `[IMAGE]` (`[ETABLISSEMENT]` garde son sens d'avant : les contacts sans
+établissement). Aucune table créée.
+
+### Documentation et captures
+
+Le guide utilisateur (« La fiche de mon établissement »), `GRIST_SETUP.md`, `specs.md`, le guide
+développeur, la sécurité, la maintenance, `grist_structure.txt`, `TESTING.md` (section 17) et le README
+suivent. Une capture s'ajoute (`fiche-etablissement.png`) ; `docs/demo/capturer.mjs` accepte
+désormais le nom des captures à refaire (et `--sortie=<dossier>`), pour n'en refaire qu'une. La
+démonstration a deux responsables fictives (CHD) et un serveur d'envoi de fichiers.
+
+### Tests
+
+**794 tests** (dont 277 dans un vrai navigateur, optionnels sans Playwright) contre 652 (dont 227)
+à la sortie de la 1.16.3.
+
+- *Droits* : `etablissementRightsFor()` fermé par défaut (pas d'identité, compte Lecteur, administrateur
+  sans établissement) ; `responsableIds()` ; un bouton forcé à la main n'ouvre rien ; la colonne
+  `Responsable_de` absente.
+- *Le brouillon* : le delta ne porte que ce qui change, un nom vide ou refusé, un logo retiré seulement
+  s'il y en a un, au moins un responsable, nommer (adresse mal formée, déjà responsable, réactivation d'un
+  responsable retiré), l'avertissement de visibilité.
+- *L'écriture* : une seule action atomique (la ligne d'établissement d'abord, puis `ACL`), fermée sans
+  droit, conflit détecté champ par champ, valeurs déjà appliquées, ligne d'administrateur conservée,
+  ligne sans établissement reprise, `admin` jamais écrite, au moins un responsable sur la liste relue,
+  envoi puis relecture, refus de Grist, colonne à formule, fichier orphelin, aucune adresse dans la console.
+- *L'envoi et l'image* : jeton demandé à chaque envoi et jamais gardé, adresse refusée, délai,
+  statuts, réponse illisible, aucun jeton dans les messages ; refus avant lecture, dimensions, PNG
+  redessiné, SVG, image trop grande.
+- *Dans un navigateur* : qui voit quel bouton, le contenu de la fenêtre, l'enregistrement de chaque
+  champ, les échecs, les conflits, le clavier et les noms accessibles, la mise en page de 320 à 1 280
+  px, le pied de fenêtre (fiche, formulaire et relecture) sur la ligne des boutons dès que tout tient,
+  l'isolation du réseau (le widget ne contacte que le serveur local, l'API Grist simulée et ses pièces
+  jointes, même quand un logo est envoyé).
+- *Documentation* : les phrases citées par le guide sont celles du code ; la démonstration reçoit
+  l'envoi d'un logo et le sert, refuse sans jeton ou au-delà de 2 Mo ; la responsable fictive modifie
+  son établissement de bout en bout ; les protections de l'envoi sont vérifiées dans le code.
+
+Contrôle négatif : 42 modifications du code de la fiche d'un établissement ont été essayées une à une
+(droit de modifier, écriture sans droit, détection d'un changement concurrent, ligne d'administrateur,
+vérification après écriture, protections de l'envoi, limites de l'image, démonstration). Les tests en
+ont détecté 34 d'emblée ; les huit autres ont montré des tests manquants (la vérification du logo et de
+la visibilité après l'écriture, une adresse portée par deux cartes, le poids d'un PNG redessiné et la
+limite de pixels d'une image, un bouton forcé à la main, le nom d'une fiche masquée), ajoutés depuis :
+sept sont maintenant détectées. La dernière (le droit de modifier recalculé au moment d'enregistrer, que
+`main.js` vérifie déjà à l'ouverture de la fenêtre) ne peut pas se produire par l'interface : c'est une
+seconde barrière, que l'écriture elle-même (`saveEtablissement()` fermé par défaut) double.
 
 ## 1.16.3 — Interrupteur de présence : focus gardé, réussite annoncée, contrastes
 

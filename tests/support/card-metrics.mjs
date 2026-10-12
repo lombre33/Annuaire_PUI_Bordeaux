@@ -3,7 +3,7 @@
 // groupe) et la hauteur des cibles à la souris (constat U08 : pastilles de 16px de haut, sous les
 // 24px de la norme WCAG 2.5.8). Sont mesurés les éléments affichés d'une carte : tout élément
 // qui porte lui-même du texte ; toute pastille, tout badge d'établissement, tout bouton
-// « Modifier ». La largeur n'est pas mesurée : une étiquette de plus d'une lettre entre deux marges
+// « Modifier » (de la personne, ou de l'établissement sous son logo). La largeur n'est pas mesurée : une étiquette de plus d'une lettre entre deux marges
 // de 9px dépasse 24px de large (sondé : aucune étiquette des jeux de test n'est plus étroite, même sans marge).
 // La norme laisse aussi une cible de moins de 24px quand elle est isolée : un cercle de 24px centré
 // sur elle ne touche aucune autre cible ni le cercle d'une autre petite cible (`crowdedSmall`). Le lien
@@ -18,7 +18,7 @@ export const measureCards = page => page.evaluate(({ minText, minTarget }) => {
   const label = element => `${element.className} « ${element.textContent.trim().slice(0, 24)} »`;
   const texts = [...document.querySelectorAll('.contact-card *')].filter(element => shown(element)
     && [...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim()));
-  const targets = [...document.querySelectorAll('.contact-card .tag, .contact-card .etablissement-tag, .contact-card .card-edit')].filter(shown);
+  const targets = [...document.querySelectorAll('.contact-card .tag, .contact-card .etablissement-tag, .contact-card .card-edit, .contact-card .etab-edit')].filter(shown);
   // Toutes les cibles de la page, pour mesurer l'isolement des petites cibles des cartes.
   const pointerTargets = [...document.querySelectorAll('a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')]
     .filter(element => shown(element) && getComputedStyle(element).visibility !== 'hidden')
