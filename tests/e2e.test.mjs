@@ -17,7 +17,7 @@ import {
   sampleTables, withoutOptionalColumns, withIdentity, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL, ADMIN_EMAIL
 } from './fixtures.mjs';
 import {
-  skip, reload, cardCount, waitForCards, waitForBanner, cardNames, resultCount, bannerText, withWidget
+  skip, reload, cardCount, waitForCards, waitForBanner, cardNames, resultCount, bannerText, withWidget, openWidget
 } from './support/browser.mjs';
 import { groupedMenu, optionCounts } from './support/grouped-menu.mjs';
 import { SEARCH_DELAY_MS } from '../constants.js';
@@ -1063,3 +1063,27 @@ test('le bandeau suit les modifications faites dans Grist : l\'accord retiré à
     await page.waitForFunction(() => document.querySelector('.presence-switch').getAttribute('aria-checked') === 'false');
     assert.equal(await accountMessage(page), 'Vous n\'apparaissez pas dans l\'annuaire.');
   }));
+
+// ===== Banc d'essai =====
+
+// La console est relue en différé (tests/support/browser.mjs) : quand la page se ferme avant la
+// réponse, la lecture échoue (« Target page, context or browser has been closed »). Sans personne
+// pour l'attendre, ce rejet ferait échouer tout le fichier, au hasard de la charge de la machine.
+// Le hasard ne se commande pas : on fait échouer la lecture d'un message à la main.
+test('une lecture de la console interrompue par la fermeture de la page ne laisse aucun rejet non traité', { skip }, async () => {
+  const rejected = [];
+  const note = reason => rejected.push(String(reason));
+  process.on('unhandledRejection', note);
+  try {
+    const { page, context, logs } = await openWidget();
+    const closed = new Error('jsHandle.jsonValue: Target page, context or browser has been closed');
+    page.emit('console', { type: () => 'warning', args: () => [{ jsonValue: () => Promise.reject(closed) }], text: () => '' });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.deepEqual(rejected, []);
+    // Qui relit la console voit toujours l'erreur : seul le rejet non traité disparaît.
+    await assert.rejects(Promise.all(logs.warnings), { message: closed.message });
+    await context.close();
+  } finally {
+    process.off('unhandledRejection', note);
+  }
+});
