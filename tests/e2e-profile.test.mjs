@@ -57,6 +57,11 @@ const headingIs = (page, expected) =>
   page.waitForFunction(value => document.getElementById('profileTitle').textContent === value, expected);
 const focusedId = page => page.evaluate(() => document.activeElement.id);
 const closed = page => page.waitForFunction(() => !document.getElementById('profileDialog').open);
+// Le focus revient à l'élément voulu (sélecteur CSS) : l'événement « close » qui le rend est
+// envoyé après que la fenêtre a cessé d'être ouverte, d'où l'attente.
+const focusReturnsTo = (page, selector) => page.waitForFunction(
+  wanted => document.activeElement?.matches(wanted), selector, { timeout: 3000 }
+);
 const press = (page, name) => dialog(page).getByRole('button', { name, exact: true });
 const closeSaved = page => dialog(page).locator('.dlg-foot').getByRole('button', { name: 'Fermer', exact: true });
 const field = (page, key) => page.locator(`#profile-${key}`);
@@ -306,7 +311,7 @@ test('Échap prévient avant d\'abandonner des modifications, puis ferme ; sans 
     await closed(page);
     assert.deepEqual(await bddCalls(page), [], 'abandonner n\'écrit rien');
     assert.equal(await bddCell(page, 'Fonction'), 'Pharmacienne');
-    assert.equal(await page.evaluate(() => document.activeElement.className), 'account-edit', 'le focus revient au bouton qui a ouvert la fenêtre');
+    await focusReturnsTo(page, '#accountBar .account-edit'); // le bouton qui a ouvert la fenêtre
   }));
 
 test('« Annuler » et la croix ferment sans rien écrire, et la fenêtre rouverte repart de la fiche', { skip }, () =>
@@ -461,7 +466,7 @@ test('« Valider » écrit en une seule action Grist, confirme, puis l\'annuaire
     await closeSaved(page).click();
     await closed(page);
     await waitForCards(page, 4);
-    assert.equal(await page.evaluate(() => document.activeElement.className), 'account-edit');
+    await focusReturnsTo(page, '#accountBar .account-edit');
 
     // La fenêtre rouverte montre la fiche enregistrée.
     await openOwn(page);
@@ -498,8 +503,7 @@ test('le focus revient au bouton de la fiche modifiée, même quand les cartes o
     await headingIs(page, 'Fiche enregistrée');
     await closeSaved(page).click();
     await closed(page);
-    assert.equal(await page.evaluate(() => document.activeElement.dataset.rowId), '10');
-    assert.equal(await page.evaluate(() => document.activeElement.className), 'card-edit');
+    await focusReturnsTo(page, '#cardsGrid .card-edit[data-row-id="10"]'); // la carte de Hugo, redessinée
   }));
 
 test('une administratrice modifie la fiche de quelqu\'un d\'autre : la fenêtre le dit, et seule cette fiche est écrite', { skip }, () =>
