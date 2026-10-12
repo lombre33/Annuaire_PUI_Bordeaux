@@ -4,7 +4,7 @@ import { ImageError, checkImageFile, fitWithin, megabytes, prepareImage, squareC
 import { IMAGE_RULES } from '../constants.js';
 
 // ===== image-prep : ce qui se décide avant de dessiner (le dessin lui-même est essayé dans
-// Chromium, tests/e2e-etablissement.test.mjs) =====
+// Chromium : tests/e2e-etablissement.test.mjs pour un logo, tests/e2e-avatar.test.mjs pour une photo) =====
 
 const fileOf = (size, type, name = 'logo') => new File([new Uint8Array(size)], name, { type });
 

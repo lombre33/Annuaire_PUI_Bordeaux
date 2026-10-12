@@ -30,4 +30,4 @@ Depuis la 1.18.0, une personne ajoute, change ou retire sa **photo de profil** (
 étape 6 de `GRIST_SETUP.md`) : elle remplace les initiales sur la carte, s'agrandit au clic, passe par la relecture avant et après,
 et le widget l'envoie lui-même à Grist, redessinée en carré de 256 px (JPEG, sans métadonnées ; envoi et règles d'accès non
 essayés dans un vrai Grist).
-{{TOTALS}}
+888 tests (dont 319 dans un vrai navigateur, optionnels sans Playwright).

@@ -1,5 +1,183 @@
 # Changelog
 
+## 1.18.0 — Photo de profil : ajoutée, changée ou retirée depuis la fiche, relue avant d'être enregistrée
+
+Demande d'Antoine du 12 octobre 2026 : la colonne `Avatar` de `BDD` (type « Pièces jointes ») porte la photo
+de la personne ; elle remplace les initiales sur la carte, s'agrandit au clic, et la personne l'ajoute depuis la
+modification de son profil. La maquette v5 (validée le 12 octobre 2026) montre le parcours ; le widget a été
+comparé à elle côte à côte, aux mêmes tailles d'écran (1 280 et 390 px), écart par écart (voir « Écarts avec la
+maquette »). **Sans colonne `Avatar`, rien ne change** : les cartes gardent leurs initiales et le formulaire
+n'a pas la carte « Photo de profil ». Aucune table n'est créée.
+
+### Ce que fait la photo
+
+- **Sur les cartes.** La photo remplace les initiales. Un clic (ou Entrée, ou Espace) l'agrandit dans une
+  fenêtre qui porte le nom de la personne et « fonction · établissement » ; un clic sur la photo ou à côté,
+  la croix ou Échap la referme. Sans photo, avec une cellule vide, un fichier supprimé ou illisible, ou sans
+  jeton de lecture, la carte garde ses initiales : ni cadre cassé, ni bouton, ni erreur dans la console.
+- **Ailleurs.** Dans le bandeau « Ma présence », dans le bloc d'identité des fenêtres de modification et dans
+  la liste des responsables de la fiche d'un établissement (pour les personnes dont la fiche est visible dans
+  l'annuaire). L'écart noté à la 1.17.0 (« les responsables ont leurs initiales, pas une photo ») est fermé.
+- **Dans le formulaire.** Une carte « Photo de profil » sous le bloc d'identité : la photo actuelle, **Ajouter
+  une photo** (**Changer la photo** quand la personne en a une), **Retirer la photo** (seulement s'il y en a
+  une), l'aide (« JPG, PNG ou WebP, 2 Mo au maximum, recadrée en carré ») et, pendant que l'image se
+  prépare, « Préparation de l’image… » : les deux boutons et « Relire » attendent, sans que le focus du
+  clavier se perde. Choisir une photo puis la retirer, quand on n'en avait pas, ne change rien. Une
+  administratrice en mode admin change ou retire la photo de n'importe qui, comme le reste de la fiche.
+- **À la relecture.** Sur la carte « Après », la photo a un anneau vert et la pastille « photo ajoutée » (ou
+  « photo modifiée ») ; un retrait a un anneau rouge et la pastille « photo retirée ». La ligne « Photo de
+  profil » du détail montre la photo actuelle, une flèche, puis la nouvelle : deux miniatures qu'un clic
+  agrandit.
+
+### L'envoi de la photo
+
+- **Rien n'est envoyé avant « Valider ».** L'image choisie s'affiche aussitôt en aperçu, sans quitter le
+  navigateur ; l'adresse locale de l'aperçu est libérée dès qu'il n'est plus utile, et à la fermeture.
+- **Le fichier n'est jamais envoyé tel quel.** Le navigateur le décode, en découpe un **carré au centre**, le
+  ramène à 256 pixels de côté au plus (une petite photo n'est pas agrandie) et l'encode en **JPEG** (qualité
+  0,85) : plus de métadonnées (la position GPS d'une photo de téléphone ne part pas), plus de script, une taille
+  bornée. Une photo de téléphone est remise à l'endroit ; un PNG ou un WebP transparent est posé sur du blanc.
+  Formats acceptés : JPG, PNG, WebP (pas de SVG : il peut porter du code) ; 2 Mo au plus avant le redessin ; une
+  image de plus de 40 millions de pixels est refusée avant d'être décodée.
+- **Le même envoi que le logo de la 1.17.0** (`upload.js`) : un jeton d'écriture demandé pour chaque envoi et
+  jamais gardé, une seule requête en `https`, sans cookie ni adresse de la page, qui s'arrête au bout de 30
+  secondes. Seul le conseil change : pour une photo, « Contactez un administrateur si le problème persiste. »
+  (pour un logo, déposer le fichier dans Grist).
+- **L'ordre.** « Valider » vérifie d'abord les droits, que la fiche est comme à la relecture et que l'adresse
+  n'est pas prise ; puis envoie la photo ; relit la fiche (l'envoi prend du temps) ; et écrit la fiche, photo
+  comprise (`['L', identifiant]` ; `['L']` pour la retirer), en **une seule action**. Retirer la photo
+  n'envoie rien.
+- **Si l'envoi échoue,** rien n'est écrit : la relecture reste ouverte avec le brouillon et dit quoi faire. Si
+  la fiche a changé pendant l'envoi, ou si Grist refuse ensuite l'écriture, rien n'est écrit non plus et la
+  phrase dit que le fichier de la nouvelle photo reste dans les pièces jointes du document sans servir : le
+  widget ne sait pas supprimer une pièce jointe. Retirer ou remplacer une photo laisse de même l'ancien fichier
+  (une photo est une donnée personnelle, visible de tous ceux qui voient la fiche et téléchargeable par toute
+  personne qui a accès au document : `docs/securite.md` et `docs/maintenance.md` disent quoi faire quand une
+  personne demande l'effacement de la sienne).
+
+### Ce qui n'a pas pu être essayé
+
+Les tests simulent la réponse de Grist ; trois points ne se constatent que dans un vrai document : que Grist
+**accepte l'envoi** de la photo avec ce jeton (c'est le même mécanisme que le logo de la 1.17.0, qui n'a pas non
+plus été essayé), que le navigateur **laisse le widget lire la réponse** de l'envoi, et que les **règles d'accès**
+laissent toute personne qui modifie sa fiche écrire sa colonne `Avatar` et ajouter une pièce jointe. Seul
+Chromium a servi aux essais : le redessin de l'image (orientation, fond blanc, JPEG) repose sur ce que les
+navigateurs font tous depuis 2020, sans avoir été vérifié dans Firefox ni Safari. Si l'un manque, rien n'est
+cassé : la fenêtre le dit et la photo se pose dans la cellule `Avatar` de Grist. Le protocole d'essai est la
+section 18 de `TESTING.md`.
+
+### Écarts avec la maquette
+
+Antoine a demandé que l'implémentation finale soit comme la maquette. Les cartes avec photo, le formulaire
+(photo actuelle, photo choisie, récapitulatif), la relecture d'un ajout et d'un retrait, la fiche d'une autre
+personne en mode admin et la fenêtre d'agrandissement ont été comparés à elle à 1 280 et 390 px : dispositions,
+textes et états sont conformes. Restent les écarts suivants, et leur raison :
+
+- **« Maquette, essayer avec : »** (six portraits à choisir sans fichier) : la maquette s'en sert pour essayer ;
+  le vrai widget choisit un fichier, ces portraits ne sont pas reproduits. Les mêmes visages inventés servent aux
+  captures de la documentation (`?photos` dans la démonstration).
+- **Les refus sont plus précis.** La maquette a deux phrases (« Format ou taille refusés : JPG, PNG ou WebP, 2 Mo
+  au maximum. » et « Image illisible, essayez un autre fichier. ») ; le widget dit lequel des quatre cas
+  (format, poids avec celui du fichier choisi, fichier vide, image illisible).
+- **« Préparation de l’image… ».** La maquette ne décode rien et n'a pas besoin d'attendre ; le widget le dit
+  pendant que le navigateur redessine l'image, et fait attendre les deux boutons de la carte et « Relire ».
+- **Un PNG ou un WebP transparent** est posé sur du blanc avant d'être encodé en JPEG ; la maquette le dessine sur
+  un fond transparent que le JPEG rend noir.
+- **Sur téléphone, la fenêtre d'agrandissement reste une boîte centrée** qui épouse la photo et sa légende, avec
+  16 px de marge ; à 390 px, la maquette la colle au bord gauche et l'étire sur toute la hauteur, avec un grand blanc
+  sous la légende. La comparaison a aussi montré ce même blanc dans la première version du widget (une fenêtre
+  modale dont la hauteur est « auto » s'étire jusqu'à sa hauteur maximale ; la règle dit maintenant
+  « fit-content ») : corrigé, et un test mesure que la fenêtre n'a pas de blanc dessous de 280 à 390 px.
+- **Les polices** : inchangé depuis la 1.15.0 (le widget ne charge aucune police).
+
+### Réglages dans Grist
+
+À faire une fois, à la main, et facultatif (`GRIST_SETUP.md`, étape 6) : ajouter à `BDD` une colonne nommée
+exactement `Avatar`, de type **Pièces jointes** ; l'ajouter aux colonnes que la personne dont `email` est la sienne
+peut modifier (étape 4) ; laisser toute personne qui modifie sa fiche ajouter une pièce jointe au document
+(jusqu'ici, seuls les responsables et les administrateurs le faisaient, pour un logo). Sans la colonne, le
+widget n'offre pas la photo.
+
+### Pour les développeurs
+
+Un module nouveau, sans dépendance : `avatar-ui.js` (`photoSource()`, `fillAvatar()`, `createAvatar()`,
+`createThumb()`, `createPhotoViewer()` : le DOM de la photo, rien d'autre). `image-prep.js` : `squareCrop()` et
+`prepareImage()` suivent les règles passées (`IMAGE_RULES.avatar` : carré, JPEG, 256 px). `constants.js` :
+`IMAGE_RULES.avatar` et le champ `Avatar` de `PROFILE_FIELDS` (`kind: 'image'`). `attachments.js` : `avatarIdOf()`.
+`profile.js` : le brouillon d'une photo (l'identifiant actuel, 0 pour la retirer, ou l'image préparée) passe par
+`diffProfile()`, `rebaseChanges()` et `describeChanges()`. `profile-save.js` : `saveProfile()` reçoit `upload` et
+fait l'envoi entre deux relectures (`leftover` : le fichier envoyé pour rien), `unsavedLabels()` vérifie la
+photo, `PHOTO_UPLOAD_HINT`. `preview.js` : `withAvatarChange()` et `marks.avatar`. `upload.js` : le conseil
+(`hint`) vient de l'appelant. `render.js` : l'avatar de la carte (`photoOf()`, `markAvatar()`). `main.js` : un
+seul écouteur pour tous les `.avatar-zoom` de la grille, `renderAvatar()`, la fenêtre `#photoDialog`
+(`index.html`). Aucune table créée, aucun nouveau préfixe de console.
+
+### Documentation et captures
+
+Le guide utilisateur (« Ma photo de profil », la question sur la photo, la liste des messages), `GRIST_SETUP.md`
+(étape 6), `specs.md`, `grist_structure.txt`, le guide développeur (« La photo de profil »), la sécurité (l'envoi
+d'un fichier, les données personnelles), la maintenance (les pièces jointes qui s'accumulent), `TESTING.md`
+(section 18) et le README suivent. Quatre captures s'ajoutent (`photo-profil-cartes.png`,
+`photo-profil-agrandie.png`, `photo-profil-formulaire.png`, `photo-profil-relecture.png`) ; les deux du
+formulaire (`modifier-fiche-formulaire.png`, `modifier-fiche-admin.png`) sont refaites avec la carte « Photo de
+profil ». La démonstration a une option `?photos` (six visages inventés, partagés avec les tests).
+
+### Tests
+
+**888 tests** (dont 319 dans un vrai navigateur, optionnels sans Playwright) contre 800 (dont 283) à
+la sortie de la 1.17.2.
+
+- *Le brouillon* (`tests/profile.test.mjs`, 16 de plus) : la photo en tête du formulaire avec l'identifiant de la
+  pièce jointe actuelle (0 sans photo, quelle que soit la forme d'une cellule vide), seulement quand `BDD` a la
+  colonne ; une photo laissée telle quelle n'est pas un changement ; une nouvelle photo remplace, 0 retire (rien à
+  retirer : rien) ; le brouillon ne peut jamais viser une autre pièce jointe du document ; la relecture suit une
+  photo changée dans Grist, un retrait déjà fait par un autre, un remplacement après un retrait.
+- *L'écriture* (`tests/profile-save.test.mjs`, 19 de plus) : l'envoi seulement après les vérifications et pour un
+  remplacement, la fiche relue après l'envoi, le fichier laissé quand la fiche a changé ou que l'écriture est
+  refusée, une seule action atomique (`['L', identifiant]` ou `['L']`), un envoi refusé qui n'écrit rien, une
+  colonne qui n'est pas de pièces jointes, l'ajout et le retrait par une administratrice, la vérification de la
+  photo après l'écriture.
+- *L'image et l'envoi* (`tests/image-prep.test.mjs` 4, `tests/upload.test.mjs` 2, `tests/attachments.test.mjs` 1,
+  `tests/constants.test.mjs` 1) : les règles de la photo, le carré au centre, la petite photo qui n'est pas
+  agrandie, le SVG refusé, le conseil de l'appelant dans les phrases d'échec (celui du logo inchangé), la première
+  pièce jointe d'une cellule.
+- *La relecture et la source d'une photo* (`tests/preview.test.mjs` 4, `tests/avatar-ui.test.mjs` 3, nouveau) : la
+  carte « Après » montre la nouvelle photo ou les initiales ; une photo ne vient que d'une pièce jointe de Grist ou
+  d'une adresse `blob:` fabriquée par le navigateur.
+- *Dans un navigateur* (`tests/e2e-avatar.test.mjs`, nouveau : 36 tests) : la photo sur les cartes et ses
+  replis, l'agrandissement (souris, clavier, légende, échec de chargement), le bandeau (qui n'est pas repeint quand
+  Grist renvoie les mêmes données), le formulaire, une photo choisie (carré, JPEG de 256 px, avant / après, une
+  seule action), l'orientation et les métadonnées, JPG et WebP, le PNG transparent sur blanc, les refus avant
+  envoi, la préparation ralentie (un second choix, le retrait et « Relire » ne font rien ; fermer la fenêtre
+  abandonne la photo sans erreur), la relecture et ses miniatures (sans jeton, ou sans miniature, en mots), le
+  retrait, l'administratrice, les échecs d'envoi (refus de Grist, en-têtes CORS absents, jeton refusé, écriture
+  refusée, fiche changée) avec la phrase du fichier resté, la mise en page de 280 à 390 px (dont la fenêtre de la
+  photo, sans blanc dessous), les noms accessibles et le focus dans la fenêtre modale.
+- *Documentation* (`tests/docs.test.mjs`, 2 de plus) : les phrases citées par le guide sont celles du code (refus
+  de l'image, conseil de l'envoi) ; la démonstration `?photos` ajoute la colonne `Avatar` et six photos sans
+  changer les cartes, et ne les sert qu'avec le jeton.
+
+Deux tests de navigateur au clavier se sont révélés instables dans la suite complète (l'un une fois sur trois,
+l'autre une fois sur huit à quarante) et ont été corrigés : le sélecteur de fichier est branché avant l'appui sur
+la touche (sans cela, Playwright pouvait ne pas voir la boîte s'ouvrir), et le focus n'est donné qu'une fois les
+cartes redessinées par l'arrivée de l'identité, puis vérifié avant l'appui. Depuis, **78 exécutions des 36 tests
+n'ont montré aucun échec** : 16 du fichier lui-même (deux à la fois), 60 d'une copie du fichier instrumentée
+pour décrire la page en cas d'échec (30 seule, 24 à trois à la fois pour charger la machine, 6 dans la suite
+complète) et 2 de la suite complète, dont une avec d'autres polices (DejaVu). Le second échec n'a jamais été
+reproduit isolément : un redessin des cartes qui fait perdre le focus entre l'appui et sa cible est la cause la
+plus probable, pas une certitude ; ces exécutions sont la seule preuve que l'instabilité a disparu.
+
+Contrôle négatif : 67 modifications du code de la photo de profil ont été essayées une à une (le brouillon et sa
+relecture, l'envoi et l'écriture, l'image et ses limites, l'interface et la mise en page). Les tests en ont
+détecté 57 d'emblée. Parmi les dix autres, une (un texte ambigu) a été refaite avec plus de contexte ; deux (une
+image aux dimensions démesurées, une image trop lourde une fois redessinée) sont gardées par les tests du logo de
+la 1.17.0, qui partagent ce code ; une (une photo qui viendrait d'une adresse extérieure) n'avait aucun test :
+`tests/avatar-ui.test.mjs` ; et six montraient des tests absents ou trop faibles, corrigés depuis : un bandeau
+repeint à chaque relecture de Grist, la photo d'une carte de relecture qui devient un bouton, la ligne du
+récapitulatif sans miniature qui ne se lit plus en mots, « Relire » qui reste actif et un second choix de fichier
+qui s'ouvre pendant que l'image se prépare, une photo qui arrive après la fermeture de la fenêtre. Les 67 sont
+maintenant détectées.
+
 ## 1.17.2 — Bandeau « Ma présence » : le texte garde 200 px, l'interrupteur passe dessous
 
 Sixième et dernier des « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un gain
