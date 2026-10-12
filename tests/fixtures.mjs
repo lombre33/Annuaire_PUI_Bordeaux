@@ -7,6 +7,7 @@
 // Résultat attendu avec ces données (voir les tests) :
 //   Fondateurs seuls   → Ana, Hostile, Gina, Hugo (4)
 //   + Partenaires      → + Bob (5)
+//   domaines           → Cancérologie : Ana ; Pharmacie : Bob ; Autres : Gina
 //   jamais affichés    → Carla (établissement « autres »), Dan (non validé),
 //                        Eve (sans établissement), Fred (hors périmètre),
 //                        le contact sans nom.
@@ -31,7 +32,9 @@ export function sampleTables() {
       GT: [['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L']],
       Communautes: [['L', 2], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L']],
       Taches: [['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L']],
-      Competences: [['L', 1], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L']],
+      // Ana : deux compétences du même domaine ; Bob : un autre domaine ; Gina :
+      // une compétence que Macro_competences ne classe pas.
+      Competences: [['L', 1, 2], ['L', 3], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L', 4], ['L']],
       perimetre: [['L', 1], ['L', 2], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L'], ['L', 1], ['L', 3], ['L', 1]],
       // Colonnes facultatives, rajoutées dans BDD sous ces noms : Numeric (le 0
       // initial est perdu) et Référence vers Role_Dans_le_PUI (0 = vide).
@@ -65,11 +68,13 @@ export function sampleTables() {
     },
     Taches: { id: [1], Taches: ['Relecture'], Taches_corrige: [''], Taches_role: [''] },
     GT: { id: [1], GT: ['GT qualité'], GT_corrige: [''] },
+    // Macro_competences : texte libre, parfois écrit autrement (id 2 : casse
+    // différente du domaine de l'id 1) ou laissé vide (id 4).
     Competences: {
-      id: [1],
-      Competences: ['oncologie'],
-      Competences_corrigees: ['Oncologie'],
-      Macro_competences: ['Cancérologie']
+      id: [1, 2, 3, 4],
+      Competences: ['oncologie', 'hematologie', 'Pharmacovigilance', 'Divers'],
+      Competences_corrigees: ['Oncologie', 'Hématologie', '', ''],
+      Macro_competences: ['Cancérologie', 'cancérologie', 'Pharmacie', '']
     },
     Role_Dans_le_PUI: { id: [1], Role: ['Référent qualité'] }
   };

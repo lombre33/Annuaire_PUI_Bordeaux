@@ -17,29 +17,29 @@ Sans dépendance, un fichier de tests par module :
 
 - `tests/grist-data.test.mjs` — décodage et formats des données Grist : `text`,
   `normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
-  `pickLabel`, `labelMapFromRows`, `refId`, `refLabel`, `isEmptyReference`,
+  `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `refId`, `refLabel`, `isEmptyReference`,
   `resolveListItem`, `isInScope`, `createRequestSequencer`,
   `referenceMapsEqual`, `mailtoHref`.
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
-  catégories liste dont compétences, anciennes colonnes ignorées, indicateurs)
-  et `labelsOf`.
+  catégories liste dont compétences et domaines, libellés sans doublon, anciennes
+  colonnes ignorées, indicateurs) et `labelsOf`.
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
   libellé), `isEtablissementEligible`, `filterVisibleEstablishments`.
 - `tests/filters.test.mjs` — `filterContacts`, `pruneStaleFilters`,
-  `computeFilterCounts`.
+  `computeFilterCounts` (dont le filtre « Domaines » et ses compteurs).
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
   (une lecture par table, aucune ancienne table lue, libellé corrigé
   prioritaire, tables indispensables illisibles, table de référence illisible,
   colonnes obligatoires, facultatives ou introuvables, annuaire vide expliqué,
-  doublons d'acronymes).
+  doublons d'acronymes, domaines des compétences).
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 24
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 30
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
 Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
@@ -78,8 +78,9 @@ Si vous changez l'affichage, ajoutez ou adaptez un scénario de
       `BDD`, et le nombre de cartes affichées (`#resultCount`) est
       inférieur ou égal à N (seuls les contacts avec `perimetre` non
       vide s'affichent — voir `isInScope()`).
-- [ ] Les 7 boutons de filtre (Actions, Tâches, Communautés, GT, Compétences,
-      Instances, Établissement) sont présents dans la barre d'outils.
+- [ ] Les 8 boutons de filtre (Actions, Tâches, Communautés, GT, Domaines,
+      Compétences, Instances, Établissement) sont présents dans la barre
+      d'outils.
 - [ ] Sur une carte avec toutes les infos renseignées : initiales correctes
       dans l'avatar, nom + prénom, fonction visible, badge établissement en
       haut à droite, email en lien `mailto:`, téléphone visible.
@@ -103,8 +104,8 @@ Si vous changez l'affichage, ajoutez ou adaptez un scénario de
 
 ## 3. Chaque filtre, seul
 
-Pour chacun des 7 filtres (Actions, Tâches, Communautés, GT, Compétences,
-Instances, Établissement) :
+Pour chacun des 8 filtres (Actions, Tâches, Communautés, GT, Domaines,
+Compétences, Instances, Établissement) :
 
 - [ ] Ouvrir le menu (clic sur le bouton) → seul ce menu est ouvert (les
       autres se ferment).
@@ -135,6 +136,20 @@ référence) :
 - [ ] Cocher une compétence dans le menu garde exactement les contacts dont
       la carte affiche cette compétence.
 
+Spécifique **Domaines** (compétences macro, colonne `Macro_competences`) :
+
+- [ ] Le bouton « Domaines » est juste avant « Compétences » ; son infobulle
+      parle de compétences macro.
+- [ ] Le menu liste chaque domaine une seule fois (pas de doublon dû à la casse
+      ou aux accents), plus « Autres » s'il existe une compétence sans domaine.
+- [ ] Cocher un domaine garde les contacts qui ont au moins une compétence de
+      ce domaine ; son nombre est celui des contacts, pas des compétences.
+- [ ] Le menu « Compétences » reste complet et filtrable en plus du domaine :
+      cocher un domaine puis une compétence de ce domaine garde ses contacts.
+- [ ] La console liste, par identifiant de ligne, les compétences que
+      `Macro_competences` ne classe pas (`[REFS] Competences : n ligne(s) sans
+      regroupement…`) : les classer dans Grist, puis recharger le widget.
+
 ## 4. Filtres combinés
 
 - [ ] Deux filtres de catégories différentes cochés (ex. une Instance +
@@ -142,7 +157,7 @@ référence) :
       correspondent aux deux restent.
 - [ ] Recherche libre + un filtre catégorie en même temps → les deux
       s'appliquent ensemble.
-- [ ] Les 7 filtres cochés simultanément (au moins une valeur chacun) →
+- [ ] Les 8 filtres cochés simultanément (au moins une valeur chacun) →
       résultat cohérent (potentiellement vide, mais sans erreur console).
 
 ## 5. Interactions carte → filtre

@@ -64,10 +64,10 @@ test('loadDirectory reads the tables of the new structure and none of the old on
 
 test('loadDirectory resolves reference tables, preferring the corrected label over the raw one', async () => {
   const { referenceMaps, etabFlags } = await load(sampleTables());
-  assert.deepEqual(referenceMaps.INSTANCES, { 1: 'CME', 3: 'COVIRIS' }, 'libellé corrigé prioritaire ; la ligne sans libellé est ignorée');
-  assert.deepEqual(referenceMaps.Actions, { 1: 'Vaccination', 2: 'Audit' }, 'libellé brut quand aucun libellé corrigé n\'est rempli');
-  assert.deepEqual(referenceMaps.Competences, { 1: 'Oncologie' });
-  assert.deepEqual(referenceMaps.Etablissements, { 1: 'CHU', 2: 'UBM', 3: 'Clinique', 4: 'INSERM', 5: 'Institut Bergonié' });
+  assert.deepEqual(referenceMaps.instances, { 1: 'CME', 3: 'COVIRIS' }, 'libellé corrigé prioritaire ; la ligne sans libellé est ignorée');
+  assert.deepEqual(referenceMaps.actions, { 1: 'Vaccination', 2: 'Audit' }, 'libellé brut quand aucun libellé corrigé n\'est rempli');
+  assert.deepEqual(referenceMaps.competences, { 1: 'Oncologie', 2: 'Hématologie', 3: 'Pharmacovigilance', 4: 'Divers' });
+  assert.deepEqual(referenceMaps.etablissement, { 1: 'CHU', 2: 'UBM', 3: 'Clinique', 4: 'INSERM', 5: 'Institut Bergonié' });
   assert.equal(etabFlags.byLabel['Institut Bergonié'].fondateur, true);
 });
 
@@ -96,15 +96,15 @@ test('loadDirectory treats a docApi that throws synchronously like a rejected re
 });
 
 test('loadDirectory keeps going when a reference table is unreadable: previous labels are reused and the problem is reported', async () => {
-  const previousMaps = { Actions: { 1: 'Vaccination', 2: 'Audit' } };
+  const previousMaps = { actions: { 1: 'Vaccination', 2: 'Audit' } };
   const withPrevious = await load(sampleTables(), { docApi: { failing: ['Actions'] }, load: { previousMaps } });
-  assert.deepEqual(withPrevious.referenceMaps.Actions, previousMaps.Actions);
+  assert.deepEqual(withPrevious.referenceMaps.actions, previousMaps.actions);
   assert.equal(withPrevious.issues.length, 1);
   assert.match(withPrevious.issues[0], /Actions/);
   assert.equal(withPrevious.contacts.length, 5, 'les contacts restent affichés');
 
   const firstLoad = await load(sampleTables(), { docApi: { failing: ['Actions', 'GT'] } });
-  assert.deepEqual(firstLoad.referenceMaps.Actions, {});
+  assert.deepEqual(firstLoad.referenceMaps.actions, {});
   assert.match(firstLoad.issues[0], /Actions, GT/);
 });
 
@@ -137,7 +137,7 @@ test('loadDirectory reports a reference table none of whose label columns exist,
   const log = recordingLog();
   const { contacts, referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
   assert.equal(contacts.length, 5, 'les contacts restent affichés');
-  assert.deepEqual(referenceMaps.Actions, {});
+  assert.deepEqual(referenceMaps.actions, {});
   assert.equal(issues.length, 1);
   assert.match(issues[0], /Actions \(Actions_corrigees ou Actions\)/);
   assert.ok(log.warnings.some(args => String(args[0]).includes('Actions') && String(args[0]).includes('introuvable')));
@@ -148,7 +148,7 @@ test('loadDirectory falls back to the raw label with a console warning when only
   delete tables.Actions.Actions_corrigees;
   const log = recordingLog();
   const { referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
-  assert.deepEqual(referenceMaps.Actions, { 1: 'Vaccination', 2: 'Audit' });
+  assert.deepEqual(referenceMaps.actions, { 1: 'Vaccination', 2: 'Audit' });
   assert.deepEqual(issues, [], 'pas de bandeau : les libellés bruts suffisent');
   assert.ok(log.warnings.some(args => String(args[0]).includes('Actions_corrigees')));
 });
@@ -212,4 +212,65 @@ test('loadDirectory: when Grist sends the establishment as text, duplicate acron
   const { contacts, issues } = await load(tables);
   assert.deepEqual(contacts.map(c => c.nom), ['Durand', 'Bergonié'], 'plus aucun contact du CHU');
   assert.match(issues[0], /CHU/);
+});
+
+// ===== Compétences macro : une colonne de plus de la table Competences =====
+
+test('loadDirectory gives each contact the domains of its skills, reading the Competences table once', async () => {
+  const docApi = fakeDocApi(sampleTables());
+  const { contacts, referenceMaps } = await loadDirectory(docApi, { log: recordingLog() });
+  assert.equal(docApi.calls.Competences, 1);
+  assert.deepEqual(referenceMaps.macro, { 1: 'Cancérologie', 2: 'Cancérologie', 3: 'Pharmacie', 4: 'Autres' },
+    'domaine écrit autrement unifié ; compétence non classée sous « Autres »');
+  const byName = Object.fromEntries(contacts.map(c => [c.nom, c.labels]));
+  assert.deepEqual(byName.Martin.competences, ['Oncologie', 'Hématologie']);
+  assert.deepEqual(byName.Martin.macro, ['Cancérologie'], 'deux compétences du même domaine : un seul domaine');
+  assert.deepEqual(byName.Durand.macro, ['Pharmacie']);
+  assert.deepEqual(byName['Bergonié'].macro, ['Autres']);
+  assert.deepEqual(byName.Bernard.macro, [], 'aucune compétence : aucun domaine');
+});
+
+test('loadDirectory tells the console which skills are not classed in a domain, by row id', async () => {
+  const log = recordingLog();
+  await loadDirectory(fakeDocApi(sampleTables()), { log });
+  const info = log.infos.find(args => String(args[0]).includes('sans regroupement'));
+  assert.ok(info, 'un message de console sur les compétences non classées');
+  assert.deepEqual(info[1], ['4']);
+});
+
+test('loadDirectory without any domain filled in classes every skill under « Autres » and says so only in the console', async () => {
+  const tables = sampleTables();
+  tables.Competences.Macro_competences = tables.Competences.Macro_competences.map(() => '');
+  const { referenceMaps, issues } = await load(tables);
+  assert.deepEqual(Object.values(referenceMaps.macro), ['Autres', 'Autres', 'Autres', 'Autres']);
+  assert.deepEqual(issues, []);
+});
+
+test('loadDirectory without the Macro_competences column leaves the domain filter empty and the detailed skills intact', async () => {
+  const tables = sampleTables();
+  delete tables.Competences.Macro_competences;
+  const { contacts, referenceMaps, issues } = await load(tables);
+  assert.deepEqual(referenceMaps.macro, {}, 'pas de faux domaine « Autres » pour tout le monde');
+  assert.equal(Object.keys(referenceMaps.competences).length, 4);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0], /Competences \(Macro_competences\)/);
+  assert.ok(contacts.every(c => c.labels.macro.length === 0));
+  assert.deepEqual(contacts[0].labels.competences, ['Oncologie', 'Hématologie']);
+});
+
+test('loadDirectory reuses the previous skills and domains together when the Competences table cannot be read, and names the table once', async () => {
+  const previousMaps = {
+    competences: { 1: 'Oncologie', 2: 'Hématologie', 3: 'Pharmacovigilance', 4: 'Divers' },
+    macro: { 1: 'Cancérologie', 2: 'Cancérologie', 3: 'Pharmacie', 4: 'Autres' }
+  };
+  const { referenceMaps, contacts, issues } = await load(sampleTables(), { docApi: { failing: ['Competences'] }, load: { previousMaps } });
+  assert.deepEqual(referenceMaps.macro, previousMaps.macro);
+  assert.deepEqual(referenceMaps.competences, previousMaps.competences);
+  assert.deepEqual(contacts[0].labels.macro, ['Cancérologie']);
+  assert.deepEqual(issues.length, 1);
+  assert.match(issues[0], /Competences/);
+  assert.equal(issues[0].match(/Competences/g).length, 1, 'table nommée une seule fois');
+
+  const firstLoad = await load(sampleTables(), { docApi: { failing: ['Competences'] } });
+  assert.deepEqual([firstLoad.referenceMaps.macro, firstLoad.referenceMaps.competences], [{}, {}]);
 });

@@ -27,6 +27,7 @@ Features
 * Filtres
   * Un champs de texte libre qui recherche sur le nom prénom
   * 6 filtres pour les instances, actions, GT, Taches compétances et communauté
+  * Un filtre « Domaines » (les compétences macro, colonne Macro_competences de la table Competences) placé avant « Compétences » : il garde les contacts qui ont au moins une compétence dans l'un des domaines cochés, et se combine avec le détail des compétences. Les cartes ne changent pas.
   * Nous n'afficherons QUE les contacts ayant au moins une valeur dans la colonne perimetre de la table BDD (même si nous n'avons pas clairement les périmètres, la colonne sert juste à cela)
   * Visibilité par établissement (table Etablissements, colonnes booléennes fondateur / partenaire / autres / ok_pour_apparaitre) :
     * Un contact n'apparaît que si son établissement est fondateur OU partenaire — jamais si "autres" (ni l'un ni l'autre).

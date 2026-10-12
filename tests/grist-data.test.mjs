@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, compareLabels,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
-  labelMapFromRows, mailtoHref
+  labelMapFromRows, mailtoHref, groupLabelMap
 } from '../grist-data.js';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
@@ -173,4 +173,26 @@ test('mailtoHref builds a link for a plain address and refuses anything that cou
     'pas-une-adresse', '@b.fr', 'a@', '', null, undefined].forEach(value => {
     assert.equal(mailtoHref(value), '', `${value} ne doit pas devenir un lien`);
   });
+});
+
+test('groupLabelMap gives every detailed row the label of its group, or the fallback when the group is empty', () => {
+  const detailMap = { 1: 'Oncologie', 2: 'Hématologie', 3: 'Divers' };
+  assert.deepEqual(groupLabelMap({ 1: 'Cancérologie', 2: 'Cancérologie' }, detailMap, 'Autres'),
+    { 1: 'Cancérologie', 2: 'Cancérologie', 3: 'Autres' });
+  assert.deepEqual(groupLabelMap({ 1: '  ', 2: null }, detailMap, 'Autres'), { 1: 'Autres', 2: 'Autres', 3: 'Autres' },
+    'vide ou espaces : non classé');
+});
+
+test('groupLabelMap writes a group the same way everywhere: the spelling of the lowest row id wins', () => {
+  const detailMap = { 1: 'A', 2: 'B', 3: 'C' };
+  assert.deepEqual(groupLabelMap({ 1: 'Cancérologie', 2: 'cancerologie', 3: 'CANCÉROLOGIE ' }, detailMap, 'Autres'),
+    { 1: 'Cancérologie', 2: 'Cancérologie', 3: 'Cancérologie' });
+  assert.deepEqual(groupLabelMap({ 1: 'autres' }, { 1: 'A', 2: 'B' }, 'Autres'), { 1: 'autres', 2: 'autres' },
+    'un domaine saisi « autres » et le repli ne font qu\'une option');
+});
+
+test('groupLabelMap ignores rows that are not in the detailed map and works without a fallback', () => {
+  assert.deepEqual(groupLabelMap({ 1: 'X', 9: 'Orphelin' }, { 1: 'A', 2: 'B' }, 'Autres'), { 1: 'X', 2: 'Autres' });
+  assert.deepEqual(groupLabelMap({ 1: 'X' }, { 1: 'A', 2: 'B' }), { 1: 'X' }, 'sans repli, une ligne non classée est omise');
+  assert.deepEqual(groupLabelMap({}, {}, 'Autres'), {});
 });
