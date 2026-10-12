@@ -195,7 +195,7 @@ L'annuaire n'a ni serveur ni base de données à lui : il tient à des comptes q
 
 **L'essentiel**
 
-1. **Deux propriétaires au moins** pour le document Grist, et deux au moins pour le dépôt GitHub. Le dépôt appartient aujourd'hui à un compte personnel, qui n'a qu'un seul propriétaire : c'est le point le plus fragile.
+1. **Deux propriétaires au moins** pour le document Grist, et deux au moins pour le dépôt GitHub. Le dépôt appartient aujourd'hui à un compte personnel, qui n'a qu'un seul propriétaire : c'est le point le plus fragile ([hébergement et risques à ce jour](#hébergement-et-risques-à-ce-jour)).
 2. **Une sauvegarde régulière** du document Grist, rangée hors du dépôt public.
 3. **Une fiche de continuité** : qui possède quoi, qui remplace qui, où sont les sauvegardes.
 4. **Les personnes qui partent sont retirées** de l'annuaire, et leurs accès supprimés, dès leur départ.
@@ -206,13 +206,22 @@ L'annuaire n'a ni serveur ni base de données à lui : il tient à des comptes q
 | Élément | Où il se trouve | Qui peut le gérer | Si plus personne ne peut le gérer |
 |---|---|---|---|
 | **Les données** | Le document Grist, sur l'instance de l'État (`grist.numerique.gouv.fr`) | Les propriétaires du document, de son espace de travail et du site qui les contient : les accès se transmettent du site à l'espace de travail, puis au document | Le widget affiche toujours les données du document, mais personne ne peut plus les corriger, ni changer le partage ou les règles d'accès, réservés aux propriétaires. La documentation de Grist ne dit pas comment reprendre la main : ne pas y compter |
-| **Le code** | Le dépôt GitHub `lombre33/Annuaire_PUI_Bordeaux` | Son seul propriétaire, le compte personnel `lombre33` | Le widget continue de fonctionner, mais rien ne peut plus être corrigé ni publié. Si le compte est supprimé, GitHub supprime ses dépôts et ses sites Pages, donc le widget, et ne peut pas les restaurer |
+| **Le code** | Le dépôt GitHub `lombre33/Annuaire_PUI_Bordeaux` | Son seul propriétaire, le compte personnel `lombre33` de la personne qui a créé le widget | Le widget continue de fonctionner, mais rien ne peut plus être corrigé ni publié. Si le compte est supprimé, GitHub supprime ses dépôts et ses sites Pages, donc le widget, et ne peut pas les restaurer |
 | **Les réglages de « Ma présence » et de la modification de fiche** | Le document Grist : table `Annuaire_Sonde` et ses formules, colonnes de données que le widget écrit dans `BDD`, table `ACL`, règles d'accès | Les propriétaires du document | Sans la sonde ou sans `ACL`, plus personne n'est identifié : l'annuaire s'affiche normalement, mais sans bandeau ni modification (le widget échoue en sécurité). Les formules ne se recréent pas seules : la marche à suivre est dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) |
 | **L'adresse du widget** | GitHub Pages, saisie dans « Enter Custom URL » du widget de chaque page Grist | Le même compte | Renommer ou transférer le dépôt change l'adresse du site **sans redirection** : à la place de l'annuaire, Grist affiche une erreur ou une zone vide, tant que l'adresse n'est pas corrigée dans chaque page |
 | **Le script de l'API Grist** | `docs.getgrist.com`, chargé par `index.html` | Grist | Sans lui, la page affiche « 0 contact » sans bandeau d'explication ; le détail est dans la console du navigateur |
 | **La connaissance** | Cette documentation, `grist_structure.txt`, `specs.md`, les tests | Quiconque peut écrire dans le dépôt | Elle se périme : `tests/docs.test.mjs` signale une partie des oublis, pas tous |
 
 Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certificat), mais il suffit qu'un compte ou une adresse de messagerie disparaisse pour tout bloquer.
+
+### Hébergement et risques à ce jour
+
+État des lieux au 12 octobre 2026, tel que le propriétaire du dépôt le décrit :
+
+- **Le code est sur le compte GitHub personnel de la personne qui a créé le widget** (`lombre33`), seule propriétaire du dépôt et du site GitHub Pages qui sert le widget. C'est le point le plus fragile de l'annuaire.
+- **Une migration vers le GitLab UB n'est pas possible aujourd'hui** : il n'a pas de module « Pages », or le widget est une page statique que Grist charge par son adresse web.
+- **Piste proposée : migrer vers un GitHub DIESE.** Une migration change l'adresse du site, sans redirection : la faire une fois, puis corriger l'adresse du widget dans chaque page Grist, comme le décrit [Ce qu'il faut prévoir](#ce-quil-faut-prévoir), point 3.
+- **Dans Grist, les administrateurs sont uniquement des agents en poste à ce jour.** Si tous partent sans passation, plus personne n'administre le document : voir [Ce qui arrive si…](#ce-qui-arrive-si), et [Ce qu'il faut prévoir](#ce-quil-faut-prévoir), points 1 et 2.
 
 ### Ce qui arrive si…
 
@@ -233,7 +242,7 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 
 1. **Au moins deux propriétaires du document Grist**, nommés, de préférence dans des services différents. Un propriétaire ne peut pas modifier son propre accès : c'est un autre propriétaire qui le retire quand la personne part, ce qui suppose d'en avoir deux. Penser aussi à l'espace de travail et au site qui contiennent le document : leurs accès se transmettent au document.
 2. **Un administrateur des données et un suppléant**, qui savent tous deux ajouter une personne, valider un établissement, ajouter une valeur de filtre et désigner un administrateur de l'annuaire ([Opérations courantes](#opérations-courantes-dans-grist)).
-3. **Le dépôt dans une organisation GitHub** avec deux propriétaires au moins. GitHub le recommande : avec un seul propriétaire injoignable, les projets de l'organisation peuvent devenir inaccessibles. Un dépôt personnel n'a qu'un propriétaire ; ses collaborateurs peuvent pousser du code, mais ni supprimer le dépôt, ni changer sa visibilité, ni inviter d'autres personnes. Le transfert change l'adresse de GitHub Pages : le faire une fois, à un moment choisi, corriger l'adresse dans chaque page Grist, puis faire le [contrôle](#contrôle-après-un-changement-de-données). À défaut d'organisation, GitHub permet de désigner un **successeur** du compte personnel (réglages du compte, « Successor settings »).
+3. **Le dépôt dans une organisation GitHub** avec deux propriétaires au moins. GitHub le recommande : avec un seul propriétaire injoignable, les projets de l'organisation peuvent devenir inaccessibles. Un dépôt personnel n'a qu'un propriétaire ; ses collaborateurs peuvent pousser du code, mais ni supprimer le dépôt, ni changer sa visibilité, ni inviter d'autres personnes. Le transfert change l'adresse de GitHub Pages : le faire une fois, à un moment choisi, corriger l'adresse dans chaque page Grist, puis faire le [contrôle](#contrôle-après-un-changement-de-données). La piste proposée est un GitHub DIESE ([hébergement et risques à ce jour](#hébergement-et-risques-à-ce-jour)). À défaut d'organisation, GitHub permet de désigner un **successeur** du compte personnel (réglages du compte, « Successor settings »).
 4. **Des sauvegardes hors de Grist.** Grist garde lui-même des instantanés du document (d'après sa documentation : horaires pendant environ un jour, mensuels pendant plus d'un an, à vérifier sur l'instance utilisée), mais ils disparaissent avec le document s'il est supprimé définitivement. Télécharger régulièrement le document (fichier `.grist`, qui ne contient pas la liste des personnes avec qui il est partagé : la noter à part) et ses pièces jointes éventuelles (photos, logos), puis les ranger dans un espace à accès restreint, jamais dans le dépôt public. Une sauvegarde contient des données personnelles : prévoir sa durée de conservation et sa destruction.
 5. **Une copie du code** ailleurs que sur le compte d'origine (un clone ou un fork sur un autre compte ou une autre forge) : supprimer un compte supprime ses dépôts, pas les copies faites ailleurs.
 6. **Une licence.** Le dépôt n'en déclare aucune : par défaut, tous les droits sont réservés, et la reprise du code par d'autres suppose l'accord de son propriétaire. À décider par le propriétaire du dépôt.
@@ -366,4 +375,4 @@ Non engagées ; à décider par le propriétaire du dépôt.
 - Ajouter une licence : le dépôt est public et n'en déclare aucune ; par défaut, tous les droits sont réservés.
 - Paginer ou charger progressivement les cartes si l'annuaire grossit beaucoup.
 - Compléter le [lexique du PUI](utilisateurs.md#lexique-du-pui) : Instances, Actions, Communautés, Tâches, Rôle PUI et périmètre attendent une définition.
-- Déplacer le dépôt dans une organisation GitHub à deux propriétaires au moins, et choisir une licence (voir [Continuité](#continuité--départs-et-absence-dadministrateur)).
+- Déplacer le dépôt dans une organisation GitHub à deux propriétaires au moins (piste proposée : un GitHub DIESE), et choisir une licence (voir [Continuité](#continuité--départs-et-absence-dadministrateur)).
