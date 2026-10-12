@@ -102,7 +102,7 @@ Sans dépendance, un fichier de tests par module :
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 69
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 72
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, cartes triées
 par nom (même quand Grist envoie les lignes dans le désordre), interrupteurs
@@ -113,8 +113,9 @@ domaine (case de domaine, détail replié, case partielle, recherche à deux niv
 ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
 bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
-double clic, écriture refusée, personne sans fiche, qui voit alors une mention sans
-interrupteur), et le banc d'essai lui-même (une lecture de la console interrompue par la
+double clic, focus gardé pendant et après l'écriture, réussite annoncée puis effacée,
+écriture refusée, personne sans fiche, qui voit alors une mention sans interrupteur), et le
+banc d'essai lui-même (une lecture de la console interrompue par la
 fermeture de la page ne laisse aucun rejet non traité).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
@@ -160,14 +161,17 @@ supprimé ou illisible, aucune trace du jeton dans la console, relecture d'une f
 `tests/branding-layout.test.mjs` y ajoute 13 scénarios sur la mise en page de l'habillage, de
 320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case,
 bandeau du bas qui se replie, rien qui dépasse du cadre.
-`tests/accessibility.test.mjs` y ajoute 5 scénarios (et 4 tests sans navigateur : les rapports de
+`tests/accessibility.test.mjs` y ajoute 8 scénarios (et 5 tests sans navigateur : les rapports de
 contraste de référence, une garde sur les feuilles de style qui refuse tout `outline: 0` ou
-`outline: none` non justifié, et le contraste de chaque couleur de catégorie et du lien e-mail) sur le
-clavier, le lecteur d'écran et les couleurs : le champ de recherche nommé par son rôle, aucun contrôle sans
-nom dans l'arbre d'accessibilité (page au repos, menu ouvert), le parcours complet à la tabulation (page,
-puis menu ouvert) où chaque arrêt change de capture avec et sans focus, avec un anneau plein de 2 px au
-moins et de 3:1 au moins, et les pastilles, les titres de groupe et le lien e-mail d'une carte mesurés sur
-la page rendue (4,5:1 au moins).
+`outline: none` non justifié, le contraste de chaque couleur de catégorie et du lien e-mail, et celui de
+la piste et du curseur de l'interrupteur de présence) sur le clavier, le lecteur d'écran et les couleurs :
+le champ de recherche nommé par son rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au
+repos, menu ouvert), le parcours complet à la tabulation (page, puis menu ouvert) où chaque arrêt change
+de capture avec et sans focus, avec un anneau plein de 2 px au moins et de 3:1 au moins, les pastilles,
+les titres de groupe et le lien e-mail d'une carte mesurés sur la page rendue (4,5:1 au moins), et la
+piste et le curseur de l'interrupteur de présence mesurés eux aussi (3:1 au moins, éteint et allumé),
+en contraste forcé émulé (bordure, curseur distinct de la piste, états différents) et sans transition
+quand on réduit les animations.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
