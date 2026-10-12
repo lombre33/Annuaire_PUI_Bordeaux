@@ -1,4 +1,4 @@
-# Version 1.17.1 — Texte de 12 px et pastilles de 24 px (voir CHANGELOG.md)
+# Version 1.17.2 — Bandeau « Ma présence » lisible de 320 à 860 px (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -24,4 +24,6 @@ Depuis la 1.17.0, le responsable d'un établissement (une ligne d'`ACL`) modifie
 du logo à Grist (réglages dans `GRIST_SETUP.md`, non essayés dans un vrai Grist).
 Depuis la 1.17.1, tout le texte des cartes fait 12 px au moins et les pastilles 24 px de haut : les cartes
 sont plus hautes d'un tiers environ, un écart voulu avec la maquette v5 (audit UI/UX).
-799 tests (dont 282 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.17.2, dans un cadre de moins de 860 px, le texte du bandeau « Ma présence » garde 200 px au moins :
+l'interrupteur passe dessous au lieu de le serrer, et le bloc des boutons vide ne prend plus de place (audit UI/UX).
+800 tests (dont 283 dans un vrai navigateur, optionnels sans Playwright).
