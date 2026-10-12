@@ -374,7 +374,7 @@ h1 {
   background: var(--violet);
   border-radius: 999px;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
 }
 .filter-menu {
   position: absolute;
@@ -419,7 +419,7 @@ h1 {
 }
 .option-count {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .reset-button {
   flex: 0 0 auto;
@@ -526,7 +526,7 @@ button.avatar:hover {
   min-width: 0;
   margin-top: 2px;
   color: var(--violet);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -549,14 +549,15 @@ button.avatar:hover {
 }
 .etablissement-tag {
   display: none;
-  max-width: 96px;
+  max-width: 136px;
+  min-height: 24px;
   margin: 0 0 0 8px;
-  padding: 3px 7px;
+  padding: 4px 9px;
   color: #fff;
   background: #147c72;
   border: 0;
   border-radius: 999px;
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 750;
   white-space: nowrap;
   overflow: hidden;
@@ -627,7 +628,7 @@ button.avatar:hover {
   display: none;
   margin-top: 3px;
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .detail-row.visible {
@@ -652,7 +653,7 @@ button.avatar:hover {
 }
 .tag-group-title {
   margin-bottom: 3px;
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -660,14 +661,15 @@ button.avatar:hover {
 .tag-group-values {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: 4px;
 }
 .tag {
-  padding: 3px 6px;
+  min-height: 24px;
+  padding: 4px 9px;
   border: 0;
   border-radius: 999px;
   color: #fff;
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 700;
   overflow-wrap: anywhere;
   cursor: pointer;
@@ -843,17 +845,18 @@ button.avatar:hover {
   color: #443aaf;
   background: #e8e6ff;
   border-radius: 999px;
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 800;
 }
 .card-edit {
+  min-height: 24px;
   padding: 2px 5px;
   color: #443aaf;
   background: none;
   border: 0;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -868,6 +871,7 @@ button.avatar:hover {
 /* Le bouton « Modifier » d'un responsable, sous le logo de son établissement : il ouvre la fiche de
    l'établissement, pas celle de la personne de la carte. */
 .etab-edit {
+  min-height: 24px;
   margin: 0 -4px 0 0;
   padding: 2px 5px;
   color: #443aaf;
@@ -875,7 +879,7 @@ button.avatar:hover {
   border: 0;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -978,35 +982,15 @@ button.avatar:hover {
   }
 }
 
-/* Petit écran ou écran tactile : le texte des cartes (8,5 à 10,5px) est
-   illisible à bout de bras, on le monte d'un cran. */
+/* Petit écran ou écran tactile : le texte des cartes fait déjà 12px au moins partout (le
+   plancher est celui de la base) ; on ne grossit que le nom, et on écarte un peu plus les
+   pastilles. */
 @media (max-width: 599px), (pointer: coarse) {
   .name {
     font-size: 15px;
   }
-  .fonction,
-  .detail-row {
-    font-size: 12px;
-  }
-  .card-edit,
-  .etab-edit {
-    font-size: 12px;
-  }
-  .own-flag {
-    font-size: 11px;
-  }
-  .tag-group-title {
-    font-size: 10px;
-  }
   .tag-group-values {
     gap: 5px;
-  }
-  .tag {
-    padding: 4px 9px;
-    font-size: 11px;
-  }
-  .etablissement-tag {
-    font-size: 10px;
   }
 }
 
