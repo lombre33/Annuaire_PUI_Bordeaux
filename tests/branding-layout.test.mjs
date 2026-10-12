@@ -19,7 +19,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { crowdedTables, crowdedBranding } from './fixtures-responsive.mjs';
+import { crowdedTables, crowdedBranding, crowdedIdentity } from './fixtures-responsive.mjs';
 import { routeAttachments, TALL_FILE, WIDE_FILE, UNSIZED_FILE } from './support/fake-attachments.mjs';
 import { BAND_LOGO, FUNDER_LOGO } from '../constants.js';
 
@@ -29,7 +29,7 @@ const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 
 const FAKE_GRIST = fs.readFileSync(path.join(ROOT, 'tests/support/fake-grist.js'), 'utf8').replace(/^export /gm, '');
 const GRIST_MOCK = `${FAKE_GRIST}
-window.__fake = createFakeGrist({ tables: () => window.__tables });
+window.__fake = createFakeGrist({ tables: () => window.__tables, user: () => window.__user });
 window.grist = {
   ready() {},
   onRecords(callback) { window.__triggerRecords = callback; setTimeout(callback, 0); },
@@ -91,7 +91,7 @@ async function settle(page) {
   });
 }
 
-async function openWidget({ width = 1480, touch = false, tables = crowdedBranding(), waitLogos = true } = {}) {
+async function openWidget({ width = 1480, touch = false, tables = crowdedBranding(), user = null, waitLogos = true } = {}) {
   const context = await browser.newContext({
     viewport: { width, height: HEIGHT },
     ...(touch ? { hasTouch: true, isMobile: true } : {})
@@ -102,9 +102,10 @@ async function openWidget({ width = 1480, touch = false, tables = crowdedBrandin
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(value => { window.__tables = value; }, tables);
+  await page.addInitScript(value => { window.__tables = value.tables; window.__user = value.user; }, { tables, user: user && { email: user } });
   await page.goto(`${baseUrl}/index.html`);
   await page.waitForFunction(() => document.querySelectorAll('.contact-card').length > 0);
+  if (user) await page.waitForFunction(() => !document.getElementById('accountBar').hidden);
   if (waitLogos) await settle(page);
   return { page, context, errors };
 }
@@ -167,9 +168,9 @@ test('avec les logos, aucun défilement horizontal du téléphone (320px) au gra
 
 // ===== En-tête : titre, compteur, financeurs =====
 
-test('en-tête : financeurs sous le titre sous 980px, à sa droite de 980 à 1169px, au centre dès 1170px', { skip }, () =>
+test('en-tête : financeurs sous le titre sous 980px, à sa droite de 980 à 1299px, au centre dès 1300px', { skip }, () =>
   withWidget({}, async ({ page }) => {
-    await atEachWidth(page, [320, 360, 414, 599, 600, 768, 979, 980, 1024, 1169, 1170, 1279, 1280, 1400, 1480, 1920], async width => {
+    await atEachWidth(page, [320, 360, 414, 599, 600, 768, 979, 980, 1024, 1279, 1299, 1300, 1400, 1480, 1920], async width => {
       const header = await rectOf(page, '.page-header');
       const title = await rectOf(page, '.page-title');
       const funders = await rectOf(page, '#funders');
@@ -183,14 +184,59 @@ test('en-tête : financeurs sous le titre sous 980px, à sa droite de 980 à 116
         assert.ok(funders.left >= title.right + 12, `${message} : les financeurs sont à droite du titre, sans le toucher`);
         assert.ok(funders.top < title.bottom && title.top < funders.bottom, `${message} : sur la bande du titre`);
       }
-      if (width >= 980 && width < 1170) {
+      if (width >= 980 && width < 1300) {
         assert.ok(Math.abs(funders.right - header.right) <= 1, `${message} : calés à droite de l'en-tête`);
         assert.ok(Math.abs(funders.top - header.top) <= 1, `${message} : en haut de l'en-tête`);
       }
-      if (width >= 1280) {
+      if (width >= 1300) {
         assert.ok(Math.abs(centerX(funders) - centerX(header)) <= 1,
           `${message} : financeurs au centre (décalés de ${Math.round(centerX(funders) - centerX(header))}px)`);
       }
+    });
+  }));
+
+// « Ma présence » : la personne connectée (ici Camille, ligne 2 de BDD) a sa zone dans l'en-tête.
+const CAMILLE = 'contact1@bordeaux.example';
+
+test('en-tête avec « Ma présence » : un seul bandeau dès 1300px, titre, financeurs au centre, profil à droite', { skip }, () =>
+  withWidget({ tables: crowdedIdentity(crowdedBranding(), CAMILLE), user: CAMILLE }, async ({ page }) => {
+    await atEachWidth(page, [1300, 1400, 1480, 1920], async width => {
+      const header = await rectOf(page, '.page-header');
+      const title = await rectOf(page, '.page-title');
+      const funders = await rectOf(page, '#funders');
+      const account = await rectOf(page, '#accountBar');
+      const message = `à ${width}px`;
+      assert.ok(account.left >= funders.right + 12, `${message} : le profil est à droite des financeurs`);
+      assert.ok(Math.abs(account.right - header.right) <= 1, `${message} : calé à droite de l'en-tête`);
+      assert.ok(funders.right <= account.left && title.right <= funders.left, `${message} : titre, financeurs, profil dans l'ordre, sans se toucher`);
+      assert.ok(Math.abs(centerX(funders) - centerX(header)) <= 1, `${message} : financeurs toujours au centre`);
+      // Un seul bandeau : le profil ne rend pas l'en-tête plus haut que le titre.
+      assert.ok(account.top >= header.top - 0.5 && account.bottom <= title.bottom + 12, `${message} : le profil tient dans la hauteur du titre`);
+      assert.ok(header.height <= title.height + 12, `${message} : l'en-tête fait ${Math.round(header.height)}px de haut, le titre ${Math.round(title.height)}px`);
+    });
+  }));
+
+test('en-tête avec « Ma présence » : sous les financeurs à droite de 980 à 1299px, pleine largeur sous 980px', { skip }, () =>
+  withWidget({ tables: crowdedIdentity(crowdedBranding(), CAMILLE), user: CAMILLE }, async ({ page }) => {
+    await atEachWidth(page, [320, 360, 600, 768, 979, 980, 1024, 1299], async width => {
+      const header = await rectOf(page, '.page-header');
+      const title = await rectOf(page, '.page-title');
+      const funders = await rectOf(page, '#funders');
+      const account = await rectOf(page, '#accountBar');
+      const message = `à ${width}px`;
+      assert.ok(account.top >= funders.bottom - 0.5, `${message} : le profil est sous les financeurs`);
+      assert.ok(account.left >= header.left - 0.5 && account.right <= header.right + 0.5, `${message} : le profil tient dans l'en-tête`);
+      if (width < 980) {
+        assert.ok(account.top >= title.bottom - 0.5, `${message} : le profil est sous le titre`);
+        assert.ok(Math.abs(account.left - header.left) <= 1 && Math.abs(account.right - header.right) <= 1, `${message} : sur toute la largeur`);
+      } else {
+        assert.ok(account.left >= title.right + 12, `${message} : le profil est à droite du titre`);
+        assert.ok(Math.abs(account.right - header.right) <= 1, `${message} : calé à droite de l'en-tête`);
+      }
+      // Le bouton « Modifier mon profil » et l'interrupteur restent à portée : dans le cadre, jamais coupés.
+      const controls = await rects(page, '#accountBar .presence-switch, #accountBar .account-edit');
+      assert.equal(controls.length, 2, `${message} : l'interrupteur et le bouton sont affichés`);
+      controls.forEach(control => assert.ok(control.left >= header.left - 0.5 && control.right <= header.right + 0.5, `${message} : un bouton du profil sort de l'en-tête`));
     });
   }));
 

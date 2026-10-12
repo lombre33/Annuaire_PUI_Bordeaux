@@ -149,8 +149,15 @@ h1 {
   font-weight: 800;
 }
 
+/* « Ma présence » (voir plus bas) vit dans l'en-tête, à droite : la zone « me ». */
+.page-header > .account-bar {
+  grid-area: me;
+  margin-bottom: 0;
+}
+
 /* Le cadre est assez large pour mettre le titre et, à sa droite, les financeurs
-   au-dessus de la zone profil. */
+   au-dessus de la zone profil, qui devient compacte : sans fond, sur deux rangées
+   (l'avatar et le message, puis l'interrupteur et le bouton). */
 @media (min-width: 980px) {
   .page-header {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -162,9 +169,35 @@ h1 {
   .page-header > .account-bar {
     justify-self: end;
   }
+  .page-header > .account-bar {
+    width: 380px;
+    gap: 6px 8px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .page-header > .account-bar .avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 11px;
+  }
+  .page-header > .account-bar .account-identity {
+    flex-basis: 150px;
+  }
+  .page-header > .account-bar .presence-switch,
+  .page-header > .account-bar .account-edit {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+  .page-header > .account-bar .presence-switch {
+    gap: 8px;
+  }
 }
 /* Plus large encore : les financeurs passent au centre, entre le titre et le profil. */
-@media (min-width: 1170px) {
+@media (min-width: 1300px) {
   .page-header {
     grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
     grid-template-areas: "title funders me";

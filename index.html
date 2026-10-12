@@ -22,23 +22,22 @@
         <p class="funders-label">Projet financé par l'État dans le cadre de France 2030</p>
         <ul id="fundersLogos" class="funders-logos" aria-label="Financeurs"></ul>
       </div>
+      <section id="accountBar" class="account-bar" aria-label="Ma présence dans l'annuaire" hidden>
+        <div class="avatar account-avatar" aria-hidden="true"></div>
+        <div class="account-identity">
+          <p class="account-name"></p>
+          <p class="account-detail"></p>
+        </div>
+        <button type="button" class="presence-switch" role="switch" aria-checked="false">
+          <span class="presence-track" aria-hidden="true"><span class="presence-thumb"></span></span>
+          <span class="presence-label">Apparaître dans l'annuaire</span>
+        </button>
+        <div class="account-actions">
+          <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
+        </div>
+        <p class="account-status" role="status" data-tone="info"></p>
+      </section>
     </header>
-
-    <section id="accountBar" class="account-bar" aria-label="Ma présence dans l'annuaire" hidden>
-      <div class="avatar account-avatar" aria-hidden="true"></div>
-      <div class="account-identity">
-        <p class="account-name"></p>
-        <p class="account-detail"></p>
-      </div>
-      <button type="button" class="presence-switch" role="switch" aria-checked="false">
-        <span class="presence-track" aria-hidden="true"><span class="presence-thumb"></span></span>
-        <span class="presence-label">Apparaître dans l'annuaire</span>
-      </button>
-      <div class="account-actions">
-        <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
-      </div>
-      <p class="account-status" role="status" data-tone="info"></p>
-    </section>
 
     <section class="toolbar" aria-label="Recherche et filtres">
       <label class="search-box" for="searchInput">

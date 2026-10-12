@@ -109,3 +109,12 @@ export function crowdedBranding(tables = crowdedTables()) {
   };
   return copy;
 }
+
+// Le jeu chargé complété de ce qu'il faut pour identifier une personne connectée (ACL et
+// la table-sonde, GRIST_SETUP.md) : `email` doit être celui d'une ligne de BDD.
+export function crowdedIdentity(tables, email, { admin = false } = {}) {
+  const copy = structuredClone(tables);
+  copy.ACL = { id: [1], email: [email], Responsable_de_l_Etablissement: [0], admin: [admin] };
+  copy.Annuaire_Sonde = { id: [], Email: [], Admin: [] };
+  return copy;
+}

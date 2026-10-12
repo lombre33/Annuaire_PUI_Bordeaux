@@ -12,18 +12,46 @@
 // écrits sous une forme lisible, puis convertis par tablesFictives() vers les
 // tables « en colonnes » que renvoie grist.docApi.fetchTable(), avec les
 // encodages réels de Grist : références en identifiant de ligne (0 = vide),
-// listes ['L', id, ...], téléphone Numeric sans son 0 initial.
+// listes ['L', id, ...], téléphone Numeric sans son 0 initial, pièces jointes
+// ['L', numéro du fichier].
+//
+// Les logos des établissements et des financeurs sont des dessins inventés
+// (logos-fictifs.mjs), jamais ceux de vraies structures.
 
+import { BRANDING } from '../../constants.js';
+import { IDS_LOGOS } from './logos-fictifs.mjs';
+
+// `ordreBandeau` : la place de l'établissement fondateur dans le bandeau des logos du bas
+// (colonne ordre_bandeau, GRIST_SETUP.md). Le logo d'un établissement est le dessin de même
+// acronyme dans logos-fictifs.mjs ; Réseau Santé Démo n'en a pas : ses cartes gardent le nom
+// de l'établissement écrit, comme le fait le widget quand le logo manque.
 const ETABLISSEMENTS = [
-  { acronyme: 'CHD', nomComplet: 'Centre Hospitalier de Démonstration', statut: 'fondateur', valide: true },
-  { acronyme: 'UDD', nomComplet: 'Université de Démonstration', statut: 'fondateur', valide: true },
-  { acronyme: 'ISD', nomComplet: 'Institut Santé Démo', statut: 'fondateur', valide: true },
-  { acronyme: 'EDD', nomComplet: 'École de Démonstration', statut: 'fondateur', valide: true },
+  { acronyme: 'CHD', nomComplet: 'Centre Hospitalier de Démonstration', statut: 'fondateur', valide: true, ordreBandeau: 2 },
+  { acronyme: 'UDD', nomComplet: 'Université de Démonstration', statut: 'fondateur', valide: true, ordreBandeau: 1 },
+  { acronyme: 'ISD', nomComplet: 'Institut Santé Démo', statut: 'fondateur', valide: true, ordreBandeau: 4 },
+  { acronyme: 'EDD', nomComplet: 'École de Démonstration', statut: 'fondateur', valide: true, ordreBandeau: 5 },
   { acronyme: 'CLEX', nomComplet: 'Clinique Exemple', statut: 'partenaire', valide: true },
   { acronyme: 'RSD', nomComplet: 'Réseau Santé Démo', statut: 'partenaire', valide: true },
-  // Jamais affichés : établissement « autres », et fondateur n'ayant pas validé.
+  // Jamais affichés : établissement « autres », et fondateur n'ayant pas validé (son logo
+  // n'apparaît donc pas non plus dans le bandeau).
   { acronyme: 'LABT', nomComplet: 'Laboratoire Témoin', statut: 'autres', valide: true },
-  { acronyme: 'FDX', nomComplet: 'Fondation Exemple', statut: 'fondateur', valide: false }
+  { acronyme: 'FDX', nomComplet: 'Fondation Exemple', statut: 'fondateur', valide: false, ordreBandeau: 9 },
+  // Fondateurs sans personne dans l'annuaire : ils n'ont pas de carte, mais leur logo figure
+  // dans le bandeau du bas.
+  { acronyme: 'IND', nomComplet: 'Institut National de Démonstration', statut: 'fondateur', valide: true, ordreBandeau: 3 },
+  { acronyme: 'ASD', nomComplet: 'AgroSciences Démo', statut: 'fondateur', valide: true, ordreBandeau: 6 },
+  { acronyme: 'PTD', nomComplet: 'Polytechnique de Démonstration', statut: 'fondateur', valide: true, ordreBandeau: 7 },
+  { acronyme: 'MND', nomComplet: 'Métropole de Démonstration', statut: 'fondateur', valide: true, ordreBandeau: 8 }
+];
+
+// La table facultative Financeurs (GRIST_SETUP.md), dans l'ordre de la colonne `ordre`. Celui
+// dont le nom est BRANDING.roundelFunder ferme aussi le bandeau du bas : son dessin est un
+// rond inventé, pas le logo du programme du même nom.
+const FINANCEURS = [
+  { nom: 'République Démo', logo: 'REPUBLIQUE', ordre: 1 },
+  { nom: 'Agence Démo de la Recherche', logo: 'ADR', ordre: 2 },
+  { nom: 'Banque Démo de l\'Innovation', logo: 'BDI', ordre: 3 },
+  { nom: BRANDING.roundelFunder, logo: 'ROND', ordre: 4 }
 ];
 
 // Une entrée par table de référence dont BDD porte une colonne ReferenceList.
@@ -324,7 +352,16 @@ export function tablesFictives() {
       fondateur: ETABLISSEMENTS.map(etablissement => etablissement.statut === 'fondateur'),
       partenaire: ETABLISSEMENTS.map(etablissement => etablissement.statut === 'partenaire'),
       autres: ETABLISSEMENTS.map(etablissement => etablissement.statut === 'autres'),
-      ok_pour_apparaitre: ETABLISSEMENTS.map(etablissement => etablissement.valide)
+      ok_pour_apparaitre: ETABLISSEMENTS.map(etablissement => etablissement.valide),
+      // Habillage (GRIST_SETUP.md) : Pièces jointes (null quand la cellule est vide) et Numérique (0 : sans ordre).
+      logo: ETABLISSEMENTS.map(etablissement => (IDS_LOGOS[etablissement.acronyme] ? ['L', IDS_LOGOS[etablissement.acronyme]] : null)),
+      ordre_bandeau: ETABLISSEMENTS.map(etablissement => etablissement.ordreBandeau ?? 0)
+    },
+    Financeurs: {
+      id: FINANCEURS.map((_, index) => index + 1),
+      nom: FINANCEURS.map(financeur => financeur.nom),
+      logo: FINANCEURS.map(financeur => ['L', IDS_LOGOS[financeur.logo]]),
+      ordre: FINANCEURS.map(financeur => financeur.ordre)
     },
     Competences: {
       ...tableDeReference({ corrigee: 'Competences_corrigees', brute: 'Competences' }, COMPETENCES.map(competence => competence.libelle)),
