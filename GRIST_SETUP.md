@@ -9,7 +9,8 @@ la faire et comment vérifier qu'elle a marché.
 | 1 | `BDD.Accepte_apparaitre` est une colonne de **données** (case à cocher) | l'interrupteur « Ma présence » échoue, avec un message qui renvoie ici |
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?) | personne n'est identifié : pas de bandeau, rien d'autre ne change |
 | 3 | Case `admin` cochée dans `ACL` pour les administrateurs | personne n'est administrateur |
-| 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité |
+| 4 | Table `Annuaire_Demandes` (les demandes de modification de fiche) | personne ne peut proposer de modification, aucun écran de validation |
+| 5 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité |
 
 Le widget ne crée ni ne modifie jamais une table ou une colonne de lui-même : tout
 ce qui est ci-dessous se fait à la main, une fois.
@@ -97,7 +98,7 @@ Si le bandeau manque, la console dit pourquoi :
 |---|---|---|
 | `table « Annuaire_Sonde » introuvable` | la table n'existe pas, ou son identifiant diffère | étape 2 |
 | `la formule user.Email de Annuaire_Sonde n'a renvoyé aucune adresse` | la formule n'est pas une formule de déclenchement, ou le compte est anonyme | reprendre la colonne `Email` |
-| `lecture impossible : …` | Grist a refusé l'écriture ou la lecture (règle d'accès) | étape 4 |
+| `lecture impossible : …` | Grist a refusé l'écriture ou la lecture (règle d'accès) | étape 5 |
 | `document ouvert en lecture seule` | compte **Lecteur** : il ne peut rien écrire | normal, aucune modification n'est proposée |
 | `Aucune ligne de BDD ne porte l'adresse…` | la personne est connectée mais son adresse n'est pas dans `BDD.email` | corriger l'adresse dans `BDD` |
 | `BDD n'a pas de colonne « email »` | la colonne n'existe pas ou a un autre nom | la rajouter sous ce nom |
@@ -112,7 +113,81 @@ on ne coche pas les cases d'une colonne à formule.
 L'adresse de `ACL` est comparée à celle de Grist sans tenir compte des majuscules ni
 des espaces.
 
-## 4. Règles d'accès
+## 4. La table `Annuaire_Demandes` : les demandes de modification
+
+Une personne ne modifie pas sa fiche elle-même : elle dépose une **demande**, qu'un
+administrateur valide ou refuse. Seule la validation écrit dans `BDD`. Les demandes
+vivent dans une table que le widget lit et écrit, mais ne crée jamais.
+
+Le nom de la table et des colonnes est exact.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `Date` | Date et heure | quand la demande a été déposée ; **formule de déclenchement** `NOW()` |
+| `Email` | Texte | **l'auteur** de la demande ; **formule de déclenchement** `user.Email` |
+| `Personne` | Référence vers `BDD` | la fiche concernée |
+| `Statut` | Choix : `en_attente`, `validee`, `refusee` | l'état de la demande |
+| `Changements` | Texte | ce qui est demandé, en JSON ; **ne pas modifier à la main** |
+| `Resume` | Texte | la même chose en une phrase, pour la lire dans Grist |
+| `Message` | Texte | le mot facultatif de la personne à l'administrateur |
+| `Traitee_par` | Texte | l'adresse de l'administrateur qui a validé ou refusé |
+| `Traitee_le` | Date et heure | quand |
+| `Motif_refus` | Texte | la raison, dite à la personne |
+
+`Date` et `Email` sont remplis **par Grist**, jamais par le widget : c'est ce qui rend
+l'auteur fiable. Ce sont les mêmes formules de déclenchement que celles de
+`Annuaire_Sonde`, appliquées aux nouveaux enregistrements et à rien d'autre.
+
+**Avec votre widget « Structure de table Grist »** (onglet Import, mode « Nouvelle
+table », cocher **Formules**) : collez
+
+```python
+import grist
+from functions import *
+import datetime, math, re
+
+@grist.UserTable
+class Annuaire_Demandes:
+  def _default_Date(rec, table, value, user):
+    return NOW()
+  Date = grist.DateTime('Europe/Paris')
+
+  def _default_Email(rec, table, value, user):
+    return user.Email
+  Email = grist.Text()
+  Personne = grist.Reference('BDD')
+  Statut = grist.Choice()
+  Changements = grist.Text()
+  Resume = grist.Text()
+  Message = grist.Text()
+  Traitee_par = grist.Text()
+  Traitee_le = grist.DateTime('Europe/Paris')
+  Motif_refus = grist.Text()
+```
+
+Puis, sur la colonne `Statut`, déclarez les trois valeurs `en_attente`, `validee` et
+`refusee`. La table est vide au départ.
+
+**Ce que le widget exige d'une demande** (et pourquoi) : n'importe qui peut écrire
+n'importe quoi dans cette table depuis la console du navigateur, donc rien n'est cru
+sur parole. Avant toute validation le widget relit la demande champ par champ
+(seuls prénom, nom, fonction, téléphone, rôle PUI et les six listes sont
+modifiables, jamais l'e-mail, l'établissement, le périmètre ni l'accord), retrouve
+les libellés dans les tables de référence, et vérifie que **l'adresse de l'auteur
+est celle de la fiche**. Une demande qui ne passe pas ces contrôles ne peut qu'être
+refusée. Le tout est appliqué en une seule action : la fiche et le statut changent
+ensemble ou pas du tout.
+
+**Pour que l'auteur soit fiable**, les règles d'accès de l'étape 5 doivent
+empêcher d'écrire soi-même la colonne `Email` d'une demande : sans cela, quelqu'un
+pourrait déposer une demande au nom d'un autre. L'administrateur voit toujours
+l'adresse de l'auteur et ce qui change, il n'est jamais obligé de valider.
+
+Vérifier : aucune ligne n'apparaît tant que personne n'a rien demandé ; une demande
+déposée par le widget a `Statut` = `en_attente`, un `Email` et une `Date` remplis
+**sans que le widget les ait écrits**.
+
+## 5. Règles d'accès
 
 Le widget parle à Grist **avec les droits de la personne connectée**. Les règles
 d'accès décident donc de ce qu'il peut faire, et ce sont elles seules qui protègent
@@ -129,6 +204,18 @@ document.
   celle de la ligne, par exemple avec la condition
   `user.Email and rec.email and user.Email.strip().lower() == rec.email.strip().lower()`,
   et la refuse à tout autre que vous.
+- **`Annuaire_Demandes`** : toute personne qui peut modifier le document doit pouvoir
+  y **créer** une ligne et **lire les siennes** (`rec.Email == user.Email`, casse et
+  espaces ignorés). Les administrateurs lisent et **modifient** toutes les lignes
+  (valider, refuser). Personne d'autre ne modifie ni ne supprime une demande, et
+  **personne ne doit pouvoir choisir lui-même `Email`** à la création : testez-le
+  depuis la console du navigateur avec un compte non administrateur, en ajoutant
+  une ligne dont `Email` est une autre adresse, qui doit être refusée ou écrasée par
+  Grist. Si ce test échoue, ne vous fiez pas à l'auteur affiché.
+- **`BDD`** : une modification par les administrateurs doit rester possible, c'est
+  ainsi que la validation d'une demande s'applique. Les personnes, elles, n'ont pas
+  besoin d'écrire dans `BDD` autrement que par l'interrupteur « Ma présence » sur
+  leur propre ligne.
 - **`ACL`** : peut être masquée à tous sauf à vous. La formule de `Annuaire_Sonde`
   la lit pour son propre compte, sans passer par les droits de la personne.
 
@@ -147,3 +234,7 @@ modification… » et l'interrupteur reste dans son état réel.
   toutes ces lignes (la console le signale). Mieux vaut corriger les doublons.
 - **Une personne connectée avec une autre adresse que celle de `BDD`** n'est pas
   retrouvée : pas de bandeau.
+- **Les demandes traitées restent dans `Annuaire_Demandes`** : c'est l'historique de
+  ce qui a été validé ou refusé, et ce que la personne relit. Videz-la de temps en
+  temps (les lignes validées ou refusées depuis longtemps) : le widget relit toute la
+  table à l'ouverture.

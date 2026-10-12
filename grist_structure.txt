@@ -10,10 +10,15 @@
 # Version du schéma : table BDD (remplace l'ancienne table Annuaire, qui reste
 # dans le document mais n'est plus lue).
 #
-# Le widget ÉCRIT dans deux tables, jamais dans une autre : BDD (une seule colonne,
-# Accepte_apparaitre, par l'interrupteur « Ma présence ») et Annuaire_Sonde (une
-# ligne ajoutée puis supprimée à chaque chargement). Il ne crée ni ne modifie
-# jamais une table ou une colonne : voir GRIST_SETUP.md pour les créer.
+# Le widget ÉCRIT dans trois tables, jamais dans une autre :
+#   - BDD : la colonne Accepte_apparaitre de la personne connectée (interrupteur
+#     « Ma présence »), et, quand un administrateur valide une demande, les seules
+#     colonnes que la demande modifie (prénom, nom, Fonction, numero_de_telephone,
+#     Role_dans_le_PUI et les six listes : voir PROFILE_FIELDS dans constants.js) ;
+#   - Annuaire_Sonde : une ligne ajoutée puis supprimée à chaque chargement ;
+#   - Annuaire_Demandes : une ligne par demande de modification de fiche.
+# Il ne crée ni ne modifie jamais une table ou une colonne : voir GRIST_SETUP.md
+# pour les créer.
 
 Table BDD (table principale : une ligne par personne, lue par son nom via fetchTable)
   prenom, nom       : Text          OBLIGATOIRES (sans l'une d'elles, erreur explicite)
@@ -51,6 +56,7 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
     Affichée sur la carte, et sert à retrouver la fiche de la personne connectée
     (comparaison sans casse ni espaces autour). Sans elle, pas de bandeau « Ma
     présence » : la console le dit. Voir createPeopleIndex() dans grist-data.js.
+    Jamais modifiable par une demande : c'est elle qui désigne la personne.
   Fonction          : Text          facultative
 
   Colonnes facultatives, rajoutées dans BDD sous ces noms : le widget les
@@ -98,6 +104,29 @@ Table Annuaire_Sonde (à créer dans Grist, voir GRIST_SETUP.md ; vide au repos)
   Le widget y ajoute une ligne à chaque chargement, la relit par son identifiant
   puis la supprime. Un compte Lecteur ne peut pas y écrire : il n'est pas
   identifié. Voir readIdentity() dans identity.js.
+
+Table Annuaire_Demandes (à créer dans Grist, voir GRIST_SETUP.md ; une ligne par demande
+de modification de fiche, déposée par la personne, traitée par un administrateur)
+  Date        : DateTime        formule de déclenchement NOW() : remplie par Grist
+  Email       : Text            formule de déclenchement user.Email : l'AUTEUR de la
+                                demande, rempli par Grist. Le widget ne l'écrit jamais.
+                                Une demande n'est valable que si cette adresse est celle
+                                de la fiche (Personne).
+  Personne    : Reference(BDD)  la fiche concernée
+  Statut      : Choice          en_attente | validee | refusee
+  Changements : Text            JSON { "v": 1, "champs": { colonne: changement } } ;
+                                un changement est { avant, apres } pour un texte, un
+                                téléphone ou une référence, { ajout: [...], retrait: [...] }
+                                pour une liste. Donnée NON FIABLE : relue champ par champ
+                                (parseChanges dans requests.js) avant tout usage.
+  Resume      : Text            les changements en une phrase
+  Message     : Text            le mot de la personne (500 caractères au plus)
+  Traitee_par : Text            adresse de l'administrateur
+  Traitee_le  : DateTime
+  Motif_refus : Text            dit à la personne
+  Le widget y ajoute une ligne (submitRequest), puis la met à jour une seule fois, en
+  même temps que BDD pour une validation (validateRequest : une seule action
+  atomique) ou seule pour un refus (refuseRequest).
 
 Table ACL (lue par la formule de Annuaire_Sonde.Admin, jamais par le widget lui-même)
   email : Text, Responsable_de_l_Etablissement : Reference(Etablissements),

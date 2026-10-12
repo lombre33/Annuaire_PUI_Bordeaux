@@ -45,6 +45,22 @@ Sans dépendance, un fichier de tests par module :
 - `tests/presence.test.mjs` — `describePresence` (les messages dits à la
   personne), `setPresence` (une écriture atomique, seule la case de la personne,
   plusieurs lignes, refus de Grist) et `explainWriteError`.
+- `tests/schema.test.mjs` — `readColumnTypes` : le type que Grist déclare pour chaque
+  colonne (le téléphone s'écrit en nombre ou en texte selon lui), métadonnées
+  illisibles ou table inconnue.
+- `tests/profile.test.mjs` — le formulaire de modification (`profileFormModel` : une
+  colonne facultative absente n'est pas proposée, une valeur sans libellé reste hors
+  du formulaire) et `diffProfile` : ce qui change, pas ce qui est resté tel quel (même
+  mal écrit), les textes nettoyés et bornés, les formules de tableur refusées, les
+  numéros français sous toutes leurs écritures, les listes en ajouts et retraits, un
+  brouillon d'un autre type refusé plutôt que lu comme « vide ».
+- `tests/requests.test.mjs` — les demandes : `parseChanges` (relecture stricte d'une
+  demande hostile : champ non modifiable, type inattendu, identifiant inconnu, taille),
+  `buildRowUpdate` (liste recalculée sur la fiche d'aujourd'hui, téléphone écrit dans
+  la forme de sa colonne), `submitRequest` (jamais d'`Email` ni de `Date` écrits par le
+  widget), `describeRequest` (auteur différent de la fiche, fiche changée depuis),
+  `validateRequest` (une seule action atomique, relecture à l'instant d'agir, demande
+  déjà traitée, administrateur non identifié) et `refuseRequest`.
 - `tests/support/fake-grist.js` — le faux document Grist commun aux tests Node et
   au test navigateur : lectures, `applyUserActions` atomique (ajout, modification,
   suppression), formules déclenchées de la sonde, pannes, écritures refusées.

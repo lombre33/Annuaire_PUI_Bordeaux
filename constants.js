@@ -10,6 +10,14 @@ export const CONSENT_COLUMN = 'Accepte_apparaitre';
 // au document et se crée à la main : GRIST_SETUP.md donne ses colonnes.
 export const PROBE_TABLE = 'Annuaire_Sonde';
 
+// Table des demandes de modification (voir requests.js) : une ligne par demande
+// d'une personne, que seul un administrateur applique à sa fiche. Elle appartient
+// au document et se crée à la main : GRIST_SETUP.md donne ses colonnes.
+export const REQUESTS_TABLE = 'Annuaire_Demandes';
+
+// États d'une demande, tels qu'écrits dans la colonne Statut.
+export const REQUEST_STATUS = Object.freeze({ pending: 'en_attente', accepted: 'validee', refused: 'refusee' });
+
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.
 //   label, color  affichage
@@ -67,3 +75,22 @@ export const REFERENCE_SOURCES = Object.entries(CATEGORIES)
 export const LIST_CATEGORIES = Object.entries(CATEGORIES)
   .filter(([, category]) => category.column)
   .map(([key, { column, table, groups }]) => ({ key, column, table, ...(groups && { groups }) }));
+
+// Ce qu'une personne peut demander à changer sur sa fiche, dans l'ordre du
+// formulaire. Jamais : email (c'est lui qui désigne la personne), Etablissement et
+// perimetre (ils décident de ce qui s'affiche : l'affaire d'un administrateur),
+// Accepte_apparaitre (l'interrupteur « Ma présence » l'écrit directement).
+//   key       colonne de BDD
+//   kind      'text', 'phone' (numéro français), 'reference' (une valeur d'une
+//             table de référence) ou 'list' (plusieurs)
+//   category  catégorie de CATEGORIES dont viennent les valeurs proposées
+const LIST_FIELD_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches'];
+
+export const PROFILE_FIELDS = [
+  { key: 'prenom', label: 'Prénom', kind: 'text' },
+  { key: 'nom', label: 'Nom', kind: 'text' },
+  { key: 'Fonction', label: 'Fonction', kind: 'text' },
+  { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
+  { key: 'Role_dans_le_PUI', label: CATEGORIES.role.label, kind: 'reference', category: 'role' },
+  ...LIST_FIELD_KEYS.map(category => ({ key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category }))
+];

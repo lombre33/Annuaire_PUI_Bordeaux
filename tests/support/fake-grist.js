@@ -6,8 +6,9 @@
 //   - fetchTable / listTables, avec des tables en colonnes ({ id: [...], nom: [...] }) ;
 //   - applyUserActions pour AddRecord, UpdateRecord et RemoveRecord, atomique (un
 //     lot refusé ne change rien) et qui renvoie retValues comme Grist ;
-//   - les formules déclenchées de la table-sonde (GRIST_SETUP.md) : Email prend
-//     l'adresse de la personne connectée, Admin se déduit de la table ACL ;
+//   - les formules déclenchées de la table-sonde et de la table des demandes
+//     (GRIST_SETUP.md) : Email prend l'adresse de la personne connectée, Admin se
+//     déduit de la table ACL, Date prend l'heure ;
 //   - des pannes de lecture (failTables) et des écritures refusées (denyWrites),
 //     comme le ferait une règle d'accès.
 //
@@ -34,6 +35,10 @@ export function createFakeGrist(options = {}) {
 
   // Formules déclenchées de GRIST_SETUP.md, calculées à la création d'une ligne.
   const builtInTriggers = {
+    Annuaire_Demandes: {
+      Date: () => Math.floor(Date.now() / 1000),
+      Email: ({ user }) => user?.email ?? ''
+    },
     Annuaire_Sonde: {
       Email: ({ user }) => user?.email ?? '',
       Admin: ({ user, tables }) => {
@@ -99,8 +104,10 @@ export function createFakeGrist(options = {}) {
       return structuredClone(requireTable(read(options.tables), name));
     },
 
+    // Comme Grist : les tables de métadonnées (_grist_Tables…) se lisent avec
+    // fetchTable mais ne sont pas des tables de l'utilisateur.
     async listTables() {
-      return Object.keys(read(options.tables));
+      return Object.keys(read(options.tables)).filter(name => !name.startsWith('_grist_'));
     },
 
     // Atomique : les actions s'appliquent à une copie, adoptée seulement si toutes

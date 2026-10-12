@@ -70,14 +70,21 @@ export class PresenceError extends Error {
 }
 
 // Ce que Grist répond à une écriture refusée n'est pas stable d'une version à
-// l'autre : on reconnaît les deux causes qui comptent, la règle d'accès et la
-// colonne à formule, et on reste générique pour le reste.
-export function explainWriteError(error) {
+// l'autre : on reconnaît les deux causes qui comptent, la règle d'accès ('denied')
+// et la colonne à formule ('formula'), et on reste générique ('other') pour le reste.
+export function classifyWriteError(error) {
   const detail = String(error?.message || error || '');
-  if (/access rule|blocked|denied|forbidden|permission|\bACL\b/i.test(detail)) {
+  if (/access rule|blocked|denied|forbidden|permission|\bACL\b/i.test(detail)) return 'denied';
+  if (/formula column/i.test(detail)) return 'formula';
+  return 'other';
+}
+
+export function explainWriteError(error) {
+  const kind = classifyWriteError(error);
+  if (kind === 'denied') {
     return 'Grist a refusé la modification : vos droits ne permettent pas de changer cette information. Contactez un administrateur.';
   }
-  if (/formula column/i.test(detail)) {
+  if (kind === 'formula') {
     return `La colonne ${CONSENT_COLUMN} est une colonne à formule : elle doit être une colonne de données (case à cocher). Voir GRIST_SETUP.md.`;
   }
   return 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.';
