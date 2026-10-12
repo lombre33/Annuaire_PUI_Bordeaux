@@ -86,6 +86,12 @@ export const CATEGORIES = {
   role: { label: 'Rôle PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
 };
 
+// Clé, parmi les libellés lus de Grist (referenceMaps), des noms complets des établissements
+// (nom_complet, à défaut l'acronyme). Les cartes, les filtres et les tags parlent par acronyme ;
+// les fenêtres (la liste d'un administrateur, le détail des changements) disent « Université de
+// Bordeaux ». Ce n'est pas une catégorie : aucun filtre ni tag n'en vient.
+export const ETABLISSEMENT_NAMES = 'etablissementNom';
+
 // Ordre des boutons de filtre. Rôle PUI n'a pas de filtre (specs.md), ni les
 // compétences macro : leurs domaines sont les groupes du menu Compétences.
 const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement'];
@@ -114,21 +120,32 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
   .filter(([, category]) => category.column)
   .map(([key, { column, table, groups }]) => ({ key, column, table, ...(groups && { groups }) }));
 
-// Ce qu'une personne peut changer sur une fiche, dans l'ordre du formulaire. Jamais :
-// email (c'est lui qui désigne la personne), Etablissement et perimetre (ils décident
-// de ce qui s'affiche : l'affaire des administrateurs, dans Grist) ni Accepte_apparaitre
-// (l'interrupteur « Ma présence » l'écrit).
+// Ce qu'on peut changer sur une fiche, dans l'ordre du formulaire. Une personne ne change
+// jamais : email (c'est lui qui désigne la personne), Etablissement et perimetre (ils
+// décident de ce qui s'affiche) ni Accepte_apparaitre (l'interrupteur « Ma présence »
+// l'écrit). Un administrateur qui modifie la fiche d'UNE AUTRE personne change aussi
+// l'e-mail et l'établissement (`admin: true`) ; le périmètre reste l'affaire de Grist.
 //   key       colonne de BDD
-//   kind      'text', 'phone' (numéro français), 'reference' (une valeur d'une
-//             table de référence) ou 'list' (plusieurs)
+//   kind      'text', 'email' (une adresse), 'phone' (numéro français), 'reference'
+//             (une valeur d'une table de référence) ou 'list' (plusieurs)
 //   category  catégorie de CATEGORIES dont viennent les valeurs proposées
+//   admin     réservé à un administrateur sur la fiche d'une autre personne
+//   labelsFrom  la table de libellés à proposer, quand ce n'est pas celle de la catégorie
+//   required  une référence qu'on ne peut pas vider
 const LIST_FIELD_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches'];
 
 export const PROFILE_FIELDS = [
   { key: 'prenom', label: 'Prénom', kind: 'text' },
   { key: 'nom', label: 'Nom', kind: 'text' },
+  { key: 'email', label: 'E-mail', kind: 'email', admin: true },
+  { key: 'Etablissement', label: CATEGORIES.etablissement.label, kind: 'reference', category: 'etablissement', labelsFrom: ETABLISSEMENT_NAMES, admin: true, required: true },
   { key: 'Fonction', label: 'Fonction', kind: 'text' },
   { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
-  { key: 'Role_dans_le_PUI', label: CATEGORIES.role.label, kind: 'reference', category: 'role' },
+  { key: 'Role_dans_le_PUI', label: 'Rôle dans le PUI', kind: 'reference', category: 'role' },
   ...LIST_FIELD_KEYS.map(category => ({ key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category }))
 ];
+
+// Les champs que le formulaire propose : ceux de tout le monde, plus ceux de l'administrateur
+// quand c'en est un qui modifie la fiche d'une autre personne (`admin` vaut exactement true :
+// fermé par défaut).
+export const fieldsFor = admin => PROFILE_FIELDS.filter(field => admin === true || !field.admin);

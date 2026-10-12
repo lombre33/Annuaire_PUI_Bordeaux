@@ -128,7 +128,7 @@ test('diffProfile refuses text that a spreadsheet would read as a formula, and t
   for (const bad of ['=SOMME(A1)', '+33 cmd', '-2+3', '@admin']) {
     const result = diffProfile(row(1), { Fonction: bad }, referenceMaps);
     assert.deepEqual(result.champs, {}, bad);
-    assert.match(result.errors[0], /Fonction : ne peut pas commencer par = \+ - ou @\./);
+    assert.match(result.errors[0], /Fonction : Ne peut pas commencer par = \+ - ou @\./);
   }
   const long = diffProfile(row(1), { Fonction: 'x'.repeat(MAX_TEXT_LENGTH + 1) }, referenceMaps);
   assert.match(long.errors[0], /200 caractères au plus/);
@@ -148,7 +148,7 @@ test('diffProfile refuses a phone number that is not a French 10-digit number, a
   for (const bad of ['12345', '+44 7700 900123', 'appelez-moi', '05 56 78 90']) {
     const result = diffProfile(row(1), { numero_de_telephone: bad }, referenceMaps);
     assert.deepEqual(result.champs, {}, bad);
-    assert.match(result.errors[0], /Téléphone : un numéro français à 10 chiffres est attendu/);
+    assert.match(result.errors[0], /Téléphone : Un numéro français compte 10 chiffres, par exemple 05 56 78 90 12\./);
   }
   const cleared = diffProfile(row(1), { numero_de_telephone: '' }, referenceMaps);
   assert.deepEqual(cleared.champs, { numero_de_telephone: { avant: '0556789012', apres: '' } });
@@ -160,7 +160,7 @@ test('diffProfile handles a reference: change, removal, and an id the table does
   assert.deepEqual(removal.champs, { Role_dans_le_PUI: { avant: { id: 1, label: 'Référent qualité' }, apres: { id: 0, label: '' } } });
   const unknown = diffProfile(row(1), { Role_dans_le_PUI: 99 }, referenceMaps);
   assert.deepEqual(unknown.champs, {});
-  assert.match(unknown.errors[0], /Rôle PUI : valeur inconnue/);
+  assert.match(unknown.errors[0], /Rôle dans le PUI : Valeur inconnue/);
   assert.deepEqual(diffProfile(row(2), { Role_dans_le_PUI: 1 }, referenceMaps).champs.Role_dans_le_PUI.avant, { id: 0, label: '' });
 });
 
@@ -178,7 +178,7 @@ test('diffProfile treats a reordered list as unchanged, and an unknown id as an 
   assert.deepEqual(diffProfile(row(1), { Competences: [2, 1] }, referenceMaps).champs, {});
   const unknown = diffProfile(row(1), { Competences: [1, 2, 404] }, referenceMaps);
   assert.deepEqual(unknown.champs, {});
-  assert.match(unknown.errors[0], /Compétences : valeur inconnue/);
+  assert.match(unknown.errors[0], /Compétences : Valeur inconnue/);
 });
 
 test('diffProfile never removes a value the form could not show', async () => {
@@ -222,12 +222,12 @@ test('diffProfile refuses a draft of the wrong type instead of reading it as "no
   for (const wrong of ['1', '', null, 1.5, -1, NaN, [1], {}]) {
     const result = diffProfile(row(1), { Role_dans_le_PUI: wrong }, referenceMaps);
     assert.deepEqual(result.champs, {}, `référence ${JSON.stringify(wrong)}`);
-    assert.match(result.errors.join(' '), /Rôle PUI : valeur illisible/, `référence ${JSON.stringify(wrong)}`);
+    assert.match(result.errors.join(' '), /Rôle dans le PUI : Valeur illisible/, `référence ${JSON.stringify(wrong)}`);
   }
   for (const wrong of ['1', '', null, 1, {}, [1, '2'], [1, null], [1.5], [NaN]]) {
     const result = diffProfile(row(1), { Competences: wrong }, referenceMaps);
     assert.deepEqual(result.champs, {}, `liste ${JSON.stringify(wrong)}`);
-    assert.match(result.errors.join(' '), /Compétences : valeur illisible/, `liste ${JSON.stringify(wrong)}`);
+    assert.match(result.errors.join(' '), /Compétences : Valeur illisible/, `liste ${JSON.stringify(wrong)}`);
   }
 });
 
@@ -248,8 +248,8 @@ test('diffProfile reports each refusal against its own field', async () => {
     Fonction: '=1+1', numero_de_telephone: '12', Role_dans_le_PUI: 99, Competences: [404], Instances: 'x'
   }, referenceMaps);
   assert.deepEqual(Object.keys(result.fieldErrors).sort(), ['Competences', 'Fonction', 'Instances', 'Role_dans_le_PUI', 'numero_de_telephone']);
-  assert.equal(result.fieldErrors.Fonction, 'ne peut pas commencer par = + - ou @.');
-  assert.match(result.fieldErrors.numero_de_telephone, /^un numéro français à 10 chiffres est attendu/);
+  assert.equal(result.fieldErrors.Fonction, 'Ne peut pas commencer par = + - ou @.');
+  assert.match(result.fieldErrors.numero_de_telephone, /^Un numéro français compte 10 chiffres/);
   assert.equal(result.errors.length, 5);
   assert.ok(result.errors.every(message => /^[^:]+ : /.test(message)), 'chaque phrase nomme son champ');
   const nameless = diffProfile({ ...row(1), nom: '' }, { prenom: '' }, referenceMaps);
@@ -291,12 +291,30 @@ test('rightsFor lets a person edit their own fiche, whatever the case and spaces
   assert.equal(rights(rowOf(10)), null, 'une fiche sans adresse n\'est la fiche de personne');
 });
 
-test('rightsFor lets an administrator edit every fiche, and tells her own from the others', () => {
-  const rights = rightsFor(ready('ana.martin@chu-bordeaux.fr', true));
+test('rightsFor lets an administrator edit every fiche once the admin mode is on, and tells her own from the others', () => {
+  const rights = rightsFor(ready('ana.martin@chu-bordeaux.fr', true), { adminMode: true });
   assert.equal(rights(rowOf(1)), 'own');
   assert.equal(rights(rowOf(2)), 'admin');
   assert.equal(rights(rowOf(10)), 'admin', 'même une fiche sans adresse');
-  assert.equal(rightsFor(ready('admin@chu-bordeaux.fr', true))(rowOf(1)), 'admin', 'une administratrice sans fiche');
+  assert.equal(rightsFor(ready('admin@chu-bordeaux.fr', true), { adminMode: true })(rowOf(1)), 'admin', 'une administratrice sans fiche');
+});
+
+test('rightsFor gives an administrator no more than anybody else while the admin mode is off', () => {
+  for (const rights of [rightsFor(ready('ana.martin@chu-bordeaux.fr', true)), rightsFor(ready('ana.martin@chu-bordeaux.fr', true), { adminMode: false }),
+    rightsFor(ready('ana.martin@chu-bordeaux.fr', true), {})]) {
+    assert.equal(rights(rowOf(1)), 'own', 'sa propre fiche reste modifiable');
+    assert.equal(rights(rowOf(2)), null, 'celle d\'un autre ne l\'est pas sans le mode admin');
+    assert.equal(rights(rowOf(10)), null);
+  }
+  assert.equal(rightsFor(ready('admin@chu-bordeaux.fr', true))(rowOf(1)), null, 'une administratrice sans fiche n\'a rien à modifier');
+});
+
+test('rightsFor never grants the admin right for an admin mode that is not exactly true, or to somebody who is not an administrator', () => {
+  for (const adminMode of [1, 'true', 'oui', {}, [], null, undefined]) {
+    assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', true), { adminMode })(rowOf(2)), null, JSON.stringify(adminMode));
+  }
+  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', false), { adminMode: true })(rowOf(2)), null, 'le mode ne fait pas un administrateur');
+  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', false), { adminMode: true })(rowOf(1)), 'own');
 });
 
 test('rightsFor is closed by default: no reliable identity, no right, administrator flag or not', () => {
@@ -304,18 +322,19 @@ test('rightsFor is closed by default: no reliable identity, no right, administra
   for (const identity of [null, undefined, {}, { ...hostile, status: 'unavailable' }, { ...hostile, status: 'viewer' }, { ...hostile, status: 'pending' }]) {
     assert.equal(rightsFor(identity)(rowOf(1)), null, JSON.stringify(identity));
     assert.equal(rightsFor(identity)(rowOf(2)), null, JSON.stringify(identity));
+    assert.equal(rightsFor(identity, { adminMode: true })(rowOf(2)), null, `${JSON.stringify(identity)} même en mode admin`);
   }
 });
 
 test('rightsFor takes only a real true for an administrator, and never matches an empty address', () => {
   for (const admin of [1, 'true', 'oui', {}, [], 'admin']) {
-    assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', admin))(rowOf(2)), null, JSON.stringify(admin));
+    assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', admin), { adminMode: true })(rowOf(2)), null, JSON.stringify(admin));
   }
   const blank = rightsFor(ready('   '));
   assert.equal(blank(rowOf(10)), null, 'une adresse vide ne désigne pas les fiches sans adresse');
   assert.equal(blank(rowOf(1)), null);
   assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr'))(null), null);
-  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', true))(undefined), null);
+  assert.equal(rightsFor(ready('ana.martin@chu-bordeaux.fr', true), { adminMode: true })(undefined), null);
 });
 
 // ===== rebaseChanges : ramener ce que la personne a changé sur la fiche d'aujourd'hui =====
@@ -344,7 +363,7 @@ test('rebaseChanges starts a text, a phone and a reference from their value of t
     numero_de_telephone: { avant: '0556789099', apres: '0556789013' },
     Role_dans_le_PUI: { avant: { id: 2, label: 'Coordinatrice' }, apres: { id: 0, label: '' } }
   });
-  assert.deepEqual(rebased.moved, ['Fonction', 'Téléphone', 'Rôle PUI']);
+  assert.deepEqual(rebased.moved, ['Fonction', 'Téléphone', 'Rôle dans le PUI']);
 });
 
 test('rebaseChanges drops what somebody else has already done, and says nothing about it', async () => {
@@ -395,7 +414,7 @@ test('describeChanges gives one line per changed field in form order, whatever t
   assert.deepEqual(lines.map(line => line.key), ['prenom', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Competences']);
   assert.deepEqual(lines[0], { key: 'prenom', label: 'Prénom', kind: 'text', before: 'Ana', after: 'Anna' });
   assert.deepEqual(lines[2], { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone', before: '05 56 78 90 12', after: '' });
-  assert.deepEqual(lines[3], { key: 'Role_dans_le_PUI', label: 'Rôle PUI', kind: 'reference', before: 'Référent qualité', after: '' });
+  assert.deepEqual(lines[3], { key: 'Role_dans_le_PUI', label: 'Rôle dans le PUI', kind: 'reference', before: 'Référent qualité', after: '' });
   assert.deepEqual(lines[4], { key: 'Competences', label: 'Compétences', kind: 'list', added: ['Pharmacovigilance'], removed: ['Oncologie'] });
   const shuffled = Object.fromEntries(Object.entries(champs).reverse());
   assert.deepEqual(describeChanges(shuffled), lines);
@@ -405,4 +424,147 @@ test('describeChanges names a value by its identifier when its label is unknown,
   const lines = describeChanges({ Instances: { ajout: [{ id: 9, label: '' }], retrait: [] } });
   assert.deepEqual(lines[0].added, ['n° 9']);
   assert.deepEqual(describeChanges({}), []);
+});
+
+// ===== L'administrateur qui modifie la fiche d'une autre personne : e-mail et établissement =====
+
+test('profileFormModel offers the e-mail and the établissement to an administrator, in the order of the form, and to nobody else', async () => {
+  const { referenceMaps, row } = await setup();
+  const admin = profileFormModel(row(2), referenceMaps, { admin: true }); // Bob, vu par une administratrice
+  assert.deepEqual(admin.map(entry => entry.key),
+    ['prenom', 'nom', 'email', 'Etablissement', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+  assert.deepEqual(field(admin, 'email'), { key: 'email', label: 'E-mail', kind: 'email', value: 'bob@u-bordeaux-montaigne.fr' });
+  const etab = field(admin, 'Etablissement');
+  assert.deepEqual([etab.kind, etab.category, etab.value, etab.required], ['reference', 'etablissement', 2, true]);
+  assert.deepEqual(etab.options.map(option => option.label),
+    ['Clinique du Parc', 'CHU de Bordeaux', 'INSERM', 'Institut Bergonié', 'Université Bordeaux Montaigne'].sort((a, b) => a.localeCompare(b, 'fr-FR')),
+    'tous les établissements, validés ou non, par leur nom complet, triés');
+  for (const forbidden of ['perimetre', 'Accepte_apparaitre', 'Avatar']) assert.equal(field(admin, forbidden), undefined, forbidden);
+  for (const model of [profileFormModel(row(2), referenceMaps), profileFormModel(row(2), referenceMaps, { admin: false }), profileFormModel(row(2), referenceMaps, {})]) {
+    assert.equal(field(model, 'email'), undefined);
+    assert.equal(field(model, 'Etablissement'), undefined);
+  }
+});
+
+test('profileFormModel does not offer an e-mail column that BDD does not have, and shows 0 for a person without établissement', async () => {
+  const tables = sampleTables();
+  delete tables.BDD.email;
+  const { referenceMaps, row } = await setup(tables);
+  const model = profileFormModel(row(2), referenceMaps, { admin: true });
+  assert.equal(field(model, 'email'), undefined, 'colonne facultative absente : rien à modifier');
+  assert.equal(field(model, 'Etablissement').value, 2);
+  const eve = await setup();
+  assert.equal(field(profileFormModel(eve.row(5), eve.referenceMaps, { admin: true }), 'Etablissement').value, 0, 'Eve n\'a pas d\'établissement');
+});
+
+test('diffProfile lets an administrator change the e-mail, written in lower case with the spaces around it removed', async () => {
+  const { referenceMaps, row } = await setup();
+  const next = (email, options = { admin: true }) => diffProfile(row(2), { email }, referenceMaps, options);
+  assert.deepEqual(next('  Bob.Nouveau@U-Bordeaux-Montaigne.FR ').champs.email,
+    { avant: 'bob@u-bordeaux-montaigne.fr', apres: 'bob.nouveau@u-bordeaux-montaigne.fr' });
+  assert.deepEqual(next('bob@u-bordeaux-montaigne.fr').champs, {}, 'laissée telle quelle');
+  assert.deepEqual(next('BOB@u-bordeaux-montaigne.fr'), { champs: {}, errors: [], fieldErrors: {} }, 'la même adresse écrite autrement n\'est pas un changement');
+  assert.deepEqual(next('Dan@Inserm.fr', { admin: true, emailTaken: address => address === 'dan@inserm.fr' }).fieldErrors,
+    { email: 'Cette adresse est déjà utilisée par une autre fiche.' });
+});
+
+test('diffProfile names the owner of a taken e-mail when the caller gives a name, and says only "une autre fiche" otherwise', async () => {
+  const { referenceMaps, row } = await setup();
+  const fault = emailTaken => diffProfile(row(2), { email: 'ana.martin@chu-bordeaux.fr' }, referenceMaps, { admin: true, emailTaken }).fieldErrors.email;
+  assert.equal(fault(() => 'Ana Martin'), 'Cette adresse est déjà utilisée par Ana Martin.', 'une fiche visible dans l\'annuaire se nomme');
+  assert.equal(fault(() => true), 'Cette adresse est déjà utilisée par une autre fiche.', 'une fiche masquée ne dévoile pas son nom');
+  assert.equal(fault(() => false), undefined);
+});
+
+test('profileFormModel falls back to the acronyms of the établissements when Grist gave no full names', async () => {
+  const { referenceMaps, row } = await setup();
+  const withoutNames = { ...referenceMaps, etablissementNom: {} };
+  const options = field(profileFormModel(row(2), withoutNames, { admin: true }), 'Etablissement').options;
+  assert.deepEqual(options.map(option => option.label).sort(), ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'].sort());
+  const next = diffProfile(row(2), { Etablissement: 1 }, withoutNames, { admin: true }).champs.Etablissement;
+  assert.deepEqual(next, { avant: { id: 2, label: 'UBM' }, apres: { id: 1, label: 'CHU' } });
+});
+
+test('diffProfile refuses an e-mail that is not an address, that is too long, or that a spreadsheet would read as a formula', async () => {
+  const { referenceMaps, row } = await setup();
+  const fault = email => diffProfile(row(2), { email }, referenceMaps, { admin: true }).fieldErrors.email;
+  for (const bad of ['pas une adresse', 'bob@', 'bob@chu', 'bob @chu.fr', 'bob@chu..', 'bob@chu.f', 'a,b@chu.fr', 'a;b@chu.fr', 'a<b@chu.fr', 'bob@chu.fr?cc=x@y.fr',
+    'bob@chu.fr#x', 'bob@chu.fr, cc@chu.fr', '"bob"@chu.fr', 'bob@@chu.fr']) {
+    assert.equal(fault(bad), 'Indiquez une adresse e-mail valide.', bad);
+  }
+  assert.equal(fault(`${'a'.repeat(195)}@chu.fr`), `${MAX_TEXT_LENGTH} caractères au plus.`);
+  assert.equal(fault('+bob@chu.fr'), 'Ne peut pas commencer par = + - ou @.');
+  assert.equal(fault('=bob@chu.fr'), 'Ne peut pas commencer par = + - ou @.');
+  assert.equal(fault('@chu.fr'), 'Ne peut pas commencer par = + - ou @.');
+  for (const good of ['bob@chu.fr', 'prenom.nom+tag@sous.domaine.example.fr', 'o\'brien@chu.fr', 'a_b-c@chu-bordeaux.fr']) {
+    assert.equal(fault(good), undefined, good);
+  }
+});
+
+test('diffProfile does not let an e-mail be emptied, but leaves an empty one alone', async () => {
+  const { referenceMaps, row } = await setup();
+  const emptied = diffProfile(row(2), { email: '   ' }, referenceMaps, { admin: true });
+  assert.deepEqual(emptied.champs, {});
+  assert.deepEqual(emptied.fieldErrors, { email: 'Indiquez une adresse e-mail valide.' });
+  assert.deepEqual(emptied.errors, ['E-mail : Indiquez une adresse e-mail valide.']);
+  // Hugo n'a pas d'adresse : la laisser vide n'est pas une erreur, lui en donner une est un changement.
+  assert.deepEqual(diffProfile(row(10), { email: '' }, referenceMaps, { admin: true }), { champs: {}, errors: [], fieldErrors: {} });
+  assert.deepEqual(diffProfile(row(10), { email: '  ' }, referenceMaps, { admin: true }), { champs: {}, errors: [], fieldErrors: {} });
+  assert.deepEqual(diffProfile(row(10), { email: 'hugo@chu-bordeaux.fr' }, referenceMaps, { admin: true }).champs.email,
+    { avant: '', apres: 'hugo@chu-bordeaux.fr' });
+});
+
+test('diffProfile lets an administrator move a person to another établissement, never to none, never to an unknown one', async () => {
+  const { referenceMaps, row } = await setup();
+  const next = (draft, fiche = 2) => diffProfile(row(fiche), draft, referenceMaps, { admin: true });
+  assert.deepEqual(next({ Etablissement: 1 }).champs.Etablissement,
+    { avant: { id: 2, label: 'Université Bordeaux Montaigne' }, apres: { id: 1, label: 'CHU de Bordeaux' } });
+  assert.deepEqual(next({ Etablissement: 2 }).champs, {}, 'même établissement : pas un changement');
+  assert.deepEqual(next({ Etablissement: 0 }).fieldErrors, { Etablissement: 'Une valeur est requise.' });
+  assert.deepEqual(next({ Etablissement: 99 }).fieldErrors, { Etablissement: 'Valeur inconnue.' });
+  for (const unreadable of ['1', -1, 1.5, null, NaN, [1]]) {
+    assert.deepEqual(next({ Etablissement: unreadable }).fieldErrors, { Etablissement: 'Valeur illisible.' }, String(unreadable));
+  }
+  // Une personne qui n'a pas encore d'établissement n'est pas en faute de n'en avoir aucun.
+  assert.deepEqual(next({ Etablissement: 0 }, 5), { champs: {}, errors: [], fieldErrors: {} });
+  assert.deepEqual(next({ Etablissement: 4 }, 5).champs.Etablissement, { avant: { id: 0, label: '' }, apres: { id: 4, label: 'INSERM' } });
+});
+
+test('diffProfile ignores the e-mail and the établissement of a draft when nobody is administrating, whatever the draft holds', async () => {
+  const { referenceMaps, row } = await setup();
+  const draft = { email: 'intrus@example.fr', Etablissement: 1, Fonction: 'Chef' };
+  for (const options of [undefined, {}, { admin: false }, { admin: 'oui' }, { admin: 1 }]) {
+    const next = diffProfile(row(2), draft, referenceMaps, options);
+    assert.deepEqual(Object.keys(next.champs), ['Fonction'], JSON.stringify(options));
+  }
+  const bad = diffProfile(row(2), { email: 'pas une adresse', Etablissement: 99 }, referenceMaps);
+  assert.deepEqual(bad, { champs: {}, errors: [], fieldErrors: {} }, 'même invalides, ils ne sont pas lus');
+});
+
+test('rebaseChanges rebuilds the e-mail and the établissement from the current fiche, and names them when somebody else moved them', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(2), { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1 }, referenceMaps, { admin: true });
+  const same = rebaseChanges(champs, row(2), referenceMaps, { admin: true });
+  assert.deepEqual(same.moved, []);
+  assert.deepEqual(same.champs, champs);
+  // Entre-temps, quelqu'un d'autre a changé l'adresse ET l'établissement.
+  const moved = rebaseChanges(champs, { ...row(2), email: 'autre@exemple.fr', Etablissement: 4 }, referenceMaps, { admin: true });
+  assert.deepEqual(moved.moved, ['E-mail', 'Établissement']);
+  assert.deepEqual(moved.champs.email, { avant: 'autre@exemple.fr', apres: 'nouveau@u-bordeaux-montaigne.fr' });
+  assert.deepEqual(moved.champs.Etablissement, { avant: { id: 4, label: 'INSERM' }, apres: { id: 1, label: 'CHU de Bordeaux' } });
+  // Déjà fait par un autre : plus rien à écrire.
+  assert.deepEqual(rebaseChanges(champs, { ...row(2), email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1 }, referenceMaps, { admin: true }).champs, {});
+  // Sans administrateur, ces deux champs sont écartés.
+  assert.deepEqual(rebaseChanges(champs, row(2), referenceMaps).champs, {});
+  assert.deepEqual(rebaseChanges(champs, row(2), referenceMaps, { admin: false }).champs, {});
+});
+
+test('describeChanges says the e-mail and the établissement like any other text and reference', async () => {
+  const { referenceMaps, row } = await setup();
+  const { champs } = diffProfile(row(2), { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1, prenom: 'Robert' }, referenceMaps, { admin: true });
+  assert.deepEqual(describeChanges(champs), [
+    { key: 'prenom', label: 'Prénom', kind: 'text', before: 'Bob', after: 'Robert' },
+    { key: 'email', label: 'E-mail', kind: 'email', before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@u-bordeaux-montaigne.fr' },
+    { key: 'Etablissement', label: 'Établissement', kind: 'reference', before: 'Université Bordeaux Montaigne', after: 'CHU de Bordeaux' }
+  ]);
 });

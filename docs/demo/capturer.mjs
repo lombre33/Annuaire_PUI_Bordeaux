@@ -26,6 +26,7 @@ const MARGE_RANGEE = 8; // plus petite que l'écart entre deux rangées de carte
 const MARGE_ENTETE = 12; // sous l'en-tête : moins que l'écart qui le sépare de la barre de recherche, qui ne déborde donc pas sur la capture
 const HAUTEUR_FENETRE_MODIFICATION = 1000; // la fenêtre de modification mesure au plus 900 px (dialogs.css) : elle tient en entier à l'écran
 const MARGE_FENETRE = 12; // fond assombri gardé autour de la fenêtre de modification
+const HAUTEUR_CONFIRMATION = 900; // le message de confirmation est fixé en bas de l'écran : la capture garde l'écran entier
 
 let chromium;
 try {
@@ -150,10 +151,19 @@ const attendreBoutonsModifier = (page, nom) =>
       && Math.round(carte.getBoundingClientRect().top) === premierRang;
   }, nom, { timeout: 10_000 });
 
-// La fenêtre est ouverte sur l'étape qui porte ce titre (« Modifier mon profil », « Relire vos modifications »).
+// La fenêtre est ouverte sur l'étape qui porte ce titre (« Modifier mon profil », « Relire avant de valider »).
 const attendreEtape = (page, titre) =>
   page.waitForFunction(attendu => document.getElementById('profileDialog').open
     && document.getElementById('profileTitle').textContent === attendu, titre, { timeout: 10_000 });
+
+// Un administrateur allume le « mode admin » du bandeau : chaque carte a son bouton « Modifier ».
+async function allumerModeAdmin(page) {
+  await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+  await page.locator('#accountBar .account-admin').waitFor();
+  await page.click('#accountBar .account-admin');
+  await page.waitForFunction(attendu => document.querySelectorAll('.card-actions:not([hidden]) .card-edit').length === attendu,
+    CARTES_ATTENDUES.fondateurs, { timeout: 10_000 });
+}
 
 // Ouvre la fenêtre par le bouton du bandeau, comme le ferait la personne.
 async function ouvrirMonProfil(page) {
@@ -464,24 +474,26 @@ const SCENES = [
     }
   },
   {
-    // La relecture : la carte « Avant » telle quelle, la carte « Après » avec ce qui change repéré
-    // (pastille « modifié » sur la fonction, « + » et barré sur les tags), et la liste « Ce qui change ».
+    // La relecture : la légende des repères, la carte « Avant » telle quelle, la carte « Après » avec
+    // ce qui change repéré (pastille « modifié » sur la fonction, « + » et barré sur les tags), et le
+    // « Détail des changements ».
     fichier: 'modifier-fiche-relecture.png', requete: `?connecte=${PERSONNES_DEMO.visible}`,
     hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFenetre,
     async preparer(page) {
       await ouvrirMonProfil(page);
       await saisirBrouillon(page);
       await fenetre(page).getByRole('button', { name: 'Relire mes modifications', exact: true }).click();
-      await attendreEtape(page, 'Relire vos modifications');
+      await attendreEtape(page, 'Relire avant de valider');
       const compter = selecteur => fenetre(page).locator(selecteur).count();
-      exiger(await fenetre(page).locator('.preview-before .preview-label').textContent() === 'Avant', 'pas de carte « Avant »');
-      exiger(await fenetre(page).locator('.preview-after .preview-label').textContent() === 'Après', 'pas de carte « Après »');
-      exiger(await compter('.preview-before .mk-pill, .preview-before .mark-new, .preview-before .mark-gone') === 0, 'la carte « Avant » porte des repères');
-      exiger(await compter('.preview-after .fonction.mark-new .mk-pill') === 1, 'la fonction modifiée n\'est pas repérée sur la carte « Après »');
-      exiger(await compter('.preview-after .tag.mark-new') === BROUILLON.listes.length, 'les tags ajoutés ne sont pas tous repérés');
-      exiger(await compter('.preview-after .tag.mark-gone') === BROUILLON.listes.length, 'les tags retirés ne sont pas tous repérés');
-      exiger(await fenetre(page).locator('.recap-title').textContent() === 'Ce qui change', 'pas de liste « Ce qui change »');
-      exiger(await compter('.recap .diff-row') === CHAMPS_MODIFIES, 'la liste « Ce qui change » n\'a pas une ligne par champ modifié');
+      exiger(await fenetre(page).locator('#review-before-title').evaluate(titre => titre.firstChild.textContent) === 'Avant', 'pas de carte « Avant »');
+      exiger(await fenetre(page).locator('#review-after-title').evaluate(titre => titre.firstChild.textContent) === 'Après', 'pas de carte « Après »');
+      exiger(await compter('.rv-col-before .mk, .rv-col-before .mk-gone, .rv-col-before .mk-pill, .rv-col-before .tag-add, .rv-col-before .tag-del') === 0, 'la carte « Avant » porte des repères');
+      exiger(await compter('.rv-col-after .fonction .mk-pill') === 1, 'la fonction modifiée n\'est pas repérée sur la carte « Après »');
+      exiger(await compter('.rv-col-after .tag-add') === BROUILLON.listes.length, 'les tags ajoutés ne sont pas tous repérés');
+      exiger(await compter('.rv-col-after .tag-del') === BROUILLON.listes.length, 'les tags retirés ne sont pas tous repérés');
+      exiger(await compter('.rv-legend .lg-add, .rv-legend .lg-del') === 2, 'la légende des repères manque');
+      exiger(await fenetre(page).locator('.recap-title').textContent() === 'Détail des changements', 'pas de « Détail des changements »');
+      exiger(await compter('.recap .diff-row') === CHAMPS_MODIFIES, 'le détail n\'a pas une ligne par champ modifié');
       exiger(await fenetre(page).locator('.dlg-summary').textContent() === `${CHAMPS_MODIFIES} champs modifiés`, 'le pied ne résume pas les changements');
       // Rien de coupé : la relecture entière tient dans la fenêtre, sans défilement.
       exiger(await page.evaluate(() => {
@@ -489,6 +501,46 @@ const SCENES = [
         return corps.scrollHeight - corps.clientHeight <= 1;
       }), 'la relecture est plus haute que la fenêtre : une partie serait coupée');
       exiger(await fenetre(page).getByRole('button', { name: 'Valider', exact: true }).isEnabled(), '« Valider » n\'est pas cliquable');
+    }
+  },
+  {
+    // Après « Valider » : la fenêtre se ferme, la carte de l'annuaire est à jour et un message le confirme.
+    // Il est posé en bas de l'écran (fixe) : la capture garde l'écran entier.
+    fichier: 'modifier-fiche-confirmation.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, hauteur: HAUTEUR_CONFIRMATION,
+    async preparer(page) {
+      await ouvrirMonProfil(page);
+      await saisirBrouillon(page);
+      await fenetre(page).getByRole('button', { name: 'Relire mes modifications', exact: true }).click();
+      await attendreEtape(page, 'Relire avant de valider');
+      await fenetre(page).getByRole('button', { name: 'Valider', exact: true }).click();
+      await page.waitForFunction(() => !document.getElementById('profileDialog').open && !document.getElementById('toast').hidden, null, { timeout: 10_000 });
+      exiger(await page.locator('#toast').textContent() === 'Vos modifications sont enregistrées.', 'le message de confirmation n\'est pas celui attendu');
+      await page.waitForFunction(attendu => [...document.querySelectorAll('.contact-card .fonction')].some(ligne => ligne.textContent === attendu),
+        BROUILLON.fonction, { timeout: 10_000 });
+    }
+  },
+  {
+    // Le « mode admin » d'un administrateur (case admin de la table ACL), allumé : un bandeau l'annonce
+    // et chaque carte a son bouton « ✎ Modifier la fiche » (la sienne garde « ✎ Modifier »).
+    fichier: 'mode-admin.png', requete: `?connecte=${PERSONNES_DEMO.administrateur}`, zone: jusquALaRangee(1),
+    async preparer(page) {
+      await allumerModeAdmin(page);
+      exiger(await page.locator('#adminStrip').isVisible(), 'le bandeau « Mode admin » n\'est pas affiché');
+      exiger(await page.locator('.card-actions:not([hidden]) .own-flag:not([hidden])').count() === 1, 'seule la carte de l\'administrateur porte « Votre fiche »');
+      exiger(await page.locator('.card-edit', { hasText: 'Modifier la fiche' }).count() === CARTES_ATTENDUES.fondateurs - 1, 'les autres cartes n\'ont pas « Modifier la fiche »');
+    }
+  },
+  {
+    // L'administrateur ouvre la fiche d'une autre personne : l'e-mail et l'établissement se modifient.
+    fichier: 'modifier-fiche-admin.png', requete: `?connecte=${PERSONNES_DEMO.administrateur}`,
+    hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFenetre,
+    async preparer(page) {
+      await allumerModeAdmin(page);
+      await page.locator('.contact-card', { hasText: 'Camille Rousseau' }).locator('.card-edit').click();
+      await attendreEtape(page, 'Modifier la fiche de Camille Rousseau');
+      exiger(await page.locator('#profile-email').isVisible() && await page.locator('#profile-Etablissement').isVisible(), 'l\'e-mail et l\'établissement ne sont pas modifiables');
+      exiger(await fenetre(page).locator('.ident-lock').count() === 0, 'la fenêtre d\'un administrateur ne verrouille rien');
+      await page.evaluate(() => document.activeElement.blur());
     }
   }
 ];

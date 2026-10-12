@@ -122,12 +122,21 @@ Si le bandeau manque, la console dit pourquoi :
 
 La table `ACL` a trois colonnes : `email`, `Responsable_de_l_Etablissement` et
 `admin`. Seule `admin` sert pour l'instant. Cochez-la pour chaque administrateur : il
-voit un bouton « Modifier » sur toutes les cartes et peut corriger la fiche de
-n'importe qui. Si la colonne est une colonne à formule, convertissez-la d'abord en
-colonne de données : on ne coche pas les cases d'une colonne à formule.
+voit, dans le bandeau « Ma présence », un bouton **Mode admin** (éteint à chaque
+ouverture). Une fois allumé, un bouton « Modifier la fiche » apparaît sur toutes les
+cartes affichées et il peut corriger la fiche de n'importe qui, **adresse e-mail et
+établissement compris** (sur sa propre fiche, ces deux champs restent verrouillés). Si
+la colonne est une colonne à formule, convertissez-la d'abord en colonne de données :
+on ne coche pas les cases d'une colonne à formule.
 
 L'adresse de `ACL` est comparée à celle de Grist sans tenir compte des majuscules ni
 des espaces.
+
+**Changer l'e-mail d'une fiche ne change pas `ACL`.** Le widget n'écrit jamais dans
+`ACL` : si la personne dont on change l'adresse est administratrice (ou responsable
+d'un établissement), ses droits restent attachés à son ancienne adresse. La relecture
+le rappelle à l'administrateur ; c'est à l'administrateur des données de corriger la
+ligne d'`ACL` dans Grist.
 
 ## 4. Règles d'accès
 
@@ -145,7 +154,8 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 |---|---|---|
 | `Annuaire_Sonde` : créer, lire, supprimer des lignes | toute personne qui peut modifier le document | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
 | `BDD` : modifier `prenom`, `nom`, `Fonction`, `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
-| `BDD` : modifier `email`, `Etablissement`, `perimetre` | les administrateurs | `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` et `perimetre` décident de qui apparaît |
+| `BDD` : modifier `email`, `Etablissement` | les administrateurs | c'est ce que le widget écrit quand un administrateur, mode admin allumé, change l'adresse ou l'établissement d'une autre personne. `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` décide de qui apparaît |
+| `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais ; il décide de qui apparaît |
 | `BDD` : ajouter ou supprimer une ligne | les administrateurs | le widget ne crée ni ne supprime jamais de fiche |
 | `ACL` | les administrateurs (masquée aux autres) | la formule d'`Annuaire_Sonde` la lit pour son propre compte, sans passer par les droits de la personne |
 
