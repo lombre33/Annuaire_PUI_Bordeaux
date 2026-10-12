@@ -176,7 +176,7 @@ Une flèche signifie « importe » ; tous les `import` des fichiers à la racine
 | `branding-ui.js` | Le DOM de l'habillage : `createLogoImage()` (une image qui se charge à l'écran, ou le nom en texte), `sizeLogo()`, `createBrandingUI()` (les financeurs de l'en-tête, le bandeau des fondateurs et son rond) |
 | `dom.js` | `el()` : crée un élément avec sa classe et son texte (jamais du HTML : ce qui vient de Grist reste du texte) |
 | `dialogs.css` | Feuille de style de la fenêtre de modification (formulaire, relecture, confirmation) et du message de confirmation |
-| `main.js` | Point d'entrée : détient l'état de l'application (dont le mode admin), relie `window.grist` et les événements du DOM aux autres modules, et affiche le message de confirmation d'un enregistrement (`showToast()`) |
+| `main.js` | Point d'entrée : détient l'état de l'application (dont le mode admin), relie `window.grist` et les événements du DOM aux autres modules, affiche le message de confirmation d'un enregistrement (`showToast()`) et donne à la fenêtre de modification le logo de l'établissement de la fiche, ou son nom en pastille (`etablissementBadge()`) |
 
 Règles de répartition, à respecter pour que les tests restent possibles sans navigateur :
 

@@ -230,7 +230,7 @@ test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le t
           boxes: Object.fromEntries(selectors.map(selector => [selector, rect(document.querySelector(selector))])),
           clipped: identity.scrollWidth > identity.clientWidth + 1,
           track: rect(document.querySelector('.presence-track')),
-          label: { lines: labelElement.getBoundingClientRect().height / parseFloat(getComputedStyle(labelElement).lineHeight) }
+          label: { ...rect(labelElement), lines: labelElement.getBoundingClientRect().height / parseFloat(getComputedStyle(labelElement).lineHeight) }
         };
       }, parts);
       for (const selector of parts) {
@@ -247,9 +247,13 @@ test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le t
       assert.ok(Math.abs(track.width - 38) <= 0.5, `à ${width} px : la piste de l'interrupteur garde sa largeur (${Math.round(track.width)} px)`);
       if (width >= 860) {
         // Dans l'en-tête compact, « Mode admin » est dans le coin de la première rangée : l'interrupteur
-        // garde la largeur de son étiquette, sur une ligne, et le bandeau ne dépasse pas le titre.
-        assert.ok(boxes['.account-admin'].y + boxes['.account-admin'].height <= boxes['.presence-switch'].y + 0.5, `à ${width} px : « Mode admin » est au-dessus de l'interrupteur`);
-        assert.ok(label.lines < 1.5, `à ${width} px : l'étiquette de l'interrupteur tient sur une ligne (${label.lines.toFixed(1)})`);
+        // garde la largeur de son étiquette (une ligne, deux avec une police plus large que prévue,
+        // jamais trois qui débordent de la case) et le bandeau ne dépasse pas le titre.
+        const toggle = boxes['.presence-switch'];
+        assert.ok(boxes['.account-admin'].y + boxes['.account-admin'].height <= toggle.y + 0.5, `à ${width} px : « Mode admin » est au-dessus de l'interrupteur`);
+        assert.ok(label.lines < 2.5, `à ${width} px : l'étiquette de l'interrupteur tient sur deux lignes au plus (${label.lines.toFixed(1)})`);
+        assert.ok(label.y >= toggle.y - 0.5 && label.y + label.height <= toggle.y + toggle.height + 0.5
+          && label.x >= toggle.x - 0.5 && label.x + label.width <= toggle.x + toggle.width + 0.5, `à ${width} px : l'étiquette reste dans la case de l'interrupteur`);
         assert.ok(bar.height <= title.height + 12, `à ${width} px : le bandeau fait ${Math.round(bar.height)} px, le titre ${Math.round(title.height)} px`);
       }
     });

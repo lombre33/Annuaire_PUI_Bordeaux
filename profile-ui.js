@@ -37,6 +37,8 @@ function notice(kind, text, role) {
 //   viewerAdmin   la personne connectée est administratrice, même sur sa propre fiche
 //   person        { name, email, initials } de la fiche
 //   etablissement libellé de son établissement
+//   renderEtablissement  (facultatif) libellé → l'élément qui montre l'établissement dans le bloc
+//                 d'identité (son logo quand Grist en a un) ; sans lui, une pastille avec le nom
 //   model         profileFormModel(row, referenceMaps)
 //   draft         le brouillon de départ (draftOf)
 //   evaluate      draft → { errors, fieldErrors, lines } : ce que le brouillon change et
@@ -104,7 +106,7 @@ export function createProfileDialog(dialog) {
         : 'Verrouillé : l’e-mail et l’établissement sont liés à votre compte. Pour les corriger, contactez un administrateur.'));
     }
     box.append(main);
-    if (etablissement) box.append(el('span', 'et-pill', etablissement));
+    if (etablissement) box.append(session.renderEtablissement?.(etablissement) ?? el('span', 'et-pill', etablissement));
     return box;
   }
 

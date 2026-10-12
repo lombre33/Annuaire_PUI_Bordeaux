@@ -60,8 +60,8 @@ ni historique), le widget ne crée aucune table et n'ajoute aucune colonne.
 
 ### La modification de fiche, comme la maquette
 
-- **La fenêtre.** Un bloc d'identité en tête (initiales, nom, e-mail, puis l'établissement en
-  pastille) qui dit, pour une personne ordinaire, que son e-mail et son établissement ne se
+- **La fenêtre.** Un bloc d'identité en tête (initiales, nom, e-mail, puis, à droite, le logo de
+  l'établissement, ou sa pastille s'il n'en a pas) qui dit, pour une personne ordinaire, que son e-mail et son établissement ne se
   changent pas ici (« Verrouillé : l'e-mail et l'établissement sont liés à votre compte. Pour les
   corriger, contactez un administrateur. »), les champs dans l'ordre de la maquette
   (« Rôle dans le PUI » remplace « Rôle PUI »), un pied de fenêtre qui dit en une ligne ce qui
@@ -124,7 +124,7 @@ fiche d'une autre personne modifiée par un administrateur.
 
 ### Tests
 
-**546 tests** (dont 182 dans un vrai navigateur, optionnels sans Playwright) contre 499 (dont 164)
+**548 tests** (dont 184 dans un vrai navigateur, optionnels sans Playwright) contre 499 (dont 164)
 à la sortie de la 1.14.0.
 
 - *Mode admin* : éteint à l'ouverture, un administrateur ne voit « Modifier » que sur sa fiche ; allumé,
@@ -150,6 +150,10 @@ fiche d'une autre personne modifiée par un administrateur.
   bouton « Modifier » rangé sous la fonction sans toucher le badge d'établissement, le titre « Modifier
   mon profil » conservé sur sa propre fiche, et `describeUnknownAccount()` (adresse inconnue,
   administrateur sans fiche, colonne `email` absente de `BDD`).
+- *Habillage et fenêtre de modification* : le logo de l'établissement dans le bloc d'identité de
+  la fenêtre (pastille quand il n'a pas de logo, ou quand le fichier manque), le bandeau « Ma
+  présence » de l'en-tête de 280 à 1 440 px (rien ne se recouvre, l'interrupteur garde sa largeur)
+  et les deux colonnes de la relecture, que le test des logos retrouve.
 - Les tests de la 1.12.0 qui décrivaient l'ancienne fenêtre (textes, étapes, sélecteurs) sont
   réécrits pour la nouvelle ; aucun n'a été supprimé sans remplaçant.
 

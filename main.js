@@ -6,7 +6,7 @@
 // fenêtre), et branding.js, attachments.js et branding-ui.js (les logos : cartes,
 // financeurs, fondateurs).
 
-import { ETABLISSEMENT_NAMES } from './constants.js';
+import { CARD_LOGO, ETABLISSEMENT_NAMES } from './constants.js';
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
@@ -18,7 +18,7 @@ import { ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './p
 import { createProfileDialog } from './profile-ui.js';
 import { buildBranding, logoForContact } from './branding.js';
 import { createAttachments } from './attachments.js';
-import { createBrandingUI } from './branding-ui.js';
+import { createBrandingUI, createLogoImage, sizeLogo } from './branding-ui.js';
 
 const state = {
   allContacts: [],
@@ -437,6 +437,25 @@ async function saveReviewed(row, review, draft, admin) {
   return { status: 'saved', lines: review.lines, leftovers, reloaded: outcome !== 'failed' };
 }
 
+// L'établissement d'une fiche dans le bloc d'identité de la fenêtre de modification : son logo
+// quand Grist en a un, sinon (ou si le fichier ne se charge pas) son nom en pastille.
+function etablissementBadge(row, label) {
+  const pill = () => {
+    const node = document.createElement('span');
+    node.className = 'et-pill';
+    node.textContent = label;
+    return node;
+  };
+  const brand = attachments && state.branding ? logoForContact(state.branding, row) : null;
+  if (!brand?.logo) return pill();
+  const holder = document.createElement('span');
+  holder.className = 'et-logo';
+  holder.title = brand.name;
+  holder.append(createLogoImage(attachments, brand.logo, label, () => holder.replaceWith(pill()),
+    { eager: true, onLoad: image => sizeLogo(image, CARD_LOGO) }));
+  return holder;
+}
+
 // Ouvre la fenêtre de modification de la fiche `rowId`, si la personne connectée en a le
 // droit : la sienne, ou n'importe laquelle pour une administratrice. Fermé par défaut.
 // `returnFocus` redonne le focus à l'endroit d'où la fenêtre a été ouverte, à sa fermeture.
@@ -461,6 +480,7 @@ function openProfile(rowId, returnFocus) {
     fieldWarning: (key, value) => (key === 'Etablissement' ? etablissementWarning(value) : ''),
     save: (review, draft) => saveReviewed(row, review, draft, admin),
     renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks, cardLogos()),
+    renderEtablissement: label => etablissementBadge(row, label),
     notify: showToast,
     onClose: returnFocus
   });

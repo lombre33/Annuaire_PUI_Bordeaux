@@ -10,5 +10,5 @@ et affiche les logos des établissements, des financeurs et des fondateurs, des 
 jointes du document lues avec un jeton d'accès en lecture seule (1.14.0, facultatif,
 étape 5 de `GRIST_SETUP.md`). Depuis la 1.15.0, un administrateur allume un « mode admin »
 pour modifier la fiche de n'importe qui, e-mail et établissement compris, et la fenêtre de
-modification suit la maquette validée par Antoine. 546 tests (dont 182 dans un
+modification suit la maquette validée par Antoine. 548 tests (dont 184 dans un
 vrai navigateur, optionnels sans Playwright).

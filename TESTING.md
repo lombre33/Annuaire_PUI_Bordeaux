@@ -472,7 +472,8 @@ l'e-mail et de l'établissement sont à la section 15.
 - [ ] Compte Lecteur, document sans `Annuaire_Sonde` : ni bandeau ni bouton. Compte dont
       l'adresse ne figure pas dans `BDD` : un bandeau « Compte absent de l'annuaire » sans
       interrupteur de présence ni bouton « Modifier ».
-- [ ] Ouvrir sa fiche : un bloc d'identité (initiales, nom, e-mail, établissement) et la
+- [ ] Ouvrir sa fiche : un bloc d'identité (initiales, nom, e-mail, et à droite le logo de
+      l'établissement, ou son nom en pastille s'il n'a pas de logo) et la
       phrase « Verrouillé : l'e-mail et l'établissement sont liés à votre compte… » ; les
       champs contiennent les valeurs de Grist (le téléphone avec son 0 initial et ses
       espaces). La console ne dit pas `[SCHEMA] Types de colonnes illisibles` (sinon le
