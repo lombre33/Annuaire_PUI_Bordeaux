@@ -138,8 +138,9 @@ pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) e
   Fondateurs / Partenaires (36 px).
 - **Pour les développeurs** : `tests/support/card-metrics.mjs` (nouveau) mesure la page rendue : taille du
   texte, hauteur des pastilles, isolement des petites cibles. La section « Accessibilité » de
-  `docs/developpeurs.md` a une règle de plus (le plancher de 12 px et les 24 px), `TESTING.md` (sections 12
-  et 15) deux contrôles à l'œil pour un vrai Grist, et `specs.md` une exigence de lisibilité.
+  `docs/developpeurs.md` a une règle de plus (le plancher de 12 px et les 24 px), `TESTING.md` trois contrôles à l'œil
+  pour un vrai Grist (« Texte des cartes » et « Badge de l'établissement en texte » en section 12, « Cibles à la
+  souris » en section 15), et `specs.md` une exigence de lisibilité.
 - **Tests** : 799 tests (282 dans un vrai navigateur, optionnels sans Playwright), 5 de plus qu'à la
   1.17.0 (4 dans `tests/responsive.test.mjs`, 1 dans `tests/accessibility.test.mjs`). Dans
   `tests/responsive.test.mjs` : le test des tailles de texte « le bureau garde ses tailles » est remplacé
@@ -164,6 +165,7 @@ pastilles 24 px de haut. Les cartes sont donc plus hautes (d'un tiers environ) e
   s'adapte aux cartes plus hautes : la légende demande une fenêtre de 3 600 px (la carte de Camille Rousseau est
   loin dans la liste) et la relecture lève le plafond de 900 px de la fenêtre le temps de la capture, puisqu'elle
   le dépasse maintenant.
+
 ## 1.17.0 — La fiche d'un établissement, modifiée par son responsable
 
 Une demande d'Antoine, validée sur la maquette v5 le 12 octobre 2026 (« Go pour tout implémenter »,
