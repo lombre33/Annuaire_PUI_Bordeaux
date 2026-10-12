@@ -600,7 +600,7 @@ Le bandeau ne montre que les établissements **fondateurs** qui ont **validé** 
 
 **Puis-je utiliser l'annuaire sur mon téléphone ?**
 
-Oui : l'annuaire s'adapte à la largeur de la zone que Grist lui donne. Sur un petit écran ou dans un panneau étroit, les cartes passent sur une colonne, la recherche et les filtres s'empilent, les noms des personnes sont un peu plus grands et les boutons plus faciles à toucher. Le reste du texte des cartes, étiquettes comprises, a la même taille à toutes les largeurs, assez grande pour se lire sans effort (12 px au moins). Cet affichage a été vérifié dans un navigateur de bureau avec un écran tactile simulé, pas encore sur un téléphone : signalez à l'administrateur des données ce qui s'afficherait mal.
+Oui : l'annuaire s'adapte à la largeur de la zone que Grist lui donne. Sur un petit écran ou dans un panneau étroit, les cartes passent sur une colonne, la recherche et les filtres s'empilent, les noms des personnes sont un peu plus grands et les boutons plus faciles à toucher. Le bandeau « Ma présence » range l'interrupteur sous votre nom quand la place manque, au lieu de serrer le texte. Le reste du texte des cartes, étiquettes comprises, a la même taille à toutes les largeurs, assez grande pour se lire sans effort (12 px au moins). Cet affichage a été vérifié dans un navigateur de bureau avec un écran tactile simulé, pas encore sur un téléphone : signalez à l'administrateur des données ce qui s'afficherait mal.
 
 **Puis-je utiliser l'annuaire au clavier, ou avec un lecteur d'écran ?**
 
