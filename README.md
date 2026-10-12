@@ -94,7 +94,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 | **Utiliser l'annuaire** : rechercher, filtrer, comprendre un message, vocabulaire du PUI | [Guide utilisateur](docs/utilisateurs.md) |
 | **Comprendre et modifier le code** : architecture, chargement des données, règles, tests, recettes | [Documentation développeur](docs/developpeurs.md) |
 | **Évaluer les risques** : accès demandé à Grist, données personnelles, recommandations | [Sécurité et confidentialité](docs/securite.md) |
-| **Faire vivre l'annuaire** : règles de visibilité, diagnostic, publication, retour arrière | [Maintenance](docs/maintenance.md) |
+| **Faire vivre l'annuaire** : règles de visibilité, diagnostic, publication, retour arrière, continuité (départs, absence d'administrateur) | [Maintenance](docs/maintenance.md) |
 | **Consulter le cahier des charges** | [`specs.md`](specs.md) |
 | **Tester à la main avant un déploiement** | [`TESTING.md`](TESTING.md) |
 | **Retrouver l'historique des versions** | [`CHANGELOG.md`](CHANGELOG.md), [`VERSION.md`](VERSION.md) |

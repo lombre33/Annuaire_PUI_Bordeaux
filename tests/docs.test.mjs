@@ -250,6 +250,16 @@ test('le guide utilisateur définit le vocabulaire du PUI (GT, fondateur, parten
   assert.deepEqual(missing, [], 'Ces mots doivent être définis dans la section « Lexique du PUI » de docs/utilisateurs.md.');
 });
 
+// Demande d'Antoine : la page de maintenance dit ce qui se passe quand les personnes
+// partent et qu'il n'y a plus d'administrateur, avec les éléments à prévoir et les
+// bonnes pratiques.
+test('la page de maintenance a un chapitre de continuité (départs, absence d\'administrateur)', () => {
+  const chapter = read('docs/maintenance.md').split(/^## /m).find(part => part.startsWith('Continuité')) ?? '';
+  const missing = ['propriétaire', 'sauvegarde', 'suppléant', 'fiche de continuité', 'bonnes pratiques', 'GitHub', 'Grist']
+    .filter(word => !chapter.toLowerCase().includes(word.toLowerCase()));
+  assert.deepEqual(missing, [], 'Le chapitre « Continuité » de docs/maintenance.md doit rester : départs, absence d\'administrateur, éléments à prévoir, bonnes pratiques.');
+});
+
 test('la documentation développeur cite chaque module du widget', () => {
   const guide = read('docs/developpeurs.md');
   const missing = fs.readdirSync(ROOT).filter(name => name.endsWith('.js')).filter(name => !guide.includes(`\`${name}\``));

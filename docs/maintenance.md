@@ -15,6 +15,7 @@ Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [do
 - [Publier](#publier)
 - [Revenir en arrière](#revenir-en-arrière)
 - [Dépendances et mises à jour](#dépendances-et-mises-à-jour)
+- [Continuité : départs et absence d'administrateur](#continuité--départs-et-absence-dadministrateur)
 - [Limites connues](#limites-connues)
 - [Maintenir la documentation](#maintenir-la-documentation)
 - [Pistes d'amélioration](#pistes-damélioration)
@@ -27,6 +28,8 @@ Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [do
 | **Mainteneur du code** | Widget, tests, publication, documentation | GitHub, `node --test` |
 
 Le dépôt est celui du compte GitHub `lombre33` : <https://github.com/lombre33/Annuaire_PUI_Bordeaux>.
+
+Chaque rôle doit avoir un suppléant, et le document Grist comme le dépôt doivent avoir au moins deux propriétaires : voir [Continuité](#continuité--départs-et-absence-dadministrateur).
 
 ## Pourquoi un contact est visible ou non
 
@@ -146,6 +149,125 @@ Ne pas utiliser `git push --force` sur `main` : le widget en production se met �
 - **Navigateur** : le widget utilise des fonctions récentes (modules ES, `Object.hasOwn`, propriétés Unicode des expressions régulières) et demande donc un navigateur à jour.
 - **API de Grist** : elle n'est pas versionnée côté widget. Après une mise à jour de l'instance Grist, rejouer le protocole manuel de [`TESTING.md`](../TESTING.md).
 
+## Continuité : départs et absence d'administrateur
+
+L'annuaire n'a ni serveur ni base de données à lui : il tient à des comptes qui appartiennent à des personnes. Si elles partent sans passation, il ne s'arrête pas du jour au lendemain, mais ses données se périment, plus personne ne peut le corriger et, selon le cas, il finit par disparaître. Ce chapitre dit de quoi il dépend, ce qui arrive dans chaque cas, ce qu'il faut prévoir à l'avance, les bonnes pratiques d'usage et comment le reprendre sans son créateur.
+
+**L'essentiel**
+
+1. **Deux propriétaires au moins** pour le document Grist, et deux au moins pour le dépôt GitHub. Le dépôt appartient aujourd'hui à un compte personnel, qui n'a qu'un seul propriétaire : c'est le point le plus fragile.
+2. **Une sauvegarde régulière** du document Grist, rangée hors du dépôt public.
+3. **Une fiche de continuité** : qui possède quoi, qui remplace qui, où sont les sauvegardes.
+4. **Les personnes qui partent sont retirées** de l'annuaire, et leurs accès supprimés, dès leur départ.
+5. **Un contrôle tous les trimestres** ([contrôles réguliers](#contrôles-réguliers)).
+
+### De quoi l'annuaire dépend
+
+| Élément | Où il se trouve | Qui peut le gérer | Si plus personne ne peut le gérer |
+|---|---|---|---|
+| **Les données** | Le document Grist, sur l'instance de l'État (`grist.numerique.gouv.fr`) | Les propriétaires du document, de son espace de travail et du site qui les contient : les accès se transmettent du site à l'espace de travail, puis au document | Le widget affiche toujours les données du document, mais personne ne peut plus les corriger, ni changer le partage ou les règles d'accès, réservés aux propriétaires. La documentation de Grist ne dit pas comment reprendre la main : ne pas y compter |
+| **Le code** | Le dépôt GitHub `lombre33/Annuaire_PUI_Bordeaux` | Son seul propriétaire, le compte personnel `lombre33` | Le widget continue de fonctionner, mais rien ne peut plus être corrigé ni publié. Si le compte est supprimé, GitHub supprime ses dépôts et ses sites Pages, donc le widget, et ne peut pas les restaurer |
+| **L'adresse du widget** | GitHub Pages, saisie dans « Enter Custom URL » du widget de chaque page Grist | Le même compte | Renommer ou transférer le dépôt change l'adresse du site **sans redirection** : à la place de l'annuaire, Grist affiche une erreur ou une zone vide, tant que l'adresse n'est pas corrigée dans chaque page |
+| **Le script de l'API Grist** | `docs.getgrist.com`, chargé par `index.html` | Grist | Sans lui, la page affiche « 0 contact » sans bandeau d'explication ; le détail est dans la console du navigateur |
+| **La connaissance** | Cette documentation, `grist_structure.txt`, `specs.md`, les tests | Quiconque peut écrire dans le dépôt | Elle se périme : `tests/docs.test.mjs` signale une partie des oublis, pas tous |
+
+Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certificat), mais il suffit qu'un compte ou une adresse de messagerie disparaisse pour tout bloquer.
+
+### Ce qui arrive si…
+
+| Situation | Effet sur l'annuaire | Que faire |
+|---|---|---|
+| Une personne de l'annuaire quitte le PUI ou change de structure | Sa carte reste affichée avec des coordonnées périmées : le widget ne sait rien des départs | La retirer sans attendre ([Quand quelqu'un part](#quand-quelquun-part)) |
+| L'administrateur des données part | Plus personne pour valider un établissement, ajouter une valeur de filtre ou corriger une fiche : l'annuaire se fige | Lui faire transmettre le rôle avant son départ ; avoir un suppléant |
+| Le seul propriétaire du document Grist n'a plus accès à son compte | Plus personne ne peut gérer le partage ni les règles d'accès | Prévenir : au moins deux propriétaires. Sinon, demander de l'aide à l'équipe qui gère l'instance Grist, sans garantie de réponse |
+| Le compte GitHub propriétaire est inaccessible ou supprimé | Inaccessible : le widget fonctionne, mais aucune correction ni publication n'est possible. Supprimé : le dépôt, donc le widget, disparaît | Dépôt dans une organisation à deux propriétaires, copie de secours ([Reprendre l'annuaire sans son créateur](#reprendre-lannuaire-sans-son-créateur)) |
+| Le dépôt est renommé ou transféré | L'adresse du widget change, sans redirection | Corriger l'adresse dans chaque page Grist |
+| GitHub Pages ou `docs.getgrist.com` est indisponible | Le widget est vide ou affiche « 0 contact » | Attendre : les données ne sont pas touchées |
+| Le document Grist est supprimé par erreur | Ses données et son historique disparaissent avec lui | Le restaurer depuis la corbeille dans les 30 jours ; au-delà, depuis une sauvegarde |
+| Une mise à jour de Grist change son API | Le widget peut mal fonctionner | Rejouer [`TESTING.md`](../TESTING.md) après chaque mise à jour de l'instance ([Dépendances et mises à jour](#dépendances-et-mises-à-jour)) |
+
+### Ce qu'il faut prévoir
+
+1. **Au moins deux propriétaires du document Grist**, nommés, de préférence dans des services différents. Un propriétaire ne peut pas modifier son propre accès : c'est un autre propriétaire qui le retire quand la personne part, ce qui suppose d'en avoir deux. Penser aussi à l'espace de travail et au site qui contiennent le document : leurs accès se transmettent au document.
+2. **Un administrateur des données et un suppléant**, qui savent tous deux ajouter une personne, valider un établissement et ajouter une valeur de filtre ([Opérations courantes](#opérations-courantes-dans-grist)).
+3. **Le dépôt dans une organisation GitHub** avec deux propriétaires au moins. GitHub le recommande : avec un seul propriétaire injoignable, les projets de l'organisation peuvent devenir inaccessibles. Un dépôt personnel n'a qu'un propriétaire ; ses collaborateurs peuvent pousser du code, mais ni supprimer le dépôt, ni changer sa visibilité, ni inviter d'autres personnes. Le transfert change l'adresse de GitHub Pages : le faire une fois, à un moment choisi, corriger l'adresse dans chaque page Grist, puis faire le [contrôle](#contrôle-après-un-changement-de-données). À défaut d'organisation, GitHub permet de désigner un **successeur** du compte personnel (réglages du compte, « Successor settings »).
+4. **Des sauvegardes hors de Grist.** Grist garde lui-même des instantanés du document (d'après sa documentation : horaires pendant environ un jour, mensuels pendant plus d'un an, à vérifier sur l'instance utilisée), mais ils disparaissent avec le document s'il est supprimé définitivement. Télécharger régulièrement le document (fichier `.grist`, qui ne contient pas la liste des personnes avec qui il est partagé : la noter à part) et ses pièces jointes éventuelles (photos, logos), puis les ranger dans un espace à accès restreint, jamais dans le dépôt public. Une sauvegarde contient des données personnelles : prévoir sa durée de conservation et sa destruction.
+5. **Une copie du code** ailleurs que sur le compte d'origine (un clone ou un fork sur un autre compte ou une autre forge) : supprimer un compte supprime ses dépôts, pas les copies faites ailleurs.
+6. **Une licence.** Le dépôt n'en déclare aucune : par défaut, tous les droits sont réservés, et la reprise du code par d'autres suppose l'accord de son propriétaire. À décider par le propriétaire du dépôt.
+7. **Une fiche de continuité** (ci-dessous), tenue à jour et rangée hors du dépôt public, parce qu'elle contient des noms et des adresses.
+
+### Fiche de continuité
+
+À copier dans un document **hors du dépôt public**, puis à remplir et à relire (voir [Contrôles réguliers](#contrôles-réguliers)).
+
+| Élément | Titulaire | Suppléant | Où le trouver | Vérifié le |
+|---|---|---|---|---|
+| Propriétaires du document Grist (et de son espace de travail) | | | | |
+| Administrateur des données | | | | |
+| Mainteneur du code | | | | |
+| Propriétaires de l'organisation GitHub | | | | |
+| Pages Grist qui utilisent le widget, et adresse saisie dans chacune | | | | |
+| Sauvegardes : emplacement, fréquence, durée de conservation | | | | |
+| Responsable du traitement des données personnelles ([sécurité](securite.md#données-personnelles)) | | | | |
+
+### Bonnes pratiques d'usage
+
+**Administrateur des données**
+
+- Modifier les données **dans le document Grist seulement**, jamais dans une copie qui divergerait ensuite.
+- **Ne pas renommer ni supprimer** une table ou une colonne que le widget lit (elles sont listées dans [`grist_structure.txt`](../grist_structure.txt)) : l'annuaire affiche un bandeau rouge ou perd une information. Pour restructurer, travailler sur une copie du document, puis prévenir le mainteneur. Une règle d'accès Grist peut réserver la modification de la structure aux propriétaires (rubrique « Lock down structure » de la documentation des règles d'accès de Grist).
+- **Retirer un établissement** en décochant `ok_pour_apparaitre`, pas en supprimant sa ligne : un contact dont l'établissement n'existe plus est masqué sans aucun message.
+- Après chaque changement, faire le [contrôle](#contrôle-après-un-changement-de-données) ; après une modification d'une table de référence, **recharger la page**.
+- Donner le rôle **Éditeur** (Editor) à qui doit modifier les données, **Lecteur** (Viewer) aux autres, et **Propriétaire** (Owner) à très peu de personnes. Relire cette liste chaque trimestre.
+- **Vérifier qui a accès au document** : l'annuaire n'est pas mieux protégé que lui ([sécurité](securite.md#affichage-et-droits-daccès)).
+- **Répondre sans délai** à une personne qui demande à corriger sa fiche ou à disparaître de l'annuaire ([Quand quelqu'un part](#quand-quelquun-part)).
+
+**Mainteneur du code**
+
+- Passer par une **pull request** à la CI verte : un push direct sur `main` publie aussitôt pour tous les documents.
+- **Tester dans une copie** du document avant de publier ([`TESTING.md`](../TESTING.md)), puis taguer la version.
+- Tenir la **documentation à jour** ([Maintenir la documentation](#maintenir-la-documentation)) : le guide de contribution de Grist.Gouv demande qu'un widget soit assez documenté pour qu'une autre personne puisse le comprendre et le faire évoluer sans son auteur.
+- Ne jamais mettre dans le dépôt public de vraie donnée ni le schéma complet du document.
+- Activer l'**authentification à deux facteurs** et protéger la branche `main` ([sécurité](securite.md#recommandations)).
+- **Ne pas renommer ni déplacer le dépôt** sans prévenir : l'adresse du widget en dépend.
+
+### Quand quelqu'un part
+
+**Une personne de l'annuaire**
+
+1. Supprimer sa ligne de `BDD`. Les instantanés de Grist permettent de la retrouver pendant un temps. Le consentement individuel (`Accepte_apparaitre`, en préparation : [Chantiers en cours](developpeurs.md#chantiers-en-cours)) permettra de masquer une fiche sans l'effacer.
+2. Si elle a demandé l'effacement de ses données, purger aussi les sauvegardes qui la contiennent, selon la durée de conservation prévue.
+
+**Un administrateur des données, un propriétaire ou un mainteneur**
+
+1. **Avant son départ**, ajouter son successeur comme propriétaire du document Grist (et de l'espace de travail et du site si besoin) et de l'organisation GitHub.
+2. Faire un **exercice à blanc** avec lui : ouvrir le document, ajouter puis retirer une valeur dans une copie, lancer `node --test`, ouvrir la dernière pull request.
+3. **Faire retirer ses accès** par un autre propriétaire, côté Grist et côté GitHub : on ne peut pas modifier son propre accès.
+4. **Exporter une sauvegarde** du document, avec ses pièces jointes.
+5. **Mettre à jour la fiche de continuité**, et prévenir les personnes qui utilisent l'annuaire si l'administrateur des données change.
+
+### Contrôles réguliers
+
+| Quand | Quoi |
+|---|---|
+| À chaque changement de données | Le [contrôle](#contrôle-après-un-changement-de-données) : compteur, pastilles, bandeau |
+| Chaque mois | Relire la liste des personnes : départs, changements de fonction ou de structure. Ouvrir l'annuaire et vérifier qu'aucun bandeau rouge n'apparaît |
+| Chaque trimestre | Vérifier les propriétaires et les éditeurs du document Grist, et les propriétaires de l'organisation GitHub. Exporter une sauvegarde et la ranger. Vérifier que la dernière exécution de la CI sur `main` est verte et que l'annuaire s'ouvre depuis Grist |
+| Chaque année, et à chaque changement d'équipe | Relire la fiche de continuité. **Tester une restauration** : importer la sauvegarde dans un nouveau document et y ouvrir l'annuaire. Relire la durée de conservation des sauvegardes et les [dépendances](#dépendances-et-mises-à-jour) |
+
+### Reprendre l'annuaire sans son créateur
+
+Le dépôt est public et le widget est une page statique, sans compilation : tant que le dépôt (ou une copie) existe, une autre personne peut le reprendre.
+
+1. **Récupérer le code** : `git clone https://github.com/lombre33/Annuaire_PUI_Bordeaux.git`, ou une copie de secours. Sans licence, la reprise suppose l'accord du propriétaire.
+2. **Vérifier qu'il fonctionne** : `node --test` (Node 22.7 ou plus), puis `node docs/demo/serveur-demo.mjs` pour le voir sans Grist ([README](../README.md#essayer-sans-grist)).
+3. **Le publier** : copier `index.html`, `style.css` et les fichiers `.js` de la racine ([Organisation du code](developpeurs.md#organisation-du-code)) sur un hébergement de pages statiques en HTTPS, ou activer GitHub Pages sur la copie.
+4. **Pointer Grist vers la nouvelle adresse** : dans chaque page du document, ouvrir les options du widget et remplacer l'adresse dans « Enter Custom URL ». L'accès complet est à accorder de nouveau si Grist le demande.
+5. **Contrôler** : [contrôle après un changement de données](#contrôle-après-un-changement-de-données), puis protocole de [`TESTING.md`](../TESTING.md).
+6. **Reprendre la main sur les données** : il faut être propriétaire du document Grist (voir [De quoi l'annuaire dépend](#de-quoi-lannuaire-dépend)).
+
+Une piste plus durable : le guide de contribution des widgets Grist.Gouv (juillet 2026) prévoit que l'équipe de l'instance de l'État puisse reprendre un widget public (chemin A), voire l'héberger sur ses instances après une revue de sécurité (chemin B). Cela supprimerait la dépendance à un compte personnel. Rien n'est engagé.
+
 ## Limites connues
 
 - **Modifier une table de référence ne rafraîchit pas le widget.** Grist ne prévient le widget que des changements de la table liée à sa section (la table des contacts). Après avoir modifié `Etablissements` (par exemple `ok_pour_apparaitre`) ou une autre table de référence, recharger la page.
@@ -173,6 +295,7 @@ Ne pas utiliser `git push --force` sur `main` : le widget en production se met �
 | Une version | [`CHANGELOG.md`](../CHANGELOG.md), [`VERSION.md`](../VERSION.md), et les mentions de la version courante (rechercher son numéro dans `README.md` et dans `docs/`) |
 | Un message du bandeau d'état | [Guide utilisateur](utilisateurs.md#messages-du-bandeau-rouge), [Diagnostiquer un problème](#diagnostiquer-un-problème), [Fiabilité](developpeurs.md#fiabilité--que-se-passe-t-il-en-cas-de-panne-) |
 | Une version de Node, de Playwright ou d'une action CI | [Dépendances et mises à jour](#dépendances-et-mises-à-jour), [Sécurité](securite.md#risques-et-protections), [Documentation développeur](developpeurs.md#versions-déploiement-et-ci) |
+| Les propriétaires, les sauvegardes ou l'adresse du widget | La fiche de continuité (hors dépôt) et le chapitre [Continuité](#continuité--départs-et-absence-dadministrateur) |
 
 `tests/docs.test.mjs` vérifie aussi que les liens et images de la documentation existent, que chaque image a un texte alternatif et que le jeu de démonstration reste fictif et lisible par le vrai widget.
 
@@ -186,3 +309,4 @@ Non engagées ; à décider par le propriétaire du dépôt.
 - Fusionner les deux simulateurs de l'API Grist ([documentation développeur](developpeurs.md#données-et-captures-de-démonstration)).
 - Paginer ou charger progressivement les cartes si l'annuaire grossit beaucoup.
 - Compléter le [lexique du PUI](utilisateurs.md#lexique-du-pui) : Instances, Actions, Communautés, Tâches, Rôle PUI et périmètre attendent une définition.
+- Déplacer le dépôt dans une organisation GitHub à deux propriétaires au moins, et choisir une licence (voir [Continuité](#continuité--départs-et-absence-dadministrateur)).
