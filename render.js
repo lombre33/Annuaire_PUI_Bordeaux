@@ -1,7 +1,7 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
 import { TAG_GROUPS, FILTERS } from './constants.js';
-import { compareLabels, formatPhone, labelsOf, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
 
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
@@ -197,37 +197,77 @@ export function initials(contact) {
   return `${(contact.prenom || '').charAt(0)}${(contact.nom || '').charAt(0)}`.toUpperCase() || '?';
 }
 
-function fullName(contact) {
-  return `${contact.prenom || ''} ${contact.nom || ''}`.trim() || 'Sans nom';
+// Pour une carte de relecture, ce qui est modifié se voit (une couleur, un trait) mais
+// se dit aussi : le mot est ajouté en texte réservé aux lecteurs d'écran.
+function flag(element, className, spoken) {
+  element.classList.add(className);
+  const note = document.createElement('span');
+  note.className = 'sr-only';
+  note.textContent = ` (${spoken})`;
+  element.appendChild(note);
+}
+
+// Une ligne de texte modifiée porte sa pastille écrite (« modifié », « ajouté », « supprimé ») :
+// la couleur n'est jamais le seul repère, et le mot se lit aussi à l'écran.
+function flagText(element, className, word) {
+  element.classList.add(className);
+  const pill = document.createElement('span');
+  pill.className = className === 'mark-gone' ? 'mk-pill mk-pill-del' : 'mk-pill';
+  pill.textContent = word;
+  element.append(' ', pill);
+}
+
+// Une ligne de texte de la carte de relecture qui a changé (marque `{ before, after }`
+// de preview.js) : la nouvelle valeur en relief (« ajouté » si la ligne était vide, sinon
+// « modifié »), ou l'ancienne barrée si la ligne a été vidée.
+function showTextChange(element, mark, format = value => value) {
+  if (mark.after) {
+    reveal(element, format(mark.after));
+    flagText(element, 'mark-new', mark.before ? 'modifié' : 'ajouté');
+  } else {
+    reveal(element, format(mark.before));
+    flagText(element, 'mark-gone', 'supprimé');
+  }
 }
 
 function fillEtablissement(badge, label, onToggle) {
   if (!label) return;
   reveal(badge, label);
-  badge.addEventListener('click', () => onToggle('etablissement', label));
+  if (onToggle) badge.addEventListener('click', () => onToggle('etablissement', label));
+  else badge.disabled = true;
 }
 
-function fillEmail(link, email) {
+// Sans `onToggle` (carte de relecture), l'adresse est du texte : un clic ne doit pas
+// ouvrir un message depuis une fenêtre de relecture.
+function fillEmail(link, email, linked) {
   if (!email) return;
   reveal(link, email);
-  const href = mailtoHref(email);
+  const href = linked ? mailtoHref(email) : '';
   if (href) link.href = href;
 }
 
 // Un groupe sans filtre (« Rôle PUI », specs.md) est fait de <span> non cliquables :
-// un bouton qui ne filtre rien induirait en erreur.
-function buildTag(group, value, onToggle) {
-  const filterable = FILTERABLE_KEYS.has(group.key);
+// un bouton qui ne filtre rien induirait en erreur. Il en va de même sans `onToggle`.
+function buildTag(group, value, onToggle, isNew) {
+  const filterable = Boolean(onToggle) && FILTERABLE_KEYS.has(group.key);
   const tag = document.createElement(filterable ? 'button' : 'span');
   if (filterable) tag.type = 'button';
   tag.className = filterable ? `tag tag-${group.key}` : `tag tag-${group.key} tag-static`;
   tag.style.backgroundColor = group.color;
   tag.textContent = value;
   if (filterable) tag.addEventListener('click', () => onToggle(group.key, value));
+  if (isNew) flag(tag, 'mark-new', 'ajouté');
   return tag;
 }
 
-function buildTagGroup(group, labels, onToggle) {
+// Un tag retiré, montré barré dans la carte « après » : ce qui a disparu se voit aussi.
+function buildRemovedTag(group, value) {
+  const tag = buildTag(group, value, null, false);
+  flag(tag, 'mark-gone', 'retiré');
+  return tag;
+}
+
+function buildTagGroup(group, labels, onToggle, change) {
   const section = document.createElement('section');
   section.className = 'tag-group';
 
@@ -236,35 +276,77 @@ function buildTagGroup(group, labels, onToggle) {
   title.textContent = group.label;
   title.style.color = group.color;
 
+  const added = new Set((change?.added ?? []).map(normalize));
   const values = document.createElement('div');
   values.className = 'tag-group-values';
-  values.append(...labels.map(value => buildTag(group, value, onToggle)));
+  values.append(
+    ...labels.map(value => buildTag(group, value, onToggle, added.has(normalize(value)))),
+    ...(change?.removed ?? []).map(value => buildRemovedTag(group, value))
+  );
 
   section.append(title, values);
   return section;
 }
 
-function fillTags(container, contact, onToggle) {
+function fillTags(container, contact, onToggle, changes) {
   TAG_GROUPS.forEach(group => {
     const labels = labelsOf(contact, group.key);
-    if (labels.length > 0) container.appendChild(buildTagGroup(group, labels, onToggle));
+    const change = changes?.[group.key];
+    if (labels.length > 0 || change?.removed.length > 0) {
+      container.appendChild(buildTagGroup(group, labels, onToggle, change));
+    }
   });
 }
 
-function buildCard(template, contact, onToggle) {
+// La ligne d'actions d'une carte que la personne connectée peut modifier (voir
+// rightsFor() dans profile.js) : « Votre fiche » sur la sienne, et le bouton. Le clic
+// est écouté une seule fois par main.js, sur la grille.
+function fillActions(box, contact, rights) {
+  box.hidden = false;
+  box.querySelector('.own-flag').hidden = rights !== 'own';
+  const edit = box.querySelector('.card-edit');
+  edit.dataset.rowId = String(contact.id);
+  edit.setAttribute('aria-label', `Modifier la fiche de ${displayName(contact)}`);
+}
+
+// `view` : { rights } pour la grille ('own', 'admin' ou rien), { marks } pour une
+// carte de relecture (voir renderPreviewCard).
+function buildCard(template, contact, onToggle, view = {}) {
+  const { rights = null, marks = null } = view;
   const card = template.content.cloneNode(true);
   card.querySelector('.avatar').textContent = initials(contact);
-  card.querySelector('.name').textContent = fullName(contact);
-  if (contact.Fonction) reveal(card.querySelector('.fonction'), contact.Fonction);
+
+  const name = card.querySelector('.name');
+  name.textContent = displayName(contact);
+  if (marks?.texts.name) flagText(name, 'mark-new', 'modifié');
+
+  const fonction = card.querySelector('.fonction');
+  if (marks?.texts.fonction) showTextChange(fonction, marks.texts.fonction);
+  else if (contact.Fonction) reveal(fonction, contact.Fonction);
+
   fillEtablissement(card.querySelector('.etablissement-tag'), contact.etablissement_label, onToggle);
-  fillEmail(card.querySelector('.email'), contact.email);
+  fillEmail(card.querySelector('.email'), contact.email, Boolean(onToggle));
+
+  const tel = card.querySelector('.tel');
   const phone = formatPhone(contact.numero_de_telephone);
-  if (phone) reveal(card.querySelector('.tel'), `☎ ${phone}`);
-  fillTags(card.querySelector('.card-tags'), contact, onToggle);
+  if (marks?.texts.tel) showTextChange(tel, marks.texts.tel, value => `☎ ${value}`);
+  else if (phone) reveal(tel, `☎ ${phone}`);
+
+  fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags);
+  if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);
   return card;
 }
 
-export function renderCards(grid, template, contacts, onToggle) {
+// `rightsOf(contact)` (facultatif) dit ce que la personne connectée peut faire de la
+// fiche : 'own', 'admin' ou rien.
+export function renderCards(grid, template, contacts, onToggle, rightsOf = () => null) {
   grid.innerHTML = '';
-  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle)));
+  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle, { rights: rightsOf(contact) })));
+}
+
+// Une carte pour la relecture d'une modification : même gabarit et mêmes classes que
+// dans l'annuaire, mais rien n'y est cliquable. `marks` (preview.js) repère dans la
+// carte « après » ce qui a changé ; sans lui, c'est la carte « avant ».
+export function renderPreviewCard(template, contact, marks = null) {
+  return buildCard(template, contact, null, { marks });
 }

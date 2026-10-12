@@ -114,6 +114,28 @@ export function withIdentity(tables = sampleTables()) {
   return copy;
 }
 
+// Les métadonnées que Grist expose par fetchTable('_grist_Tables') et
+// fetchTable('_grist_Tables_column') : le type des colonnes de BDD qui comptent pour
+// écrire (le téléphone est Numeric, comme dans le document d'origine).
+export function withSchema(tables = sampleTables(), { phoneType = 'Numeric' } = {}) {
+  const copy = structuredClone(tables);
+  copy._grist_Tables = { id: [1, 2], tableId: ['BDD', 'Etablissements'] };
+  const bdd = [
+    ['prenom', 'Text'], ['nom', 'Text'], ['email', 'Text'], ['Fonction', 'Text'], ['numero_de_telephone', phoneType],
+    ['Etablissement', 'Ref:Etablissements'], ['Role_dans_le_PUI', 'Ref:Role_Dans_le_PUI'],
+    ['Instances', 'RefList:INSTANCES'], ['Actions', 'RefList:Actions'], ['GT', 'RefList:GT'],
+    ['Communautes', 'RefList:Communautes'], ['Taches', 'RefList:Taches'], ['Competences', 'RefList:Competences'],
+    ['perimetre', 'RefList:REMMAPING_PERIMETRES_COMPETENCES'], ['Accepte_apparaitre', 'Bool']
+  ];
+  copy._grist_Tables_column = {
+    id: bdd.map((_, index) => index + 1),
+    parentId: bdd.map(() => 1),
+    colId: bdd.map(([colId]) => colId),
+    type: bdd.map(([, type]) => type)
+  };
+  return copy;
+}
+
 // Noms affichés (« Prénom Nom ») dans l'ordre des cartes, périmètre par défaut.
 export const DEFAULT_CARD_NAMES = [
   'Ana Martin',

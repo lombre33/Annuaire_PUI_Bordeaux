@@ -1,0 +1,404 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  ProfileSaveError, buildRowUpdate, signatureOf, readRow, prepareReview, saveProfile, unsavedLabels
+} from '../profile-save.js';
+import { profileFormModel, draftOf } from '../profile.js';
+import { loadDirectory, tableToRows } from '../grist-data.js';
+import { createFakeGrist } from './support/fake-grist.js';
+import { sampleTables, withIdentity, withSchema, ANA_EMAIL } from './fixtures.mjs';
+
+// ===== profile-save : relire, vérifier, écrire une fiche modifiée =====
+
+const logged = () => {
+  const lines = { info: [], warn: [], error: [] };
+  const log = Object.fromEntries(Object.keys(lines).map(level => [level, (...args) => lines[level].push(args.map(String).join(' '))]));
+  return { lines, log };
+};
+const quiet = { info() {}, warn() {}, error() {} };
+
+// Un document complet (identité, métadonnées), vu par une personne. `fail(['BDD'])`
+// rend ensuite illisibles les tables nommées : l'annuaire est déjà chargé, c'est la
+// relecture d'une fiche qui échoue.
+async function world(options = {}) {
+  const tables = options.tables ?? withSchema(withIdentity());
+  const broken = { tables: [] };
+  const fake = createFakeGrist({ user: { email: ANA_EMAIL }, ...options, tables, failTables: () => broken.tables });
+  const directory = await loadDirectory(fake.docApi, { log: quiet });
+  const row = id => tableToRows(tables.BDD).find(candidate => candidate.id === id);
+  return {
+    ...fake, ...directory, tables, row,
+    fail: names => { broken.tables = names; },
+    // La fiche telle que le formulaire l'ouvre.
+    form: id => {
+      const opened = structuredClone(row(id));
+      return { row: opened, draft: draftOf(profileFormModel(opened, directory.referenceMaps)) };
+    },
+    context: { referenceMaps: directory.referenceMaps, etabFlags: directory.etabFlags, log: quiet }
+  };
+}
+
+const writes = w => w.calls.filter(call => ['AddRecord', 'UpdateRecord', 'RemoveRecord'].includes(call.action));
+
+// Ouvre le formulaire d'une fiche, y saisit `changes`, prépare la relecture.
+async function review(w, id, changes) {
+  const { row, draft } = w.form(id);
+  return prepareReview(w.docApi, row, { ...draft, ...changes }, w.context);
+}
+
+// ===== buildRowUpdate =====
+
+test('buildRowUpdate computes a list from the CURRENT row: concurrent changes and unnamed values survive', async () => {
+  const w = await world();
+  // Hugo : Instances [999]. Le changement ajoute CME (1) ; entre-temps Grist y a ajouté COVIRIS (3).
+  const change = { Instances: { ajout: [{ id: 1, label: 'CME' }], retrait: [] } };
+  const current = { ...w.row(10), Instances: ['L', 999, 3] };
+  assert.deepEqual(buildRowUpdate(change, current).values, { Instances: ['L', 999, 3, 1] });
+  const removal = { Competences: { ajout: [{ id: 3, label: 'x' }], retrait: [{ id: 1, label: 'y' }] } };
+  assert.deepEqual(buildRowUpdate(removal, w.row(1)).values, { Competences: ['L', 2, 3] });
+});
+
+test('buildRowUpdate is idempotent: adding what is already there or removing what is gone changes nothing more', async () => {
+  const w = await world();
+  const change = { Competences: { ajout: [{ id: 1, label: '' }], retrait: [{ id: 404, label: '' }] } };
+  assert.deepEqual(buildRowUpdate(change, w.row(1)).values, { Competences: ['L', 1, 2] });
+});
+
+test('buildRowUpdate writes an emptied list in the Grist encoding', async () => {
+  const w = await world();
+  const change = { Competences: { ajout: [], retrait: [{ id: 1, label: '' }, { id: 2, label: '' }] } };
+  assert.deepEqual(buildRowUpdate(change, w.row(1)).values, { Competences: ['L'] });
+});
+
+test('buildRowUpdate refuses to rewrite a list that holds values it cannot represent', async () => {
+  const w = await world();
+  // Ana : Actions ['L', 'Vaccination'] (déjà résolu en texte).
+  const change = { Actions: { ajout: [{ id: 2, label: 'Audit' }], retrait: [] } };
+  assert.match(buildRowUpdate(change, w.row(1)).error, /Actions : la fiche contient des valeurs que le widget ne sait pas modifier/);
+});
+
+test('buildRowUpdate writes the phone in the form of its column: a number when Numeric, a text otherwise', async () => {
+  const w = await world();
+  const change = { numero_de_telephone: { avant: '', apres: '0556789013' } };
+  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Numeric' }).values, { numero_de_telephone: 556789013 });
+  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Int' }).values, { numero_de_telephone: 556789013 });
+  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Text' }).values, { numero_de_telephone: '05 56 78 90 13' });
+  assert.deepEqual(buildRowUpdate(change, w.row(1), {}).values, { numero_de_telephone: 556789013 }, 'type inconnu : la cellule est un nombre');
+  assert.deepEqual(buildRowUpdate(change, { ...w.row(1), numero_de_telephone: '05 56 78 90 12' }, {}).values,
+    { numero_de_telephone: '05 56 78 90 13' }, 'type inconnu : la cellule est un texte');
+  const clear = { numero_de_telephone: { avant: '', apres: '' } };
+  assert.deepEqual(buildRowUpdate(clear, w.row(1), { numero_de_telephone: 'Numeric' }).values, { numero_de_telephone: null });
+  assert.deepEqual(buildRowUpdate(clear, w.row(1), { numero_de_telephone: 'Text' }).values, { numero_de_telephone: '' });
+});
+
+test('buildRowUpdate writes text and references, and refuses a nameless row or a missing column', async () => {
+  const w = await world();
+  const change = { Fonction: { avant: '', apres: 'Cheffe' }, Role_dans_le_PUI: { avant: { id: 1, label: '' }, apres: { id: 0, label: '' } } };
+  assert.deepEqual(buildRowUpdate(change, w.row(1)).values, { Fonction: 'Cheffe', Role_dans_le_PUI: 0 });
+  const nameless = { prenom: { avant: '', apres: '' }, nom: { avant: '', apres: '' } };
+  assert.match(buildRowUpdate(nameless, w.row(1)).error, /ni prénom ni nom/);
+  const alreadyNameless = { ...w.row(1), prenom: '', nom: '' };
+  assert.deepEqual(buildRowUpdate({ Fonction: { avant: '', apres: 'Cheffe' } }, alreadyNameless).values, { Fonction: 'Cheffe' },
+    'une fiche déjà sans nom peut changer autre chose');
+  assert.match(buildRowUpdate({ prenom: { avant: '', apres: '' } }, alreadyNameless).error, /ni prénom ni nom/);
+  const { numero_de_telephone: _omitted, ...withoutPhone } = w.row(1);
+  assert.match(buildRowUpdate({ numero_de_telephone: { avant: '', apres: '0102030405' } }, withoutPhone).error, /la colonne numero_de_telephone n'existe pas/);
+});
+
+test('buildRowUpdate writes nothing for an empty set of changes, and only the columns that changed', async () => {
+  const w = await world();
+  assert.deepEqual(buildRowUpdate({}, w.row(1)), { values: {} });
+  const { values } = buildRowUpdate({ Fonction: { avant: 'Pharmacienne', apres: 'Cheffe' } }, w.row(1));
+  assert.deepEqual(Object.keys(values), ['Fonction']);
+});
+
+// ===== signatureOf =====
+
+test('signatureOf changes when a touched cell changes, and only then', async () => {
+  const w = await world();
+  const keys = ['Fonction', 'Competences'];
+  const before = signatureOf(w.row(1), keys);
+  assert.equal(signatureOf({ ...w.row(1) }, keys), before, 'la même fiche donne la même signature');
+  assert.notEqual(signatureOf({ ...w.row(1), Fonction: 'Autre' }, keys), before);
+  assert.notEqual(signatureOf({ ...w.row(1), Competences: ['L', 1, 2, 3] }, keys), before);
+  assert.equal(signatureOf({ ...w.row(1), nom: 'Autre', Instances: ['L', 3] }, keys), before, 'une cellule non touchée ne compte pas');
+  assert.equal(signatureOf(null, keys), '[null,null]', 'une fiche absente a sa propre signature');
+});
+
+// ===== readRow =====
+
+test('readRow gives the row as Grist holds it now, and says so in French when it is gone or unreadable', async () => {
+  const w = await world();
+  assert.equal((await readRow(w.docApi, 1)).prenom, 'Ana');
+  await assert.rejects(readRow(w.docApi, 404), error => error instanceof ProfileSaveError && /n'existe plus dans Grist/.test(error.message));
+  const { lines, log } = logged();
+  const broken = await world();
+  broken.fail(['BDD']);
+  await assert.rejects(readRow(broken.docApi, 1, { log }), error => error instanceof ProfileSaveError && /n'a pas pu être relue/.test(error.message));
+  assert.equal(lines.error.length, 1);
+  assert.match(lines.error[0], /^\[PROFIL\] lecture de la fiche impossible/);
+});
+
+// ===== prepareReview =====
+
+test('prepareReview builds the card before and after from the fiche as Grist holds it, and writes nothing', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '05 56 78 90 13', Role_dans_le_PUI: 0, Competences: [2, 3] });
+  assert.equal(next.rowId, 1);
+  assert.equal(next.before.Fonction, 'Pharmacienne');
+  assert.equal(next.after.Fonction, 'Cheffe de service');
+  assert.equal(next.after.numero_de_telephone, 556789013, 'la carte « après » montre ce que Grist stockera');
+  assert.deepEqual(next.after.labels.competences, ['Hématologie', 'Pharmacovigilance']);
+  assert.deepEqual(next.after.labels.role, []);
+  assert.deepEqual(next.before.labels.competences, ['Oncologie', 'Hématologie']);
+  assert.deepEqual(next.marks.tags.competences, { added: ['Pharmacovigilance'], removed: ['Oncologie'] });
+  assert.deepEqual(next.marks.tags.role, { added: [], removed: ['Référent qualité'] });
+  assert.deepEqual(next.marks.texts.fonction, { before: 'Pharmacienne', after: 'Cheffe de service' });
+  assert.deepEqual(next.lines.map(line => line.key), ['Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Competences']);
+  assert.equal(next.notice, '');
+  assert.equal(next.columnTypes.numero_de_telephone, 'Numeric');
+  assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien dans Grist');
+});
+
+test('prepareReview says whether the fiche figures in the directory, as the directory itself decides', async () => {
+  const w = await world();
+  const visible = await review(w, 1, { Fonction: 'Cheffe' });
+  assert.equal(visible.visibility.visible, true);
+  assert.equal(visible.visibility.accepted, true);
+  // Iris a refusé d'apparaître ; Dan est accepté mais son établissement n'est pas validé.
+  const refused = await review(w, 11, { Fonction: 'Ingénieure' });
+  assert.deepEqual([refused.visibility.visible, refused.visibility.accepted], [false, false]);
+  const unvalidated = await review(w, 4, { Fonction: 'Chargé de projet' });
+  assert.deepEqual([unvalidated.visibility.visible, unvalidated.visibility.accepted, unvalidated.visibility.etablissement], [false, true, 'not_validated']);
+  // Ce que la modification écrit compte : une fiche qu'on rend sans nom ne figurerait plus (mais elle est refusée plus haut).
+  w.tables.BDD.Accepte_apparaitre[0] = false;
+  assert.equal((await review(w, 1, { Fonction: 'Cheffe' })).visibility.accepted, false, 'la fiche relue dans Grist, pas celle du formulaire');
+});
+
+test('prepareReview refuses to review nothing, and a draft that has errors', async () => {
+  const w = await world();
+  await assert.rejects(review(w, 1, {}), error => error instanceof ProfileSaveError && /rien à relire/.test(error.message));
+  await assert.rejects(review(w, 1, { Fonction: '=1+1' }), /rien à relire/);
+  await assert.rejects(review(w, 1, { numero_de_telephone: '12' }), /rien à relire/);
+  assert.deepEqual(writes(w), []);
+});
+
+test('prepareReview never drops a refused field silently: one error stops the whole review, even beside valid changes', async () => {
+  const w = await world();
+  await assert.rejects(review(w, 1, { Fonction: '=1+1', numero_de_telephone: '05 56 78 90 13' }),
+    error => error instanceof ProfileSaveError && /rien à relire/.test(error.message));
+  await assert.rejects(review(w, 1, { prenom: '', nom: '', Fonction: 'Cheffe' }), /rien à relire/);
+  assert.deepEqual(writes(w), []);
+});
+
+test('prepareReview reads the fiche again: the card before shows what Grist holds now, and the notice names what moved', async () => {
+  const w = await world();
+  const { row, draft } = w.form(1);
+  // Pendant que la personne remplit le formulaire, quelqu'un d'autre change la fonction et ajoute une compétence.
+  w.tables.BDD.Fonction[0] = 'Directrice';
+  w.tables.BDD.Competences[0] = ['L', 1, 2, 4];
+  const next = await prepareReview(w.docApi, row, { ...draft, Fonction: 'Cheffe', Competences: [1, 2, 3] }, w.context);
+  assert.equal(next.before.Fonction, 'Directrice', 'la carte « avant » est celle d\'aujourd\'hui');
+  assert.deepEqual(next.champs.Fonction, { avant: 'Directrice', apres: 'Cheffe' });
+  assert.match(next.notice, /ont changé dans Grist depuis l'ouverture de la fenêtre : Fonction\./);
+  assert.deepEqual(next.after.labels.competences.sort(), ['Divers', 'Hématologie', 'Oncologie', 'Pharmacovigilance'],
+    'l\'ajout fait par un autre est conservé dans la carte « après »');
+});
+
+test('prepareReview says there is nothing to save when somebody else already made the same changes', async () => {
+  const w = await world();
+  const { row, draft } = w.form(1);
+  w.tables.BDD.Fonction[0] = 'Cheffe';
+  await assert.rejects(prepareReview(w.docApi, row, { ...draft, Fonction: 'Cheffe' }, w.context),
+    error => error instanceof ProfileSaveError && /déjà dans la fiche/.test(error.message));
+});
+
+test('prepareReview reports a fiche that was deleted, a table it cannot read, and a column that is gone', async () => {
+  const w = await world();
+  const { row, draft } = w.form(1);
+  const gone = { ...w.tables.BDD };
+  Object.keys(gone).forEach(column => { gone[column] = gone[column].filter((_, index) => w.tables.BDD.id[index] !== 1); });
+  w.tables.BDD = gone;
+  await assert.rejects(prepareReview(w.docApi, row, { ...draft, Fonction: 'X' }, w.context), /n'existe plus dans Grist/);
+
+  const broken = await world();
+  const form = broken.form(1);
+  broken.fail(['BDD']);
+  await assert.rejects(prepareReview(broken.docApi, form.row, { ...form.draft, Fonction: 'X' }, broken.context), /n'a pas pu être relue/);
+
+  const missing = await world();
+  const opened = missing.form(1);
+  delete missing.tables.BDD.numero_de_telephone;
+  await assert.rejects(prepareReview(missing.docApi, opened.row, { ...opened.draft, numero_de_telephone: '05 56 78 90 13' }, missing.context),
+    /la colonne numero_de_telephone n'existe pas dans BDD/);
+});
+
+test('prepareReview writes the phone in the form of the column the document declares, and in the form of the cell without metadata', async () => {
+  const text = await world({ tables: withSchema(withIdentity(), { phoneType: 'Text' }) });
+  assert.equal((await review(text, 1, { numero_de_telephone: '0556789013' })).after.numero_de_telephone, '05 56 78 90 13');
+  const noMeta = await world({ tables: withIdentity() });
+  const next = await review(noMeta, 1, { numero_de_telephone: '0556789013' });
+  assert.deepEqual(next.columnTypes, {});
+  assert.equal(next.after.numero_de_telephone, 556789013, 'sans métadonnées, la cellule est un nombre : on écrit un nombre');
+});
+
+test('prepareReview keeps the unnamed values of a list and refuses to rewrite a list it cannot read', async () => {
+  const w = await world();
+  const hugo = await review(w, 10, { Instances: [1] }); // Hugo : Instances ['L', 999], valeur que le formulaire ne montre pas
+  assert.deepEqual(hugo.champs.Instances.ajout, [{ id: 1, label: 'CME' }]);
+  await assert.rejects(review(w, 1, { Actions: [1, 2] }), /Actions : la fiche contient des valeurs que le widget ne sait pas modifier/);
+});
+
+// ===== saveProfile =====
+
+test('saveProfile writes the changes in one single UpdateRecord of the fiche, and only the columns that changed', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '+33 5 56 78 90 13', Competences: [2, 3] });
+  const result = await saveProfile(w.docApi, next, { log: quiet });
+  assert.equal(result.status, 'saved');
+  assert.deepEqual(writes(w), [{
+    action: 'UpdateRecord', table: 'BDD', rowId: 1, ok: true,
+    values: { Fonction: 'Cheffe de service', numero_de_telephone: 556789013, Competences: ['L', 2, 3] }
+  }]);
+  assert.deepEqual(result.values, writes(w)[0].values);
+  assert.equal(w.row(1).email, ANA_EMAIL, 'l\'adresse n\'est jamais écrite');
+  assert.equal(w.row(1).Accepte_apparaitre, true, 'le choix de présence n\'est jamais touché');
+});
+
+test('saveProfile leaves every other fiche alone, and the cells of the fiche it was not asked to change', async () => {
+  const w = await world();
+  const before = structuredClone(w.tables.BDD);
+  await saveProfile(w.docApi, await review(w, 1, { Fonction: 'Cheffe' }), { log: quiet });
+  const after = w.tables.BDD;
+  Object.keys(before).forEach(column => before[column].forEach((value, index) => {
+    if (column === 'Fonction' && index === 0) return;
+    assert.deepEqual(after[column][index], value, `${column}, ligne ${index + 1}`);
+  }));
+  assert.equal(after.Fonction[0], 'Cheffe');
+});
+
+test('after saving, the directory shows the new values: the whole path, from the form to the card', async () => {
+  const w = await world();
+  await saveProfile(w.docApi, await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '+33 5 56 78 90 14', Competences: [3], prenom: 'Anna' }), { log: quiet });
+  const { contacts } = await loadDirectory(w.docApi, { log: quiet });
+  const ana = contacts.find(contact => contact.id === 1);
+  assert.equal(ana.prenom, 'Anna');
+  assert.equal(ana.Fonction, 'Cheffe de service');
+  assert.equal(ana.numero_de_telephone, 556789014);
+  assert.deepEqual(ana.labels.competences, ['Pharmacovigilance']);
+});
+
+test('what the card after showed is what the directory shows once the fiche is saved', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Fonction: 'Cheffe', Competences: [2, 3], Role_dans_le_PUI: 0, numero_de_telephone: '' });
+  await saveProfile(w.docApi, next, { log: quiet });
+  const { contacts } = await loadDirectory(w.docApi, { log: quiet });
+  const ana = contacts.find(contact => contact.id === 1);
+  assert.deepEqual(ana.labels, next.after.labels);
+  assert.equal(ana.Fonction, next.after.Fonction);
+  assert.equal(ana.numero_de_telephone, next.after.numero_de_telephone);
+});
+
+test('saveProfile writes nothing when a field the person touched has changed in Grist since the review', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Fonction: 'Cheffe', Competences: [2, 3] });
+  w.tables.BDD.Fonction[0] = 'Directrice'; // quelqu'un d'autre, après la relecture
+  const result = await saveProfile(w.docApi, next, { log: quiet });
+  assert.equal(result.status, 'changed');
+  assert.equal(result.row.Fonction, 'Directrice', 'la fiche d\'aujourd\'hui, pour relire');
+  assert.deepEqual(writes(w), []);
+  assert.equal(w.tables.BDD.Fonction[0], 'Directrice');
+});
+
+test('saveProfile also asks for a new review when a touched list changed meanwhile, so the card after stays true', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Competences: [2, 3] });
+  w.tables.BDD.Competences[0] = ['L', 1, 2, 4];
+  assert.equal((await saveProfile(w.docApi, next, { log: quiet })).status, 'changed');
+  assert.deepEqual(writes(w), []);
+});
+
+test('saveProfile ignores what changed in a field the person did not touch, and keeps it', async () => {
+  const w = await world();
+  const next = await review(w, 1, { numero_de_telephone: '05 56 78 90 13' });
+  w.tables.BDD.Fonction[0] = 'Directrice'; // une autre colonne, changée entre-temps
+  assert.equal((await saveProfile(w.docApi, next, { log: quiet })).status, 'saved');
+  assert.equal(w.tables.BDD.Fonction[0], 'Directrice', 'ce qu\'un autre a changé n\'est pas écrasé');
+  assert.equal(w.tables.BDD.numero_de_telephone[0], 556789013);
+});
+
+test('saveProfile writes only once for a given review: a second attempt finds the fiche already changed', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Fonction: 'Cheffe' });
+  assert.equal((await saveProfile(w.docApi, next, { log: quiet })).status, 'saved');
+  assert.equal((await saveProfile(w.docApi, next, { log: quiet })).status, 'changed', 'la signature a changé : pas de deuxième écriture');
+  assert.equal(writes(w).length, 1);
+});
+
+test('saveProfile reports a fiche deleted since the review, and refuses an empty review', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Fonction: 'Cheffe' });
+  Object.keys(w.tables.BDD).forEach(column => w.tables.BDD[column].shift());
+  await assert.rejects(saveProfile(w.docApi, next, { log: quiet }), /n'existe plus dans Grist/);
+  await assert.rejects(saveProfile(w.docApi, { ...next, champs: {} }, { log: quiet }), /Aucun changement à enregistrer/);
+});
+
+test('saveProfile turns a refusal of the access rules into a clear message, logs the cause and changes nothing', async () => {
+  for (const options of [{ denyWrites: ['BDD'] }, { denyRows: { BDD: [1] } }]) {
+    const w = await world(options);
+    const next = await review(w, 1, { Fonction: 'Cheffe' });
+    const { lines, log } = logged();
+    await assert.rejects(saveProfile(w.docApi, next, { log }), error => {
+      assert.ok(error instanceof ProfileSaveError);
+      assert.match(error.message, /^Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche/);
+      assert.ok(error.cause instanceof Error, 'l\'erreur d\'origine est gardée');
+      return true;
+    });
+    assert.equal(w.tables.BDD.Fonction[0], 'Pharmacienne');
+    assert.match(lines.error[0], /^\[PROFIL\] écriture impossible/);
+  }
+});
+
+test('saveProfile explains a formula column and any other failure, without the raw Grist message', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Fonction: 'Cheffe' });
+  const failing = message => ({
+    fetchTable: w.docApi.fetchTable,
+    applyUserActions: async () => { throw new Error(message); }
+  });
+  await assert.rejects(saveProfile(failing('Cannot modify formula column "Fonction"'), next, { log: quiet }), /colonne à formule/);
+  await assert.rejects(saveProfile(failing('boom 500'), next, { log: quiet }), error => {
+    assert.match(error.message, /^La modification n'a pas pu être enregistrée\. Réessayez/);
+    assert.doesNotMatch(error.message, /boom/);
+    return true;
+  });
+});
+
+test('saveProfile never logs the address of the person, nor the values it writes', async () => {
+  const w = await world({ denyWrites: ['BDD'] });
+  const next = await review(w, 1, { Fonction: 'Valeur très personnelle' });
+  const { lines, log } = logged();
+  await assert.rejects(saveProfile(w.docApi, next, { log }));
+  const everything = JSON.stringify(lines);
+  assert.ok(!everything.includes('@'), 'aucune adresse dans la console');
+  assert.ok(!everything.includes('Valeur très personnelle'));
+});
+
+test('an administrator saves the fiche of someone else the same way, on that fiche only', async () => {
+  const w = await world({ user: { email: 'admin@chu-bordeaux.fr' } });
+  await saveProfile(w.docApi, await review(w, 9, { Fonction: 'Directrice générale' }), { log: quiet });
+  assert.deepEqual(writes(w).map(call => [call.table, call.rowId]), [['BDD', 9]]);
+  assert.equal(w.tables.BDD.Fonction[8], 'Directrice générale');
+});
+
+// ===== unsavedLabels =====
+
+test('unsavedLabels is empty when Grist kept everything, and names the fields it did not keep', async () => {
+  const w = await world();
+  const next = await review(w, 1, { Fonction: 'Cheffe', Competences: [2, 3], Role_dans_le_PUI: 0 });
+  await saveProfile(w.docApi, next, { log: quiet });
+  assert.deepEqual(unsavedLabels(next, w.row(1), w.referenceMaps), []);
+  // Grist a ignoré la fonction et le rôle, et remis la compétence retirée.
+  const stubborn = { ...w.row(1), Fonction: 'Pharmacienne', Role_dans_le_PUI: 1, Competences: ['L', 1, 2, 3] };
+  assert.deepEqual(unsavedLabels(next, stubborn, w.referenceMaps), ['Fonction', 'Rôle PUI', 'Compétences']);
+});
