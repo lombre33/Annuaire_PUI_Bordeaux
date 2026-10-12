@@ -160,12 +160,14 @@ export function withSchema(tables = sampleTables(), { phoneType = 'Numeric' } = 
   return copy;
 }
 
-// Noms affichés (« Prénom Nom ») dans l'ordre des cartes, périmètre par défaut.
+// Noms affichés (« Prénom Nom ») dans l'ordre des cartes, périmètre par défaut : les cartes
+// sont triées par nom de famille (Bergonié, Bernard, Hostile, Martin), pas dans l'ordre des
+// lignes de la table.
 export const DEFAULT_CARD_NAMES = [
-  'Ana Martin',
-  `${HOSTILE_FIRST_NAME} Hostile`,
   'Gina Bergonié',
-  'Hugo Bernard'
+  'Hugo Bernard',
+  `${HOSTILE_FIRST_NAME} Hostile`,
+  'Ana Martin'
 ];
 
 // Le document complété pour l'habillage (GRIST_SETUP.md) : logos et ordre du bandeau

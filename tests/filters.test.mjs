@@ -28,6 +28,94 @@ test('filterContacts free-text search on nom/prenom is accent- and case-insensit
   assert.equal(filterContacts(contacts, activeFilters, 'ÉCOLE').length, 1);
 });
 
+// L'annuaire d'essai de la recherche : les noms dont l'audit UI/UX (U31) a constaté qu'ils ne
+// se trouvaient pas, avec des homonymes de prénom ou de nom pour que chaque requête ait une
+// seule bonne réponse.
+const PEOPLE = [
+  { prenom: 'Karim', nom: 'Benali', Fonction: 'Pharmacien', etablissement_label: 'CHU' },
+  { prenom: 'Aïcha', nom: 'Benali-Haddad' },
+  { prenom: 'Jean', nom: 'Le Cœur' },
+  { prenom: 'Marie-Christine', nom: 'de La Rochefoucauld-Montmorency' },
+  { prenom: 'Sophie', nom: 'D\'Arcy' },
+  { prenom: 'Zoé', nom: 'Éluard' },
+  { prenom: 'Jean-Pierre', nom: 'Martin' }
+];
+const found = (term, contacts = PEOPLE) =>
+  filterContacts(contacts, createEmptyFilterState(), term).map(person => `${person.prenom} ${person.nom}`);
+
+test('filterContacts searches « prénom nom » word by word, in any order: « karim benali » and « benali karim » find Karim Benali', () => {
+  assert.deepEqual(found('karim benali'), ['Karim Benali']);
+  assert.deepEqual(found('benali karim'), ['Karim Benali'], 'ordre sans importance');
+  assert.deepEqual(found('Jean Le Cœur'), ['Jean Le Cœur']);
+  assert.deepEqual(found('Jean Le'), ['Jean Le Cœur'], 'un début de nom suffit');
+  assert.deepEqual(found('Zoé É'), ['Zoé Éluard']);
+  assert.deepEqual(found('  karim   benali '), ['Karim Benali'], 'espaces de bord et multiples');
+  assert.deepEqual(found('kar ben'), ['Karim Benali'], 'chaque mot peut n\'être qu\'un début');
+});
+
+test('filterContacts requires every word: « karim haddad » finds nobody, « benali » finds both Benali', () => {
+  assert.deepEqual(found('karim haddad'), []);
+  assert.deepEqual(found('benali'), ['Karim Benali', 'Aïcha Benali-Haddad']);
+  assert.deepEqual(found('karim benali zzz'), [], 'un mot de trop : plus personne');
+});
+
+test('filterContacts treats hyphens, spaces, apostrophes and œ as the same in a name (audit U31)', () => {
+  // Chaque écriture trouvait 0 ou 1 résultat selon le tiret, l'espace ou l'apostrophe tapés.
+  for (const term of ['marie christine', 'marie-christine', 'Marie–Christine', 'christine marie']) {
+    assert.deepEqual(found(term), ['Marie-Christine de La Rochefoucauld-Montmorency'], term);
+  }
+  for (const term of ['benali haddad', 'benali-haddad', 'haddad benali']) {
+    assert.deepEqual(found(term), ['Aïcha Benali-Haddad'], term);
+  }
+  for (const term of ['d\'arcy', 'd’arcy', 'darcy', 'D ARCY', 'sophie d’arcy']) {
+    assert.deepEqual(found(term), ['Sophie D\'Arcy'], term);
+  }
+  for (const term of ['cœur', 'coeur', 'COEUR', 'le coeur', 'le cœur']) {
+    assert.deepEqual(found(term), ['Jean Le Cœur'], term);
+  }
+  assert.deepEqual(found('jean pierre'), ['Jean-Pierre Martin']);
+});
+
+test('filterContacts: one word still finds a family name or a first name, and only those', () => {
+  assert.deepEqual(found('mar'), ['Marie-Christine de La Rochefoucauld-Montmorency', 'Jean-Pierre Martin'], 'prénom ou nom');
+  assert.deepEqual(found('pharmacien'), [], 'pas la fonction (specs.md : recherche sur le nom et le prénom)');
+  assert.deepEqual(found('chu'), [], 'pas l\'établissement : c\'est le rôle du filtre Établissement');
+});
+
+test('filterContacts: a search with nothing but separators, or nothing, keeps everybody, and the order is the order given', () => {
+  assert.equal(found('').length, PEOPLE.length);
+  assert.equal(found('   ').length, PEOPLE.length);
+  assert.equal(found(' - \' . ').length, PEOPLE.length);
+  assert.deepEqual(found('', PEOPLE.slice().reverse()), found('').reverse(), 'le filtre ne trie pas : le tri se fait à la lecture');
+  assert.deepEqual(found(null), found(''));
+  assert.deepEqual(found(undefined), found(''));
+});
+
+test('filterContacts: the search still works for contacts without a first name or without a family name', () => {
+  const partial = [{ prenom: 'Madonna' }, { nom: 'Cher' }, { prenom: '', nom: '' }];
+  assert.deepEqual(filterContacts(partial, createEmptyFilterState(), 'madonna').length, 1);
+  assert.deepEqual(filterContacts(partial, createEmptyFilterState(), 'cher').length, 1);
+  assert.deepEqual(filterContacts(partial, createEmptyFilterState(), 'x').length, 0);
+});
+
+test('filterContacts reads the name again when a contact is a new object, never a stale one', () => {
+  // La clé de recherche est gardée par objet : une lecture de Grist rend de nouveaux objets.
+  const before = { prenom: 'Ana', nom: 'Martin' };
+  assert.equal(filterContacts([before], createEmptyFilterState(), 'martin').length, 1);
+  const after = { ...before, nom: 'Durand' };
+  assert.equal(filterContacts([after], createEmptyFilterState(), 'martin').length, 0);
+  assert.equal(filterContacts([after], createEmptyFilterState(), 'durand').length, 1);
+});
+
+test('computeFilterCounts counts with the same multi-word search as the cards', () => {
+  const contacts = [
+    { prenom: 'Karim', nom: 'Benali', labels: { instances: ['CME'] } },
+    { prenom: 'Aïcha', nom: 'Benali-Haddad', labels: { instances: ['CME', 'COVIRIS'] } }
+  ];
+  const counts = computeFilterCounts(contacts, createEmptyFilterState(), 'benali karim');
+  assert.deepEqual(counts.instances, { cme: 1 }, 'seule la carte de Karim compte');
+});
+
 test('filterContacts applies a category filter (etablissement) via the uniform labels.etablissement array', () => {
   const contacts = [
     { nom: 'A', labels: { etablissement: ['CHU'] } },

@@ -107,9 +107,15 @@ export async function openWidget({
     // navigateur lui-même (un fichier introuvable) n'en a pas : on garde son texte.
     const readable = async () => (await Promise.all(message.args().map(arg => arg.jsonValue())))
       .map(value => (typeof value === 'string' ? value : JSON.stringify(value))).join(' ') || message.text();
-    if (message.type() === 'error') logs.errors.push(readable());
-    if (message.type() === 'warning') logs.warnings.push(readable());
-    if (message.type() === 'info') logs.infos.push(readable());
+    // La lecture est en vol quand le test se termine et ferme la page, surtout quand plusieurs
+    // fichiers de test tournent ensemble : elle échoue alors (« Target page, context or browser
+    // has been closed ») et, sans personne pour l'attendre, Node fait échouer tout le fichier.
+    // Le crochet vide évite ce rejet non traité ; un test qui relit la console voit toujours
+    // l'erreur, puisque la promesse gardée dans `logs` reste rejetée.
+    const keep = list => { const line = readable(); line.catch(() => {}); list.push(line); };
+    if (message.type() === 'error') keep(logs.errors);
+    if (message.type() === 'warning') keep(logs.warnings);
+    if (message.type() === 'info') keep(logs.infos);
   });
   await page.addInitScript(values => {
     window.__tables = values.tables;

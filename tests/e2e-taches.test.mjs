@@ -39,6 +39,10 @@ const HUGO = 'Hugo Bernard';
 
 const COUNTS = { [VACCINATION]: '2', [AUDIT]: '1', [NONE]: '1' };
 
+// Les cartes sont triées par nom de famille (Bergonié, Bernard, Durand, Martin) : une carte se
+// retrouve par le nom qu'elle affiche, pas par sa place.
+const cardOf = (page, name) => page.locator('.contact-card').filter({ has: page.locator('.name', { hasText: name }) });
+
 // Les lignes que le widget écrit dans la console : le texte seulement.
 const consoleLines = async logs => (await Promise.all([...logs.warnings, ...logs.infos]));
 
@@ -99,7 +103,7 @@ test('cocher une action coche toutes ses tâches : ses cartes, un badge à 1, et
     await tasks.open(page);
     await tasks.box(page, VACCINATION).check();
     await waitForCards(page, 2);
-    assert.deepEqual(await cardNames(page), [ANA, GINA]);
+    assert.deepEqual(await cardNames(page), [GINA, ANA]);
     assert.equal(await tasks.badge(page).textContent(), '1', 'une action : « 1 », pas « 2 » comme ses deux tâches');
     assert.equal(await tasks.box(page, VACCINATION).isChecked(), true);
     assert.equal(await tasks.box(page, VACCINATION).evaluate(box => box.indeterminate), false);
@@ -188,11 +192,13 @@ test('les nombres des actions tiennent compte de l\'interrupteur Partenaires et 
     await tasks.open(page);
     await tasks.box(page, AUDIT).check();
     await waitForCards(page, 2);
-    assert.deepEqual(await cardNames(page), [ANA, BOB]);
+    assert.deepEqual(await cardNames(page), [BOB, ANA]);
     assert.deepEqual(await tasks.groupCounts(page), withPartners,
       'cocher l\'action 2 ne vide pas le nombre des autres actions : ce nombre dit ce que donnerait chaque case');
 
-    await page.locator('.contact-card', { hasText: 'Bob' }).locator('.etablissement-tag').click(); // Établissement : UBM
+    // Le menu ouvert recouvrirait la carte de Bob, la première depuis que les cartes sont triées par nom.
+    await page.mouse.click(5, 5);
+    await cardOf(page, BOB).locator('.etablissement-tag').click(); // Établissement : UBM
     await waitForCards(page, 1);
     assert.deepEqual(await tasks.groupCounts(page), { [VACCINATION]: '0', [AUDIT]: '1', [NONE]: '0' }, 'un autre filtre s\'applique aux actions');
   }));
@@ -277,7 +283,7 @@ test('une modification dans Grist (une action renommée, renumérotée, une tâc
     await tasks.toggle(page, AUDIT).click();
     await tasks.item(page, 'Inspection').locator('input').check();
     await waitForCards(page, 2);
-    assert.deepEqual(await cardNames(page), [ANA, BOB]);
+    assert.deepEqual(await cardNames(page), [BOB, ANA]);
 
     const RENAMED = 'Action 2 : Contrôle';
     await page.evaluate(label => { window.__tables.Actions.Actions[1] = label; }, RENAMED);
@@ -285,7 +291,7 @@ test('une modification dans Grist (une action renommée, renumérotée, une tâc
     await page.waitForFunction(label => document.querySelector(`.filter-group[data-value="${label}"]`), RENAMED);
     assert.deepEqual(await tasks.groupNames(page), [VACCINATION, RENAMED, NONE], 'l\'action renommée');
     assert.equal(await tasks.badge(page).textContent(), '1', 'la tâche cochée l\'est toujours');
-    assert.deepEqual(await cardNames(page), [ANA, BOB]);
+    assert.deepEqual(await cardNames(page), [BOB, ANA]);
 
     // Le numéro de l'action change, celui de la tâche non : « 2.1 Inspection » n'a plus d'action.
     await page.evaluate(() => { window.__tables.Actions.Actions[1] = 'Action 3 : Contrôle'; });
@@ -294,7 +300,7 @@ test('une modification dans Grist (une action renommée, renumérotée, une tâc
     assert.deepEqual(await tasks.groupNames(page), [VACCINATION, NONE], 'plus de tâche dans l\'action 2 : plus de groupe');
     assert.equal(await tasks.item(page, 'Inspection').locator('input').isChecked(), true, 'reclassée sous « Sans action », toujours cochée');
     assert.equal(await tasks.group(page, NONE).locator('.filter-option', { hasText: 'Inspection' }).count(), 1);
-    assert.deepEqual(await cardNames(page), [ANA, BOB]);
+    assert.deepEqual(await cardNames(page), [BOB, ANA]);
 
     // Le libellé de la tâche change : comme pour tout libellé renommé dans Grist, la coche tombe.
     await page.evaluate(() => { window.__tables.Taches.Taches[2] = '1.3 Inspection'; });
@@ -319,7 +325,7 @@ test('quand une action est complète et que Grist renomme une action, le menu es
     await page.waitForFunction(label => document.querySelector(`.filter-group[data-value="${label}"]`), RENAMED);
     assert.equal(await tasks.badge(page).textContent(), '1');
     assert.equal(await tasks.box(page, VACCINATION).isChecked(), true);
-    assert.deepEqual(await cardNames(page), [ANA, GINA]);
+    assert.deepEqual(await cardNames(page), [GINA, ANA]);
   }));
 
 // ===== Sans numéro, le menu reste à plat =====
@@ -398,7 +404,7 @@ test('le rangement des tâches ne change rien d\'autre : mêmes cartes, mêmes t
   withWidget({ tables: withTaskActions() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     assert.equal(await page.locator('#statusBanner').isHidden(), true);
-    const tagsByGroup = await page.locator('.contact-card').first().locator('.tag-group').evaluateAll(groups =>
+    const tagsByGroup = await cardOf(page, ANA).locator('.tag-group').evaluateAll(groups =>
       groups.map(group => [group.querySelector('.tag-group-title').textContent,
         [...group.querySelectorAll('.tag')].map(tag => tag.textContent)]));
     assert.deepEqual(tagsByGroup.filter(([title]) => title === 'Tâches'), [['Tâches', [RELECTURE, INSPECTION]]],
