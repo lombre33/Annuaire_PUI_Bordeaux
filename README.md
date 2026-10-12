@@ -10,11 +10,16 @@ Pas de bundler : le navigateur charge directement des modules ES natifs.
 
 - `index.html` — structure de la page + template de carte.
 - `style.css` — feuille de style (un seul fichier, non minifié à la main).
-- `constants.js` — taxonomie des filtres/tags (`FILTERS`, `TAG_GROUPS`), source unique.
+- `constants.js` — taxonomie, source unique : `CATEGORIES` donne, pour chaque
+  catégorie (actions, instances, compétences, établissement, rôle...), son
+  libellé, sa couleur, sa table de référence et sa colonne dans `Annuaire` ;
+  `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES` et `LIST_CATEGORIES` en sont
+  dérivés. Ajouter une catégorie = une entrée ici.
 - `grist-data.js` — lecture des tables Grist (`loadDirectory()`, seule
   fonction qui appelle `docApi`), conversion colonnes→lignes, enrichissement
-  des contacts. Aucune dépendance au DOM.
-- `filters.js` — état des filtres actifs + logique de filtrage (pure elle aussi).
+  des contacts (`contact.labels[clé]`, lu par `labelsOf()`). Aucune dépendance
+  au DOM.
+- `filters.js` — état des filtres actifs + logique de filtrage (fonctions pures).
 - `render.js` — construction du DOM (cartes, menus de filtres). Pas de logique métier.
 - `main.js` — point d'entrée : câble `window.grist` et les événements DOM aux
   modules ci-dessus.
@@ -31,7 +36,7 @@ node --test
 ```
 
 Sans rien installer (Node ≥ 18, testé avec Node 22), `node --test` exécute les
-tests unitaires (`tests/data.test.mjs`) : lecture des tables Grist
+tests unitaires (`tests/*.test.mjs`, un fichier par module) : lecture des tables Grist
 (`loadDirectory()` avec un faux `docApi`), résolution des Références,
 enrichissement des contacts, filtrage, et plusieurs tests de non-régression
 (filtre `perimetre_all`, tag « Rôle PUI », fallback établissement, pannes de
