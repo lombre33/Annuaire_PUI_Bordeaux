@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadDirectory, DirectoryLoadError } from '../grist-data.js';
-import { sampleTables, withoutOptionalColumns, DEFAULT_CARD_NAMES } from './fixtures.mjs';
+import { sampleTables, withoutOptionalColumns, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME } from './fixtures.mjs';
 
 // ===== loadDirectory : lecture de Grist → contacts affichables =====
 
@@ -109,7 +109,7 @@ test('loadDirectory keeps going when a reference table is unreadable: previous l
 });
 
 test('loadDirectory refuses a BDD table that lacks a required column instead of silently showing nothing', async () => {
-  for (const column of ['nom', 'prenom', 'Etablissement', 'perimetre']) {
+  for (const column of ['nom', 'prenom', 'Etablissement', 'perimetre', 'Accepte_apparaitre']) {
     const tables = sampleTables();
     delete tables.BDD[column];
     await assert.rejects(
@@ -170,11 +170,64 @@ test('loadDirectory works without the optional BDD columns (Fonction, email, pho
   assert.deepEqual(contacts.map(contact => contact.labels.role), contacts.map(() => []));
 });
 
-test('loadDirectory ignores Accepte_apparaitre for now: BDD still holds a formula that returns False for everyone', async () => {
+// ===== Consentement individuel : BDD.Accepte_apparaitre =====
+
+test('loadDirectory hides the people who have not accepted to appear, with no banner: refusals are normal', async () => {
+  const { contacts, issues } = await load(sampleTables());
+  const names = contacts.map(contact => contact.prenom);
+  assert.deepEqual(names, ['Ana', 'Bob', HOSTILE_FIRST_NAME, 'Gina', 'Hugo']);
+  assert.ok(!names.includes('Iris'), 'Iris a refusé d\'apparaître');
+  assert.ok(!names.includes('Jules'), 'Jules n\'a pas répondu : cellule vide');
+  assert.deepEqual(issues, []);
+});
+
+test('loadDirectory counts only a checked box as consent, never an empty or look-alike value', async () => {
+  for (const value of [false, null, undefined, 0, '', 'true', 'oui', 1]) {
+    const tables = sampleTables();
+    tables.BDD.Accepte_apparaitre[0] = value; // Ana
+    const { contacts } = await load(tables);
+    assert.ok(!contacts.some(contact => contact.prenom === 'Ana'), `${JSON.stringify(value)} n'est pas un accord`);
+    assert.equal(contacts.length, 4);
+  }
+});
+
+test('loadDirectory shows a person as soon as they accept, and consent never overrides the establishment rules', async () => {
   const tables = sampleTables();
-  assert.ok(tables.BDD.Accepte_apparaitre.every(value => value === false));
+  tables.BDD.Accepte_apparaitre[10] = true; // Iris
+  tables.BDD.Accepte_apparaitre[11] = true; // Jules
   const { contacts } = await load(tables);
-  assert.equal(contacts.length, 5);
+  assert.deepEqual(contacts.map(contact => contact.prenom), ['Ana', 'Bob', HOSTILE_FIRST_NAME, 'Gina', 'Hugo', 'Iris', 'Jules']);
+  const accepted = tables.BDD.prenom.filter((_, index) => tables.BDD.Accepte_apparaitre[index] === true);
+  ['Carla', 'Dan', 'Eve', 'Fred'].forEach(name => {
+    assert.ok(accepted.includes(name), `${name} a accepté d'apparaître`);
+    assert.ok(!contacts.some(contact => contact.prenom === name), `${name} reste masqué par une autre règle`);
+  });
+});
+
+test('loadDirectory says why the directory is empty when nobody has accepted to appear', async () => {
+  const tables = sampleTables();
+  tables.BDD.Accepte_apparaitre = tables.BDD.Accepte_apparaitre.map(() => false);
+  const { contacts, issues } = await load(tables);
+  assert.equal(contacts.length, 0);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0], /Personne n'a accepté d'apparaître/);
+  assert.match(issues[0], /Accepte_apparaitre/);
+});
+
+test('loadDirectory does not blame the consent column when it is another rule that empties the directory', async () => {
+  const nothingValidated = sampleTables();
+  nothingValidated.Etablissements.ok_pour_apparaitre = nothingValidated.Etablissements.ok_pour_apparaitre.map(() => false);
+  const { issues } = await load(nothingValidated);
+  assert.match(issues[0], /Aucun contact affichable/);
+});
+
+test('loadDirectory tells the console how many in-scope people are hidden for lack of consent, never who', async () => {
+  const log = recordingLog();
+  await loadDirectory(fakeDocApi(sampleTables()), { log });
+  const info = log.infos.find(args => String(args[0]).startsWith('[CONSENTEMENT]'));
+  assert.ok(info, 'un message de console sur le consentement');
+  assert.match(info[0], /^\[CONSENTEMENT\] 2\/11 /, 'Iris et Jules, sur les 11 contacts du périmètre (Fred en est exclu)');
+  assert.ok(!/Iris|Jules|@/.test(JSON.stringify(log.infos)), 'ni nom ni adresse dans la console');
 });
 
 test('loadDirectory explains an empty directory instead of leaving an unexplained « 0 contact »', async () => {

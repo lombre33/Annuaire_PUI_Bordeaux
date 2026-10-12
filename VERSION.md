@@ -1,6 +1,6 @@
-# Version 1.9.0 — Filtre « Domaines » : la recherche par compétences macro (voir CHANGELOG.md)
+# Version 1.10.0 — Consentement individuel (voir CHANGELOG.md)
 
-Le widget lit la table `BDD` (1.8.0) et propose en plus un filtre « Domaines »,
-issu de `Competences.Macro_competences`, qui se combine avec le détail des
-compétences. 122 tests (dont 30 dans un vrai navigateur, optionnels sans
-Playwright).
+Le widget lit la table `BDD` (1.8.0), propose le filtre « Domaines » (1.9.0) et
+n'affiche plus que les personnes qui ont accepté d'apparaître
+(`Accepte_apparaitre`). 133 tests (dont 34 dans un vrai navigateur, optionnels
+sans Playwright).

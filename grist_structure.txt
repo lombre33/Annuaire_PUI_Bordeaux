@@ -28,6 +28,12 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
     Encodage brut renvoyé par l'API Grist pour les colonnes liste :
     ['L', id1, id2, ...] — une liste vide est donc ['L'] (longueur 1) et non [].
     Voir isInScope() / safeValues() dans grist-data.js.
+  Accepte_apparaitre : Bool         OBLIGATOIRE
+    Accord de la personne pour figurer dans l'annuaire (cf. specs.md). Doit
+    être une colonne de DONNÉES de type Bascule, pas une formule. Seule la
+    valeur vraie compte : vide, décochée ou autre valeur masque la personne.
+    Sans cette colonne, le widget affiche une erreur au lieu d'afficher tout le
+    monde. Voir hasAccepted() dans grist-data.js.
   Actions           : ReferenceList(Actions)
   Communautes       : ReferenceList(Communautes)
   Taches            : ReferenceList(Taches)

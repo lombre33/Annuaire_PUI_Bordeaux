@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.10.0 — Consentement individuel : seules les personnes qui l'ont accepté apparaissent
+
+Un contact ne s'affiche plus que si la personne a accepté d'apparaître
+(`BDD.Accepte_apparaitre`, une case à cocher), en plus des règles existantes :
+périmètre renseigné, établissement validé (`ok_pour_apparaitre`) et fondateur
+ou partenaire. Les deux accords sont indépendants : l'établissement ne remplace
+pas celui de la personne, et celui de la personne ne contourne pas
+l'établissement.
+
+- **Seul `true` vaut accord.** Une case décochée, vide, `0` ou un texte ne
+  suffisent pas : dans le doute, la personne n'apparaît pas.
+- **Colonne obligatoire.** Si `Accepte_apparaitre` n'existe pas dans `BDD`, le
+  widget affiche une erreur explicite (« colonne « Accepte_apparaitre » absente
+  de la table BDD ») et aucune carte : jamais l'annuaire de tout le monde faute
+  de pouvoir vérifier l'accord.
+- **Annuaire vide expliqué.** Si personne n'a accepté, le bandeau le dit
+  (« Personne n'a accepté d'apparaître : Accepte_apparaitre n'est coché pour
+  aucun contact… ») au lieu de laisser un « 0 contact » muet. Des refus
+  individuels, eux, ne sont pas une anomalie : pas de bandeau.
+- **Console.** `[CONSENTEMENT] n/m contact(s) du périmètre masqué(s)` donne le
+  nombre de personnes masquées, jamais leurs noms ni leurs adresses.
+- **À faire dans Grist avant de fusionner** : `Accepte_apparaitre` doit être une
+  colonne de données (type Bascule), pas une formule, et cochée pour les
+  personnes qui doivent figurer dans l'annuaire. Tant qu'elle ne l'est pour
+  personne, l'annuaire est vide (avec son bandeau).
+- **Tests** : 133 tests (98 unitaires, 1 règle du projet, 34 dans un vrai
+  navigateur). Le jeu de données a deux personnes de plus (l'une a refusé, l'autre
+  n'a pas répondu) ; toutes les autres ont accepté, pour que chaque règle de
+  visibilité se teste seule. Contrôle négatif : retirer le filtre, ou accepter
+  toute valeur « vraie », fait échouer 9 et 2 tests.
+
 ## 1.9.0 — Filtre « Domaines » : la recherche par compétences macro
 
 Le document Grist regroupe désormais les compétences par domaine
