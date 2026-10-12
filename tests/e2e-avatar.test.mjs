@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withAvatars, withBranding, withIdentity, withSchema, ANA_EMAIL, IRIS_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
-import { skip, waitForCards, withWidget } from './support/browser.mjs';
+import { reload, skip, waitForCards, withWidget } from './support/browser.mjs';
 import { FIRST_UPLOAD_ID, MISSING_FILE } from './support/fake-attachments.mjs';
 
 // ===== Outils =====
@@ -232,6 +232,12 @@ test('le bandeau « Ma présence » montre la photo de la personne connectée, o
     await waitForPhoto(avatar, 'la photo du bandeau se charge');
     assert.ok(isAttachment(await photoSrc(avatar), 501));
     assert.equal(await avatar.evaluate(node => node.tagName), 'DIV', 'rien à agrandir dans le bandeau');
+    // Une relecture de Grist ne repeint pas l'avatar : la photo reste la même image, sans clignoter ni être redemandée.
+    const picture = await avatar.locator('img').elementHandle();
+    await page.evaluate(() => { window.__tables.BDD.Fonction[9] = 'Directeur'; });
+    await reload(page);
+    await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.fonction').textContent()) === 'Directeur', 'l\'annuaire n\'a pas été relu');
+    assert.equal(await picture.evaluate(node => node.isConnected), true, 'le bandeau n\'est pas repeint quand Grist renvoie les mêmes photo et initiales');
   });
   // Iris n'apparaît pas dans l'annuaire mais a une fiche, sans photo.
   await withWidget({ tables: world(), user: IRIS_EMAIL }, async ({ page, files }) => {
@@ -635,6 +641,97 @@ test('pendant que l\'image se prépare, les boutons de la photo et « Relire » 
     assert.equal(await press(page, 'Relire mes modifications').isEnabled(), true);
   }));
 
+// Ralentit le redessin d'une image : la préparation dure alors le temps d'un fichier lourd, assez pour
+// que le test agisse « pendant » elle sans compter sur la vitesse de la machine.
+const slowImages = (page, delay) => page.evaluate(ms => {
+  const original = HTMLCanvasElement.prototype.toBlob;
+  HTMLCanvasElement.prototype.toBlob = function slowToBlob(...args) { setTimeout(() => original.apply(this, args), ms); };
+}, delay);
+const preparing = page => until(async () => (await photoField(page).locator('.photo-status').textContent()) === 'Préparation de l’image…', 'la préparation commence');
+
+test('pendant que l\'image se prépare, un second choix, le retrait et « Relire » ne font rien', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await openOwn(page);
+    // Une autre modification d'abord : « Relire » est actif avant la photo, et c'est la photo qui l'éteint.
+    await dialog(page).locator('#profile-Fonction').fill('Cheffe de service');
+    assert.equal(await press(page, 'Relire mes modifications').isEnabled(), true);
+    await slowImages(page, 1500);
+    // Le choix d'un fichier est compté, sans ouvrir de vraie boîte : un clic sur le champ de fichier est un second choix.
+    await page.evaluate(() => {
+      window.__fileClicks = 0;
+      const original = HTMLInputElement.prototype.click;
+      HTMLInputElement.prototype.click = function countedClick(...args) {
+        if (this.type === 'file') window.__fileClicks += 1;
+        else original.apply(this, args);
+      };
+    });
+    const fileClicks = () => page.evaluate(() => window.__fileClicks);
+    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
+    await preparing(page);
+    assert.equal(await press(page, 'Relire mes modifications').isEnabled(), false, 'pas de relecture à mi-chemin');
+    // Les boutons sont marqués « aria-disabled » : Playwright attendrait qu'ils s'activent, on force le clic.
+    await photoField(page).getByRole('button', { name: 'Changer la photo', exact: true }).click({ force: true });
+    await photoField(page).getByRole('button', { name: 'Retirer la photo', exact: true }).click({ force: true });
+    assert.equal(await fileClicks(), 0, 'aucun second choix de fichier pendant la préparation');
+    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
+    assert.equal(await photoField(page).locator('.photo-status').textContent(), '');
+    assert.equal(await photoField(page).getByRole('button', { name: 'Retirer la photo', exact: true }).isVisible(), true, 'le retrait demandé pendant la préparation n\'a rien fait');
+    assert.equal(await press(page, 'Relire mes modifications').isEnabled(), true);
+    // Une fois la photo prête, le même bouton ouvre de nouveau le choix d'un fichier (le compteur fonctionne).
+    await photoField(page).getByRole('button', { name: 'Changer la photo', exact: true }).click();
+    assert.equal(await fileClicks(), 1);
+    assert.equal(await summary(page), '2 champs modifiés');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
+test('fermer la fenêtre pendant la préparation abandonne la photo : aucune erreur, et la fenêtre rouverte repart de la fiche', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await openOwn(page);
+    await slowImages(page, 1200);
+    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
+    await preparing(page);
+    await press(page, 'Annuler').click();
+    await closed(page);
+    // L'image abandonnée finit de se préparer : elle ne doit plus rien toucher.
+    await page.waitForTimeout(1800);
+    assert.deepEqual(await Promise.all(logs.errors), [], 'rien n\'est resté en route : aucune erreur');
+    await openOwn(page);
+    assert.equal(await photoField(page).locator('img[src^="blob:"]').count(), 0, 'la photo abandonnée ne revient pas');
+    assert.equal(await summary(page), 'Aucune modification');
+    assert.equal(await photoField(page).locator('.photo-status').textContent(), '');
+  }));
+
+test('sans jeton de lecture, la photo ne se montre pas mais se retire : la miniature de la photo actuelle dit qu\'elle est illisible', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL, accessToken: null }, async ({ page, logs }) => {
+    await openOwn(page);
+    assert.equal(await photoField(page).locator('.photo-preview .avatar').textContent(), 'AM', 'les initiales, faute de photo à montrer');
+    assert.equal(await photoField(page).locator('.photo-preview img').count(), 0);
+    await photoField(page).getByRole('button', { name: 'Retirer la photo', exact: true }).click();
+    const row = dialog(page).locator('.recap .diff-row');
+    assert.equal(await row.locator('.diff-label').textContent(), 'Photo de profil');
+    assert.equal(await row.locator('.thumb').count(), 0, 'pas de miniature sans jeton');
+    assert.deepEqual(await row.locator('.diff-val > *').allTextContents(), ['photo illisible', '→', 'photo retirée']);
+    await review(page);
+    assert.equal(await column(page, 'after').locator('.rv-note .mk-pill').textContent(), 'photo retirée');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
+test('sans miniatures, la ligne « Photo de profil » d\'une liste de changements se lit en mots', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    const words = await page.evaluate(async () => {
+      const { renderChangeList } = await import('./changes-ui.js');
+      const line = (before, after) => ({ key: 'Avatar', label: 'Photo de profil', kind: 'image', before, after });
+      return [line(0, 'replace'), line(501, 'replace'), line(501, 'remove')]
+        .map(entry => [...renderChangeList([entry]).querySelectorAll('.diff-val > *')].map(node => node.textContent));
+    });
+    assert.deepEqual(words, [
+      ['aucune photo', '→', 'nouvelle photo'],
+      ['photo actuelle', '→', 'nouvelle photo'],
+      ['photo actuelle', '→', 'photo retirée']
+    ]);
+  }));
+
 // ===== Retirer une photo =====
 
 test('« Retirer la photo » rend les initiales, se relit en rouge, n\'envoie rien et écrit une cellule vide', { skip }, () =>
@@ -664,6 +761,7 @@ test('« Retirer la photo » rend les initiales, se relit en rouge, n\'envoie ri
     assert.equal(await after.locator('.avatar img').count(), 0);
     assert.equal(await after.locator('.rv-note .mk-pill').textContent(), 'photo retirée');
     await waitForPhoto(column(page, 'before').locator('.contact-card .avatar'));
+    assert.equal(await dialog(page).locator('.contact-card .avatar-zoom').count(), 0, 'sur les cartes de la relecture, la photo n\'est pas un bouton : rien ne s\'y agrandit');
 
     await press(page, 'Valider').click();
     await closed(page);

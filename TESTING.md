@@ -100,6 +100,9 @@ Sans dépendance, un fichier de tests par module :
   formats, poids et fichier vide refusés avant lecture, image redessinée à 480 px au plus, SVG
   agrandi, PNG produit ; pour une photo, carré découpé au centre sans agrandir, 256 px au plus,
   JPEG, SVG refusé.
+- `tests/avatar-ui.test.mjs` — `photoSource` : l'identifiant d'une pièce jointe de Grist ou une
+  adresse `blob:` fabriquée par le navigateur sont les seules sources d'une photo ; toute autre
+  adresse, tout autre type et toute forme vide donnent « pas de photo ».
 - `tests/branding.test.mjs` — `buildBranding` (fondateurs validés du bandeau du bas dans
   l'ordre, financeurs, rond « France 2030 », logo de chaque établissement),
   `logoForContact`, `logoSize` et le branchement sur `loadDirectory` (table `Financeurs`
@@ -184,16 +187,18 @@ serveur, réponse illisible, jeton refusé), le fichier resté sans servir, le r
 pendant que la fenêtre est ouverte, Échap, le double clic, le clavier et les noms accessibles, la
 mise en page de 320 à 1280px et l'absence de tout appel réseau autre que l'API simulée.
 
-`tests/e2e-avatar.test.mjs` y ajoute 32 scénarios sur la photo de profil, avec des portraits servis par
+`tests/e2e-avatar.test.mjs` y ajoute 36 scénarios sur la photo de profil, avec des portraits servis par
 `tests/support/fake-attachments.mjs` : la photo à la place des initiales sur les cartes, dans le bandeau « Ma
 présence » et dans la liste des responsables (initiales sans photo, avec un fichier supprimé ou illisible, ou
 sans colonne `Avatar`), l'agrandissement au clic, à Entrée et à Espace et sa fermeture par chaque geste, la
 carte « Photo de profil » du formulaire, le choix d'un fichier (recadrage en carré de 256 px en JPEG, photo de
 téléphone remise à l'endroit et sans position GPS, JPG, WebP, PNG transparent posé sur du blanc, refus avant
-tout envoi), la relecture (anneau, pastille, miniatures), le retrait, l'ajout par une administratrice, les
+tout envoi), l'attente pendant la préparation de l'image (préparation ralentie : un second choix, le retrait et
+« Relire » ne font rien, fermer la fenêtre abandonne la photo sans erreur), la relecture (anneau, pastille,
+miniatures, une photo qui ne se charge pas faute de jeton), le retrait, l'ajout par une administratrice, les
 pannes de l'envoi (refus, jeton, réponse sans en-têtes d'autorisation entre sites), le fichier resté sans
-servir, le conflit pendant l'envoi, l'abandon d'une photo choisie, les cadres de 280 à 360px et les noms
-accessibles.
+servir, le conflit pendant l'envoi, l'abandon d'une photo choisie, les cadres de 280 à 390px (dont la fenêtre
+qui agrandit la photo, sans blanc sous la légende) et les noms accessibles.
 
 `tests/responsive.test.mjs` y ajoute 24 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
