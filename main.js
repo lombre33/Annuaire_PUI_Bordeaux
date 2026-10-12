@@ -1,9 +1,10 @@
 // Point d'entrée : relie l'API Grist et les événements du DOM aux modules
 // grist-data.js (lecture, enrichissement), filters.js (filtrage), render.js
 // (construction du DOM), identity.js et presence.js (la personne connectée et
-// son choix d'apparaître), account-ui.js (son bandeau) et, pour la modification
-// d'une fiche, profile.js / profile-save.js / preview.js (la logique) avec
-// profile-ui.js (la fenêtre).
+// son choix d'apparaître), account-ui.js (son bandeau), pour la modification d'une
+// fiche, profile.js / profile-save.js / preview.js (la logique) avec profile-ui.js (la
+// fenêtre), et branding.js, attachments.js et branding-ui.js (les logos : cartes,
+// financeurs, fondateurs).
 
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, referenceMapsEqual, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
@@ -14,6 +15,9 @@ import { createAccountBar } from './account-ui.js';
 import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges } from './profile.js';
 import { ProfileSaveError, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
 import { createProfileDialog } from './profile-ui.js';
+import { buildBranding, logoForContact } from './branding.js';
+import { createAttachments } from './attachments.js';
+import { createBrandingUI } from './branding-ui.js';
 
 const state = {
   allContacts: [],
@@ -32,6 +36,8 @@ const state = {
   // retrouver sa fiche.
   identity: null,
   people: null,
+  // Logos et financeurs (branding.js), vides tant que Grist n'a pas répondu.
+  branding: buildBranding(),
   // Ce que la personne connectée peut faire de chaque fiche (profile.js) : rien tant
   // qu'elle n'est pas identifiée.
   rightsOf: () => null,
@@ -57,6 +63,22 @@ const elements = {
 const accountBar = createAccountBar(document.getElementById('accountBar'), { onToggle: togglePresence, onEdit: openOwnProfile });
 
 const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
+
+// Les logos sont des pièces jointes de Grist : leurs adresses demandent un jeton,
+// réclamé à Grist seulement quand un logo est à afficher.
+const attachments = createAttachments(window.grist.docApi);
+const brandingUI = createBrandingUI({
+  funders: document.getElementById('funders'),
+  fundersLogos: document.getElementById('fundersLogos'),
+  band: document.getElementById('foundersBand'),
+  bandLogos: document.getElementById('bandLogos'),
+  bandRoundel: document.getElementById('bandRoundel'),
+  bandLink: document.getElementById('bandLink')
+}, attachments);
+
+// Ce qu'il faut à une carte pour montrer le logo de son établissement : la carte de
+// l'annuaire comme la carte « avant / après » de la relecture.
+const cardLogos = () => ({ attachments, logoFor: contact => logoForContact(state.branding, contact) });
 
 function toggleFilter(filterKey, value) {
   if (!state.activeFilters[filterKey]) state.activeFilters[filterKey] = new Set();
@@ -90,7 +112,7 @@ function rebuildFilterUI() {
 
 function refreshCards() {
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
-  renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf);
+  renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos());
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
   updateFilterCounts(elements.filtersContainer, currentCounts());
@@ -165,7 +187,18 @@ const recordsSequencer = createRequestSequencer();
 
 window.grist.ready({ requiredAccess: 'full' });
 
-function applyDirectory({ contacts, referenceMaps, etabFlags, people }) {
+// Les logos sont un habillage : une erreur ici ne doit jamais empêcher les cartes
+// de s'afficher.
+function applyBranding({ etablissementRows, financeurRows }) {
+  try {
+    state.branding = buildBranding({ etablissementRows, financeurRows });
+    brandingUI.render(state.branding);
+  } catch (error) {
+    console.error('[LOGOS] Impossible d\'afficher les logos :', error);
+  }
+}
+
+function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissementRows, financeurRows }) {
   const filterReferenceMaps = {
     ...referenceMaps,
     etablissement: filterVisibleEstablishments(referenceMaps.etablissement, etabFlags)
@@ -182,6 +215,7 @@ function applyDirectory({ contacts, referenceMaps, etabFlags, people }) {
   state.allContacts = contacts;
   state.people = people;
   state.etabFlags = etabFlags;
+  applyBranding({ etablissementRows, financeurRows });
   if (referenceMapsChanged) rebuildFilterUI();
   refreshCards();
   refreshAccount();
@@ -350,7 +384,7 @@ function openProfile(rowId, returnFocus) {
     review: draft => reviewProfile(row, draft),
     hiddenNotice: visibility => describeHiddenFiche(visibility, { own: rights === 'own' }),
     save: (review, draft) => saveReviewed(row, review, draft),
-    renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks),
+    renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks, cardLogos()),
     onClose: returnFocus
   });
 }

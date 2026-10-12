@@ -18,6 +18,11 @@
 # _grist_Tables et _grist_Tables_column pour écrire le téléphone dans la forme de sa
 # colonne. Il ne crée ni ne modifie jamais une table ou une colonne : voir GRIST_SETUP.md
 # pour les créer.
+#
+# Les logos (1.14.0) sont des pièces jointes du document : le widget lit les colonnes
+# facultatives logo et ordre_bandeau d'Etablissements et la table facultative Financeurs,
+# sans jamais y écrire. Pour afficher un fichier, il demande à Grist un jeton d'accès en
+# lecture seule (getAccessToken, attachments.js).
 
 Table BDD (table principale : une ligne par personne, lue par son nom via fetchTable)
   prenom, nom       : Text          OBLIGATOIRES (sans l'une d'elles, erreur explicite)
@@ -67,7 +72,17 @@ Tables de référence (id -> libellé, chargées via fetchTable)
   Chaque table porte un libellé brut (issu de l'import) et un libellé corrigé :
   le widget affiche le libellé corrigé quand il est rempli, le brut sinon.
   Actions            : Actions_corrigees (Choice)     puis Actions (Text)
+                       Le libellé commence par « Action n : » (ou « Action n: ») :
+                       ce numéro n rattache les tâches du même numéro à l'action
+                       (menu « Tâches » rangé par action).
   Taches             : Taches_corrige (Choice)        puis Taches (Text)
+                       Aucune colonne ne donne l'action d'une tâche : c'est le
+                       numéro avant le point de son libellé (« 1.3 Animer le
+                       réseau » est une tâche de l'action 1). Une tâche sans
+                       numéro, ou sans action de ce numéro, est classée sous
+                       « Sans action » ; si aucune tâche n'a son action, le menu
+                       Tâches reste à plat. Voir taskActionNumber() et
+                       actionNumber() dans grist-data.js.
   Communautes        : communautes_corrigees (Text)   puis communautes (Text)
   GT                 : GT_corrige (Choice)            puis GT (Text)
   Competences        : Competences_corrigees (Text)   puis Competences (Text)
@@ -93,7 +108,29 @@ Tables de référence (id -> libellé, chargées via fetchTable)
     fondateur OU partenaire, ET ayant validé (ok_pour_apparaitre = true),
     laisse voir ses contacts — "autres" n'est jamais affiché. Voir
     etablissementFlagsFromRows() / isEtablissementEligible() dans grist-data.js.
+    Colonnes facultatives de l'habillage (1.14.0), lues par branding.js :
+      logo          : Attachments   le logo de l'établissement, sur ses cartes et dans
+                                    le bandeau du bas. Seul le premier fichier est affiché ;
+                                    une cellule vide, ['L'] ou 0 n'a pas de logo (le nom
+                                    s'affiche à la place). Une cellule « Pièces jointes » arrive
+                                    sous la forme ['L', 12, 13] : des identifiants de fichiers.
+      ordre_bandeau : Numeric       la place de l'établissement dans le bandeau du bas, de
+                                    gauche à droite (1, 2, 3…). Seuls les fondateurs validés
+                                    (fondateur ET ok_pour_apparaitre) y figurent ; sans numéro
+                                    valable, ils passent après les autres, dans l'ordre de la table.
   Role_Dans_le_PUI   : Role (Text)
+
+Table Financeurs (facultative, à créer dans Grist à la main, voir GRIST_SETUP.md ; lue, jamais écrite)
+  nom   : Text         le nom du financeur : affiché à la place du logo quand le fichier manque,
+                       et lu par les lecteurs d'écran. Le financeur dont le nom est « France 2030 »
+                       (casse et accents ignorés) ferme aussi le bandeau du bas, sous la forme d'un rond
+                       (BRANDING.roundelFunder dans constants.js).
+  logo  : Attachments  le logo du financeur (le premier fichier)
+  ordre : Numeric      l'ordre des logos en haut de la page, de gauche à droite (1, 2, 3…)
+  Pas de table Financeurs : l'en-tête n'a simplement pas de financeurs, sans aucun message.
+  Pourquoi une table : les financeurs ne sont pas des établissements, les ranger dans
+  Etablissements les ferait apparaître dans le filtre « Établissement » et dans les règles de
+  visibilité. Voir branding.js.
 
 Table Annuaire_Sonde (à créer dans Grist, voir GRIST_SETUP.md ; vide au repos)
   Email : Text    formule de déclenchement `user.Email`, appliquée aux nouvelles

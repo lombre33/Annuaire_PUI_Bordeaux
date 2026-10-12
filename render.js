@@ -1,8 +1,9 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
-import { CATEGORIES, TAG_GROUPS, FILTERS } from './constants.js';
+import { CATEGORIES, TAG_GROUPS, FILTERS, CARD_LOGO } from './constants.js';
 import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, sortWithCheckedFirst, normalize } from './grist-data.js';
 import { groupState, menuGroups, selectionCount } from './filters.js';
+import { createLogoImage, sizeLogo } from './branding-ui.js';
 
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
@@ -403,11 +404,30 @@ function showTextChange(element, mark, format = value => value) {
   }
 }
 
-function fillEtablissement(badge, label, onToggle) {
+// L'établissement d'une carte : son logo seul quand Grist en a un, sinon son nom dans
+// une pastille. `logo` : { attachment, name, attachments } (voir buildCard), ou null.
+// Si le logo ne se charge pas, le nom reprend sa place.
+function fillEtablissement(badge, label, onToggle, logo) {
   if (!label) return;
-  reveal(badge, label);
   if (onToggle) badge.addEventListener('click', () => onToggle('etablissement', label));
   else badge.disabled = true;
+  if (!logo) {
+    reveal(badge, label);
+    return;
+  }
+  // `with-logo` donne au logo, plus haut que la pastille, la place des deux rangées du nom
+  // et de la fonction (style.css) : sa hauteur ne décentre pas le nom par rapport à l'avatar.
+  const body = badge.closest('.card-body');
+  const showName = () => {
+    badge.classList.remove('has-logo');
+    body?.classList.remove('with-logo');
+    badge.replaceChildren();
+    reveal(badge, label);
+  };
+  badge.classList.add('visible', 'has-logo');
+  body?.classList.add('with-logo');
+  badge.title = logo.name;
+  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { onLoad: image => sizeLogo(image, CARD_LOGO) }));
 }
 
 // Sans `onToggle` (carte de relecture), l'adresse est du texte : un clic ne doit pas
@@ -483,9 +503,11 @@ function fillActions(box, contact, rights) {
 }
 
 // `view` : { rights } pour la grille ('own', 'admin' ou rien), { marks } pour une
-// carte de relecture (voir renderPreviewCard).
+// carte de relecture (voir renderPreviewCard), { logos } de quoi montrer le logo de
+// l'établissement : { attachments, logoFor(contact) } (attachments.js, branding.js) ;
+// sans eux la carte garde la pastille texte.
 function buildCard(template, contact, onToggle, view = {}) {
-  const { rights = null, marks = null } = view;
+  const { rights = null, marks = null, logos = null } = view;
   const card = template.content.cloneNode(true);
   card.querySelector('.avatar').textContent = initials(contact);
 
@@ -497,7 +519,9 @@ function buildCard(template, contact, onToggle, view = {}) {
   if (marks?.texts.fonction) showTextChange(fonction, marks.texts.fonction);
   else if (contact.Fonction) reveal(fonction, contact.Fonction);
 
-  fillEtablissement(card.querySelector('.etablissement-tag'), contact.etablissement_label, onToggle);
+  const etablissement = logos?.attachments && logos.logoFor?.(contact);
+  fillEtablissement(card.querySelector('.etablissement-tag'), contact.etablissement_label, onToggle,
+    etablissement?.logo ? { attachment: etablissement.logo, name: etablissement.name, attachments: logos.attachments } : null);
   fillEmail(card.querySelector('.email'), contact.email, Boolean(onToggle));
 
   const tel = card.querySelector('.tel');
@@ -511,15 +535,16 @@ function buildCard(template, contact, onToggle, view = {}) {
 }
 
 // `rightsOf(contact)` (facultatif) dit ce que la personne connectée peut faire de la
-// fiche : 'own', 'admin' ou rien.
-export function renderCards(grid, template, contacts, onToggle, rightsOf = () => null) {
+// fiche : 'own', 'admin' ou rien. `logos` (facultatif) : de quoi montrer le logo de
+// l'établissement, voir buildCard.
+export function renderCards(grid, template, contacts, onToggle, rightsOf = () => null, logos = null) {
   grid.innerHTML = '';
-  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle, { rights: rightsOf(contact) })));
+  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle, { rights: rightsOf(contact), logos })));
 }
 
 // Une carte pour la relecture d'une modification : même gabarit et mêmes classes que
 // dans l'annuaire, mais rien n'y est cliquable. `marks` (preview.js) repère dans la
 // carte « après » ce qui a changé ; sans lui, c'est la carte « avant ».
-export function renderPreviewCard(template, contact, marks = null) {
-  return buildCard(template, contact, null, { marks });
+export function renderPreviewCard(template, contact, marks = null, logos = null) {
+  return buildCard(template, contact, null, { marks, logos });
 }

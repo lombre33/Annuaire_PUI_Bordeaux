@@ -119,3 +119,29 @@ export function crowdedTablesByAction(count = CROWDED_CONTACT_COUNT) {
   tables.BDD.Taches = Array.from({ length: count }, (_, i) => list(i, TACHES_NUMEROTEES.length, i % 5));
   return tables;
 }
+
+// L'habillage par-dessus le jeu chargé (GRIST_SETUP.md) : un logo par établissement (les
+// fichiers 101, 102… de tests/support/fake-attachments.mjs, de proportions variées),
+// l'ordre du bandeau, et les quatre financeurs. Les 17 établissements sont fondateurs :
+// le bandeau montre 17 logos, un compte impair qui laisse une dernière rangée incomplète.
+export function crowdedBranding(tables = crowdedTables()) {
+  const copy = structuredClone(tables);
+  copy.Etablissements.logo = copy.Etablissements.id.map(id => ['L', 100 + id]);
+  copy.Etablissements.ordre_bandeau = [...copy.Etablissements.id];
+  copy.Financeurs = {
+    id: [1, 2, 3, 4],
+    nom: ['République française', 'ANR', 'Bpifrance', 'France 2030'],
+    logo: [['L', 21], ['L', 22], ['L', 24], ['L', 23]],
+    ordre: [1, 2, 3, 4]
+  };
+  return copy;
+}
+
+// Le jeu chargé complété de ce qu'il faut pour identifier une personne connectée (ACL et
+// la table-sonde, GRIST_SETUP.md) : `email` doit être celui d'une ligne de BDD.
+export function crowdedIdentity(tables, email, { admin = false } = {}) {
+  const copy = structuredClone(tables);
+  copy.ACL = { id: [1], email: [email], Responsable_de_l_Etablissement: [0], admin: [admin] };
+  copy.Annuaire_Sonde = { id: [], Email: [], Admin: [] };
+  return copy;
+}

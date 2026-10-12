@@ -569,19 +569,36 @@ test('les textes ne grossissent que sous 600px ou au tactile : le bureau garde s
     });
   }));
 
-test('sur téléphone, le compteur de résultats passe sous le titre au lieu de le comprimer', { skip }, () =>
+test('le compteur de résultats reste à côté du titre quand il y a la place, passe dessous sinon au lieu de le comprimer', { skip }, () =>
   withWidget({ width: 1480 }, async ({ page }) => {
-    const header = () => page.evaluate(() => {
-      const rect = selector => document.querySelector(selector).getBoundingClientRect();
-      const { top, bottom, right } = rect('.page-header > div:first-child');
-      return { titleTop: top, titleBottom: bottom, titleRight: right, countTop: rect('#resultCount').top, countLeft: rect('#resultCount').left };
+    await atEachWidth(page, [320, 360, 414, 600, 768, 1024, 1480], async width => {
+      const { line, h1, count } = await page.evaluate(() => {
+        const rect = selector => {
+          const { left, right, top, bottom, width, height } = document.querySelector(selector).getBoundingClientRect();
+          return { left, right, top, bottom, width, height };
+        };
+        return { line: rect('.title-line'), h1: rect('h1'), count: rect('#resultCount') };
+      });
+      const message = `à ${width}px`;
+      // Selon la police, le titre et le compteur tiennent ou non côte à côte (écart de 14px) : dans les deux cas,
+      // le titre garde sa ligne et le compteur ne le recouvre jamais.
+      assert.ok(h1.height <= 1.5 * 34, `${message} : le titre tient sur une ligne (${Math.round(h1.height)}px de haut)`);
+      if (h1.width + 14 + count.width <= line.width + 0.5) {
+        assert.ok(count.left >= h1.right + 8, `${message} : le compteur est à droite du titre`);
+        assert.ok(Math.abs((count.top + count.bottom) / 2 - (h1.top + h1.bottom) / 2) <= 12, `${message} : sur la ligne du titre`);
+      } else {
+        assert.ok(count.top >= h1.bottom - 0.5, `${message} : le compteur passe sous le titre`);
+        assert.ok(Math.abs(count.left - line.left) <= 1, `${message} : aligné à gauche, comme le titre`);
+      }
+      assert.ok(count.right <= line.right + 0.5, `${message} : le compteur reste dans l'en-tête`);
     });
-    const wide = await header();
-    assert.ok(wide.countLeft >= wide.titleRight - 0.5 && wide.countTop < wide.titleBottom, 'à 1480px, le compteur est à droite du titre');
-    await atEachWidth(page, [320, 360], async width => {
-      const narrow = await header();
-      assert.ok(narrow.countTop >= narrow.titleBottom - 0.5, `à ${width}px, le compteur est sous le titre`);
+    // À 1480px il y a de la place : la phrase de départ de ce test reste vraie sur grand écran.
+    await resize(page, 1480);
+    const wide = await page.evaluate(() => {
+      const h1 = document.querySelector('h1').getBoundingClientRect();
+      return { sameLine: document.getElementById('resultCount').getBoundingClientRect().left >= h1.right };
     });
+    assert.equal(wide.sameLine, true, 'à 1480px, le compteur est à droite du titre');
   }));
 
 // ===== États particuliers =====

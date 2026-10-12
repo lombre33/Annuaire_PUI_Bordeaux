@@ -20,14 +20,19 @@ Features
   * Avatar : Pas d'avatar mais à la rigueur les initiales de la personne joliment indiquées dans une bulle. 
   * Nom Prénom 
   * Fonction (si renseignée, vide sinon)
-  * Établissement
+  * Établissement : son logo, seul (son nom ne s'affiche, dans une pastille, que si Grist n'a pas de logo pour lui) (1.14.0)
   *  Email
   *  Tel si renseigné
   *  Les Instances, Actions, GT, communautés Role dans le PUI auxquelles la personne fait partie (le cas échéant)
+* En-tête et pied de page (décisions d'Antoine du 12/10/2026, 1.14.0) : le PUI est le consortium de tous ses établissements fondateurs et n'a pas d'identité graphique propre, ce sont leurs logos qui l'habillent.
+  * Un seul bandeau d'en-tête, pour limiter la place prise : le titre en haut à gauche, les financeurs (ANR, France 2030…) discrets au centre, la zone du profil à droite.
+  * Un bandeau tout en bas avec les logos des établissements fondateurs, dans l'ordre et à la position du bandeau fourni par le PUI, fermé par le rond « France 2030 » et la phrase de financement.
+  * Les logos sont stockés dans le document Grist (pièces jointes), jamais dans le dépôt, et sont facultatifs : sans eux, les noms s'affichent.
 * Filtres
   * Un champs de texte libre qui recherche sur le nom prénom
   * 6 filtres pour les instances, actions, GT, Taches compétances et communauté
   * Le menu « Compétences » range les compétences par domaine (les compétences macro, colonne Macro_competences de la table Competences) et se cherche à deux niveaux (décision d'Antoine du 12/10/2026, 1.13.0 ; il n'y a plus de filtre « Domaines » à part, qui existait en 1.9.0) : cocher un domaine coche toutes ses compétences, la flèche d'un domaine déplie le détail, et le champ de recherche du menu trouve un domaine comme une compétence. Il n'y a qu'une sélection, faite de compétences : tout est un OU dans le menu. Les cartes ne changent pas.
+  * Le menu « Tâches » range les tâches par action, de la même façon (demande d'Antoine du 12/10/2026, 1.15.0) : cocher une action coche toutes ses tâches, la flèche d'une action déplie le détail, et le champ de recherche du menu trouve une action comme une tâche. L'action d'une tâche n'est pas une colonne : c'est le numéro avant le point du libellé de la tâche (« 1.3 … » est une tâche de l'action 1, dont le libellé commence par « Action 1 »). Une tâche sans numéro, ou sans action de ce numéro, est rangée sous « Sans action ». Le filtre Actions ne change pas. Les cartes ne changent pas.
   * Nous n'afficherons QUE les contacts ayant au moins une valeur dans la colonne perimetre de la table BDD (même si nous n'avons pas clairement les périmètres, la colonne sert juste à cela)
   * Consentement individuel : un contact n'apparaît que si la personne a accepté d'apparaître (colonne Accepte_apparaitre de BDD, une case à cocher). Seul « coché » vaut accord ; une case vide ou décochée masque la personne. Ce consentement s'ajoute aux règles ci-dessous, il ne les remplace pas.
   * « Ma présence » : la personne connectée à Grist (identifiée par l'adresse e-mail de sa ligne de BDD) voit en haut de l'annuaire si elle apparaît et peut changer son accord d'un clic (colonne Accepte_apparaitre). C'est un verrou d'interface : seules les règles d'accès de Grist protègent vraiment les données (voir GRIST_SETUP.md).

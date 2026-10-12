@@ -16,24 +16,28 @@ node --test
 Sans dépendance, un fichier de tests par module :
 
 - `tests/grist-data.test.mjs` — décodage et formats des données Grist : `text`,
-  `normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
-  `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `refId`, `refLabel`, `isEmptyReference`,
+  `normalize`, `compareLabels` (les nombres dans l'ordre), `formatPhone`, `safeValues`, `tableToRows`,
+  `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `taskActionNumber`, `actionNumber`,
+  `refId`, `refLabel`, `isEmptyReference`,
   `resolveListItem`, `isInScope`, `createRequestSequencer`,
   `referenceMapsEqual`, `mailtoHref`.
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
-  catégories liste dont compétences et domaines, libellés sans doublon, anciennes
+  catégories liste dont compétences, domaines, tâches et actions, libellés sans doublon, anciennes
   colonnes ignorées, indicateurs) et `labelsOf`.
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
   libellé), `isEtablissementEligible`, `filterVisibleEstablishments`.
 - `tests/filters.test.mjs` — `filterContacts`, `pruneStaleFilters`,
-  `computeFilterCounts` (dont les compteurs des domaines) et le menu rangé par
-  domaine : `menuGroups`, `groupState`, `toggleGroup`, `selectionCount`.
+  `computeFilterCounts` (dont les compteurs des domaines et des actions) et le menu
+  rangé par groupe, domaine ou action : `menuGroups`, `groupState`, `toggleGroup`,
+  `selectionCount`.
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
   (une lecture par table, aucune ancienne table lue, libellé corrigé
   prioritaire, tables indispensables illisibles, table de référence illisible,
   colonnes obligatoires, facultatives ou introuvables, annuaire vide expliqué,
-  doublons d'acronymes, domaines des compétences).
+  doublons d'acronymes, domaines des compétences, tâches rangées par action
+  d'après leur numéro : formats de libellé, repli « Sans action », menu à plat,
+  lectures en panne).
 - `tests/identity.test.mjs` — `readIdentity` avec un faux document Grist (adresse
   lue sur la ligne de la sonde, administrateur d'après `ACL`, compte Lecteur,
   table-sonde absente, formule muette, écriture refusée, lecture en panne, ligne de
@@ -58,12 +62,27 @@ Sans dépendance, un fichier de tests par module :
 - `tests/preview.test.mjs` — `diffContacts` et `previewOf` : ce qui change entre la
   carte avant et la carte après.
 - `tests/schema.test.mjs` — `readColumnTypes` (type des colonnes de `BDD`, repli).
+- `tests/attachments.test.mjs` — `attachmentIds` (cellules `['L', …]`, identifiant seul,
+  cellule vide) et `createAttachments` (jeton en lecture seule demandé une seule fois,
+  renouvelé avant son expiration, échecs et délai d'attente, réponses inattendues,
+  aucune adresse ni aucun jeton dans la console).
+- `tests/branding.test.mjs` — `buildBranding` (fondateurs validés du bandeau du bas dans
+  l'ordre, financeurs, rond « France 2030 », logo de chaque établissement),
+  `logoForContact`, `logoSize` et le branchement sur `loadDirectory` (table `Financeurs`
+  facultative).
 - `tests/support/fake-grist.js` — le faux document Grist commun aux tests Node et
   au test navigateur : lectures, `applyUserActions` atomique (ajout, modification,
   suppression), formules déclenchées de la sonde, pannes, écritures refusées (par
   table ou par ligne).
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : serveur
   statique, Chromium, faux Grist injecté dans la page.
+- `tests/support/grouped-menu.mjs` — les aides communes aux tests des menus rangés par
+  groupe (Compétences par domaine, Tâches par action) : groupe, case, flèche,
+  nombres, éléments visibles.
+- `tests/support/fake-attachments.mjs` — les pièces jointes du faux Grist pour les tests
+  navigateur : des logos dessinés à la demande (proportions variées, un logo très haut,
+  une bannière très large, un SVG sans dimensions), un fichier supprimé (404), un
+  fichier qui n'est pas une image, et un compte des téléchargements et des jetons employés.
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
@@ -82,6 +101,15 @@ double clic, écriture refusée, personne sans fiche).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
+`tests/e2e-taches.test.mjs` y ajoute 24 scénarios sur le menu Tâches rangé par action,
+sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
+sept boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
+en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
+filtres, nombres de cartes, recherche d'une action, d'une tâche ou d'un numéro, tag de
+carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numéros (console
+et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
+les tâches par action.
+
 `tests/e2e-profile.test.mjs` y ajoute 43 scénarios sur la modification d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur, compte Lecteur,
 anonyme, adresse inconnue, doublon), le formulaire et ses refus, la relecture (carte
@@ -90,16 +118,25 @@ action, la fiche modifiée par un administrateur, le téléphone numérique ou t
 refus de Grist, un changement concurrent, une fiche supprimée, le double clic, Échap,
 un prénom piégé, le focus, la tabulation dans la fenêtre et l'affichage de 280 à 360px.
 
-`tests/responsive.test.mjs` y ajoute 19 scénarios sur la mise en page, de 280 à
+`tests/responsive.test.mjs` y ajoute 20 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
-d'outils, menus de filtres (le menu Compétences déplié compris) entièrement dans le
-cadre, cibles tactiles (écran
+d'outils, menus de filtres (les menus Compétences et Tâches dépliés compris) entièrement
+dans le cadre, cibles tactiles (écran
 tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
+
+`tests/branding-e2e.test.mjs` y ajoute 27 scénarios sur l'habillage, avec des logos servis par
+`tests/support/fake-attachments.mjs` : logo seul sur les cartes, pastille texte quand il manque,
+clic et clavier, jeton demandé une seule fois et en lecture seule, financeurs, bandeau des
+fondateurs dans l'ordre, rond « France 2030 », jeton refusé ou méthode absente, fichier
+supprimé ou illisible, aucune trace du jeton dans la console, relecture d'une fiche.
+`tests/branding-layout.test.mjs` y ajoute 13 scénarios sur la mise en page de l'habillage, de
+320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case,
+bandeau du bas qui se replie, rien qui dépasse du cadre.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -139,8 +176,8 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
       Instances, Établissement) sont présents dans la barre d'outils. Il n'y a
       pas de bouton « Domaines » : les domaines sont dans le menu Compétences.
 - [ ] Sur une carte avec toutes les infos renseignées : initiales correctes
-      dans l'avatar, nom + prénom, fonction visible, badge établissement en
-      haut à droite, email en lien `mailto:`, téléphone visible.
+      dans l'avatar, nom + prénom, fonction visible, logo (ou pastille)
+      de l'établissement en haut à droite, email en lien `mailto:`, téléphone visible.
 - [ ] Sur une carte avec des infos manquantes (pas de fonction / pas
       d'email / pas de téléphone) : les lignes correspondantes sont
       absentes, pas affichées vides.
@@ -241,6 +278,37 @@ valeurs par domaine, sans second bouton.
 - [ ] Sans la colonne `Macro_competences` (essai sur une copie du document) : le
       bandeau « Colonne de libellé introuvable » s'affiche et le menu Compétences
       reste complet, mais à plat, sans domaines.
+
+Spécifique **Tâches par action** : le menu Tâches range ses valeurs par action, sans
+second bouton et sans colonne à ajouter dans Grist. Le numéro avant le point du libellé
+d'une tâche (« 2.1 … ») est celui de son action, dont le libellé commence par « Action 2 ».
+Le menu Tâches fonctionne comme le menu Compétences par domaine (ci-dessus) : reprendre
+les mêmes essais en remplaçant domaine par action et compétence par tâche, puis :
+
+- [ ] L'infobulle du bouton « Tâches » parle d'actions ; le champ de recherche du menu
+      dit « Action ou tâche… » en entier, sans être coupé.
+- [ ] Les actions sont dans l'ordre de leur numéro (« Action 2 » avant « Action 10 »),
+      chaque tâche sous l'action dont elle porte le numéro, et les tâches d'une action
+      dans l'ordre de leur numéro (« 1.2 » avant « 1.10 »). « Sans action » est **en
+      dernier** s'il existe une tâche sans numéro, ou dont le numéro ne correspond à
+      aucune action. Une action qui n'a aucune tâche ne figure pas dans le menu.
+- [ ] Le filtre **Actions** est inchangé : toujours une liste à plat, qui filtre sur les
+      actions inscrites sur les cartes, et qui ne coche pas le menu Tâches (ni
+      l'inverse). Les deux se cumulent (ET).
+- [ ] Rechercher « 2.1 » (le numéro d'une tâche) garde cette tâche sous son action ;
+      « action 2 » garde l'action avec toutes ses tâches.
+- [ ] Renuméroter une tâche dans `Taches` (par exemple « 2.1 … » devient « 1.4 … »)
+      puis recharger : elle change d'action. Une sélection qui portait l'ancien libellé
+      est retirée.
+- [ ] La console liste, par identifiant de ligne, les tâches classées sous « Sans
+      action » (`[REFS] Taches : n ligne(s) sans regroupement…`) : les numéroter dans
+      Grist, puis recharger le widget.
+- [ ] Sur une copie du document où **aucune tâche** ne commence par un numéro « n.m »
+      (ou aucune action par « Action n »), le menu Tâches reste complet, mais à plat,
+      sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches : aucune
+      ligne n'est rattachée à une action…`).
+- [ ] Dans la fenêtre « Modifier mon profil », la liste des tâches est rangée par action
+      elle aussi, et celle des actions reste à plat.
 
 ## 4. Filtres combinés
 
@@ -373,7 +441,7 @@ Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde
       s'affiche comme avant, la console dit `[IDENTITE] table « Annuaire_Sonde »
       introuvable`.
 - [ ] Avec la table, un compte qui peut modifier le document et dont l'adresse est
-      dans `BDD.email` : le bandeau apparaît au-dessus des filtres avec son nom et
+      dans `BDD.email` : le bandeau apparaît à droite de l'en-tête avec son nom et
       sa situation ; la console dit `[IDENTITE] personne identifiée (administrateur :
       oui|non)` sans aucune adresse ; la table `Annuaire_Sonde` est vide.
 - [ ] Administrateur : le compte dont l'adresse est dans `ACL` avec `admin` coché
@@ -412,11 +480,12 @@ iOS, Chrome Android) que les tests ne couvrent pas :
       de la rangée : il reste entièrement visible, sans être coupé à droite, et
       se referme d'un clic ailleurs. Élargir le cadre puis le rouvrir : il
       s'ouvre de nouveau sous son bouton.
-- [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit :
-      aucune barre de défilement horizontale, un nom de compétence très long
-      passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et le
-      nombre de chaque domaine restent visibles, et la flèche se touche sans
-      viser.
+- [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit
+      (et de même le menu Tâches avec une action dépliée) : aucune barre de
+      défilement horizontale, un nom de compétence, de tâche ou d'action très
+      long passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et
+      le nombre de chaque domaine ou action restent visibles, et la flèche se
+      touche sans viser.
 - [ ] Carte avec un nom, un prénom et une fonction très longs : le nom tient sur
       deux lignes au plus, le badge d'établissement reste à sa droite, rien ne
       passe sous le badge ni hors de la carte.
@@ -482,3 +551,54 @@ administrateur) dans deux navigateurs, console ouverte.
 - [ ] Téléphone ou tablette : la fenêtre tient dans l'écran, les cartes avant et après
       sont l'une sous l'autre, « Valider » reste accessible.
 - [ ] La console ne montre aucune erreur ni aucune adresse e-mail.
+
+## 14. Logos et habillage (1.14.0)
+
+Réglages d'abord : `GRIST_SETUP.md`, étape 5 (colonnes `logo` et `ordre_bandeau` d'`Etablissements`, table
+facultative `Financeurs`). À jouer sur une **copie** du document, avec la console et l'onglet Réseau du
+navigateur ouverts (F12). **Ce protocole est le seul contrôle du jeton d'accès et des adresses de pièces
+jointes : les tests automatiques simulent la réponse de Grist.** Si un point échoue, relever le message de
+la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
+
+- [ ] Document sans aucune colonne ni table de logos : aucune erreur, aucune ligne `[LOGOS]`, aucune demande de
+      jeton dans l'onglet Réseau, pas de financeurs en tête de page, les pastilles texte sur les cartes comme
+      avant la 1.14.0, et en bas de page le bandeau des fondateurs validés **en texte** (leurs acronymes).
+- [ ] Un logo (PNG ou SVG) ajouté dans la colonne `logo` de deux établissements fondateurs validés, puis le
+      widget rechargé : le logo remplace la pastille sur leurs cartes, **seul** (ni nom dessous) ; les autres
+      établissements gardent leur pastille. Cliquer le logo filtre sur l'établissement, comme la pastille.
+- [ ] Onglet Réseau : **une seule** demande de jeton au chargement, puis une demande par logo à une adresse de
+      la forme `…/attachments/<numéro>/download?auth=…`, réponse 200 de type image (pas 401, 403 ni 404).
+      Aucune ligne `[LOGOS]` dans la console.
+- [ ] Table `Financeurs` remplie (`nom`, `logo`, `ordre`) : au centre de l'en-tête (cadre assez large), la phrase
+      « Projet financé par l'État dans le cadre de France 2030 » puis les logos, dans l'ordre d'`ordre`.
+- [ ] Bandeau tout en bas : seuls les fondateurs **validés**, dans l'ordre d'`ordre_bandeau` ; le rond
+      « France 2030 » à droite (le financeur de ce nom) ; la phrase de financement dont le lien ouvre la page
+      du projet dans un nouvel onglet ; une infobulle donne le nom complet de chaque établissement.
+- [ ] **Les droits** : avec un compte **Lecteur**, puis un compte **Éditeur**, les logos s'affichent dans les
+      deux cas (le jeton demandé est en lecture seule). Les règles d'accès de l'étape 4 posées, un compte
+      ordinaire voit toujours les logos ; sinon, noter lesquels sont refusés (les noms les remplacent, sans
+      bandeau rouge).
+- [ ] **Expiration du jeton** : laisser la page ouverte plus longtemps que sa validité (quelques minutes),
+      puis cocher et décocher un filtre : les logos des cartes reviennent (un nouveau jeton est demandé, visible
+      dans l'onglet Réseau), sans cadre cassé ni nom à leur place.
+- [ ] Supprimer le fichier de la cellule `logo` d'un établissement, recharger : seul cet établissement retrouve
+      sa pastille (et son nom dans le bandeau du bas) ; les autres logos sont intacts, sans bandeau rouge.
+- [ ] Renommer temporairement la table `Financeurs` : les financeurs disparaissent, sans erreur ni bandeau
+      rouge. Remettre son nom. Même chose avec la colonne `logo` : les noms remplacent les logos partout.
+- [ ] Remplacer un logo dans Grist puis recharger le widget : le nouveau logo apparaît (sans recharger, rien ne
+      change : Grist ne prévient pas le widget d'un changement d'`Etablissements`).
+- [ ] Un logo SVG qui n'a ni `width` ni `height` (seulement un `viewBox`) s'affiche à une taille raisonnable ;
+      un logo en hauteur et une bannière large ont un poids visuel voisin de leurs voisins.
+- [ ] Mise en page, en réduisant la section du widget : à partir de 1180px, le titre à gauche, les financeurs
+      au centre (leur phrase de financement ne s'ajoute qu'à partir de 1320px), le profil à droite ; de 860 à
+      1179px, les financeurs au-dessus du profil, à droite ; sous 860px, tout est empilé ; les financeurs du haut
+      sont en niveaux de gris, le rond du bandeau du bas en couleurs ; quand la largeur utile du bandeau du bas
+      passe sous 560px, ses logos se
+      répartissent sur quatre colonnes au lieu de huit. Aucune barre de
+      défilement horizontale, aucun logo déformé ni coupé.
+- [ ] Console : aucune erreur, aucune adresse e-mail, ni jeton ni adresse d'image dans les lignes écrites par
+      le widget (le navigateur, lui, en écrit une pour une image introuvable : ne pas la partager).
+- [ ] Clavier et lecteur d'écran (au moins une fois) : un logo de carte se focalise avec Tab et s'active avec
+      Entrée ; les logos sont lus par le nom de l'établissement ; le logo seul garde un nom accessible.
+- [ ] La relecture d'une modification de fiche montre le logo de l'établissement sur les deux cartes, sans rien
+      de cliquable.
