@@ -5,8 +5,8 @@
 // logos sur les cartes, le bandeau des fondateurs en bas. Rien ne dépasse du cadre, les
 // logos restent dans leur case quelle que soit leur forme, le bandeau se replie.
 //
-// Les seuils sont ceux de style.css (980 et 1170px pour l'en-tête, 560px de large utile
-// pour le bandeau, 600px pour le téléphone). Les contrôles ne dépendent pas de la police
+// Les seuils sont ceux de style.css (860 et 1180px pour l'en-tête, 1320px pour la légende des
+// financeurs, 560px de large utile pour le bandeau, 600px pour le téléphone). Les contrôles ne dépendent pas de la police
 // installée : des positions relatives, des dépassements, et des tailles bornées par les
 // constantes de constants.js.
 //
@@ -168,39 +168,48 @@ test('avec les logos, aucun défilement horizontal du téléphone (320px) au gra
 
 // ===== En-tête : titre, compteur, financeurs =====
 
-test('en-tête : financeurs sous le titre sous 980px, à sa droite de 980 à 1299px, au centre dès 1300px', { skip }, () =>
+test('en-tête : financeurs sous le titre sous 860px, à sa droite de 860 à 1179px, au centre dès 1180px', { skip }, () =>
   withWidget({}, async ({ page }) => {
-    await atEachWidth(page, [320, 360, 414, 599, 600, 768, 979, 980, 1024, 1279, 1299, 1300, 1400, 1480, 1920], async width => {
+    await atEachWidth(page, [320, 360, 414, 599, 600, 768, 859, 860, 1024, 1179, 1180, 1200, 1319, 1320, 1400, 1480, 1920], async width => {
       const header = await rectOf(page, '.page-header');
       const title = await rectOf(page, '.page-title');
       const funders = await rectOf(page, '#funders');
       const message = `à ${width}px`;
       assert.ok(funders.width > 0 && funders.height > 0, `${message} : les financeurs s'affichent`);
       assert.ok(funders.left >= header.left - 0.5 && funders.right <= header.right + 0.5, `${message} : les financeurs tiennent dans l'en-tête`);
-      if (width < 980) {
+      if (width < 860) {
         assert.ok(funders.top >= title.bottom - 0.5, `${message} : les financeurs passent sous le titre`);
         assert.ok(Math.abs(funders.left - title.left) <= 1, `${message} : alignés à gauche, comme le titre`);
       } else {
         assert.ok(funders.left >= title.right + 12, `${message} : les financeurs sont à droite du titre, sans le toucher`);
         assert.ok(funders.top < title.bottom && title.top < funders.bottom, `${message} : sur la bande du titre`);
       }
-      if (width >= 980 && width < 1300) {
+      if (width >= 860 && width < 1180) {
         assert.ok(Math.abs(funders.right - header.right) <= 1, `${message} : calés à droite de l'en-tête`);
         assert.ok(Math.abs(funders.top - header.top) <= 1, `${message} : en haut de l'en-tête`);
       }
-      if (width >= 1300) {
+      if (width >= 1180) {
         assert.ok(Math.abs(centerX(funders) - centerX(header)) <= 1,
           `${message} : financeurs au centre (décalés de ${Math.round(centerX(funders) - centerX(header))}px)`);
       }
+      // Entre 1180 et 1319px, la légende est trop large pour garder les financeurs au centre : elle
+      // n'est plus qu'un texte pour les lecteurs d'écran (toujours dans la page).
+      const label = await page.locator('.funders-label').evaluate(element => {
+        const box = element.getBoundingClientRect();
+        return { width: box.width, text: element.textContent.trim() };
+      });
+      assert.equal(label.text, 'Projet financé par l\'État dans le cadre de France 2030', `${message} : la légende reste dans la page`);
+      if (width >= 1180 && width < 1320) assert.ok(label.width <= 2, `${message} : la légende est cachée (${Math.round(label.width)}px)`);
+      else assert.ok(label.width > 40, `${message} : la légende s'affiche (${Math.round(label.width)}px)`);
     });
   }));
 
 // « Ma présence » : la personne connectée (ici Camille, ligne 2 de BDD) a sa zone dans l'en-tête.
 const CAMILLE = 'contact1@bordeaux.example';
 
-test('en-tête avec « Ma présence » : un seul bandeau dès 1300px, titre, financeurs au centre, profil à droite', { skip }, () =>
+test('en-tête avec « Ma présence » : un seul bandeau dès 1180px, titre, financeurs au centre, profil à droite', { skip }, () =>
   withWidget({ tables: crowdedIdentity(crowdedBranding(), CAMILLE), user: CAMILLE }, async ({ page }) => {
-    await atEachWidth(page, [1300, 1400, 1480, 1920], async width => {
+    await atEachWidth(page, [1180, 1200, 1319, 1320, 1400, 1480, 1920], async width => {
       const header = await rectOf(page, '.page-header');
       const title = await rectOf(page, '.page-title');
       const funders = await rectOf(page, '#funders');
@@ -216,9 +225,9 @@ test('en-tête avec « Ma présence » : un seul bandeau dès 1300px, titre, fin
     });
   }));
 
-test('en-tête avec « Ma présence » : sous les financeurs à droite de 980 à 1299px, pleine largeur sous 980px', { skip }, () =>
+test('en-tête avec « Ma présence » : sous les financeurs à droite de 860 à 1179px, pleine largeur sous 860px', { skip }, () =>
   withWidget({ tables: crowdedIdentity(crowdedBranding(), CAMILLE), user: CAMILLE }, async ({ page }) => {
-    await atEachWidth(page, [320, 360, 600, 768, 979, 980, 1024, 1299], async width => {
+    await atEachWidth(page, [320, 360, 600, 768, 859, 860, 1024, 1179], async width => {
       const header = await rectOf(page, '.page-header');
       const title = await rectOf(page, '.page-title');
       const funders = await rectOf(page, '#funders');
@@ -226,7 +235,7 @@ test('en-tête avec « Ma présence » : sous les financeurs à droite de 980 à
       const message = `à ${width}px`;
       assert.ok(account.top >= funders.bottom - 0.5, `${message} : le profil est sous les financeurs`);
       assert.ok(account.left >= header.left - 0.5 && account.right <= header.right + 0.5, `${message} : le profil tient dans l'en-tête`);
-      if (width < 980) {
+      if (width < 860) {
         assert.ok(account.top >= title.bottom - 0.5, `${message} : le profil est sous le titre`);
         assert.ok(Math.abs(account.left - header.left) <= 1 && Math.abs(account.right - header.right) <= 1, `${message} : sur toute la largeur`);
       } else {

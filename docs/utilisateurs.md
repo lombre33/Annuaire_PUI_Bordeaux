@@ -10,6 +10,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 - [Lexique du PUI](#lexique-du-pui)
 - [Découvrir l'écran](#découvrir-lécran)
 - [Lire une carte](#lire-une-carte)
+- [Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)
 - [Rechercher une personne](#rechercher-une-personne)
 - [Filtrer](#filtrer), dont [Domaines et compétences](#domaines-et-compétences)
 - [Gagner du temps : cliquer sur une étiquette](#gagner-du-temps--cliquer-sur-une-étiquette)
@@ -27,6 +28,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 - Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (instances, actions, groupes de travail ou GT, communautés, tâches, compétences, rôle).
 - On retrouve quelqu'un par son **nom** ou, grâce aux **filtres**, par ce qu'il fait.
+- L'annuaire porte les **logos** du PUI : celui de chaque établissement sur ses cartes, ceux des financeurs au centre de l'en-tête et ceux des établissements fondateurs dans un bandeau tout en bas ([Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)).
 - L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un grand écran, une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
 - **Chacun décide s'il y figure.** Une personne n'apparaît que si elle a accepté d'apparaître. Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'adresse e-mail de ce compte, un bandeau **Ma présence** vous dit où vous en êtes et vous laisse changer d'avis d'un clic ([Ma présence](#ma-présence--apparaître-ou-non)).
 - **Chacun corrige sa propre fiche.** Quand l'annuaire vous reconnaît, un bouton **✎ Modifier** apparaît sur votre carte et un bouton **Modifier mon profil** dans le bandeau : vous changez votre nom, votre fonction, votre téléphone, votre rôle et vos listes, vous relisez votre carte avant et après, puis vous validez ([Modifier ma fiche](#modifier-ma-fiche)). L'enregistrement est direct : aucun administrateur ne valide et l'annuaire ne tient aucun historique. L'adresse e-mail, l'établissement et le périmètre ne se changent pas ici : adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist.
@@ -56,13 +58,15 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 | Élément | À quoi il sert |
 |---|---|
-| **Compteur** (en haut à droite, « 14 contacts ») | Indique combien de cartes sont affichées avec la recherche et les filtres actuels |
-| **Bandeau « Ma présence »** (au-dessus de la recherche, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)) |
+| **Titre et compteur** (en haut à gauche, « PUI Bordeaux » et « 14 contacts ») | Le compteur indique combien de cartes sont affichées avec la recherche et les filtres actuels |
+| **Financeurs** (au centre de l'en-tête) | La phrase de financement et les logos des financeurs ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
+| **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
 | **Actions, Tâches, Communautés, GT, Domaines, Compétences, Instances, Établissement** | Huit filtres : chaque bouton ouvre un menu de valeurs à cocher |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
 | **Réinitialiser** | Efface la recherche et décoche tous les filtres |
 | **Cartes** | Une carte par personne, trois par ligne, dans l'ordre de la liste des contacts dans Grist (sans tri) |
+| **Bandeau des fondateurs** (tout en bas de la page, sous les cartes) | Les logos des établissements fondateurs, le rond « France 2030 » et la phrase de financement ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Bouton « ✎ Modifier »** et mention **« Votre fiche »** (en bas d'une carte, seulement si vous pouvez modifier cette fiche) | Ouvre le formulaire de modification de la fiche ([Modifier ma fiche](#modifier-ma-fiche)). La capture ci-dessus est celle d'un annuaire consulté sans être reconnu : elle n'a ni bandeau ni bouton |
 
 ## Lire une carte
@@ -72,7 +76,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 1. **Initiales** de la personne.
 2. **Prénom et nom** de la personne.
 3. **Fonction**, si elle est renseignée.
-4. **Établissement** (pastille en haut à droite) : un clic filtre sur cet établissement.
+4. **Établissement** (en haut à droite) : son logo, seul, ou sa pastille s'il n'a pas de logo dans Grist ([Les logos](#les-logos-et-le-bandeau-du-bas)). Un clic filtre sur cet établissement.
 5. **Adresse e-mail** : c'est un lien : un clic ouvre un nouveau message dans votre messagerie, si votre navigateur le permet. Une adresse saisie sous une forme inhabituelle (plusieurs destinataires, paramètres) reste affichée en texte, sans lien.
 6. **Téléphone**, s'il est renseigné, présenté par paires de chiffres.
 7. **Titres de section** : Instances, Actions, GT, Compétences, Communautés, Tâches, Rôle PUI. Une section n'apparaît que si la personne y a au moins une valeur.
@@ -82,6 +86,24 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 Sur une carte que vous pouvez modifier, une ligne s'ajoute en bas : la mention **Votre fiche** (sur la vôtre) et le bouton **✎ Modifier** ([Modifier ma fiche](#modifier-ma-fiche)).
 
 Une information absente n'est pas remplacée par une ligne vide : elle n'apparaît simplement pas. Les **domaines** de compétences ne figurent pas sur la carte, qui garde le détail des compétences : ils servent à filtrer (voir [Domaines et compétences](#domaines-et-compétences)).
+
+## Les logos et le bandeau du bas
+
+Le PUI est le consortium de tous ses établissements fondateurs : il n'a pas d'identité graphique propre, ce sont **leurs logos** qui l'habillent. Ils viennent du document Grist, il n'y a rien à installer.
+
+- **Au centre de l'en-tête : les financeurs.** La phrase « Projet financé par l'État dans le cadre de France 2030 » et les logos des financeurs, dans l'ordre choisi dans Grist. Discrets (affichés en niveaux de gris), ils ne sont pas cliquables.
+- **Sur chaque carte : le logo de l'établissement**, en haut à droite, **seul**, sans le nom dessous. Un clic dessus filtre sur cet établissement, comme la pastille avant lui ([Gagner du temps](#gagner-du-temps--cliquer-sur-une-étiquette)). Le nom de l'établissement ne s'affiche, dans une pastille, que lorsque Grist n'a pas de logo pour lui.
+- **Tout en bas : le bandeau des fondateurs.** Les logos des établissements fondateurs qui ont validé leur apparition, dans l'ordre choisi dans Grist, puis le rond « France 2030 » et une phrase de financement dont le nom du Pôle universitaire d'innovation Bordeaux est un lien vers la page du projet. En survolant un logo, on lit le nom complet de l'établissement.
+
+![Le bandeau du bas : les logos des établissements fondateurs sur une ligne, le rond « 2030 » à droite et, dessous, la phrase « Le Pôle universitaire d'innovation Bordeaux est un projet financé par l'État dans le cadre de France 2030 »](images/bandeau-fondateurs.png)
+
+Les logos de toutes ces captures sont **inventés**, comme le reste du jeu de démonstration.
+
+**Quand un logo manque.** Le nom prend sa place : l'acronyme dans la pastille des cartes, le nom de la structure dans le bandeau du bas et chez les financeurs. L'annuaire reste utilisable. Cela arrive quand le fichier n'a pas été ajouté dans Grist, quand il a été supprimé ou n'est pas une image lisible, ou quand Grist ne donne pas accès aux pièces jointes : ce dernier cas touche **tous** les logos à la fois.
+
+![L'en-tête et les premières cartes quand aucun logo ne se charge : les noms des financeurs remplacent leurs logos et chaque carte porte la pastille de l'acronyme de son établissement (CHD, UDD, ISD)](images/sans-logos.png)
+
+Un logo absent ou mal affiché se corrige dans Grist, par l'administrateur des données ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 5, et [maintenance](maintenance.md#les-logos-et-le-bandeau-du-bas)). Les tables de logos ne préviennent pas l'annuaire quand on les modifie : après un changement de logo, rechargez la page.
 
 ## Rechercher une personne
 
@@ -123,7 +145,7 @@ Une compétence dont le domaine n'est pas renseigné dans Grist est rangée sous
 
 ## Gagner du temps : cliquer sur une étiquette
 
-Cliquer sur une étiquette de carte ou sur la pastille d'établissement **coche le filtre correspondant** ; cliquer à nouveau le décoche. C'est le même résultat que cocher la case dans le menu, sans l'ouvrir.
+Cliquer sur une étiquette de carte, sur le logo ou la pastille d'établissement **coche le filtre correspondant** ; cliquer à nouveau le décoche. C'est le même résultat que cocher la case dans le menu, sans l'ouvrir.
 
 Seul le **Rôle PUI** n'est pas cliquable : il s'affiche mais n'a pas de filtre.
 
@@ -150,13 +172,13 @@ Quand rien ne correspond, l'annuaire affiche « Aucun contact trouvé » : modif
 
 Chaque personne décide elle-même si elle figure dans l'annuaire. Une personne n'apparaît que si elle a **accepté d'apparaître** et si son établissement a validé son apparition (voir [Pourquoi une personne n'apparaît-elle pas ?](#pourquoi-une-personne-napparaît-elle-pas-)).
 
-Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'adresse e-mail de ce compte, un bandeau **Ma présence** s'affiche au-dessus de la recherche. Il porte votre nom, une phrase qui dit où vous en êtes, un interrupteur et, quand une seule fiche porte votre adresse, le bouton **Modifier mon profil** ([Modifier ma fiche](#modifier-ma-fiche)).
+Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'adresse e-mail de ce compte, un bandeau **Ma présence** s'affiche à droite de l'en-tête. Il porte votre nom, une phrase qui dit où vous en êtes, un interrupteur et, quand une seule fiche porte votre adresse, le bouton **Modifier mon profil** ([Modifier ma fiche](#modifier-ma-fiche)).
 
-![Bandeau « Ma présence » de Camille Rousseau : « Vous apparaissez dans l'annuaire. », interrupteur « Apparaître dans l'annuaire » activé, compteur à 14 contacts](images/ma-presence.png)
+![L'en-tête de l'annuaire, avec à droite le bandeau « Ma présence » de Camille Rousseau : « Vous apparaissez dans l'annuaire. », interrupteur « Apparaître dans l'annuaire » activé et bouton « Modifier mon profil » ; à gauche le titre et le compteur à 14 contacts, au centre les financeurs](images/ma-presence.png)
 
 **Changer d'avis.** Cliquez sur l'interrupteur « Apparaître dans l'annuaire ». S'il était activé, il se désactive : votre carte disparaît de l'annuaire et le compteur perd une unité. S'il était désactivé, il s'active et votre carte revient, si rien d'autre ne vous masque. Pendant l'enregistrement, l'interrupteur est gelé et le bandeau indique « Enregistrement… » ; l'annuaire est ensuite relu, si bien que ce que vous voyez est ce que Grist a vraiment enregistré.
 
-![Bandeau « Ma présence » après un clic sur l'interrupteur : « Vous n'apparaissez pas dans l'annuaire. », interrupteur désactivé, compteur à 13 contacts](images/ma-presence-retiree.png)
+![Le bandeau « Ma présence » après un clic sur l'interrupteur : « Vous n'apparaissez pas dans l'annuaire. », interrupteur désactivé, et le compteur de l'en-tête à 13 contacts](images/ma-presence-retiree.png)
 
 **Ce que dit le bandeau**
 
@@ -169,7 +191,7 @@ Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'a
 | « Vous n'avez accepté d'apparaître que sur une partie de vos fiches. » | Plusieurs fiches portent votre adresse, et seules certaines ont votre accord | Un clic sur l'interrupteur donne votre accord à toutes ; prévenez l'administrateur des données pour qu'il supprime les doublons |
 | « 2 fiches portent votre adresse : votre choix s'applique à toutes. » | Plusieurs fiches portent votre adresse (le chiffre varie). Votre choix, dans un sens comme dans l'autre, vaut pour chacune | Prévenez l'administrateur des données pour qu'il supprime les doublons |
 
-![Bandeau « Ma présence » de Sarah Colin : « Vous avez accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'a pas encore été validé. Contactez un administrateur. »](images/ma-presence-masquee.png)
+![L'en-tête de Sarah Colin : son bandeau « Ma présence » dit « Vous avez accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'a pas encore été validé. Contactez un administrateur. »](images/ma-presence-masquee.png)
 
 Quand votre fiche reste masquée alors que vous avez accepté d'apparaître, le message donne la ou les raisons, séparées par des points-virgules :
 
@@ -203,7 +225,7 @@ Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, votre t
 
 ### Où cliquer
 
-![Le haut de l'annuaire de Camille Rousseau, personne fictive connectée : le bandeau « Ma présence » avec l'interrupteur « Apparaître dans l'annuaire » et le bouton « Modifier mon profil », puis des cartes dont la sienne porte la mention « Votre fiche » et le bouton « ✎ Modifier » en bas de la carte](images/modifier-fiche-bouton.png)
+![Le haut de l'annuaire de Camille Rousseau, personne fictive connectée : à droite de l'en-tête, le bandeau « Ma présence » avec l'interrupteur « Apparaître dans l'annuaire » et le bouton « Modifier mon profil », puis des cartes dont la sienne porte la mention « Votre fiche » et le bouton « ✎ Modifier » en bas de la carte](images/modifier-fiche-bouton.png)
 
 *Où cliquer : le bouton « Modifier mon profil » du bandeau « Ma présence » et, sur la carte de la personne connectée (la première ici), la mention « Votre fiche » et le bouton « ✎ Modifier ». Les deux autres cartes n'ont pas de bouton.*
 
@@ -391,7 +413,7 @@ Les administrateurs, oui : ils peuvent modifier les fiches affichées de tout le
 
 **D'où viennent les informations ?**
 
-D'un document Grist, qui sert de base de données à l'annuaire. L'annuaire n'enregistre rien dans votre navigateur. Dans le document Grist, il n'écrit que dans trois cas : à l'ouverture, une ligne de service qui sert à vous reconnaître (ajoutée puis supprimée aussitôt) ; votre choix d'apparaître ou non, quand vous cliquez sur l'interrupteur ; votre fiche, quand vous cliquez sur « Valider » après une relecture.
+D'un document Grist, qui sert de base de données à l'annuaire, logos compris : ce sont des fichiers joints à ce document, que votre navigateur télécharge chez Grist avec une autorisation de lecture qui expire en quelques minutes ([sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes)). L'annuaire n'enregistre rien dans votre navigateur, hormis ce que celui-ci garde de lui-même des images affichées. Dans le document Grist, il n'écrit que dans trois cas : à l'ouverture, une ligne de service qui sert à vous reconnaître (ajoutée puis supprimée aussitôt) ; votre choix d'apparaître ou non, quand vous cliquez sur l'interrupteur ; votre fiche, quand vous cliquez sur « Valider » après une relecture.
 
 **J'ai changé une information dans Grist et je ne la vois pas.**
 
@@ -400,6 +422,14 @@ Une modification de la liste des contacts apparaît d'elle-même, après un cour
 **Le téléphone ou la fonction d'une personne ne s'affiche pas.**
 
 Ils ne s'affichent que s'ils sont renseignés dans Grist.
+
+**Pourquoi vois-je le nom d'un établissement au lieu de son logo ?**
+
+Parce que Grist n'a pas de logo lisible pour cet établissement (fichier absent, supprimé ou qui n'est pas une image), ou parce que Grist n'a pas donné à l'annuaire l'accès aux pièces jointes : ce dernier cas touche tous les logos à la fois. L'annuaire fonctionne normalement, avec les noms. Prévenez l'administrateur des données : un logo se remplace dans la colonne `logo` de la table `Etablissements` ([Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)).
+
+**Pourquoi un établissement fondateur ne figure-t-il pas dans le bandeau du bas ?**
+
+Le bandeau ne montre que les établissements **fondateurs** qui ont **validé** leur apparition, comme pour les cartes : un établissement qui n'a pas validé n'apparaît nulle part, et un établissement partenaire n'y figure jamais. L'ordre des logos est celui de la colonne `ordre_bandeau`, choisi dans Grist.
 
 **Puis-je utiliser l'annuaire sur mon téléphone ?**
 

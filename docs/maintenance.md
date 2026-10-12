@@ -1,6 +1,6 @@
 # Maintenance
 
-Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.12.0**.
+Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.13.0**.
 
 Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [documentation développeur](developpeurs.md), [sécurité](securite.md).
 
@@ -9,6 +9,7 @@ Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [do
 - [Qui fait quoi](#qui-fait-quoi)
 - [Pourquoi un contact est visible ou non](#pourquoi-un-contact-est-visible-ou-non)
 - [Opérations courantes dans Grist](#opérations-courantes-dans-grist)
+- [Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)
 - [Contrôle après un changement de données](#contrôle-après-un-changement-de-données)
 - [Diagnostiquer un problème](#diagnostiquer-un-problème)
 - [Avant de publier une modification du code](#avant-de-publier-une-modification-du-code)
@@ -57,7 +58,7 @@ Quatre précisions sur la version 1.12.0 :
 
 Les noms de tables et de colonnes sont ceux de [`grist_structure.txt`](../grist_structure.txt).
 
-**Ajouter une personne.** Renseigner le nom, le prénom, l'adresse e-mail (elle sert aussi à retrouver la fiche quand la personne utilise « Ma présence » ou modifie sa fiche), l'établissement (en choisissant sa ligne dans la colonne `Etablissement`), au moins un périmètre, puis ses instances, actions, groupes de travail (GT), communautés, tâches et compétences, qui sont des listes de références. **Ne cocher `Accepte_apparaitre` qu'avec l'accord de la personne** : sans cette case, elle n'apparaît pas. Vérifier que le badge de la carte affiche bien l'établissement attendu (le widget n'utilise pas la colonne `nom_de_domaine`).
+**Ajouter une personne.** Renseigner le nom, le prénom, l'adresse e-mail (elle sert aussi à retrouver la fiche quand la personne utilise « Ma présence » ou modifie sa fiche), l'établissement (en choisissant sa ligne dans la colonne `Etablissement`), au moins un périmètre, puis ses instances, actions, groupes de travail (GT), communautés, tâches et compétences, qui sont des listes de références. **Ne cocher `Accepte_apparaitre` qu'avec l'accord de la personne** : sans cette case, elle n'apparaît pas. Vérifier que le logo (ou la pastille) de la carte désigne bien l'établissement attendu (le widget n'utilise pas la colonne `nom_de_domaine`).
 
 **Recueillir ou retirer l'accord d'une personne.** C'est la case `Accepte_apparaitre` de sa ligne de `BDD`. La personne peut la cocher ou la décocher elle-même avec l'interrupteur « Apparaître dans l'annuaire » du bandeau « Ma présence », à condition d'être connectée à Grist avec l'adresse de sa fiche et de pouvoir modifier le document. Sinon, un administrateur coche la case dans Grist, **à la demande de la personne ou avec son accord**. Une personne qui a décoché l'interrupteur ne se recoche pas à sa place. Décocher masque la personne sans effacer ses données.
 
@@ -99,21 +100,42 @@ Le widget modifie le prénom, le nom, la fonction, le téléphone, le rôle dans
 - Le domaine d'une personne se déduit de ses compétences : une personne sans compétence n'a aucun domaine, et deux compétences d'un même domaine ne la comptent qu'une fois dans ce domaine.
 - La colonne `Comptetences_macr` de `BDD` n'est pas lue.
 
+## Les logos et le bandeau du bas
+
+Depuis la 1.13.0, les logos sont des **pièces jointes du document Grist** : le widget n'en contient aucun. Tout est facultatif, et le [guide utilisateur](utilisateurs.md#les-logos-et-le-bandeau-du-bas) montre le résultat. La mise en place (colonnes à créer, préparation des fichiers) est à l'étape 5 de [`GRIST_SETUP.md`](../GRIST_SETUP.md).
+
+| Ce qu'on veut | Où le régler dans Grist |
+|---|---|
+| Le logo d'un établissement, sur ses cartes et dans le bandeau du bas | Colonne `logo` (Pièces jointes) de sa ligne d'`Etablissements` |
+| Les établissements du bandeau du bas, et leur ordre | Cases `fondateur` et `ok_pour_apparaitre` cochées, puis colonne `ordre_bandeau` (Numérique) : 1, 2, 3… de gauche à droite. Sans numéro, l'établissement passe après les autres, dans l'ordre de la table |
+| Les logos des financeurs, en haut de la page, et leur ordre | Table `Financeurs` : colonnes `nom`, `logo` (Pièces jointes) et `ordre` (Numérique) |
+| Le rond qui ferme le bandeau du bas | Le financeur dont le `nom` est exactement `France 2030` (casse et accents ignorés) |
+
+- **Ajouter ou remplacer un logo.** Cliquer la cellule `logo`, puis « + » (ou glisser le fichier). **Remplacer** le fichier plutôt qu'en ajouter un : seul le premier est affiché. De préférence un SVG (ou un PNG) sur fond transparent, rogné au plus près du dessin : le widget règle lui-même la taille de chaque logo pour qu'une rangée de formes différentes ait un poids voisin, mais il ne peut pas deviner une marge blanche. Puis **recharger la page** : modifier `Etablissements` ou `Financeurs` ne prévient pas le widget.
+- **Changer l'ordre.** Modifier `ordre_bandeau` (bandeau du bas) ou `ordre` (financeurs), puis recharger.
+- **Un établissement sans logo** garde sa pastille avec son acronyme sur les cartes, et son acronyme en texte dans le bandeau du bas : tant qu'aucun logo n'a été ajouté dans Grist, le bandeau du bas liste donc simplement les fondateurs validés, en texte. Un établissement qui n'est ni fondateur ni validé n'apparaît pas dans le bandeau.
+- **La table `Financeurs`** se crée à la main et le widget n'y écrit jamais ; sans elle, l'en-tête n'a simplement pas de financeurs. Elle existe parce que les financeurs ne sont pas des établissements : les ranger dans `Etablissements` les ferait apparaître dans le filtre « Établissement » et dans les règles de visibilité.
+- **Les vrais logos restent dans Grist.** Ne jamais les ajouter au dépôt public : les captures et la démonstration n'utilisent que des dessins inventés (`docs/demo/logos-fictifs.mjs`). Un logo n'est pas un secret : toute personne qui peut lire le document peut télécharger ses pièces jointes.
+- **Sauvegarde.** Les logos sont des pièces jointes : les inclure dans les sauvegardes du document ([Continuité](#ce-quil-faut-prévoir)).
+
+Les symptômes et leurs remèdes sont dans [Diagnostiquer un problème](#diagnostiquer-un-problème) ; ce que le jeton d'accès permet, et comment le widget limite sa fuite, dans la page [sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes).
+
 ## Contrôle après un changement de données
 
 Après chaque changement de données (ajout, modification, import), vérifier les points suivants :
 
-1. **Le nombre de contacts** affiché en haut à droite correspond à ce qu'on attend.
-2. **Chaque carte a sa pastille d'établissement** (colonne `Etablissement` correctement remplie).
+1. **Le nombre de contacts** affiché en haut à gauche, à côté du titre, correspond à ce qu'on attend.
+2. **Chaque carte a le logo ou la pastille de son établissement** (colonne `Etablissement` correctement remplie).
 3. **La console du navigateur** (F12), sur les lignes `[GRIST] Enregistrements reçus: N (contacts affichables : M)` et `[ETABLISSEMENT] …` : N est le nombre de lignes de la table, M celui des cartes possibles, et un message `[ETABLISSEMENT]` liste (vingt au plus) les identifiants de ligne des contacts qui ont un périmètre mais pas d'établissement. Un écart entre N et M peut venir de personnes qui n'ont pas accepté d'apparaître (la ligne `[CONSENTEMENT] n/m …` en donne le nombre), d'un établissement non validé, d'un statut « autres » ou d'une référence qui ne désigne plus aucune ligne : ces derniers cas ne sont pas détaillés.
 4. **Aucun bandeau rouge** sous la barre d'outils.
 5. **Le filtre Domaines** : si l'option « Autres » apparaît, des compétences n'ont pas de domaine (voir [Opérations courantes](#opérations-courantes-dans-grist)).
 6. **« Ma présence »** : ouvert avec son propre compte (dont l'adresse figure dans `BDD.email`), le widget affiche le bandeau, la console dit `[IDENTITE] personne identifiée …` et la table `Annuaire_Sonde` est vide.
 7. **« ✎ Modifier »** : avec ce même compte, la carte de la personne porte « Votre fiche » et le bouton, et aucune autre carte n'en a ; avec un compte administrateur, toutes les cartes affichées en ont un ([`TESTING.md`](../TESTING.md), section 13).
+8. **Les logos** : les logos des établissements sur les cartes, ceux des financeurs au centre de l'en-tête, ceux des fondateurs dans l'ordre voulu tout en bas, et aucune ligne `[LOGOS]` dans la console ([`TESTING.md`](../TESTING.md), section 14).
 
 ## Diagnostiquer un problème
 
-La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[REFS]` (entrées par catégorie de filtre, lectures échouées, compétences sans domaine), `[ETABLISSEMENT]` (contacts sans établissement), `[CONSENTEMENT]` (personnes masquées faute d'accord), `[IDENTITE]` (pourquoi la personne connectée n'est pas identifiée), `[PRESENCE]` (écriture refusée), `[PROFIL]` (fiche illisible ou écriture refusée) et `[SCHEMA]` (types de colonnes illisibles). Aucune de ces lignes ne contient de nom ni d'adresse, hormis le message brut d'une erreur renvoyée par Grist.
+La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[REFS]` (entrées par catégorie de filtre, lectures échouées, compétences sans domaine), `[ETABLISSEMENT]` (contacts sans établissement), `[CONSENTEMENT]` (personnes masquées faute d'accord), `[IDENTITE]` (pourquoi la personne connectée n'est pas identifiée), `[PRESENCE]` (écriture refusée), `[PROFIL]` (fiche illisible ou écriture refusée), `[SCHEMA]` (types de colonnes illisibles) et `[LOGOS]` (jeton d'accès aux pièces jointes refusé, habillage impossible). Aucune de ces lignes ne contient de nom, d'adresse ni de jeton, hormis le message brut d'une erreur renvoyée par Grist. Quand un logo ne se charge pas, c'est le navigateur lui-même qui écrit dans la console « Failed to load resource » avec l'adresse de l'image, jeton compris : ne pas partager cette ligne.
 
 | Symptôme | Cause probable | Que faire |
 |---|---|---|
@@ -144,6 +166,14 @@ La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[
 | Avis « Votre fiche est masquée de l'annuaire… », « Votre fiche reste masquée de l'annuaire… » ou « Cette fiche est masquée de l'annuaire… » dans la relecture | Ce n'est pas une erreur : la modification sera enregistrée, mais la fiche ne figure pas dans l'annuaire (accord de la personne, périmètre, établissement…) tant que la cause demeure | Lire la raison dans l'avis, puis la lever dans Grist ou avec « Ma présence » |
 | La table `Annuaire_Sonde` contient des lignes | Une page a été fermée entre l'ajout et la suppression de la ligne | Vider la table, sans risque |
 | Une carte n'a pas de pastille d'établissement | Ne devrait pas arriver : un contact sans établissement reconnu est masqué | Lire les lignes `[ETABLISSEMENT]` de la console |
+| Tous les logos sont remplacés par des noms ; la console dit `[LOGOS] Jeton d'accès aux pièces jointes indisponible…` | Grist ne donne pas de jeton : version de Grist sans cette méthode, accès du widget insuffisant, ou compte qui ne peut pas lire les pièces jointes | Vérifier l'accès `full` du widget et la version de Grist ; essayer avec un compte qui peut modifier le document ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 5). Un seul avertissement par série d'échecs : le widget attend 30 secondes avant de redemander |
+| Le nom d'un seul établissement ou financeur à la place de son logo | Le fichier est absent de la cellule `logo`, a été supprimé, ou n'est pas une image lisible | Remplacer le fichier dans Grist, puis recharger la page |
+| Un fondateur manque dans le bandeau du bas | Il n'est pas fondateur, ou n'a pas validé son apparition (`ok_pour_apparaitre`) | Cocher les cases ; l'ordre est celui d'`ordre_bandeau` |
+| Pas de financeurs en tête de page | La table `Financeurs` n'existe pas (ou son nom diffère), ou elle est vide | Reprendre les noms exacts de l'étape 5 de [`GRIST_SETUP.md`](../GRIST_SETUP.md) |
+| Pas de bandeau en bas de page | Aucun établissement n'est à la fois `fondateur` et `ok_pour_apparaitre` | Cocher les deux cases pour les fondateurs |
+| Le rond du bandeau du bas manque | Aucun financeur ne s'appelle exactement `France 2030` | Corriger le `nom` du financeur |
+| Un logo paraît trop petit, ou entouré de blanc | Marge ou fond blanc dans le fichier | Rogner l'image, fond transparent |
+| La console dit `[LOGOS] Impossible d'afficher les logos : …` | Erreur inattendue en construisant l'habillage ; les cartes restent affichées | Transmettre la ligne au mainteneur |
 | Une section de tags manque sur une carte | La valeur liée n'a pas de libellé dans sa table de référence | Console : `[REFS] clé (Table): n entrées (k ligne(s) sans …)` ; renseigner le libellé |
 | Le filtre Domaines est vide, ou ne propose que « Autres » | La colonne `Macro_competences` n'existe plus (bandeau « Colonne de libellé introuvable »), ou aucune compétence n'a de domaine | Rétablir la colonne, ou renseigner les domaines, puis recharger |
 | Un établissement manque dans le filtre Établissement | Il n'est pas validé (`ok_pour_apparaitre`) | Le valider, puis recharger |
@@ -183,7 +213,7 @@ Ne pas utiliser `git push --force` sur `main` : le widget en production se met �
 
 ## Dépendances et mises à jour
 
-- **À l'exécution : aucune.** Le dépôt n'a pas de `package.json`. Le seul script externe est `grist-plugin-api.js`, chargé depuis `docs.getgrist.com` ([sécurité](securite.md#risques-et-protections)).
+- **À l'exécution : aucune.** Le dépôt n'a pas de `package.json`. Le seul script externe est `grist-plugin-api.js`, chargé depuis `docs.getgrist.com` ([sécurité](securite.md#risques-et-protections)). Les logos ne sont pas une dépendance externe : ce sont des pièces jointes du document Grist.
 - **En CI** ([`.github/workflows/tests.yml`](../.github/workflows/tests.yml)) : Node 22, `playwright@1.64.0` (version figée), `actions/checkout@v4` et `actions/setup-node@v4`. Les revoir à chaque nouvelle version majeure de Node, de Playwright ou de ces actions : mettre à jour le fichier, puis vérifier que les scénarios navigateur passent.
 - **Pour lancer les tests en local** : Node 22.7 ou plus, ou 20.19 ou plus ([documentation développeur](developpeurs.md#tests)). Le dépôt n'a pas de `package.json` : en dessous, les tests échouent avant même de s'exécuter.
 - **Navigateur** : le widget utilise des fonctions récentes (modules ES, `Object.hasOwn`, propriétés Unicode des expressions régulières) et demande donc un navigateur à jour.
@@ -208,6 +238,7 @@ L'annuaire n'a ni serveur ni base de données à lui : il tient à des comptes q
 | **Les données** | Le document Grist, sur l'instance de l'État (`grist.numerique.gouv.fr`) | Les propriétaires du document, de son espace de travail et du site qui les contient : les accès se transmettent du site à l'espace de travail, puis au document | Le widget affiche toujours les données du document, mais personne ne peut plus les corriger, ni changer le partage ou les règles d'accès, réservés aux propriétaires. La documentation de Grist ne dit pas comment reprendre la main : ne pas y compter |
 | **Le code** | Le dépôt GitHub `lombre33/Annuaire_PUI_Bordeaux` | Son seul propriétaire, le compte personnel `lombre33` | Le widget continue de fonctionner, mais rien ne peut plus être corrigé ni publié. Si le compte est supprimé, GitHub supprime ses dépôts et ses sites Pages, donc le widget, et ne peut pas les restaurer |
 | **Les réglages de « Ma présence » et de la modification de fiche** | Le document Grist : table `Annuaire_Sonde` et ses formules, colonnes de données que le widget écrit dans `BDD`, table `ACL`, règles d'accès | Les propriétaires du document | Sans la sonde ou sans `ACL`, plus personne n'est identifié : l'annuaire s'affiche normalement, mais sans bandeau ni modification (le widget échoue en sécurité). Les formules ne se recréent pas seules : la marche à suivre est dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) |
+| **Les logos** | Le document Grist : colonne `logo` d'`Etablissements`, table `Financeurs` | Les propriétaires et les éditeurs du document | Les logos déjà en place restent affichés mais ne peuvent plus être remplacés. Si les fichiers sont supprimés, les noms les remplacent : l'annuaire continue de fonctionner |
 | **L'adresse du widget** | GitHub Pages, saisie dans « Enter Custom URL » du widget de chaque page Grist | Le même compte | Renommer ou transférer le dépôt change l'adresse du site **sans redirection** : à la place de l'annuaire, Grist affiche une erreur ou une zone vide, tant que l'adresse n'est pas corrigée dans chaque page |
 | **Le script de l'API Grist** | `docs.getgrist.com`, chargé par `index.html` | Grist | Sans lui, la page affiche « 0 contact » sans bandeau d'explication ; le détail est dans la console du navigateur |
 | **La connaissance** | Cette documentation, `grist_structure.txt`, `specs.md`, les tests | Quiconque peut écrire dans le dépôt | Elle se périme : `tests/docs.test.mjs` signale une partie des oublis, pas tous |
@@ -320,6 +351,7 @@ Une piste plus durable : le guide de contribution des widgets Grist.Gouv (juille
 
 ## Limites connues
 
+- **Les logos n'ont pas été essayés dans un vrai Grist.** Le widget suit la méthode que documente Grist pour afficher une pièce jointe (jeton `getAccessToken` en lecture seule, adresse `/attachments/<identifiant>/download?auth=…`), mais les tests simulent la réponse de Grist : le contrôle est la section 14 de [`TESTING.md`](../TESTING.md). Un seul fichier par cellule est affiché (le premier), et un changement dans `Etablissements` ou `Financeurs` demande de recharger la page. Le jeton, valable quelques minutes, figure dans l'adresse des images : ne pas partager de capture de la console ou de l'onglet Réseau ([sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes)).
 - **Modifier une table de référence ne rafraîchit pas le widget.** Grist ne prévient le widget que des changements de la table liée à sa section (la table des contacts). Après avoir modifié `Etablissements` (par exemple `ok_pour_apparaitre`) ou une autre table de référence, recharger la page.
 - **Établissement sans acronyme.** Le libellé d'un établissement est son acronyme, ou son nom complet quand l'acronyme est vide. Le contact y est rattaché par l'identifiant de ligne de sa référence `Etablissement`, sans dépendre de ce libellé : un établissement sans acronyme s'affiche donc avec son nom complet.
 - **Script de l'API Grist.** `index.html` charge `grist-plugin-api.js` depuis `docs.getgrist.com`, sans version figée. Le charger depuis l'instance utilisée serait plus cohérent, mais cela ne se vérifie que dans un vrai document Grist : ce changement n'a pas été fait.
@@ -345,6 +377,7 @@ Une piste plus durable : le guide de contribution des widgets Grist.Gouv (juille
 | Si l'on change… | Mettre à jour… |
 |---|---|
 | L'interface | [Guide utilisateur](utilisateurs.md), captures (`node docs/demo/capturer.mjs`), [`TESTING.md`](../TESTING.md) |
+| Les logos ou le bandeau du bas | [`GRIST_SETUP.md`](../GRIST_SETUP.md) (étape 5), [Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas), la page [sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes), les logos inventés de `docs/demo/logos-fictifs.mjs` et les captures |
 | Une règle d'affichage | [`specs.md`](../specs.md), le schéma de la [documentation développeur](developpeurs.md#règles-daffichage), [Pourquoi un contact est visible ou non](#pourquoi-un-contact-est-visible-ou-non), le guide utilisateur, le résumé du [README](../README.md), la ligne « Affichage d'un contact » des [risques](securite.md#risques-et-protections), et le réglage par défaut des interrupteurs Fondateurs et Partenaires |
 | La structure Grist (tables, colonnes) | [`grist_structure.txt`](../grist_structure.txt), `tests/fixtures.mjs`, `docs/demo/donnees-fictives.mjs`, les noms cités dans cette page et dans la documentation développeur |
 | Le code (modules, noms de fonctions) | [Documentation développeur](developpeurs.md) : `tests/docs.test.mjs` signale un nom de fonction cité qui n'existe plus |

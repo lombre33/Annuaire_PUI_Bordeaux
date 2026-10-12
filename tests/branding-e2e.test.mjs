@@ -125,6 +125,20 @@ test('les financeurs s\'affichent dans l\'ordre de la table, un logo chacun et l
     assert.equal(await page.locator('#funders .funders-label').textContent(), 'Projet financé par l\'État dans le cadre de France 2030');
   }));
 
+// La maquette validée par Antoine montre les financeurs en gris, discrets, et le rond de France 2030
+// du bandeau du bas en couleurs : la même pièce jointe sert aux deux, la feuille de style désature
+// seulement celle du haut.
+test('les logos des financeurs sont en niveaux de gris en haut de page, le rond du bandeau du bas garde ses couleurs', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await waitForLogos(page, 3);
+    const filterOf = selector => page.locator(selector).first().evaluate(image => getComputedStyle(image).filter);
+    assert.equal(await filterOf('#fundersLogos img'), 'grayscale(1)');
+    assert.equal(await filterOf('#bandRoundel img'), 'none');
+    assert.equal(await filterOf('#bandLogos img'), 'none');
+    assert.equal(await filterOf('.contact-card .etablissement-tag img'), 'none');
+  }));
+
 test('sans table Financeurs, l\'en-tête n\'a pas de financeurs et rien n\'est signalé', { skip }, () => {
   const tables = withBranding();
   delete tables.Financeurs;
@@ -240,6 +254,23 @@ test('un fichier supprimé dans Grist : la pastille texte reprend sa place, sans
   });
 });
 
+// docs/securite.md : le jeton ouvre le document en lecture pour quelques minutes, le widget
+// ne le laisse donc dans aucune trace (le navigateur, lui, consigne l'adresse d'une image
+// introuvable : c'est hors de son contrôle).
+test('ni le jeton ni l\'adresse d\'un logo ne passent par la console du widget, même quand un fichier manque', { skip }, () => {
+  const tables = withBranding();
+  tables.Etablissements.logo[0] = ['L', MISSING_FILE];
+  return withWidget({ tables }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => [...document.querySelectorAll('.contact-card .etablissement-tag')]
+      .filter(badge => badge.textContent.trim() === 'CHU').length === 3);
+    await waitForLogos(page, 4); // les 3 financeurs et le rond : les logos du CHU, absents, ont laissé place au nom
+    assert.ok((await tokenRequests(page)).length >= 1, 'le test doit avoir exercé le jeton');
+    const everything = (await Promise.all([...logs.errors, ...logs.warnings, ...logs.infos])).join('\n');
+    assert.doesNotMatch(everything, /fake-token|auth=|\/attachments\//);
+  });
+});
+
 test('un fichier qui n\'est pas une image : le nom reprend sa place dans le bandeau comme sur les cartes', { skip }, () => {
   const tables = withBranding();
   tables.Etablissements.logo[0] = ['L', BROKEN_FILE];
@@ -250,6 +281,28 @@ test('un fichier qui n\'est pas une image : le nom reprend sa place dans le band
     assert.equal(await page.locator('#bandLogos img').count(), 0);
   });
 });
+
+// Une image en erreur est retentée une fois avec un jeton renouvelé, pas davantage : même quand
+// Grist donne un autre jeton à chaque demande, un fichier qui ne se charge jamais ne fait pas
+// boucler le navigateur. Une adresse « data: » qui n'est pas une image est une erreur certaine,
+// sans réseau.
+test('un logo en erreur n\'est retenté qu\'une fois, même si Grist donne un autre jeton à chaque demande', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    const counts = await page.evaluate(async () => {
+      const { createLogoImage } = await import('./branding-ui.js');
+      const seen = { urls: 0, refreshes: 0, failures: 0 };
+      const attachments = {
+        url: () => `data:text/plain,essai ${++seen.urls}`,
+        refresh: async () => { seen.refreshes += 1; return true; },
+        ready: async () => true
+      };
+      createLogoImage(attachments, 7, 'Logo', () => { seen.failures += 1; }, { eager: true });
+      await new Promise(resolve => setTimeout(resolve, 600));
+      return seen;
+    });
+    assert.deepEqual(counts, { urls: 2, refreshes: 1, failures: 1 });
+  }));
 
 test('une version de Grist sans getAccessToken s\'affiche avec les noms, sans erreur', { skip }, () =>
   withWidget({ withoutMethods: ['getAccessToken'] }, async ({ page, logs }) => {

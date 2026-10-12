@@ -389,3 +389,18 @@ export function tablesFictives() {
 // Nombre de cartes attendues avec ce jeu de données (les captures vérifient
 // qu'elles les affichent bien avant de photographier l'écran).
 export const CARTES_ATTENDUES = { fondateurs: 14, fondateursEtPartenaires: 18 };
+
+// Ce que l'habillage montre avec ce jeu de données (les captures le vérifient de même) :
+//   financeurs                 les logos du haut, dans l'ordre de la colonne `ordre`
+//   bandeau                    les fondateurs du bandeau du bas, dans l'ordre d'ordre_bandeau :
+//                              les noms complets, qui sont l'infobulle de chaque logo
+//   cartesPartenairesSansLogo  les cartes de partenaires qui gardent le nom de l'établissement
+export const HABILLAGE_ATTENDU = {
+  financeurs: [...FINANCEURS].sort((a, b) => a.ordre - b.ordre).map(financeur => financeur.nom),
+  bandeau: ETABLISSEMENTS.filter(etablissement => etablissement.statut === 'fondateur' && etablissement.valide)
+    .sort((a, b) => a.ordreBandeau - b.ordreBandeau).map(etablissement => etablissement.nomComplet),
+  cartesPartenairesSansLogo: CONTACTS.filter(contact => {
+    const etablissement = ETABLISSEMENTS.find(candidat => candidat.acronyme === contact.etab);
+    return etablissement?.statut === 'partenaire' && !IDS_LOGOS[etablissement.acronyme];
+  }).length
+};

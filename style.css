@@ -135,6 +135,9 @@ h1 {
   height: 32px;
   max-width: 110px;
   object-fit: contain;
+  /* Discrets en haut de page, comme sur la maquette, quelle que soit la version du logo
+     déposée dans Grist : le rond du bandeau du bas, lui, garde ses couleurs. */
+  filter: grayscale(1);
 }
 /* Dimensions calculées à partir des proportions du fichier (--w et --h, en pixels :
    voir logoSize() dans branding.js) ; --scale les réduit sur téléphone. */
@@ -157,8 +160,11 @@ h1 {
 
 /* Le cadre est assez large pour mettre le titre et, à sa droite, les financeurs
    au-dessus de la zone profil, qui devient compacte : sans fond, sur deux rangées
-   (l'avatar et le message, puis l'interrupteur et le bouton). */
-@media (min-width: 980px) {
+   (l'avatar et le message, puis l'interrupteur et le bouton). La zone est une grille, pas
+   une ligne qui se replie : avec une police plus large que prévue, l'étiquette de
+   l'interrupteur passe sur deux lignes au lieu de rejeter le bouton sur une troisième
+   rangée, et le bandeau garde la hauteur du titre. */
+@media (min-width: 860px) {
   .page-header {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
@@ -170,8 +176,11 @@ h1 {
     justify-self: end;
   }
   .page-header > .account-bar {
-    width: 380px;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
     gap: 6px 8px;
+    width: 380px;
     padding: 0;
     background: none;
     border: 0;
@@ -179,12 +188,31 @@ h1 {
     box-shadow: none;
   }
   .page-header > .account-bar .avatar {
+    grid-column: 1;
+    grid-row: 1;
     width: 34px;
     height: 34px;
     font-size: 11px;
   }
   .page-header > .account-bar .account-identity {
-    flex-basis: 150px;
+    grid-column: 2 / 4;
+    grid-row: 1;
+  }
+  .page-header > .account-bar .presence-switch {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    gap: 8px;
+    min-width: 0;
+  }
+  .page-header > .account-bar .presence-label {
+    line-height: 1.15;
+  }
+  .page-header > .account-bar .account-actions {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .page-header > .account-bar .account-status {
+    grid-column: 1 / -1;
   }
   .page-header > .account-bar .presence-switch,
   .page-header > .account-bar .account-edit {
@@ -192,18 +220,37 @@ h1 {
     padding: 0 10px;
     font-size: 12px;
   }
-  .page-header > .account-bar .presence-switch {
-    gap: 8px;
-  }
 }
-/* Plus large encore : les financeurs passent au centre, entre le titre et le profil. */
-@media (min-width: 1300px) {
+/* Plus large encore : les financeurs passent au centre, entre le titre et le profil. Les
+   seuils laissent de la marge avec une police plus large que la police prévue (DejaVu Sans,
+   celle de la CI : le titre y prend 392 px, le profil 380 px) pour que les financeurs restent
+   exactement au centre. Leur légende est trop large pour y tenir tout de suite : elle ne
+   s'affiche qu'à partir de 1320 px (elle reste lue par les lecteurs d'écran). */
+@media (min-width: 1180px) {
   .page-header {
     grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
     grid-template-areas: "title funders me";
   }
   .funders {
     justify-self: center;
+  }
+  .funders-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (min-width: 1320px) {
+  .funders-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
   }
 }
 
