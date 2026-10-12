@@ -66,8 +66,8 @@ const REFERENCES = {
   },
   actions: {
     table: 'Actions', corrigee: 'Actions_corrigees', brute: 'Actions', colonneBDD: 'Actions',
-    libelles: ['Valorisation de la recherche', 'Maturation de projets', 'Formation à l\'innovation',
-      'Veille et propriété intellectuelle', 'Accompagnement des start-up', 'Recherche de financements']
+    libelles: ['Action 1: Valorisation de la recherche', 'Action 2: Maturation de projets', 'Action 3: Formation à l\'innovation',
+      'Action 4: Veille et propriété intellectuelle', 'Action 5: Accompagnement des start-up', 'Action 6: Recherche de financements']
   },
   gt: {
     table: 'GT', corrigee: 'GT_corrige', brute: 'GT', colonneBDD: 'GT',
@@ -79,7 +79,12 @@ const REFERENCES = {
   },
   taches: {
     table: 'Taches', corrigee: 'Taches_corrige', brute: 'Taches', colonneBDD: 'Taches',
-    libelles: ['Animation de réseau', 'Suivi de projets', 'Relecture de dossiers', 'Organisation d\'événements', 'Veille stratégique']
+    // Le numéro d'une tâche (« 2.1 ») est celui de son action (« Action 2: … ») : le menu Tâches
+    // range les tâches par action. « Coordination transverse » n'a pas de numéro, donc pas
+    // d'action : elle est rangée sous « Sans action ». Aucune tâche n'est numérotée 5 ou 6 : ces
+    // actions n'ont pas de groupe dans le menu.
+    libelles: ['1.1 Animation de réseau', '1.2 Organisation d\'événements', '2.1 Suivi de projets', '2.2 Relecture de dossiers',
+      '3.1 Conception de parcours', '4.1 Veille stratégique', 'Coordination transverse']
   }
 };
 
@@ -116,88 +121,88 @@ const CONTACTS = [
   {
     prenom: 'Camille', nom: 'Rousseau', fonction: 'Cheffe de projet innovation', etab: 'CHD', tel: '0536490112',
     role: 'Référent établissement',
-    instances: ['Comité de pilotage', 'Comité stratégique'], actions: ['Maturation de projets', 'Recherche de financements'],
-    gt: ['GT Financement'], communautes: ['Santé numérique'], taches: ['Suivi de projets'],
+    instances: ['Comité de pilotage', 'Comité stratégique'], actions: ['Action 2: Maturation de projets', 'Action 6: Recherche de financements'],
+    gt: ['GT Financement'], communautes: ['Santé numérique'], taches: ['2.1 Suivi de projets'],
     competences: ['Gestion de projet', 'Financement de l\'innovation', 'Santé numérique']
   },
   {
     prenom: 'Mehdi', nom: 'Bensaïd', fonction: 'Responsable valorisation', etab: 'UDD', tel: '0536490234',
     role: 'Coordinateur', admin: true,
-    instances: ['Comité de pilotage'], actions: ['Valorisation de la recherche', 'Veille et propriété intellectuelle'],
+    instances: ['Comité de pilotage'], actions: ['Action 1: Valorisation de la recherche', 'Action 4: Veille et propriété intellectuelle'],
     gt: ['GT Propriété intellectuelle'], communautes: ['Transfert de technologie', 'Deeptech'],
-    taches: ['Animation de réseau', 'Relecture de dossiers'],
+    taches: ['1.1 Animation de réseau', '2.2 Relecture de dossiers'],
     competences: ['Propriété intellectuelle', 'Droit des contrats', 'Partenariats industriels']
   },
   {
     prenom: 'Élise', nom: 'Marchetti', fonction: 'Juriste en propriété intellectuelle', etab: 'ISD', tel: '0536490356',
-    instances: ['Conseil scientifique'], actions: ['Veille et propriété intellectuelle'],
-    gt: ['GT Propriété intellectuelle'], communautes: ['Transfert de technologie'], taches: ['Relecture de dossiers'],
+    instances: ['Conseil scientifique'], actions: ['Action 4: Veille et propriété intellectuelle'],
+    gt: ['GT Propriété intellectuelle'], communautes: ['Transfert de technologie'], taches: ['2.2 Relecture de dossiers'],
     competences: ['Propriété intellectuelle', 'Droit des contrats']
   },
   {
     prenom: 'Julien', nom: 'Garnier', fonction: 'Chargé de transfert de technologie', etab: 'UDD', tel: '0639980478',
     role: 'Membre du comité',
-    instances: ['Comité stratégique'], actions: ['Valorisation de la recherche', 'Maturation de projets'],
-    communautes: ['Transfert de technologie', 'Deeptech'], taches: ['Suivi de projets'],
+    instances: ['Comité stratégique'], actions: ['Action 1: Valorisation de la recherche', 'Action 2: Maturation de projets'],
+    communautes: ['Transfert de technologie', 'Deeptech'], taches: ['2.1 Suivi de projets'],
     competences: ['Partenariats industriels', 'Création d\'entreprise']
   },
   {
     prenom: 'Sofia', nom: 'Almeida', fonction: 'Directrice de la recherche clinique', etab: 'CHD', tel: '0536490590',
     role: 'Membre du comité',
-    instances: ['Comité d\'éthique', 'Conseil scientifique'], actions: ['Maturation de projets'],
-    gt: ['GT Données de santé'], communautes: ['Santé numérique'], taches: ['Relecture de dossiers'],
+    instances: ['Comité d\'éthique', 'Conseil scientifique'], actions: ['Action 2: Maturation de projets'],
+    gt: ['GT Données de santé'], communautes: ['Santé numérique'], taches: ['2.2 Relecture de dossiers'],
     competences: ['Essais cliniques', 'Dispositifs médicaux', 'Open science']
   },
   {
     prenom: 'Hugo', nom: 'Lefèvre', fonction: 'Ingénieur en santé numérique', etab: 'EDD',
-    actions: ['Accompagnement des start-up'], gt: ['GT Données de santé'],
-    communautes: ['Santé numérique', 'Deeptech'], taches: ['Veille stratégique'],
+    actions: ['Action 5: Accompagnement des start-up'], gt: ['GT Données de santé'],
+    communautes: ['Santé numérique', 'Deeptech'], taches: ['4.1 Veille stratégique'],
     competences: ['Intelligence artificielle', 'Santé numérique']
   },
   {
     prenom: 'Nadia', nom: 'Kowalski', fonction: 'Chargée de mission entrepreneuriat', etab: 'UDD', tel: '0536490712',
     role: 'Animation de communauté',
-    actions: ['Accompagnement des start-up', 'Formation à l\'innovation'], gt: ['GT Formation'],
-    communautes: ['Entrepreneuriat étudiant'], taches: ['Organisation d\'événements', 'Animation de réseau'],
+    actions: ['Action 5: Accompagnement des start-up', 'Action 3: Formation à l\'innovation'], gt: ['GT Formation'],
+    communautes: ['Entrepreneuriat étudiant'], taches: ['1.2 Organisation d\'événements', '1.1 Animation de réseau'],
     competences: ['Création d\'entreprise', 'Gestion de projet']
   },
   {
     prenom: 'Thomas', nom: 'Vidal', fonction: 'Responsable partenariats industriels', etab: 'ISD', tel: '0639980834',
     role: 'Référent établissement',
-    instances: ['Comité de pilotage'], actions: ['Valorisation de la recherche', 'Recherche de financements'],
-    gt: ['GT Financement'], communautes: ['Transfert de technologie'], taches: ['Animation de réseau'],
+    instances: ['Comité de pilotage'], actions: ['Action 1: Valorisation de la recherche', 'Action 6: Recherche de financements'],
+    gt: ['GT Financement'], communautes: ['Transfert de technologie'], taches: ['1.1 Animation de réseau'],
     competences: ['Partenariats industriels', 'Droit des contrats', 'Financement de l\'innovation']
   },
   {
     prenom: 'Léa', nom: 'Fontaine', fonction: 'Gestionnaire de projets européens', etab: 'CHD', tel: '0536490956',
-    actions: ['Recherche de financements'], gt: ['GT Financement'], taches: ['Suivi de projets', 'Relecture de dossiers'],
+    actions: ['Action 6: Recherche de financements'], gt: ['GT Financement'], taches: ['2.1 Suivi de projets', '2.2 Relecture de dossiers'],
     competences: ['Financement de l\'innovation', 'Gestion de projet']
   },
   {
     prenom: 'Karim', nom: 'Haddad', fonction: 'Directeur de l\'innovation', etab: 'EDD', tel: '0536491078',
     role: 'Coordinateur',
     instances: ['Comité de pilotage', 'Comité stratégique', 'Cellule de coordination'],
-    actions: ['Maturation de projets', 'Accompagnement des start-up'], gt: ['GT Formation'],
-    communautes: ['Innovation pédagogique', 'Deeptech'], taches: ['Animation de réseau'],
+    actions: ['Action 2: Maturation de projets', 'Action 5: Accompagnement des start-up'], gt: ['GT Formation'],
+    communautes: ['Innovation pédagogique', 'Deeptech'], taches: ['1.1 Animation de réseau', 'Coordination transverse'],
     competences: ['Gestion de projet', 'Création d\'entreprise']
   },
   {
     prenom: 'Inès', nom: 'Moreau', fonction: 'Chargée de communication', etab: 'UDD', tel: '0536491190',
-    actions: ['Valorisation de la recherche'], gt: ['GT Événements'],
-    communautes: ['Entrepreneuriat étudiant', 'Innovation pédagogique'], taches: ['Organisation d\'événements'],
+    actions: ['Action 1: Valorisation de la recherche'], gt: ['GT Événements'],
+    communautes: ['Entrepreneuriat étudiant', 'Innovation pédagogique'], taches: ['1.2 Organisation d\'événements'],
     competences: ['Communication scientifique']
   },
   {
     prenom: 'Paul', nom: 'Girard', fonction: 'Pharmacien référent innovation', etab: 'CHD', tel: '0639981212',
     role: 'Membre du comité',
-    instances: ['Comité d\'éthique'], actions: ['Maturation de projets'], gt: ['GT Données de santé'],
-    communautes: ['Santé numérique'], taches: ['Veille stratégique'],
+    instances: ['Comité d\'éthique'], actions: ['Action 2: Maturation de projets'], gt: ['GT Données de santé'],
+    communautes: ['Santé numérique'], taches: ['4.1 Veille stratégique'],
     competences: ['Dispositifs médicaux', 'Essais cliniques']
   },
   {
     prenom: 'Anaïs', nom: 'Perrot', fonction: 'Responsable de la formation continue', etab: 'ISD', tel: '0536491334',
-    actions: ['Formation à l\'innovation'], gt: ['GT Formation'], communautes: ['Innovation pédagogique'],
-    taches: ['Organisation d\'événements'],
+    actions: ['Action 3: Formation à l\'innovation'], gt: ['GT Formation'], communautes: ['Innovation pédagogique'],
+    taches: ['3.1 Conception de parcours', '1.2 Organisation d\'événements'],
     competences: ['Communication scientifique', 'Gestion de projet']
   },
   {
@@ -208,7 +213,7 @@ const CONTACTS = [
   // Établissements partenaires : visibles seulement avec l'interrupteur « Partenaires ».
   {
     prenom: 'Clara', nom: 'Dubois', fonction: 'Chargée d\'affaires', etab: 'CLEX', tel: '0536491578',
-    actions: ['Recherche de financements'], communautes: ['Transfert de technologie'],
+    actions: ['Action 6: Recherche de financements'], communautes: ['Transfert de technologie'],
     competences: ['Partenariats industriels', 'Droit des contrats']
   },
   {
@@ -222,7 +227,7 @@ const CONTACTS = [
   },
   {
     prenom: 'Yanis', nom: 'Morel', fonction: 'Directeur des opérations', etab: 'RSD', tel: '0536491834',
-    role: 'Membre du comité', instances: ['Conseil scientifique'], taches: ['Veille stratégique'],
+    role: 'Membre du comité', instances: ['Conseil scientifique'], taches: ['4.1 Veille stratégique'],
     competences: ['Gestion de projet']
   },
   // Jamais affichés (voir docs/utilisateurs.md, « Pourquoi une personne n'apparaît-elle pas ? »).

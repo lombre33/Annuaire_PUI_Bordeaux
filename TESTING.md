@@ -16,24 +16,28 @@ node --test
 Sans dépendance, un fichier de tests par module :
 
 - `tests/grist-data.test.mjs` — décodage et formats des données Grist : `text`,
-  `normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
-  `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `refId`, `refLabel`, `isEmptyReference`,
+  `normalize`, `compareLabels` (les nombres dans l'ordre), `formatPhone`, `safeValues`, `tableToRows`,
+  `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `taskActionNumber`, `actionNumber`,
+  `refId`, `refLabel`, `isEmptyReference`,
   `resolveListItem`, `isInScope`, `createRequestSequencer`,
   `referenceMapsEqual`, `mailtoHref`.
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
-  catégories liste dont compétences et domaines, libellés sans doublon, anciennes
+  catégories liste dont compétences, domaines, tâches et actions, libellés sans doublon, anciennes
   colonnes ignorées, indicateurs) et `labelsOf`.
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
   libellé), `isEtablissementEligible`, `filterVisibleEstablishments`.
 - `tests/filters.test.mjs` — `filterContacts`, `pruneStaleFilters`,
-  `computeFilterCounts` (dont les compteurs des domaines) et le menu rangé par
-  domaine : `menuGroups`, `groupState`, `toggleGroup`, `selectionCount`.
+  `computeFilterCounts` (dont les compteurs des domaines et des actions) et le menu
+  rangé par groupe, domaine ou action : `menuGroups`, `groupState`, `toggleGroup`,
+  `selectionCount`.
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
   (une lecture par table, aucune ancienne table lue, libellé corrigé
   prioritaire, tables indispensables illisibles, table de référence illisible,
   colonnes obligatoires, facultatives ou introuvables, annuaire vide expliqué,
-  doublons d'acronymes, domaines des compétences).
+  doublons d'acronymes, domaines des compétences, tâches rangées par action
+  d'après leur numéro : formats de libellé, repli « Sans action », menu à plat,
+  lectures en panne).
 - `tests/identity.test.mjs` — `readIdentity` avec un faux document Grist (adresse
   lue sur la ligne de la sonde, administrateur d'après `ACL`, compte Lecteur,
   table-sonde absente, formule muette, écriture refusée, lecture en panne, ligne de
@@ -79,6 +83,9 @@ Sans dépendance, un fichier de tests par module :
   table ou par ligne).
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : serveur
   statique, Chromium, faux Grist injecté dans la page.
+- `tests/support/grouped-menu.mjs` — les aides communes aux tests des menus rangés par
+  groupe (Compétences par domaine, Tâches par action) : groupe, case, flèche,
+  nombres, éléments visibles.
 - `tests/support/fake-attachments.mjs` — les pièces jointes du faux Grist pour les tests
   navigateur : des logos dessinés à la demande (proportions variées, un logo très haut,
   une bannière très large, un SVG sans dimensions), un fichier supprimé (404), un
@@ -104,6 +111,15 @@ interrupteur).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
+`tests/e2e-taches.test.mjs` y ajoute 24 scénarios sur le menu Tâches rangé par action,
+sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
+sept boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
+en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
+filtres, nombres de cartes, recherche d'une action, d'une tâche ou d'un numéro, tag de
+carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numéros (console
+et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
+les tâches par action.
+
 `tests/e2e-profile.test.mjs` y ajoute 61 scénarios sur la modification d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
 compte Lecteur, anonyme, adresse inconnue, doublon), le formulaire et ses refus, la
@@ -117,13 +133,13 @@ texte, un refus de Grist, un changement concurrent, une fiche supprimée, le dou
 rangé sous la fonction, le bandeau « Ma présence » qui ne se chevauche à aucune largeur et
 l'affichage de 280 à 360px.
 
-`tests/responsive.test.mjs` y ajoute 19 scénarios sur la mise en page, de 280 à
+`tests/responsive.test.mjs` y ajoute 20 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
-d'outils, menus de filtres (le menu Compétences déplié compris) entièrement dans le
-cadre, cibles tactiles (écran
+d'outils, menus de filtres (les menus Compétences et Tâches dépliés compris) entièrement
+dans le cadre, cibles tactiles (écran
 tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
@@ -283,6 +299,37 @@ valeurs par domaine, sans second bouton.
 - [ ] Sans la colonne `Macro_competences` (essai sur une copie du document) : le
       bandeau « Colonne de libellé introuvable » s'affiche et le menu Compétences
       reste complet, mais à plat, sans domaines.
+
+Spécifique **Tâches par action** : le menu Tâches range ses valeurs par action, sans
+second bouton et sans colonne à ajouter dans Grist. Le numéro avant le point du libellé
+d'une tâche (« 2.1 … ») est celui de son action, dont le libellé commence par « Action 2 ».
+Le menu Tâches fonctionne comme le menu Compétences par domaine (ci-dessus) : reprendre
+les mêmes essais en remplaçant domaine par action et compétence par tâche, puis :
+
+- [ ] L'infobulle du bouton « Tâches » parle d'actions ; le champ de recherche du menu
+      dit « Action ou tâche… » en entier, sans être coupé.
+- [ ] Les actions sont dans l'ordre de leur numéro (« Action 2 » avant « Action 10 »),
+      chaque tâche sous l'action dont elle porte le numéro, et les tâches d'une action
+      dans l'ordre de leur numéro (« 1.2 » avant « 1.10 »). « Sans action » est **en
+      dernier** s'il existe une tâche sans numéro, ou dont le numéro ne correspond à
+      aucune action. Une action qui n'a aucune tâche ne figure pas dans le menu.
+- [ ] Le filtre **Actions** est inchangé : toujours une liste à plat, qui filtre sur les
+      actions inscrites sur les cartes, et qui ne coche pas le menu Tâches (ni
+      l'inverse). Les deux se cumulent (ET).
+- [ ] Rechercher « 2.1 » (le numéro d'une tâche) garde cette tâche sous son action ;
+      « action 2 » garde l'action avec toutes ses tâches.
+- [ ] Renuméroter une tâche dans `Taches` (par exemple « 2.1 … » devient « 1.4 … »)
+      puis recharger : elle change d'action. Une sélection qui portait l'ancien libellé
+      est retirée.
+- [ ] La console liste, par identifiant de ligne, les tâches classées sous « Sans
+      action » (`[REFS] Taches : n ligne(s) sans regroupement…`) : les numéroter dans
+      Grist, puis recharger le widget.
+- [ ] Sur une copie du document où **aucune tâche** ne commence par un numéro « n.m »
+      (ou aucune action par « Action n »), le menu Tâches reste complet, mais à plat,
+      sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches : aucune
+      ligne n'est rattachée à une action…`).
+- [ ] Dans la fenêtre « Modifier mon profil », la liste des tâches est rangée par action
+      elle aussi, et celle des actions reste à plat.
 
 ## 4. Filtres combinés
 
@@ -454,11 +501,12 @@ iOS, Chrome Android) que les tests ne couvrent pas :
       de la rangée : il reste entièrement visible, sans être coupé à droite, et
       se referme d'un clic ailleurs. Élargir le cadre puis le rouvrir : il
       s'ouvre de nouveau sous son bouton.
-- [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit :
-      aucune barre de défilement horizontale, un nom de compétence très long
-      passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et le
-      nombre de chaque domaine restent visibles, et la flèche se touche sans
-      viser.
+- [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit
+      (et de même le menu Tâches avec une action dépliée) : aucune barre de
+      défilement horizontale, un nom de compétence, de tâche ou d'action très
+      long passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et
+      le nombre de chaque domaine ou action restent visibles, et la flèche se
+      touche sans viser.
 - [ ] Carte avec un nom, un prénom et une fonction très longs : le nom tient sur
       deux lignes au plus, le badge d'établissement reste à sa droite, rien ne
       passe sous le badge ni hors de la carte.
