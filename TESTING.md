@@ -61,20 +61,23 @@ Sans dépendance, un fichier de tests par module :
   `profileFormModel` et `draftOf` (dont l'e-mail et l'établissement d'un administrateur),
   `diffProfile` (textes nettoyés et refusés, téléphone français, e-mail refusé s'il est mal
   formé, trop long, vidé ou pris par une autre fiche, établissement jamais vidé ni inconnu,
-  références, listes en ajouts et retraits), `rebaseChanges` (ramener les changements sur
-  la fiche actuelle) et `describeChanges`.
+  références, listes en ajouts et retraits, photo remplacée ou retirée), `rebaseChanges` (ramener
+  les changements sur la fiche actuelle) et `describeChanges`. La photo n'est proposée que si `BDD`
+  a une colonne `Avatar`.
 - `tests/profile-save.test.mjs` — `buildRowUpdate` (listes calculées sur la fiche
   actuelle, téléphone numérique ou texte, e-mail et établissement), `signatureOf`,
   `readRow`, `prepareReview` (cartes avant et après, rien d'écrit, l'e-mail et
   l'établissement ignorés hors administrateur, une adresse prise refusée), `saveProfile`
   (une seule action atomique, changement concurrent, adresse prise entre-temps, fermé par
   défaut pour l'e-mail et l'établissement, refus de Grist, aucune adresse ni valeur dans la
-  console) et `unsavedLabels`.
-- `tests/preview.test.mjs` — `diffContacts` et `previewOf` : ce qui change entre la
-  carte avant et la carte après.
+  console ; pour une photo : envoi après les vérifications et avant l'écriture, nouvelle
+  relecture après l'envoi, `Avatar` écrit dans la même action, fichier resté sans servir,
+  aucun envoi pour un retrait) et `unsavedLabels`.
+- `tests/preview.test.mjs` — `diffContacts`, `previewOf` et `withAvatarChange` : ce qui change
+  entre la carte avant et la carte après, la photo comprise.
 - `tests/schema.test.mjs` — `readColumnTypes` (type des colonnes de `BDD`, repli).
-- `tests/attachments.test.mjs` — `attachmentIds` (cellules `['L', …]`, identifiant seul,
-  cellule vide) et `createAttachments` (jeton en lecture seule demandé une seule fois,
+- `tests/attachments.test.mjs` — `attachmentIds` et `avatarIdOf` (cellules `['L', …]`, identifiant
+  seul, cellule vide) et `createAttachments` (jeton en lecture seule demandé une seule fois,
   renouvelé avant son expiration, échecs et délai d'attente, réponses inattendues,
   aucune adresse ni aucun jeton dans la console).
 - `tests/etablissement.test.mjs` — la fiche d'un établissement sans Grist ni DOM :
@@ -92,10 +95,11 @@ Sans dépendance, un fichier de tests par module :
 - `tests/upload.test.mjs` — `uploadAttachment` : jeton en écriture demandé à chaque envoi et
   jamais gardé, adresse refusée hors https, requête sans cookie ni adresse de page, délai,
   statuts 401, 403, 413 et autres, réponse illisible, ni jeton ni adresse dans les messages
-  ni dans la console.
-- `tests/image-prep.test.mjs` — `checkImageFile`, `fitWithin` et `prepareImage` : formats, poids
-  et fichier vide refusés avant lecture, image redessinée à 480 px au plus, SVG agrandi, PNG
-  produit.
+  ni dans la console, consigne de l'appelant (celle du logo, celle de la photo).
+- `tests/image-prep.test.mjs` — `checkImageFile`, `fitWithin`, `squareCrop` et `prepareImage` :
+  formats, poids et fichier vide refusés avant lecture, image redessinée à 480 px au plus, SVG
+  agrandi, PNG produit ; pour une photo, carré découpé au centre sans agrandir, 256 px au plus,
+  JPEG, SVG refusé.
 - `tests/branding.test.mjs` — `buildBranding` (fondateurs validés du bandeau du bas dans
   l'ordre, financeurs, rond « France 2030 », logo de chaque établissement),
   `logoForContact`, `logoSize` et le branchement sur `loadDirectory` (table `Financeurs`
@@ -113,9 +117,10 @@ Sans dépendance, un fichier de tests par module :
 - `tests/support/fake-attachments.mjs` — les pièces jointes du faux Grist pour les tests
   navigateur : des logos dessinés à la demande (proportions variées, un logo très haut,
   une bannière très large, un SVG sans dimensions), un fichier supprimé (404), un
-  fichier qui n'est pas une image, un compte des téléchargements et des jetons employés, et la
-  réception des fichiers envoyés (logo d'un établissement) avec leurs refus, leur coupure et leur
-  réponse sans en-têtes d'autorisation entre sites.
+  fichier qui n'est pas une image, des portraits carrés (les fichiers 500 à 599, les mêmes visages
+  fictifs que la démonstration), un compte des téléchargements et des jetons employés, et la
+  réception des fichiers envoyés (logo d'un établissement, photo de profil) avec leurs refus, leur
+  coupure et leur réponse sans en-têtes d'autorisation entre sites.
 - `tests/support/contrast.mjs` — le rapport de contraste WCAG (`contrastRatio`, `parseColor`) à
   partir des couleurs calculées par le navigateur, pour les tests d'accessibilité.
 - `tests/support/card-metrics.mjs` — la taille du texte et des cibles des cartes sur la page rendue
@@ -178,6 +183,17 @@ dimensions démesurées et le poids d'un PNG redessiné) et les pannes de l'envo
 serveur, réponse illisible, jeton refusé), le fichier resté sans servir, le refus de Grist, le conflit
 pendant que la fenêtre est ouverte, Échap, le double clic, le clavier et les noms accessibles, la
 mise en page de 320 à 1280px et l'absence de tout appel réseau autre que l'API simulée.
+
+`tests/e2e-avatar.test.mjs` y ajoute 32 scénarios sur la photo de profil, avec des portraits servis par
+`tests/support/fake-attachments.mjs` : la photo à la place des initiales sur les cartes, dans le bandeau « Ma
+présence » et dans la liste des responsables (initiales sans photo, avec un fichier supprimé ou illisible, ou
+sans colonne `Avatar`), l'agrandissement au clic, à Entrée et à Espace et sa fermeture par chaque geste, la
+carte « Photo de profil » du formulaire, le choix d'un fichier (recadrage en carré de 256 px en JPEG, photo de
+téléphone remise à l'endroit et sans position GPS, JPG, WebP, PNG transparent posé sur du blanc, refus avant
+tout envoi), la relecture (anneau, pastille, miniatures), le retrait, l'ajout par une administratrice, les
+pannes de l'envoi (refus, jeton, réponse sans en-têtes d'autorisation entre sites), le fichier resté sans
+servir, le conflit pendant l'envoi, l'abandon d'une photo choisie, les cadres de 280 à 360px et les noms
+accessibles.
 
 `tests/responsive.test.mjs` y ajoute 24 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
@@ -923,3 +939,113 @@ message du widget, la ligne de la console, la requête et son code de réponse d
       cadre étroit, rien ne dépasse.
 - [ ] Comparaison à la maquette v5 : ouvrir la maquette (écrans D0 et D1) et le widget côte à côte à la même largeur
       (1280 px, puis 390 px). Les écarts voulus sont dans le CHANGELOG (1.17.0).
+
+## 18. Photo de profil (1.18.0)
+
+Réglages d'abord : `GRIST_SETUP.md`, étape 6 (colonne `Avatar`, de type Pièces jointes, dans `BDD`) et étape 4
+(règles d'accès sur `BDD` et sur les pièces jointes). À jouer sur une **copie** du document, avec la console et
+l'onglet Réseau du navigateur ouverts (F12), avec :
+
+- un compte **ordinaire** (ni administrateur ni responsable d'établissement) dont l'adresse figure dans `BDD.email`,
+  sur une fiche qui apparaît dans l'annuaire ;
+- un compte **administrateur** ;
+- un compte **Lecteur** du document.
+
+**Ce protocole est le seul contrôle de l'envoi d'une photo par une personne ordinaire et des règles d'accès : les
+tests automatiques simulent la réponse de Grist.** Trois points ne peuvent être constatés que dans un vrai
+document : (1) que Grist **accepte** l'envoi du fichier avec le jeton en écriture que le widget demande, (2) que le
+navigateur **laisse le widget lire la réponse** (identifiant de la pièce jointe), (3) que les règles d'accès laissent
+une personne **ordinaire** ajouter une pièce jointe et écrire `Avatar` sur **sa** fiche, et seulement la sienne. Si
+l'un échoue, relever le message du widget, la ligne de la console, la requête et son code de réponse dans
+l'onglet Réseau.
+
+**Sans la colonne**
+
+- [ ] Document **sans** colonne `Avatar` : les cartes montrent les initiales, le formulaire « Modifier mon profil »
+      n'a pas de carte « Photo de profil », aucune erreur ni ligne `[LOGOS]` dans la console.
+
+**Affichage** (colonne ajoutée)
+
+- [ ] Déposer une image carrée (PNG ou JPG) dans la cellule `Avatar` de deux personnes dont la fiche apparaît, puis
+      recharger le widget : leurs cartes montrent la photo **à la place des initiales** (dans un rond) ; les autres
+      cartes gardent leurs initiales. Onglet Réseau : une demande par photo, à une adresse de la forme
+      `…/attachments/<numéro>/download?auth=…`, réponse 200 de type image ; les photos de cartes hors écran ne sont
+      demandées qu'à l'approche (défilement). Aucune ligne `[LOGOS]` dans la console.
+- [ ] Un clic sur la photo d'une carte l'**agrandit**, avec le nom, la fonction et l'établissement en légende. La croix,
+      un clic sur la photo ou à côté, et Échap la ferment ; le focus revient sur la photo de la carte.
+- [ ] Avec le compte de l'une de ces personnes : sa photo remplace ses initiales dans le bandeau « Ma présence » et
+      dans le bloc d'identité de la fenêtre « Modifier mon profil ».
+- [ ] Un fichier qui n'est pas une image dans une cellule, ou un fichier supprimé : la carte garde les initiales,
+      sans image cassée ni bouton qui ne fait rien.
+- [ ] Une personne dont la fiche est masquée (accord retiré, établissement non validé) : pas de carte, donc pas de
+      photo nulle part dans l'annuaire.
+- [ ] Un compte **Lecteur** voit les photos (le jeton demandé pour les afficher est en lecture seule).
+
+**Ajouter sa photo** (compte ordinaire)
+
+- [ ] « Modifier mon profil » : la carte « Photo de profil » est le premier bloc après l'identité, avec « Ajouter une
+      photo » et sans bouton « Retirer la photo ». À l'ouverture, **rien** n'est demandé ni écrit.
+- [ ] Choisir une photo de téléphone en portrait de moins de 2 Mo : l'aperçu montre le **centre** de la photo,
+      recadré en carré et **à l'endroit** ; le bouton devient « Changer la photo » et « Retirer la photo » apparaît.
+      Onglet Réseau : aucune requête d'envoi, aucune demande de jeton en écriture à ce stade.
+- [ ] Un fichier de plus de 2 Mo, un PDF, un GIF, un SVG, un fichier vide ou abîmé : refusé sous les boutons, avant
+      tout envoi, avec une phrase claire (« Cette image pèse X Mo : choisissez-en une de 2 Mo au plus. », « Ce fichier
+      n’est pas une image acceptée : choisissez un fichier JPG, PNG ou WebP. »…) ; la photo actuelle reste.
+- [ ] « Relire mes modifications » : sur la carte « Après », la photo est entourée d'un anneau vert avec la pastille
+      « photo ajoutée » ; la carte « Avant » garde les initiales ; le « Détail des changements » montre « aucune photo »
+      puis la nouvelle, en miniature (un clic l'agrandit). Onglet Réseau : toujours aucun envoi.
+- [ ] « Valider » : **une** demande de jeton en écriture, puis **une** requête `POST …/attachments?auth=…` de réponse
+      200 dont le corps est `[<numéro>]`, sans cookie ni en-tête `Referer`, puis l'écriture de la fiche. Aucune erreur de
+      la console (en particulier aucun « blocked by CORS policy »). Dans Grist, la cellule `Avatar` contient le
+      **nouveau** fichier (un seul) : le télécharger, c'est un **JPEG carré de 256 px au plus**, sans métadonnées (aucune
+      position GPS : le vérifier avec un outil Exif), remis à l'endroit.
+- [ ] La carte de la personne montre la photo sans recharger ; le message de confirmation s'affiche six secondes.
+- [ ] Un PNG transparent : la photo a un fond **blanc**, jamais noir.
+- [ ] **Si l'envoi échoue** : la relecture reste ouverte avec la photo choisie, un message dit quoi faire et se termine
+      par « Contactez un administrateur si le problème persiste. », la fiche est inchangée. Relever la requête et son
+      code. Cas « réponse sans en-têtes d'autorisation entre sites » : la console du navigateur parle de « CORS » et le
+      widget dit « L’envoi du fichier à Grist a échoué » ; vérifier si le fichier s'est pourtant ajouté aux pièces jointes
+      du document (fichier sans emploi) et le noter.
+- [ ] Un compte à qui une règle interdit d'ajouter une pièce jointe : « Grist a refusé le fichier : vos droits ne
+      permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. », rien d'écrit dans la fiche.
+- [ ] Un compte à qui une règle interdit d'écrire `Avatar` : le fichier est envoyé, l'écriture est refusée, et le message
+      ajoute « Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans
+      servir. » Vérifier que le fichier est bien là, sans cellule qui le référence.
+
+**Changer, retirer**
+
+- [ ] « Changer la photo » puis « Relire » : la pastille dit « photo modifiée » ; après « Valider », la cellule `Avatar`
+      ne contient que la nouvelle photo. **Noter ce que devient l'ancien fichier** : reste-t-il dans les pièces jointes
+      du document ? (le widget ne sait pas supprimer une pièce jointe.) Grist le supprime-t-il de lui-même ?
+- [ ] « Retirer la photo » puis « Relire » : l'anneau est rouge, la pastille dit « photo retirée », le détail
+      montre la photo actuelle puis « photo retirée » ; « Valider » : la cellule est vide, les initiales reviennent, et l'onglet Réseau ne montre
+      **aucun** envoi. L'ancien fichier reste-t-il dans les pièces jointes ? Le noter.
+- [ ] Sans photo au départ : choisir une photo puis la retirer revient à ne rien changer (« Relire » reste grisé).
+- [ ] Échap avec une photo choisie : un premier appui prévient, un second ferme ; rouvrir la fenêtre repart de la
+      photo de Grist.
+
+**Administrateur, droits, concurrence**
+
+- [ ] Compte administrateur, mode admin allumé, « ✎ Modifier la fiche » d'une autre personne : la même carte « Photo
+      de profil ». Ajouter, remplacer et retirer la photo : **seule** la ligne concernée est écrite ; la photo s'affiche
+      sur la carte de cette personne.
+- [ ] Règles d'accès posées : un compte ordinaire ne peut pas écrire `Avatar` sur la fiche d'un autre, ni depuis le
+      widget (le bouton n'existe pas) ni depuis la console.
+- [ ] Deux onglets sur la même fiche : photo changée dans l'un, puis photo choisie dans l'autre (ouvert avant) : au « Valider »,
+      « La fiche a changé dans Grist pendant la relecture. Relisez ce qui suit, puis validez à nouveau. » ; rien n'est
+      écrit sur la fiche, et le message dit où est resté le fichier envoyé.
+- [ ] Console : aucun nom, aucune adresse e-mail, ni jeton ni adresse d'envoi dans les lignes écrites par le widget (le
+      navigateur, lui, peut écrire l'adresse d'une requête bloquée : ne pas partager sa console).
+
+**Clavier, lecteur d'écran, mise en page**
+
+- [ ] Au clavier : la photo d'une carte se focalise avec Tab (« Agrandir la photo de … ») et s'agrandit avec Entrée ou
+      Espace ; Échap la ferme et le focus revient sur la carte. Dans le formulaire : « Ajouter une photo » et « Retirer la
+      photo » se parcourent et s'activent au clavier ; quand « Retirer la photo » disparaît, le focus passe à « Ajouter une
+      photo ». Un anneau de focus visible à chaque arrêt.
+- [ ] Lecteur d'écran (au moins une fois) : les boutons de la photo sont lus par leur texte ; « Préparation de l’image… »
+      et les refus sont annoncés ; la photo agrandie est annoncée par sa légende.
+- [ ] En réduisant la section du widget de 1280 à 320 px : la carte « Photo de profil » reste lisible (l'aperçu au-dessus
+      des boutons sur un cadre étroit), la photo agrandie tient dans l'écran, rien ne dépasse.
+- [ ] Comparaison à la maquette v5 : ouvrir la maquette (écrans de la photo de profil) et le widget côte à côte à la
+      même largeur (1280 px, puis 390 px). Les écarts voulus sont dans le CHANGELOG (1.18.0).

@@ -70,7 +70,7 @@ test('prepareImage refuses a bad file before reading or drawing anything', async
 
 test('the avatar rules ask for a square JPEG of 256 px at most, from a JPG, PNG or WebP of 2 Mo at most', () => {
   const rules = IMAGE_RULES.avatar;
-  assert.deepEqual(rules.types, ['image/png', 'image/jpeg', 'image/webp']);
+  assert.deepEqual(rules.types, ['image/jpeg', 'image/png', 'image/webp']);
   assert.equal(rules.maxBytes, 2 * 1024 * 1024);
   assert.equal(rules.maxSide, 256);
   assert.equal(rules.square, true);
@@ -87,9 +87,9 @@ test('checkImageFile applies the avatar rules: no SVG (it can carry a script), 2
   for (const type of rules.types) assert.equal(checkImageFile(fileOf(1000, type, 'moi'), rules), '', type);
   assert.equal(checkImageFile(fileOf(rules.maxBytes, 'image/jpeg'), rules), '', 'exactement la limite');
   assert.equal(checkImageFile(fileOf(1000, 'image/svg+xml'), rules),
-    'Ce fichier n’est pas une image acceptée : choisissez un fichier PNG, JPG ou WebP.');
+    'Ce fichier n’est pas une image acceptée : choisissez un fichier JPG, PNG ou WebP.');
   assert.equal(checkImageFile(fileOf(1000, 'image/gif'), rules),
-    'Ce fichier n’est pas une image acceptée : choisissez un fichier PNG, JPG ou WebP.');
+    'Ce fichier n’est pas une image acceptée : choisissez un fichier JPG, PNG ou WebP.');
   assert.equal(checkImageFile(fileOf(rules.maxBytes + 1, 'image/png'), rules),
     'Cette image pèse 2,1 Mo : choisissez-en une de 2 Mo au plus.');
   assert.equal(checkImageFile(fileOf(0, 'image/png'), rules), 'Ce fichier est vide : choisissez-en un autre.');
@@ -116,7 +116,7 @@ test('prepareImage with the avatar rules refuses a bad file before drawing anyth
     }
     return assert.fail('devait être refusé');
   };
-  assert.match(await refused(fileOf(10, 'image/svg+xml')), /PNG, JPG ou WebP/);
+  assert.match(await refused(fileOf(10, 'image/svg+xml')), /JPG, PNG ou WebP/);
   assert.match(await refused(fileOf(IMAGE_RULES.avatar.maxBytes + 1, 'image/jpeg')), /pèse 2,1 Mo/);
   assert.match(await refused(fileOf(0, 'image/png')), /vide/);
 });

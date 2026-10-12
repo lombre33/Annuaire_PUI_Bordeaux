@@ -555,8 +555,9 @@ const SCENES = [
   },
   {
     // La fenêtre ouverte sur le formulaire, avec le brouillon saisi : le pied dit combien de champs
-    // changent et « Relire mes modifications » est devenu cliquable.
-    fichier: 'modifier-fiche-formulaire.png', requete: `?connecte=${PERSONNES_DEMO.visible}`,
+    // changent et « Relire mes modifications » est devenu cliquable. Avec ?photos, le document a la colonne
+    // Avatar : la carte « Photo de profil » ouvre le formulaire (Camille Rousseau n'a pas de photo).
+    fichier: 'modifier-fiche-formulaire.png', requete: `?photos&connecte=${PERSONNES_DEMO.visible}`,
     hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFenetre,
     async preparer(page) {
       await ouvrirMonProfil(page);
@@ -571,6 +572,8 @@ const SCENES = [
       exiger(await fenetre(page).getByRole('button', { name: 'Relire mes modifications', exact: true }).isEnabled(), '« Relire mes modifications » est grisé');
       exiger(await page.evaluate(() => document.querySelector('#profileDialog .dlg-body').scrollTop) === 0, 'le formulaire n\'est pas en haut');
       exiger(await fenetre(page).locator('.ident-name').textContent() === 'Camille Rousseau', 'la fenêtre n\'est pas celle de Camille Rousseau');
+      exiger((await fenetre(page).locator('.photo-actions button:visible').allTextContents()).join() === 'Ajouter une photo',
+        'la carte « Photo de profil » devrait proposer « Ajouter une photo » (Camille Rousseau n\'a pas de photo)');
     }
   },
   {
@@ -644,7 +647,7 @@ const SCENES = [
   },
   {
     // L'administrateur ouvre la fiche d'une autre personne : l'e-mail et l'établissement se modifient.
-    fichier: 'modifier-fiche-admin.png', requete: `?connecte=${PERSONNES_DEMO.administrateur}`,
+    fichier: 'modifier-fiche-admin.png', requete: `?photos&connecte=${PERSONNES_DEMO.administrateur}`,
     hauteur: HAUTEUR_FENETRE_MODIFICATION, zone: autourDeLaFenetre,
     async preparer(page) {
       await allumerModeAdmin(page);
@@ -652,6 +655,7 @@ const SCENES = [
       await attendreEtape(page, 'Modifier la fiche de Camille Rousseau');
       exiger(await page.locator('#profile-email').isVisible() && await page.locator('#profile-Etablissement').isVisible(), 'l\'e-mail et l\'établissement ne sont pas modifiables');
       exiger(await fenetre(page).locator('.ident-lock').count() === 0, 'la fenêtre d\'un administrateur ne verrouille rien');
+      exiger(await fenetre(page).locator('.photo-field').count() === 1, 'l\'administrateur devrait aussi voir la carte « Photo de profil »');
       await page.evaluate(() => document.activeElement.blur());
     }
   },

@@ -1146,11 +1146,13 @@ textarea {
   .photo-field {
     flex-direction: column;
   }
-  /* La fenêtre d'une photo reste une boîte centrée : seules les fenêtres de saisie prennent l'écran. */
+  /* La fenêtre d'une photo reste une boîte centrée : seules les fenêtres de saisie prennent l'écran.
+     « fit-content » et non « auto » : une fenêtre modale est positionnée haut et bas, et « auto »
+     l'étirerait sur toute la hauteur permise, avec du blanc sous la légende. */
   .dlg.photo-dlg {
     width: min(480px, calc(100vw - 32px));
     max-width: calc(100vw - 32px);
-    height: auto;
+    height: fit-content;
     max-height: min(90vh, 900px);
     margin: auto;
     border-radius: 18px;

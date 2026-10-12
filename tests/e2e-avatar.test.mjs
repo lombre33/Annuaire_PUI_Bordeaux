@@ -564,11 +564,11 @@ test('un fichier refusé avant l\'envoi (format, poids, contenu illisible) ne ch
       assert.equal(await press(page, 'Relire mes modifications').isDisabled(), true, label);
     };
     await expectError({ name: 'moi.gif', mimeType: 'image/gif', buffer: Buffer.from('GIF89a') },
-      'Ce fichier n’est pas une image acceptée : choisissez un fichier PNG, JPG ou WebP.', 'GIF');
+      'Ce fichier n’est pas une image acceptée : choisissez un fichier JPG, PNG ou WebP.', 'GIF');
     await expectError({ name: 'logo.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="window.__svgxss=1"/>') },
-      'Ce fichier n’est pas une image acceptée : choisissez un fichier PNG, JPG ou WebP.', 'SVG (il peut porter un script)');
+      'Ce fichier n’est pas une image acceptée : choisissez un fichier JPG, PNG ou WebP.', 'SVG (il peut porter un script)');
     await expectError({ name: 'cv.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') },
-      'Ce fichier n’est pas une image acceptée : choisissez un fichier PNG, JPG ou WebP.', 'PDF');
+      'Ce fichier n’est pas une image acceptée : choisissez un fichier JPG, PNG ou WebP.', 'PDF');
     await expectError({ name: 'gros.jpg', mimeType: 'image/jpeg', buffer: Buffer.alloc(3 * 1024 * 1024) },
       'Cette image pèse 3 Mo : choisissez-en une de 2 Mo au plus.', 'trop lourd');
     await expectError({ name: 'vide.png', mimeType: 'image/png', buffer: Buffer.alloc(0) },
@@ -944,6 +944,13 @@ for (const width of [280, 320, 390]) {
       await dialog(page).getByRole('button', { name: 'Agrandir : Nouvelle photo' }).click();
       await viewer(page).locator('img.photo-img.loaded').waitFor();
       assert.deepEqual(await fits('#photoDialog'), FITS, 'photo agrandie');
+      const hugs = await page.evaluate(() => {
+        const box = document.querySelector('#photoDialog').getBoundingClientRect();
+        const parts = ['.photo-stage', '.photo-cap'].map(part => document.querySelector(`#photoDialog ${part}`).getBoundingClientRect().height);
+        return { empty: box.height - parts[0] - parts[1], offset: box.top - (window.innerHeight - box.height) / 2 };
+      });
+      assert.ok(hugs.empty < 2, `la fenêtre épouse la photo et sa légende, sans blanc dessous (${Math.round(hugs.empty)} px de trop)`);
+      assert.ok(Math.abs(hugs.offset) < 2, `et reste au milieu de l'écran (décalée de ${Math.round(hugs.offset)} px)`);
       const photo = await viewer(page).locator('img').boundingBox();
       assert.ok(photo.width >= Math.min(200, width - 60), `la photo reste grande (${Math.round(photo.width)} px)`);
       assert.ok(Math.abs(photo.width - photo.height) < 1);

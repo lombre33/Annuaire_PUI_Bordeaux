@@ -51,7 +51,7 @@ export const ACL_COLUMNS = { email: 'email', etablissement: 'Responsable_de_l_Et
 //   quality    la qualité du JPEG (0 à 1), seulement pour 'image/jpeg'
 export const IMAGE_RULES = {
   logo: { types: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'], maxBytes: 1024 * 1024, maxSide: 480, output: 'image/png', name: 'logo.png' },
-  avatar: { types: ['image/png', 'image/jpeg', 'image/webp'], maxBytes: 2 * 1024 * 1024, maxSide: 256, square: true, output: 'image/jpeg', quality: 0.85, name: 'photo-de-profil.jpg' }
+  avatar: { types: ['image/jpeg', 'image/png', 'image/webp'], maxBytes: 2 * 1024 * 1024, maxSide: 256, square: true, output: 'image/jpeg', quality: 0.85, name: 'photo-de-profil.jpg' }
 };
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
