@@ -16,7 +16,10 @@ export const PROBE_TABLE = 'Annuaire_Sonde';
 export const REQUESTS_TABLE = 'Annuaire_Demandes';
 
 // États d'une demande, tels qu'écrits dans la colonne Statut.
-export const REQUEST_STATUS = Object.freeze({ pending: 'en_attente', accepted: 'validee', refused: 'refusee' });
+// `superseded` : une demande plus récente de la même personne l'a remplacée.
+export const REQUEST_STATUS = Object.freeze({
+  pending: 'en_attente', accepted: 'validee', refused: 'refusee', superseded: 'remplacee'
+});
 
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.

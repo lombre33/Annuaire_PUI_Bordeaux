@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseChanges, buildRowUpdate, describeRequest, loadRequests, requestsOf, submitRequest, validateRequest, refuseRequest,
-  RequestError, isPending
+  parseChanges, buildRowUpdate, describeRequest, describeChanges, loadRequests, requestsOf, submitRequest, validateRequest,
+  validateRequests, refuseRequest, classifyRequests, ownRequestState, hasRequestsTable, RequestError, isPending
 } from '../requests.js';
 import { profileFormModel, diffProfile } from '../profile.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
@@ -528,4 +528,173 @@ test('refuseRequest refuses a request already processed, an unknown one, and rep
   await refuseRequest(admin.docApi, 1, 'non', adminOptions(admin));
   await assert.rejects(refuseRequest(admin.docApi, 1, 'encore', adminOptions(admin)), /déjà été traitée/);
   await assert.rejects(refuseRequest(admin.docApi, 1, 'non', { ...adminOptions(admin), adminEmail: '' }), /Administrateur non identifié/);
+});
+
+// ===== Une demande plus récente remplace les précédentes =====
+
+// Trois demandes d'Ana (1: ancienne, 2: puis 3: la plus récente), une de Bob, aux dates choisies.
+async function manyRequests() {
+  const w = await world(ANA_EMAIL);
+  await fileRequest(w, 1, { Fonction: 'Première' });
+  await fileRequest(w, 1, { Fonction: 'Seconde' });
+  await fileRequest(w, 1, { Fonction: 'Troisième' });
+  const bob = createFakeGrist({ tables: w.tables, user: { email: BOB_EMAIL } });
+  await submitRequest(bob.docApi, row(w, 2), diffProfile(row(w, 2), { Fonction: 'Chef' }, w.referenceMaps), '', { log: quiet });
+  w.tables.Annuaire_Demandes.Date = [1700000100, 1700000200, 1700000300, 1700000150];
+  const admin = await world(ADMIN_EMAIL, { tables: w.tables });
+  return { w, admin };
+}
+
+test('classifyRequests keeps one request to process per person, the most recent, and calls the others replaced', async () => {
+  const { w } = await manyRequests();
+  const { active, history } = classifyRequests(await loadRequests(w.docApi));
+  assert.deepEqual(active.map(request => request.id), [4, 3], 'à traiter : Bob (150) puis la plus récente d\'Ana (300)');
+  assert.deepEqual(history.map(request => [request.id, request.effectiveStatus]), [[2, 'remplacee'], [1, 'remplacee']]);
+});
+
+test('classifyRequests sorts the processed requests by decision, most recent first, and keeps their status', async () => {
+  const { w, admin } = await manyRequests();
+  await refuseRequest(admin.docApi, 4, 'non', adminOptions(admin));
+  w.tables.Annuaire_Demandes.Traitee_le[3] = 1700000900;
+  const { active, history } = classifyRequests(await loadRequests(w.docApi));
+  assert.deepEqual(active.map(request => request.id), [3]);
+  assert.deepEqual(history.map(request => [request.id, request.effectiveStatus]), [[4, 'refusee'], [2, 'remplacee'], [1, 'remplacee']]);
+});
+
+test('classifyRequests never treats requests without a readable person as replacing each other', async () => {
+  const { w } = await manyRequests();
+  w.tables.Annuaire_Demandes.Personne = [0, 0, 0, 0];
+  const { active, history } = classifyRequests(await loadRequests(w.docApi));
+  assert.equal(active.length, 4);
+  assert.equal(history.length, 0);
+});
+
+test('classifyRequests puts requests filed at the same instant in the order of their identifier', async () => {
+  const { w } = await manyRequests();
+  w.tables.Annuaire_Demandes.Date = [1700000100, 1700000100, 1700000100, 1700000100];
+  const { active, history } = classifyRequests(await loadRequests(w.docApi));
+  assert.deepEqual(active.map(request => request.id), [3, 4]);
+  assert.deepEqual(history.map(request => request.id), [2, 1]);
+});
+
+test('validateRequest closes the older requests of the same person with the new one, in one action', async () => {
+  const { w, admin } = await manyRequests();
+  await validateRequest(admin.docApi, 3, adminOptions(admin));
+  const statuses = requestRows(w).map(request => request.Statut);
+  assert.deepEqual(statuses, ['remplacee', 'remplacee', 'validee', 'en_attente'], 'celle de Bob n\'est pas touchée');
+  assert.equal(requestRows(w)[0].Traitee_par, ADMIN_EMAIL);
+  assert.equal(row(w, 1).Fonction, 'Troisième');
+  assert.equal(admin.calls.filter(call => call.table === 'Annuaire_Demandes').length, 3);
+});
+
+test('validateRequest changes nothing at all when the older requests cannot be closed (atomic)', async () => {
+  const { w } = await manyRequests();
+  const denied = await world(ADMIN_EMAIL, { tables: w.tables, denyWrites: ['Annuaire_Demandes'] });
+  const before = structuredClone(w.tables);
+  await assert.rejects(validateRequest(denied.docApi, 3, adminOptions(denied)), /Grist a refusé la validation/);
+  assert.deepEqual(w.tables, before);
+});
+
+test('validateRequest changes nothing when only one of the older requests is protected (atomic)', async () => {
+  const { w } = await manyRequests();
+  const guarded = await world(ADMIN_EMAIL, { tables: w.tables, denyRows: { Annuaire_Demandes: [1] } });
+  const before = structuredClone(w.tables);
+  await assert.rejects(validateRequest(guarded.docApi, 3, adminOptions(guarded)), /Grist a refusé la validation/);
+  assert.deepEqual(w.tables, before, 'ni la fiche, ni la demande 3, ni la demande 2 n\'ont bougé');
+});
+
+test('between two requests filed at the same instant, the later identifier is the more recent', async () => {
+  const { w, admin } = await manyRequests();
+  w.tables.Annuaire_Demandes.Date = [1700000100, 1700000100, 1700000100, 1700000150];
+  await assert.rejects(validateRequest(admin.docApi, 2, adminOptions(admin)), /remplacée par une plus récente/);
+  await validateRequest(admin.docApi, 3, adminOptions(admin));
+  assert.deepEqual(requestRows(w).map(request => request.Statut), ['remplacee', 'remplacee', 'validee', 'en_attente']);
+});
+
+test('validateRequest and refuseRequest refuse a request that a more recent one of the same person has replaced', async () => {
+  const { w, admin } = await manyRequests();
+  await assert.rejects(validateRequest(admin.docApi, 1, adminOptions(admin)), /remplacée par une plus récente/);
+  await assert.rejects(refuseRequest(admin.docApi, 2, 'non', adminOptions(admin)), /remplacée par une plus récente/);
+  assert.deepEqual(requestRows(w).map(request => request.Statut), ['en_attente', 'en_attente', 'en_attente', 'en_attente']);
+  assert.equal(row(w, 1).Fonction, 'Pharmacienne');
+});
+
+test('refuseRequest closes the older requests of the same person too', async () => {
+  const { w, admin } = await manyRequests();
+  await refuseRequest(admin.docApi, 3, 'Pas cette fois', adminOptions(admin));
+  assert.deepEqual(requestRows(w).map(request => request.Statut), ['remplacee', 'remplacee', 'refusee', 'en_attente']);
+  assert.equal(requestRows(w)[2].Motif_refus, 'Pas cette fois');
+  assert.equal(requestRows(w)[0].Motif_refus ?? '', '', 'le motif est celui de la demande refusée, pas des remplacées');
+});
+
+// ===== validateRequests : plusieurs demandes d'un coup =====
+
+test('validateRequests validates each request on its own: a failure does not stop the others', async () => {
+  const { w, admin } = await manyRequests();
+  // La fiche de Bob est supprimée entre-temps : sa demande ne peut plus être validée.
+  w.tables.BDD = Object.fromEntries(Object.entries(w.tables.BDD).map(([column, values]) => [column, values.filter((_, index) => w.tables.BDD.id[index] !== 2)]));
+  const outcomes = await validateRequests(admin.docApi, [4, 3], adminOptions(admin));
+  assert.deepEqual(outcomes.map(outcome => [outcome.id, outcome.ok]), [[4, false], [3, true]]);
+  assert.match(outcomes[0].error, /fiche concernée est introuvable/);
+  assert.equal(row(w, 1).Fonction, 'Troisième');
+  assert.equal(requestRows(w)[3].Statut, 'en_attente');
+});
+
+test('validateRequests answers with a plain message for an error it did not foresee, and nothing to do for an empty list', async () => {
+  const { admin } = await manyRequests();
+  const broken = { ...admin.docApi, fetchTable: async () => { throw new Error('panne'); } };
+  const outcomes = await validateRequests(broken, [3], { ...adminOptions(admin), log: quiet });
+  assert.deepEqual(outcomes, [{ id: 3, ok: false, error: 'Erreur inattendue, voir la console.' }]);
+  assert.deepEqual(await validateRequests(admin.docApi, [], adminOptions(admin)), []);
+});
+
+// ===== Ce que la personne voit de ses demandes =====
+
+test('ownRequestState gives the request waiting and the last one that was processed', async () => {
+  const { w, admin } = await manyRequests();
+  let state = ownRequestState(await loadRequests(w.docApi), ANA_EMAIL.toUpperCase());
+  assert.equal(state.pending.id, 3, 'la plus récente');
+  assert.equal(state.last, null);
+  await refuseRequest(admin.docApi, 3, 'Précisez', adminOptions(admin));
+  state = ownRequestState(await loadRequests(w.docApi), ANA_EMAIL);
+  assert.equal(state.pending, null, 'les demandes remplacées ne comptent plus comme en attente');
+  assert.equal(state.last.id, 3);
+  assert.equal(state.last.status, 'refusee');
+  assert.equal(state.last.reason, 'Précisez');
+});
+
+test('ownRequestState picks the most recently processed request, and ignores replaced ones and other people', async () => {
+  const { w } = await manyRequests();
+  w.tables.Annuaire_Demandes.Statut = ['validee', 'refusee', 'remplacee', 'en_attente'];
+  w.tables.Annuaire_Demandes.Traitee_le = [1700000500, 1700000400, 1700000600, 0];
+  const state = ownRequestState(await loadRequests(w.docApi), ANA_EMAIL);
+  assert.equal(state.last.id, 1, 'la décision la plus récente parmi les validées et refusées');
+  assert.equal(state.pending, null);
+  assert.deepEqual(ownRequestState(await loadRequests(w.docApi), BOB_EMAIL).pending.id, 4);
+  assert.deepEqual(ownRequestState(await loadRequests(w.docApi), ''), { pending: null, last: null });
+});
+
+test('hasRequestsTable says whether the table of requests exists, and no when the list cannot be read', async () => {
+  const withTable = createFakeGrist({ tables: withSchema(withRequests(withIdentity())) });
+  assert.equal(await hasRequestsTable(withTable.docApi, { log: quiet }), true);
+  const withoutTable = createFakeGrist({ tables: withSchema(withIdentity()) });
+  assert.equal(await hasRequestsTable(withoutTable.docApi, { log: quiet }), false);
+  const lines = [];
+  const broken = { listTables: async () => { throw new Error('panne'); } };
+  assert.equal(await hasRequestsTable(broken, { log: { warn: (...args) => lines.push(args.join(' ')) } }), false);
+  assert.match(lines[0], /^\[DEMANDES\] Liste des tables illisible/);
+});
+
+test('describeChanges gives the lines of a request in form order, the same for the person and for the administrator', async () => {
+  const w = await world(ANA_EMAIL);
+  const diff = diffProfile(row(w, 1), { Competences: [2, 3], Fonction: 'Cheffe', prenom: 'Anna' }, w.referenceMaps);
+  const lines = describeChanges(diff.champs);
+  assert.deepEqual(lines.map(line => line.key), ['prenom', 'Fonction', 'Competences']);
+  const shuffled = { Competences: diff.champs.Competences, prenom: diff.champs.prenom, Fonction: diff.champs.Fonction };
+  assert.deepEqual(describeChanges(shuffled), lines, 'toujours dans l\'ordre du formulaire');
+  await fileRequest(w, 1, { Competences: [2, 3], Fonction: 'Cheffe', prenom: 'Anna' });
+  const [request] = await loadRequests(w.docApi);
+  const d = describeRequest(request, { findPerson: id => w.find(id), referenceMaps: w.referenceMaps });
+  assert.deepEqual(d.lines, lines);
+  assert.deepEqual(describeChanges({}), []);
 });

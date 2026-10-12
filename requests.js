@@ -177,11 +177,25 @@ function readRequestRow(row) {
     status: text(row.Statut),
     changes: row.Changements,
     message: text(row.Message),
-    reason: text(row.Motif_refus)
+    reason: text(row.Motif_refus),
+    decidedBy: text(row.Traitee_par),
+    decidedAt: row.Traitee_le
   };
 }
 
 export const isPending = request => request.status === REQUEST_STATUS.pending;
+
+// La table des demandes existe-t-elle ? Sinon le widget ne propose aucune modification
+// de fiche (GRIST_SETUP.md, étape 4). Une lecture impossible vaut « non » : on ne
+// propose jamais ce qu'on ne sait pas enregistrer.
+export async function hasRequestsTable(docApi, { log = console } = {}) {
+  try {
+    return (await docApi.listTables()).includes(REQUESTS_TABLE);
+  } catch (error) {
+    log.warn('[DEMANDES] Liste des tables illisible :', error?.message || error);
+    return false;
+  }
+}
 
 // Les demandes de la table, de la plus ancienne à la plus récente.
 export async function loadRequests(docApi) {
@@ -197,9 +211,56 @@ export function requestsOf(requests, email) {
   return requests.filter(request => normalizeEmail(request.authorEmail) === key).reverse();
 }
 
+// Ce que la personne doit savoir de ses demandes : celle qui attend (la plus récente),
+// et la dernière qui a été traitée (validée ou refusée).
+export function ownRequestState(requests, email) {
+  const mine = requestsOf(requests, email);
+  const decided = mine
+    .filter(request => request.status === REQUEST_STATUS.accepted || request.status === REQUEST_STATUS.refused)
+    .sort((a, b) => (Number(b.decidedAt) || 0) - (Number(a.decidedAt) || 0) || b.id - a.id);
+  return { pending: mine.find(isPending) || null, last: decided[0] || null };
+}
+
+// Une personne a au plus une demande à traiter : la plus récente remplace celles qu'elle
+// avait déposées avant (elle part de la fiche et d'elle, voir profile.js). Les autres
+// demandes en attente de la même personne sont « remplacées » : on ne les montre plus
+// à valider, et la validation ou le refus de la plus récente les clôt.
+// `requests` : de la plus ancienne à la plus récente (loadRequests). Renvoie
+// { active: demandes à traiter, plus anciennes d'abord ; history: les autres, plus
+// récentes d'abord, avec leur état réel dans `effectiveStatus` }.
+export function classifyRequests(requests) {
+  const newest = new Map();
+  requests.filter(isPending).forEach(request => newest.set(groupKey(request), request));
+  const active = [];
+  const history = [];
+  requests.forEach(request => {
+    if (!isPending(request)) {
+      history.push({ ...request, effectiveStatus: request.status });
+    } else if (newest.get(groupKey(request)) === request) {
+      active.push(request);
+    } else {
+      history.push({ ...request, effectiveStatus: REQUEST_STATUS.superseded });
+    }
+  });
+  history.sort((a, b) => (Number(b.decidedAt || b.date) || 0) - (Number(a.decidedAt || a.date) || 0) || b.id - a.id);
+  return { active, history };
+}
+
+// Les demandes d'une même personne se regroupent par fiche ; une demande sans fiche
+// lisible (supprimée ?) ne remplace rien et n'est remplacée par rien.
+const groupKey = request => (request.personId > 0 ? `p${request.personId}` : `r${request.id}`);
+
+// Les demandes en attente de la même fiche, déposées avant `request` ou après.
+function otherPending(requests, request) {
+  return requests.filter(other => other.id !== request.id && isPending(other) && groupKey(other) === groupKey(request));
+}
+
+const isOlder = (a, b) => (Number(a.date) || 0) < (Number(b.date) || 0) || ((Number(a.date) || 0) === (Number(b.date) || 0) && a.id < b.id);
+
 // ===== Ce que voit l'administrateur =====
 
 // Une ligne du détail d'une demande : le champ, ce qu'il valait, ce qu'on propose.
+// Même texte pour la personne qui prépare sa demande et pour l'administrateur qui la lit.
 function describeChange(field, change) {
   const base = { key: field.key, label: field.label, kind: field.kind };
   const label = entry => entry.label || `n° ${entry.id}`;
@@ -207,6 +268,12 @@ function describeChange(field, change) {
   if (field.kind === 'reference') return { ...base, before: change.avant.label, after: change.apres.label };
   if (field.kind === 'phone') return { ...base, before: formatPhone(change.avant), after: formatPhone(change.apres) };
   return { ...base, before: change.avant, after: change.apres };
+}
+
+// Les lignes de détail de `champs` (la forme de parseChanges et de diffProfile), dans
+// l'ordre du formulaire.
+export function describeChanges(champs) {
+  return PROFILE_FIELDS.filter(field => champs[field.key]).map(field => describeChange(field, champs[field.key]));
 }
 
 // Ce que la fiche contient aujourd'hui si cela diffère de ce que la demande
@@ -253,13 +320,11 @@ export function describeRequest(request, { findPerson, referenceMaps, columnType
   const parsed = parseChanges(request.changes, referenceMaps);
   if (parsed.error) problems.push(parsed.error);
 
-  const lines = [];
+  const lines = parsed.champs ? describeChanges(parsed.champs) : [];
   let update = null;
   if (parsed.champs) {
     PROFILE_FIELDS.filter(field => parsed.champs[field.key]).forEach(field => {
-      const change = parsed.champs[field.key];
-      lines.push(describeChange(field, change));
-      const since = person && valueSinceRequest(field, change, person.row, referenceMaps);
+      const since = person && valueSinceRequest(field, parsed.champs[field.key], person.row, referenceMaps);
       if (since) warnings.push(`${field.label} : la fiche a changé depuis la demande (valeur actuelle : ${since}).`);
     });
     if (person && problems.length === 0) {
@@ -333,6 +398,20 @@ function requireAdmin(adminEmail) {
   if (!adminEmail) throw new RequestError('Administrateur non identifié : rien n\'a été fait.');
 }
 
+// Les demandes de la même fiche qui attendaient avant `request` : elles sont clôturées
+// avec elle (« remplacées »), dans la même action. Une demande plus récente de la même
+// fiche interdit au contraire de traiter celle-ci : c'est elle qu'il faut traiter ; il ne
+// reste donc, après ce contrôle, que des demandes plus anciennes.
+function clearOlderPending(requests, request, adminEmail, now) {
+  const others = otherPending(requests, request);
+  if (others.some(other => isOlder(request, other))) {
+    throw new RequestError('Cette demande a été remplacée par une plus récente de la même personne : traitez celle-là.');
+  }
+  return others.map(other => ['UpdateRecord', REQUESTS_TABLE, other.id, {
+    Statut: REQUEST_STATUS.superseded, Traitee_par: adminEmail, Traitee_le: now()
+  }]);
+}
+
 // Applique la demande à la fiche ET la marque validée, en une seule action atomique :
 // jamais l'un sans l'autre. Les tables sont relues à l'instant d'agir : la décision
 // porte sur l'état réel de Grist, pas sur ce que l'écran montrait il y a dix minutes.
@@ -342,10 +421,10 @@ export async function validateRequest(docApi, requestId, options) {
   const { adminEmail, referenceMaps, columnTypes = {}, now = () => Date.now() / 1000, log = console } = options;
   requireAdmin(adminEmail);
   const [requestsTable, mainTable] = await Promise.all([docApi.fetchTable(REQUESTS_TABLE), docApi.fetchTable(MAIN_TABLE)]);
-  const row = tableToRows(requestsTable).find(candidate => candidate.id === requestId);
-  if (!row) throw new RequestError('Cette demande n\'existe plus.');
+  const all = tableToRows(requestsTable).map(readRequestRow);
+  const request = all.find(candidate => candidate.id === requestId);
+  if (!request) throw new RequestError('Cette demande n\'existe plus.');
 
-  const request = readRequestRow(row);
   const personRow = tableToRows(mainTable).find(candidate => candidate.id === request.personId);
   const description = describeRequest(request, {
     findPerson: () => (personRow ? describePerson(personRow, referenceMaps) : null),
@@ -355,12 +434,14 @@ export async function validateRequest(docApi, requestId, options) {
   if (!description.canValidate) {
     throw new RequestError(`Cette demande ne peut pas être validée : ${description.problems.join(' ; ')}.`);
   }
+  const superseded = clearOlderPending(all, request, adminEmail, now);
   try {
     await docApi.applyUserActions([
       ['UpdateRecord', MAIN_TABLE, description.person.id, description.update],
       ['UpdateRecord', REQUESTS_TABLE, request.id, {
         Statut: REQUEST_STATUS.accepted, Traitee_par: adminEmail, Traitee_le: now(), Motif_refus: ''
-      }]
+      }],
+      ...superseded
     ]);
   } catch (error) {
     log.error('[DEMANDES] Validation impossible :', error);
@@ -369,21 +450,41 @@ export async function validateRequest(docApi, requestId, options) {
   return description;
 }
 
+// Valide plusieurs demandes, l'une après l'autre : une demande qui ne passe pas (fiche
+// supprimée, droits refusés…) n'empêche pas les autres. Renvoie, pour chacune,
+// { id, ok } ou { id, ok: false, error } (le message dit pourquoi).
+export async function validateRequests(docApi, requestIds, options) {
+  const outcomes = [];
+  for (const id of requestIds) {
+    try {
+      await validateRequest(docApi, id, options);
+      outcomes.push({ id, ok: true });
+    } catch (error) {
+      outcomes.push({ id, ok: false, error: error instanceof RequestError ? error.message : 'Erreur inattendue, voir la console.' });
+    }
+  }
+  return outcomes;
+}
+
 // Marque la demande refusée, avec le motif donné à la personne ; la fiche ne bouge pas.
 export async function refuseRequest(docApi, requestId, reason, options) {
   const { adminEmail, now = () => Date.now() / 1000, log = console } = options;
   requireAdmin(adminEmail);
-  const rows = tableToRows(await docApi.fetchTable(REQUESTS_TABLE));
-  const row = rows.find(candidate => candidate.id === requestId);
-  if (!row) throw new RequestError('Cette demande n\'existe plus.');
-  if (!isPending(readRequestRow(row))) throw new RequestError('Cette demande a déjà été traitée.');
+  const all = tableToRows(await docApi.fetchTable(REQUESTS_TABLE)).map(readRequestRow);
+  const request = all.find(candidate => candidate.id === requestId);
+  if (!request) throw new RequestError('Cette demande n\'existe plus.');
+  if (!isPending(request)) throw new RequestError('Cette demande a déjà été traitée.');
+  const superseded = clearOlderPending(all, request, adminEmail, now);
   try {
-    await docApi.applyUserActions([['UpdateRecord', REQUESTS_TABLE, requestId, {
-      Statut: REQUEST_STATUS.refused,
-      Motif_refus: cleanText(reason).slice(0, MAX_MESSAGE_LENGTH),
-      Traitee_par: adminEmail,
-      Traitee_le: now()
-    }]]);
+    await docApi.applyUserActions([
+      ['UpdateRecord', REQUESTS_TABLE, requestId, {
+        Statut: REQUEST_STATUS.refused,
+        Motif_refus: cleanText(reason).slice(0, MAX_MESSAGE_LENGTH),
+        Traitee_par: adminEmail,
+        Traitee_le: now()
+      }],
+      ...superseded
+    ]);
   } catch (error) {
     log.error('[DEMANDES] Refus impossible :', error);
     throw failed('refuse', error);

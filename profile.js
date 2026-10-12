@@ -72,6 +72,35 @@ export function profileFormModel(row, referenceMaps) {
   });
 }
 
+// Le brouillon que le formulaire modifie : { colonne → valeur }, pris sur le modèle
+// (profileFormModel). Une liste est copiée, pour que le brouillon puisse changer sans
+// toucher au modèle.
+export function draftOf(model) {
+  return Object.fromEntries(model.map(field => [field.key, Array.isArray(field.value) ? [...field.value] : field.value]));
+}
+
+// Le brouillon qui reprend une demande en attente : la fiche d'aujourd'hui avec, par-dessus,
+// ce que la demande propose. `champs` vient de parseChanges (relue, jamais crue sur parole).
+// Une valeur que la table de référence ne propose plus est laissée de côté.
+export function draftFromChanges(model, champs = {}) {
+  const draft = draftOf(model);
+  model.forEach(field => {
+    const change = champs[field.key];
+    if (!change) return;
+    if (field.kind === 'text') draft[field.key] = change.apres;
+    else if (field.kind === 'phone') draft[field.key] = formatPhone(change.apres);
+    else if (field.kind === 'reference') draft[field.key] = change.apres.id;
+    else {
+      const offered = new Set(field.options.map(option => option.id));
+      const removed = new Set(change.retrait.map(entry => entry.id));
+      const kept = draft[field.key].filter(id => !removed.has(id));
+      const added = change.ajout.map(entry => entry.id).filter(id => offered.has(id) && !kept.includes(id));
+      draft[field.key] = [...kept, ...added];
+    }
+  });
+  return draft;
+}
+
 const labelOf = (options, id) => options.find(option => option.id === id)?.label || '';
 
 function sameSet(a, b) {
@@ -83,10 +112,17 @@ function sameSet(a, b) {
 // une référence est un identifiant entier (0 : aucune), une liste un tableau
 // d'identifiants entiers ; tout autre type est refusé. Renvoie { champs, errors, summary } : `champs` ne contient que ce
 // qui change, dans la forme que requests.js sérialise ; `errors` dit pourquoi le
-// brouillon est refusé ; `summary` résume les changements en une phrase.
+// brouillon est refusé (une phrase par défaut), `fieldErrors` la même chose champ par
+// champ (colonne → message), pour l'afficher sous le champ ; `summary` résume les
+// changements en une phrase.
 export function diffProfile(row, draft, referenceMaps) {
   const champs = {};
   const errors = [];
+  const fieldErrors = {};
+  const fail = (field, message) => {
+    errors.push(`${field.label} : ${message}`);
+    fieldErrors[field.key] = message;
+  };
 
   PROFILE_FIELDS.forEach(field => {
     if (!(field.key in draft) || !(field.key in row)) return;
@@ -97,7 +133,7 @@ export function diffProfile(row, draft, referenceMaps) {
       if (String(input ?? '') === before) return; // laissé tel quel : pas un changement, même si le texte n'est pas « propre »
       const after = cleanText(input);
       const fault = textFault(after);
-      if (fault) errors.push(`${field.label} : ${fault}.`);
+      if (fault) fail(field, `${fault}.`);
       else if (after !== before) champs[field.key] = { avant: before, apres: after };
       return;
     }
@@ -108,7 +144,7 @@ export function diffProfile(row, draft, referenceMaps) {
       const typed = cleanText(input);
       const before = frenchPhoneDigits(shown) || '';
       const after = typed === '' ? '' : frenchPhoneDigits(typed);
-      if (after === null) errors.push(`${field.label} : un numéro français à 10 chiffres est attendu (05 56 78 90 12).`);
+      if (after === null) fail(field, 'un numéro français à 10 chiffres est attendu (05 56 78 90 12).');
       else if (after !== before) champs[field.key] = { avant: before, apres: after };
       return;
     }
@@ -119,13 +155,13 @@ export function diffProfile(row, draft, referenceMaps) {
     // une saisie illisible ne doit pas retirer un rôle ou vider une liste.
     if (field.kind === 'reference') {
       if (!Number.isSafeInteger(input) || input < 0) {
-        errors.push(`${field.label} : valeur illisible.`);
+        fail(field, 'valeur illisible.');
         return;
       }
       const before = refId(row[field.key]) || 0;
       const after = input;
       if (after !== 0 && !options.some(option => option.id === after)) {
-        errors.push(`${field.label} : valeur inconnue.`);
+        fail(field, 'valeur inconnue.');
       } else if (after !== before) {
         champs[field.key] = {
           avant: { id: before, label: labelOf(options, before) },
@@ -138,12 +174,12 @@ export function diffProfile(row, draft, referenceMaps) {
     // Liste : seules les valeurs que le formulaire montre peuvent être retirées ou
     // ajoutées ; les autres (ligne sans libellé…) restent telles quelles.
     if (!Array.isArray(input) || !input.every(Number.isSafeInteger)) {
-      errors.push(`${field.label} : valeur illisible.`);
+      fail(field, 'valeur illisible.');
       return;
     }
     const wanted = input;
     if (wanted.some(id => !options.some(option => option.id === id))) {
-      errors.push(`${field.label} : valeur inconnue.`);
+      fail(field, 'valeur inconnue.');
       return;
     }
     const current = knownIds(row[field.key], options);
@@ -157,9 +193,11 @@ export function diffProfile(row, draft, referenceMaps) {
 
   const name = field => (champs[field] ? champs[field].apres : text(row[field]));
   if (('nom' in champs || 'prenom' in champs) && !name('nom') && !name('prenom')) {
-    errors.push('Indiquez au moins un prénom ou un nom.');
+    const message = 'Indiquez au moins un prénom ou un nom.';
+    errors.push(message);
+    ['prenom', 'nom'].filter(key => key in champs).forEach(key => { fieldErrors[key] = message; });
   }
-  return { champs, errors, summary: summarizeChanges(champs) };
+  return { champs, errors, fieldErrors, summary: summarizeChanges(champs) };
 }
 
 const quoted = value => (value === '' ? '(vide)' : `« ${value} »`);

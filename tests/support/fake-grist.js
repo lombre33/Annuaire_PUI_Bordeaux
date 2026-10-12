@@ -20,6 +20,8 @@
 //   failTables  noms des tables dont la lecture échoue
 //   user        la personne connectée : { email } (null : compte anonyme)
 //   denyWrites  noms des tables où toute écriture est refusée
+//   denyRows    lignes protégées { table: [identifiants] } : toute modification ou
+//               suppression d'une de ces lignes est refusée (une règle d'accès par ligne)
 //   triggers    formules déclenchées en plus de celles de la sonde :
 //               { table: { colonne: ({ user, tables }) => valeur } }
 //   delay       millisecondes d'attente avant chaque écriture (une écriture lente)
@@ -124,6 +126,9 @@ export function createFakeGrist(options = {}) {
           if (!applyers[action]) throw new Error(`Action non gérée par le faux Grist : ${action}`);
           if ((read(options.denyWrites) || []).includes(tableName)) {
             throw new Error(`Blocked by table ${verbs[action]} access rules`);
+          }
+          if (action !== 'AddRecord' && ((read(options.denyRows) || {})[tableName] || []).includes(rowId)) {
+            throw new Error(`Blocked by row ${verbs[action]} access rules`);
           }
           const value = applyers[action](draft, tableName, rowId, values);
           done.push({ action, table: tableName, rowId: action === 'AddRecord' ? value : rowId, values, ok: true });

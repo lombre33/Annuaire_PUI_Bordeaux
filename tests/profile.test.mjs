@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  profileFormModel, diffProfile, summarizeChanges, cleanText, frenchPhoneDigits, textFault, MAX_TEXT_LENGTH
+  profileFormModel, diffProfile, summarizeChanges, cleanText, frenchPhoneDigits, textFault, MAX_TEXT_LENGTH,
+  draftOf, draftFromChanges
 } from '../profile.js';
+import { parseChanges } from '../requests.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { sampleTables, withoutOptionalColumns } from './fixtures.mjs';
@@ -62,8 +64,7 @@ test('profileFormModel leaves out the optional columns BDD does not have', async
 test('diffProfile finds no change when the draft is the current form', async () => {
   const { referenceMaps, row } = await setup();
   const model = profileFormModel(row(1), referenceMaps);
-  const draft = Object.fromEntries(model.map(entry => [entry.key, entry.value]));
-  assert.deepEqual(diffProfile(row(1), draft, referenceMaps), { champs: {}, errors: [], summary: '' });
+  assert.deepEqual(diffProfile(row(1), draftOf(model), referenceMaps), { champs: {}, errors: [], fieldErrors: {}, summary: '' });
 });
 
 test('diffProfile records old and new value of a text field, with a readable summary', async () => {
@@ -86,7 +87,7 @@ test('diffProfile does not turn an untouched value into a change, even a messy o
   tables.BDD.numero_de_telephone[0] = 'poste 1234';
   const { referenceMaps, row } = await setup(tables);
   const result = diffProfile(row(1), { Fonction: 'Pharmacienne  chef', numero_de_telephone: 'poste 1234' }, referenceMaps);
-  assert.deepEqual(result, { champs: {}, errors: [], summary: '' });
+  assert.deepEqual(result, { champs: {}, errors: [], fieldErrors: {}, summary: '' });
 });
 
 test('diffProfile refuses text that a spreadsheet would read as a formula, and text that is too long', async () => {
@@ -208,6 +209,67 @@ test('diffProfile lets a row that has no name yet change something else, or get 
   const named = diffProfile(nameless, { prenom: 'Ana' }, referenceMaps);
   assert.deepEqual(named.errors, []);
   assert.deepEqual(named.champs.prenom, { avant: '', apres: 'Ana' });
+});
+
+test('diffProfile reports each refusal against its own field', async () => {
+  const { referenceMaps, row } = await setup();
+  const result = diffProfile(row(1), {
+    Fonction: '=1+1', numero_de_telephone: '12', Role_dans_le_PUI: 99, Competences: [404], Instances: 'x'
+  }, referenceMaps);
+  assert.deepEqual(Object.keys(result.fieldErrors).sort(), ['Competences', 'Fonction', 'Instances', 'Role_dans_le_PUI', 'numero_de_telephone']);
+  assert.equal(result.fieldErrors.Fonction, 'ne peut pas commencer par = + - ou @.');
+  assert.match(result.fieldErrors.numero_de_telephone, /^un numéro français à 10 chiffres est attendu/);
+  assert.equal(result.errors.length, 5);
+  assert.ok(result.errors.every(message => /^[^:]+ : /.test(message)), 'chaque phrase nomme son champ');
+  const nameless = diffProfile({ ...row(1), nom: '' }, { prenom: '' }, referenceMaps);
+  assert.deepEqual(nameless.fieldErrors, { prenom: 'Indiquez au moins un prénom ou un nom.' });
+});
+
+test('draftOf copies the form values, lists included', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  const draft = draftOf(model);
+  assert.equal(draft.Fonction, 'Pharmacienne');
+  assert.deepEqual(draft.Competences, [1, 2]);
+  draft.Competences.push(3);
+  assert.deepEqual(field(model, 'Competences').value, [1, 2], 'le modèle n\'est pas modifié par le brouillon');
+});
+
+test('draftFromChanges starts from the row of today and puts a pending request over it', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps);
+  const parsed = parseChanges(JSON.stringify({
+    v: 1,
+    champs: {
+      Fonction: { avant: 'Pharmacienne', apres: 'Cheffe' },
+      numero_de_telephone: { avant: '0556789012', apres: '0556789013' },
+      Role_dans_le_PUI: { avant: { id: 1 }, apres: { id: 0 } },
+      Competences: { ajout: [{ id: 3 }], retrait: [{ id: 1 }] }
+    }
+  }), referenceMaps);
+  const draft = draftFromChanges(model, parsed.champs);
+  assert.equal(draft.Fonction, 'Cheffe');
+  assert.equal(draft.numero_de_telephone, '05 56 78 90 13');
+  assert.equal(draft.Role_dans_le_PUI, 0);
+  assert.deepEqual(draft.Competences, [2, 3]);
+  assert.equal(draft.prenom, 'Ana', 'ce que la demande ne touche pas reste comme sur la fiche');
+  assert.deepEqual(field(model, 'Competences').value, [1, 2], 'le modèle n\'est pas modifié');
+  // Reprendre une demande puis la comparer à la fiche redonne les mêmes changements.
+  assert.deepEqual(diffProfile(row(1), draft, referenceMaps).champs, {
+    Fonction: parsed.champs.Fonction,
+    numero_de_telephone: parsed.champs.numero_de_telephone,
+    Role_dans_le_PUI: parsed.champs.Role_dans_le_PUI,
+    Competences: { ajout: [{ id: 3, label: 'Pharmacovigilance' }], retrait: [{ id: 1, label: 'Oncologie' }] }
+  });
+});
+
+test('draftFromChanges keeps what another person added to the row since the request, and does not add twice', async () => {
+  const { referenceMaps, row } = await setup();
+  const model = profileFormModel(row(1), referenceMaps); // Compétences 1, 2
+  const draft = draftFromChanges(model, { Competences: { ajout: [{ id: 2, label: '' }, { id: 3, label: '' }, { id: 404, label: '' }], retrait: [{ id: 99, label: '' }] } });
+  assert.deepEqual(draft.Competences, [1, 2, 3], 'une valeur que la table ne propose plus est laissée de côté');
+  assert.deepEqual(draftFromChanges(model, {}), draftOf(model));
+  assert.deepEqual(draftFromChanges(model), draftOf(model));
 });
 
 test('summarizeChanges writes one line per field in form order', () => {
