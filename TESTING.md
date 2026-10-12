@@ -160,12 +160,14 @@ supprimé ou illisible, aucune trace du jeton dans la console, relecture d'une f
 `tests/branding-layout.test.mjs` y ajoute 13 scénarios sur la mise en page de l'habillage, de
 320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case,
 bandeau du bas qui se replie, rien qui dépasse du cadre.
-`tests/accessibility.test.mjs` y ajoute 4 scénarios (et 2 tests sans navigateur : les rapports de
-contraste de référence, et une garde sur les feuilles de style qui refuse tout `outline: 0` ou
-`outline: none` non justifié) sur le clavier et le lecteur d'écran : le champ de recherche nommé par son
-rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au repos, menu ouvert), et le parcours
-complet à la tabulation (page, puis menu ouvert) où chaque arrêt change de capture avec et sans focus, avec
-un anneau plein de 2 px au moins et de 3:1 au moins.
+`tests/accessibility.test.mjs` y ajoute 5 scénarios (et 4 tests sans navigateur : les rapports de
+contraste de référence, une garde sur les feuilles de style qui refuse tout `outline: 0` ou
+`outline: none` non justifié, et le contraste de chaque couleur de catégorie et du lien e-mail) sur le
+clavier, le lecteur d'écran et les couleurs : le champ de recherche nommé par son rôle, aucun contrôle sans
+nom dans l'arbre d'accessibilité (page au repos, menu ouvert), le parcours complet à la tabulation (page,
+puis menu ouvert) où chaque arrêt change de capture avec et sans focus, avec un anneau plein de 2 px au
+moins et de 3:1 au moins, et les pastilles, les titres de groupe et le lien e-mail d'une carte mesurés sur
+la page rendue (4,5:1 au moins).
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -686,6 +688,11 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
       de développement, onglet Rendu) : l'anneau de focus reste visible sur chaque contrôle.
 - [ ] Zoom du navigateur à 200 % : l'anneau n'est coupé par aucun bord (ni celui de la barre d'outils, ni celui
       d'une carte, ni celui d'un menu).
+- [ ] **Couleurs des étiquettes** (1.16.2) : sur une carte qui en porte plusieurs, le texte blanc des
+      pastilles (Instances, Actions, GT, Compétences, Communautés, Tâches, Rôle PUI) se lit sans effort à la
+      taille normale, comme les titres de groupe et l'adresse e-mail ; on distingue encore les catégories
+      d'un coup d'œil, et le point de chaque bouton de filtre a la couleur des pastilles de sa catégorie.
+      À comparer avec `docs/images/carte-anatomie.png`.
 
 ## 16. Mode admin, e-mail et établissement (1.15.0)
 
