@@ -111,7 +111,7 @@ interrupteur).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
-`tests/e2e-taches.test.mjs` y ajoute 24 scénarios sur le menu Tâches rangé par action,
+`tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Tâches rangé par action,
 sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
 sept boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
 en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
@@ -322,11 +322,11 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       puis recharger : elle change d'action. Une sélection qui portait l'ancien libellé
       est retirée.
 - [ ] La console liste, par identifiant de ligne, les tâches classées sous « Sans
-      action » (`[REFS] Taches : n ligne(s) sans regroupement…`) : les numéroter dans
+      action » (`[REFS] Taches: n ligne(s) sans regroupement…`) : les numéroter dans
       Grist, puis recharger le widget.
 - [ ] Sur une copie du document où **aucune tâche** ne commence par un numéro « n.m »
       (ou aucune action par « Action n »), le menu Tâches reste complet, mais à plat,
-      sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches : aucune
+      sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches: aucune
       ligne n'est rattachée à une action…`).
 - [ ] Dans la fenêtre « Modifier mon profil », la liste des tâches est rangée par action
       elle aussi, et celle des actions reste à plat.
