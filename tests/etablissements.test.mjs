@@ -44,16 +44,31 @@ test('etablissementFlagsFromRows: duplicate rows with identical statuses are not
   assert.deepEqual(flags.conflicts, []);
 });
 
-test('etablissementFlags resolves via byLabel from Etablissement2 (Text, seule source de vérité)', () => {
-  const etabFlags = { byId: {}, byLabel: { UBM: { fondateur: false, partenaire: true, ok_pour_apparaitre: true } } };
-  assert.deepEqual(etablissementFlags({ Etablissement2: 'UBM' }, etabFlags), { fondateur: false, partenaire: true, ok_pour_apparaitre: true });
+const UBM_FLAGS = { fondateur: false, partenaire: true, ok_pour_apparaitre: true };
+
+test('etablissementFlags resolves BDD.Etablissement by row id, so duplicate acronyms never get mixed up', () => {
+  const etabFlags = {
+    byId: { 2: UBM_FLAGS, 6: { fondateur: true, partenaire: false, ok_pour_apparaitre: false } },
+    byLabel: { UBM: UBM_FLAGS }
+  };
+  assert.deepEqual(etablissementFlags({ Etablissement: 2 }, etabFlags), UBM_FLAGS);
+  assert.deepEqual(etablissementFlags({ Etablissement: ['R', 'Etablissements', 2] }, etabFlags), UBM_FLAGS);
+  assert.deepEqual(etablissementFlags({ Etablissement: 6 }, etabFlags), { fondateur: true, partenaire: false, ok_pour_apparaitre: false });
 });
 
-test('etablissementFlags returns null when Etablissement2 is empty or matches no Etablissements row', () => {
-  const etabFlags = { byId: {}, byLabel: { UBM: { fondateur: true, partenaire: false, ok_pour_apparaitre: true } } };
+test('etablissementFlags falls back to the label when Grist already resolved the Reference to text', () => {
+  const etabFlags = { byId: {}, byLabel: { UBM: UBM_FLAGS } };
+  assert.deepEqual(etablissementFlags({ Etablissement: 'UBM' }, etabFlags), UBM_FLAGS);
+});
+
+test('etablissementFlags returns null when Etablissement is empty or matches no Etablissements row', () => {
+  const etabFlags = { byId: { 2: UBM_FLAGS }, byLabel: { UBM: UBM_FLAGS } };
   assert.equal(etablissementFlags({}, etabFlags), null);
-  assert.equal(etablissementFlags({ Etablissement2: '' }, etabFlags), null);
-  assert.equal(etablissementFlags({ Etablissement2: 'Clinique inconnue' }, etabFlags), null);
+  assert.equal(etablissementFlags({ Etablissement: 0 }, etabFlags), null);
+  assert.equal(etablissementFlags({ Etablissement: '' }, etabFlags), null);
+  assert.equal(etablissementFlags({ Etablissement: 999 }, etabFlags), null, 'référence orpheline');
+  assert.equal(etablissementFlags({ Etablissement: 'Clinique inconnue' }, etabFlags), null);
+  assert.equal(etablissementFlags({ Etablissement2: 'UBM' }, etabFlags), null, 'l\'ancienne colonne Etablissement2 n\'est plus lue');
 });
 
 test('isEtablissementEligible requires ok_pour_apparaitre AND (fondateur OR partenaire)', () => {

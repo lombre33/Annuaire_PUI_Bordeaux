@@ -179,11 +179,11 @@ function reveal(element, text) {
 }
 
 function initials(contact) {
-  return `${(contact.Prenom || '').charAt(0)}${(contact.Nom || '').charAt(0)}`.toUpperCase() || '?';
+  return `${(contact.prenom || '').charAt(0)}${(contact.nom || '').charAt(0)}`.toUpperCase() || '?';
 }
 
 function fullName(contact) {
-  return `${contact.Prenom || ''} ${contact.Nom || ''}`.trim() || 'Sans nom';
+  return `${contact.prenom || ''} ${contact.nom || ''}`.trim() || 'Sans nom';
 }
 
 function fillEtablissement(badge, label, onToggle) {
@@ -240,9 +240,9 @@ function buildCard(template, contact, onToggle) {
   const card = template.content.cloneNode(true);
   card.querySelector('.avatar').textContent = initials(contact);
   card.querySelector('.name').textContent = fullName(contact);
-  if (contact.fonction) reveal(card.querySelector('.fonction'), contact.fonction);
+  if (contact.Fonction) reveal(card.querySelector('.fonction'), contact.Fonction);
   fillEtablissement(card.querySelector('.etablissement-tag'), contact.etablissement_label, onToggle);
-  fillEmail(card.querySelector('.email'), contact.Email);
+  fillEmail(card.querySelector('.email'), contact.email);
   const phone = formatPhone(contact.numero_de_telephone);
   if (phone) reveal(card.querySelector('.tel'), `☎ ${phone}`);
   fillTags(card.querySelector('.card-tags'), contact, onToggle);

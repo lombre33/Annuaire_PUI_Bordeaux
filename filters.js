@@ -20,7 +20,7 @@ function activeSelections(activeFilters, excludeKey) {
 }
 
 function matchesSearch(contact, term) {
-  return !term || [contact.Nom, contact.Prenom].some(value => normalize(value).includes(term));
+  return !term || [contact.nom, contact.prenom].some(value => normalize(value).includes(term));
 }
 
 function matchesScope(contact, scope) {

@@ -140,8 +140,9 @@ function applyDirectory({ contacts, referenceMaps, etabFlags }) {
 }
 
 // onRecords() ne sert qu'à savoir quand rafraîchir : son contenu ne porte pas
-// forcément toutes les colonnes d'Annuaire (Etablissement2 est une formule),
-// alors que fetchTable() renvoie la table complète.
+// forcément toutes les colonnes de BDD (selon la vue branchée) et résout les
+// Références en texte, alors que fetchTable() renvoie la table complète, les
+// Références en identifiants.
 window.grist.onRecords(debounce(async () => {
   const requestId = recordsSequencer.next();
   try {

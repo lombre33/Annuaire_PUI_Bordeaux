@@ -10,9 +10,10 @@ Pas de bundler : le navigateur charge directement des modules ES natifs.
 
 - `index.html` — structure de la page + template de carte.
 - `style.css` — feuille de style (un seul fichier, non minifié à la main).
-- `constants.js` — taxonomie, source unique : `CATEGORIES` donne, pour chaque
-  catégorie (actions, instances, compétences, établissement, rôle...), son
-  libellé, sa couleur, sa table de référence et sa colonne dans `Annuaire` ;
+- `constants.js` — table principale (`MAIN_TABLE` = `BDD`) et taxonomie, source
+  unique : `CATEGORIES` donne, pour chaque catégorie (actions, instances,
+  compétences, établissement, rôle...), son libellé, sa couleur, sa table de
+  référence (avec libellé corrigé puis brut) et sa colonne dans `BDD` ;
   `FILTERS`, `TAG_GROUPS`, `REFERENCE_TABLES` et `LIST_CATEGORIES` en sont
   dérivés. Ajouter une catégorie = une entrée ici.
 - `grist-data.js` — lecture des tables Grist (`loadDirectory()`, seule
@@ -39,12 +40,13 @@ Sans rien installer (Node ≥ 18, testé avec Node 22), `node --test` exécute l
 tests unitaires (`tests/*.test.mjs`, un fichier par module) : lecture des tables Grist
 (`loadDirectory()` avec un faux `docApi`), résolution des Références,
 enrichissement des contacts, filtrage, et plusieurs tests de non-régression
-(filtre `perimetre_all`, tag « Rôle PUI », fallback établissement, pannes de
-lecture — voir CHANGELOG).
+(filtre `perimetre`, tag « Rôle PUI », établissement, pannes de lecture — voir
+CHANGELOG). `tests/rules.test.mjs` vérifie qu'aucun fichier de code ne lit la
+colonne `nom_de_domaine`.
 
 `tests/e2e.test.mjs` charge le vrai `index.html` (`main.js`, `render.js`) dans
 Chromium avec une API Grist simulée et vérifie ce que voit l'utilisateur
-(nombre de contacts, badge `Etablissement2`, filtres, bandeau d'état). Il est
+(nombre de contacts, badge établissement, filtres, bandeau d'état). Il est
 ignoré tant que Playwright n'est pas installé — ce n'est pas une dépendance du
 widget :
 
@@ -86,14 +88,20 @@ pouvoir revenir en arrière facilement si besoin.
 ## Limites connues
 
 - **Modifier une table de référence ne rafraîchit pas le widget.** Grist ne
-  prévient le widget que des changements de la table `Annuaire`. Après avoir
-  modifié `Etablissements` (par exemple `ok_pour_apparaitre`) ou une autre
-  table de référence, recharger le widget pour voir le changement.
-- **Établissement sans acronyme** : le widget identifie l'établissement d'un
-  contact par `Etablissement2`, qui doit être égal à l'acronyme de la ligne
-  d'`Etablissements` (ou à son nom complet quand l'acronyme est vide). Si la
-  formule d'`Etablissement2` renvoie autre chose, le contact ne correspond à
-  aucune ligne et reste masqué.
+  prévient le widget que des changements de la table à laquelle sa section est
+  liée : il faut la lier à `BDD`. Après avoir modifié `Etablissements` (par
+  exemple `ok_pour_apparaitre`) ou une autre table de référence, recharger le
+  widget pour voir le changement.
+- **Établissement** : le widget lit la référence `BDD.Etablissement` (jamais
+  `nom_de_domaine`). Un contact dont la référence est vide, ou pointe sur une
+  ligne d'`Etablissements` introuvable, reste masqué. Le libellé affiché est
+  l'acronyme de la ligne, ou son nom complet quand l'acronyme est vide.
+- **Libellés des filtres et des tags** : chaque table de référence a un libellé
+  brut et un libellé corrigé (`..._corrigees`) ; le widget affiche le corrigé
+  quand il est rempli, le brut sinon.
+- **Colonnes absentes de BDD** : `numero_de_telephone` et `Role_dans_le_PUI`
+  n'existent plus ; la carte n'affiche donc ni téléphone ni rôle PUI. Si ces
+  colonnes reviennent dans `BDD` sous les mêmes noms, le widget les reprend.
 - **Script de l'API Grist** : `index.html` charge `grist-plugin-api.js` depuis
   `docs.getgrist.com`, sans version figée. Le charger depuis l'instance
   utilisée (`grist.numerique.gouv.fr`) serait plus cohérent, mais ne se vérifie

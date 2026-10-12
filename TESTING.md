@@ -17,24 +17,31 @@ Sans dépendance, un fichier de tests par module :
 
 - `tests/grist-data.test.mjs` — décodage et formats des données Grist : `text`,
   `normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
-  `pickLabel`, `labelMapFromRows`, `refId`, `refLabel`, `resolveListItem`,
-  `isInScope`, `createRequestSequencer`, `referenceMapsEqual`, `mailtoHref`.
+  `pickLabel`, `labelMapFromRows`, `refId`, `refLabel`, `isEmptyReference`,
+  `resolveListItem`, `isInScope`, `createRequestSequencer`,
+  `referenceMapsEqual`, `mailtoHref`.
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
-  catégories liste, compétences, indicateurs) et `labelsOf`.
+  catégories liste dont compétences, anciennes colonnes ignorées, indicateurs)
+  et `labelsOf`.
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
-  doublons), `etablissementFlags`, `isEtablissementEligible`,
-  `filterVisibleEstablishments`.
+  doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
+  libellé), `isEtablissementEligible`, `filterVisibleEstablishments`.
 - `tests/filters.test.mjs` — `filterContacts`, `pruneStaleFilters`,
   `computeFilterCounts`.
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
-  (une lecture par table, tables indispensables illisibles, table de référence
-  illisible, colonnes manquantes, annuaire vide expliqué).
-- `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`).
+  (une lecture par table, aucune ancienne table lue, libellé corrigé
+  prioritaire, tables indispensables illisibles, table de référence illisible,
+  colonnes obligatoires ou facultatives, annuaire vide expliqué, doublons
+  d'acronymes).
+- `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
+  table principale `BDD`, libellé corrigé avant le libellé brut.
+- `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
+  colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 20
-scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs` :
-nombre de contacts et badge `Etablissement2` de chaque carte, interrupteurs
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 21
+scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
+(structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
 Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
@@ -55,7 +62,7 @@ Si vous changez l'affichage, ajoutez ou adaptez un scénario de
 
 1. `npx serve .` ou `python3 -m http.server 8080` à la racine du dépôt (les
    modules ES ne se chargent pas via `file://`).
-2. Dans Grist, ouvrir le document contenant la table `Annuaire`, ajouter (ou
+2. Dans Grist, ouvrir le document contenant la table `BDD`, ajouter (ou
    pointer temporairement) un widget custom vers `http://localhost:8080`.
 3. Ouvrir la console navigateur (F12) — la garder ouverte tout le protocole :
    plusieurs points ci-dessous s'appuient sur l'absence d'erreur/warning
@@ -68,8 +75,8 @@ Si vous changez l'affichage, ajoutez ou adaptez un scénario de
 
 - [ ] Aucune erreur dans la console au chargement.
 - [ ] `[GRIST] Enregistrements reçus: N` correspond au nombre de lignes de
-      `Annuaire`, et le nombre de cartes affichées (`#resultCount`) est
-      inférieur ou égal à N (seuls les contacts avec `perimetre_all` non
+      `BDD`, et le nombre de cartes affichées (`#resultCount`) est
+      inférieur ou égal à N (seuls les contacts avec `perimetre` non
       vide s'affichent — voir `isInScope()`).
 - [ ] Les 7 boutons de filtre (Actions, Tâches, Communautés, GT, Compétences,
       Instances, Établissement) sont présents dans la barre d'outils.
@@ -119,15 +126,14 @@ Instances, Établissement) :
       ni ne décoche rien.
 - [ ] Cliquer en dehors du menu → il se ferme.
 
-Spécifique **Compétences** :
+Spécifique **Compétences** (et toutes les catégories issues d'une table de
+référence) :
 
-- [ ] Repérer un contact dont une compétence en texte libre diffère par la
-      casse ou les accents du libellé listé dans le menu (ex. carte affiche
-      "oncologie", menu propose "Oncologie") — cocher l'option du menu doit
-      inclure ce contact. *(Régression du correctif 1.4.0 — avant, un tel
-      contact était silencieusement exclu.)* S'il n'existe pas de tel cas
-      dans les données actuelles, il est prudent d'en créer un temporairement
-      pour ce test, puis de le retirer.
+- [ ] Le menu propose un seul libellé par compétence : le libellé corrigé
+      (`Competences_corrigees`) quand il est rempli, le libellé brut sinon.
+      Les compétences d'une carte portent les mêmes libellés que le menu.
+- [ ] Cocher une compétence dans le menu garde exactement les contacts dont
+      la carte affiche cette compétence.
 
 ## 4. Filtres combinés
 
@@ -195,23 +201,25 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       coup dans Grist (en quelques secondes) → revenir sur le widget,
       vérifier que les cartes reflètent bien l'état **final** de tous les
       contacts modifiés (pas un état intermédiaire ou partiel).
-- [ ] **Référence orpheline** : si un contact a une valeur `Etablissement`
-      qui ne résout à aucun libellé (ni `Etablissement2` renseigné), la
-      console doit afficher un `[ETABLISSEMENT] ... sans Etablissement2`
-      listant l'identifiant de ligne de ce contact (pas son email) — et il
-      n'apparaît pas dans la grille (aucun indicateur d'établissement à faire
-      valoir), ni aucun tag portant un id numérique brut.
+- [ ] **Référence vide ou orpheline** : si un contact a une `Etablissement`
+      vide ou qui ne résout à aucune ligne d'`Etablissements`, la console doit
+      afficher un `[ETABLISSEMENT] ... sans Etablissement` listant
+      l'identifiant de ligne de ce contact (pas son email) — et il n'apparaît
+      pas dans la grille (aucun indicateur d'établissement à faire valoir), ni
+      aucun tag portant un id numérique brut.
 
 ## 8. Cas limites de données
 
 - [ ] Contact sans aucune valeur dans les 7 catégories de tags → carte
       affichée sans section `card-tags` visible (pas de section vide).
-- [ ] Contact avec `perimetre_all` vide → absent de la grille (et absent du
+- [ ] Contact avec `perimetre` vide → absent de la grille (et absent du
       compte `#resultCount`).
-- [ ] Contact sans `Nom` ni `Prenom` → absent de la grille (filtré côté
-      `main.js`, `c.Nom || c.Prenom`).
-- [ ] Valeur d'établissement résolue uniquement via `Etablissement2` (pas de
-      référence directe) → badge affiché correctement.
+- [ ] Contact sans `nom` ni `prenom` → absent de la grille (filtré par
+      `buildContacts()`).
+- [ ] Établissement dont l'acronyme est vide (seul `nom_complet` renseigné) →
+      badge affiché avec le nom complet.
+- [ ] Deux lignes d'`Etablissements` de même acronyme → chaque contact garde
+      le statut de la ligne à laquelle il est rattaché.
 
 ## 9. Vérifications techniques
 
