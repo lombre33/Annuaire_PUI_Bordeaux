@@ -13,9 +13,10 @@
 # Le widget ÉCRIT dans deux tables, jamais dans une autre : BDD (la colonne
 # Accepte_apparaitre, par l'interrupteur « Ma présence », et les colonnes de la fiche
 # modifiables par « Modifier ma fiche » : prénom, nom, fonction, téléphone, rôle et
-# listes de participations, jamais l'e-mail ni l'établissement) et Annuaire_Sonde (une
-# ligne ajoutée puis supprimée à chaque chargement). Il lit aussi les métadonnées
-# _grist_Tables et _grist_Tables_column pour écrire le téléphone dans la forme de sa
+# listes de participations ; l'e-mail et l'établissement seulement quand un
+# administrateur, mode admin allumé, modifie la fiche d'une autre personne) et
+# Annuaire_Sonde (une ligne ajoutée puis supprimée à chaque chargement). Il lit aussi
+# les métadonnées _grist_Tables et _grist_Tables_column pour écrire le téléphone dans la forme de sa
 # colonne. Il ne crée ni ne modifie jamais une table ou une colonne : voir GRIST_SETUP.md
 # pour les créer.
 #
@@ -58,8 +59,8 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
   Competences       : ReferenceList(Competences)
   email             : Text          facultative
     Affichée sur la carte, et sert à retrouver la fiche de la personne connectée
-    (comparaison sans casse ni espaces autour). Sans elle, pas de bandeau « Ma
-    présence » : la console le dit. Voir createPeopleIndex() dans grist-data.js.
+    (comparaison sans casse ni espaces autour). Sans elle, le bandeau dit « Fiche
+    introuvable » : la console le dit aussi. Voir createPeopleIndex() dans grist-data.js.
   Fonction          : Text          facultative
 
   Colonnes facultatives, rajoutées dans BDD sous ces noms : le widget les

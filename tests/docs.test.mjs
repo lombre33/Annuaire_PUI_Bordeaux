@@ -595,6 +595,22 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
 // Une adresse web écrite en dur dans le code est une porte vers l'extérieur : le test précédent
 // ne voit que celles d'index.html, or le lien du bandeau du bas est posé par le code
 // (branding-ui.js). docs/securite.md doit nommer son serveur et dire comment il s'ouvre.
+// Les préfixes de la console ([GRIST], [LOGOS]…) : docs/developpeurs.md les liste avec leur nombre,
+// docs/securite.md les nomme parmi les diagnostics. Un préfixe de plus dans le code, et ces deux
+// pages doivent le dire.
+test('les pages décrivent tous les préfixes de la console, et leur nombre', () => {
+  const prefixes = [...new Set(WIDGET_SOURCES().flatMap(({ code }) => [...code.matchAll(/(['"`])\[([A-Z]{4,})\]\s/g)].map(match => match[2])))];
+  assert.ok(prefixes.length >= 9, 'Ce test ne trouve plus les préfixes de la console : le code a-t-il changé de forme ?');
+  const developers = read('docs/developpeurs.md');
+  const security = read('docs/securite.md');
+  const words = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze'];
+  const count = words[prefixes.length] ?? String(prefixes.length);
+  assert.ok(developers.includes(`avec ${count} préfixes`),
+    `docs/developpeurs.md doit dire « avec ${count} préfixes » : la console en emploie ${prefixes.length} (${prefixes.join(', ')}).`);
+  const missing = prefixes.filter(prefix => !developers.includes(`- \`[${prefix}]\` :`) || !security.includes(`\`[${prefix}]\``));
+  assert.deepEqual(missing, [], 'Ces préfixes de la console manquent dans la liste de docs/developpeurs.md (« - `[PRÉFIXE]` : … ») ou dans docs/securite.md.');
+});
+
 test('la page de sécurité nomme chaque adresse web écrite en dur dans le code du widget', () => {
   const literal = /(['"`])(https?:\/\/[^'"`\s]+)\1/g;
   const found = WIDGET_SOURCES().flatMap(({ name, code }) => [...code.matchAll(literal)].map(match => ({ name, url: match[2] })));

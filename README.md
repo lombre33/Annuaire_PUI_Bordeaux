@@ -131,7 +131,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── preview.js            Cartes « avant » et « après » d'une modification
 ├── schema.js             Type des colonnes de BDD, lu dans les métadonnées de Grist
 ├── profile-ui.js         Fenêtre de modification : formulaire, relecture, confirmation
-├── changes-ui.js         Liste « Ce qui change » de la relecture
+├── changes-ui.js         Liste des changements (formulaire, relecture, confirmation)
 ├── branding.js           Habillage : fondateurs, financeurs, logo de chaque établissement (sans DOM)
 ├── attachments.js        Pièces jointes de Grist : jeton en lecture seule et adresse des logos
 ├── branding-ui.js        Images des logos, financeurs de l'en-tête, bandeau des fondateurs
