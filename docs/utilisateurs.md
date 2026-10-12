@@ -465,6 +465,10 @@ Le bandeau ne montre que les établissements **fondateurs** qui ont **validé** 
 
 Oui : l'annuaire s'adapte à la largeur de la zone que Grist lui donne. Sur un petit écran ou dans un panneau étroit, les cartes passent sur une colonne, la recherche et les filtres s'empilent, le texte est plus grand et les boutons sont plus faciles à toucher. Cet affichage a été vérifié dans un navigateur de bureau avec un écran tactile simulé, pas encore sur un téléphone : signalez à l'administrateur des données ce qui s'afficherait mal.
 
+**Puis-je utiliser l'annuaire au clavier, ou avec un lecteur d'écran ?**
+
+Oui, en grande partie. La touche **Tab** passe d'un contrôle au suivant (l'interrupteur de « Ma présence », la recherche, les boutons de filtre, Fondateurs et Partenaires, Réinitialiser, puis les étiquettes et les boutons de chaque carte) et **Maj+Tab** revient en arrière ; **Entrée** ou **Espace** active le contrôle, y compris le bouton d'un filtre, qui ouvre ou referme son menu. Un **anneau violet** entoure le contrôle sur lequel on se trouve. Le champ de recherche est annoncé « Rechercher par nom ou prénom ». Ces points sont vérifiés par des tests automatiques dans un navigateur de bureau, pas encore avec un lecteur d'écran réel. Deux limites connues : la touche Échap ne referme pas encore un menu de filtre (cliquez ailleurs, ou appuyez de nouveau sur son bouton), et un lecteur d'écran relit toute la liste des cartes à chaque changement de recherche. Signalez à l'administrateur des données ce qui vous gênerait.
+
 **Mes coordonnées sont-elles visibles par tout le monde ?**
 
 L'annuaire n'affiche une personne que si elle a accepté d'apparaître, et si son établissement a validé son apparition et est fondateur ou partenaire. Cette règle ne concerne que l'affichage : les contacts masqués, y compris celles et ceux qui se sont retirés, restent lisibles dans le document Grist par toute personne qui y a accès. L'annuaire lui-même est visible par les personnes qui ont accès à la page Grist qui l'héberge ; les droits d'accès au document se gèrent dans Grist. Voir [sécurité et confidentialité](securite.md).

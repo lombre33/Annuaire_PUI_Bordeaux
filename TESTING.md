@@ -83,6 +83,8 @@ Sans dépendance, un fichier de tests par module :
   navigateur : des logos dessinés à la demande (proportions variées, un logo très haut,
   une bannière très large, un SVG sans dimensions), un fichier supprimé (404), un
   fichier qui n'est pas une image, et un compte des téléchargements et des jetons employés.
+- `tests/support/contrast.mjs` — le rapport de contraste WCAG (`contrastRatio`, `parseColor`) à
+  partir des couleurs calculées par le navigateur, pour les tests d'accessibilité.
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
@@ -137,6 +139,12 @@ supprimé ou illisible, aucune trace du jeton dans la console, relecture d'une f
 `tests/branding-layout.test.mjs` y ajoute 13 scénarios sur la mise en page de l'habillage, de
 320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case,
 bandeau du bas qui se replie, rien qui dépasse du cadre.
+`tests/accessibility.test.mjs` y ajoute 4 scénarios (et 2 tests sans navigateur : les rapports de
+contraste de référence, et une garde sur les feuilles de style qui refuse tout `outline: 0` ou
+`outline: none` non justifié) sur le clavier et le lecteur d'écran : le champ de recherche nommé par son
+rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au repos, menu ouvert), et le parcours
+complet à la tabulation (page, puis menu ouvert) où chaque arrêt change de capture avec et sans focus, avec
+un anneau plein de 2 px au moins et de 3:1 au moins.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -602,3 +610,29 @@ la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
       Entrée ; les logos sont lus par le nom de l'établissement ; le logo seul garde un nom accessible.
 - [ ] La relecture d'une modification de fiche montre le logo de l'établissement sur les deux cartes, sans rien
       de cliquable.
+
+## 15. Clavier et lecteur d'écran (1.14.1)
+
+Les tests automatiques lisent l'arbre d'accessibilité de Chromium et comparent des captures avec et sans
+focus : ils ne remplacent ni un lecteur d'écran réel, ni Firefox, ni Safari. **À jouer au moins une fois,
+dans le vrai Grist** (la section du widget dans la page, pas la démonstration), avec le clavier seul. Pour un
+lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkBack sous Android.
+
+- [ ] Appuyer sur **Tab** depuis le début de la page : le focus passe, dans l'ordre, par l'interrupteur et le
+      bouton de « Ma présence » (si on est identifié), le champ de recherche, les boutons de filtre, les
+      boutons Fondateurs et Partenaires, Réinitialiser, puis les boutons et liens de chaque carte. À chaque
+      arrêt, **un anneau violet de 2 px entoure le contrôle** ; aucun arrêt n'est invisible. **Maj+Tab** revient
+      en arrière.
+- [ ] Le champ de recherche : l'anneau entoure le cadre entier, loupe comprise, avec ses coins arrondis (pas
+      seulement la ligne de saisie) ; il s'affiche aussi quand on clique dans le champ.
+- [ ] Ouvrir un menu de filtre (Entrée ou Espace sur son bouton) puis tabuler : l'anneau suit la recherche du
+      menu, les cases et les flèches de détail des domaines.
+- [ ] À la souris, aucun anneau n'apparaît autour d'un bouton cliqué (sauf dans un champ de saisie).
+- [ ] **Lecteur d'écran** : en arrivant sur le champ de recherche, il annonce **« Rechercher par nom ou
+      prénom »** et un champ de recherche (pas « champ de saisie » sans nom, pas seulement l'invite grisée). Dans
+      un menu ouvert, la recherche est annoncée « Rechercher dans … » suivi du nom du filtre.
+- [ ] **Mode contraste élevé** (Windows : réglage « Contraste » ; Chrome : `forced-colors` émulé dans les outils
+      de développement, onglet Rendu) : l'anneau de focus reste visible sur chaque contrôle.
+- [ ] Zoom du navigateur à 200 % : l'anneau n'est coupé par aucun bord (ni celui de la barre d'outils, ni celui
+      d'une carte, ni celui d'un menu).
+
