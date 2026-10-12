@@ -16,24 +16,31 @@ node --test
 Sans dépendance, un fichier de tests par module :
 
 - `tests/grist-data.test.mjs` — décodage et formats des données Grist : `text`,
-  `normalize`, `compareLabels`, `formatPhone`, `safeValues`, `tableToRows`,
-  `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `refId`, `refLabel`, `isEmptyReference`,
+  `normalize`, `normalizeForSearch` (œ, apostrophes, tirets, points, espaces),
+  `compareLabels` (les nombres dans l'ordre), `compareContacts` (l'ordre des cartes), `formatPhone`,
+  `safeValues`, `tableToRows`,
+  `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `taskActionNumber`, `actionNumber`,
+  `refId`, `refLabel`, `isEmptyReference`,
   `resolveListItem`, `isInScope`, `createRequestSequencer`,
   `referenceMapsEqual`, `mailtoHref`.
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
-  catégories liste dont compétences et domaines, libellés sans doublon, anciennes
+  catégories liste dont compétences, domaines, tâches et actions, libellés sans doublon, anciennes
   colonnes ignorées, indicateurs) et `labelsOf`.
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
   libellé), `isEtablissementEligible`, `filterVisibleEstablishments`.
-- `tests/filters.test.mjs` — `filterContacts`, `pruneStaleFilters`,
-  `computeFilterCounts` (dont les compteurs des domaines) et le menu rangé par
-  domaine : `menuGroups`, `groupState`, `toggleGroup`, `selectionCount`.
+- `tests/filters.test.mjs` — `filterContacts` (dont la recherche « prénom nom », mot par
+  mot et dans n'importe quel ordre, et ses écritures tolérées), `pruneStaleFilters`,
+  `computeFilterCounts` (dont les compteurs des domaines et des actions) et le menu
+  rangé par groupe, domaine ou action : `menuGroups`, `groupState`, `toggleGroup`,
+  `selectionCount`.
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
-  (une lecture par table, aucune ancienne table lue, libellé corrigé
+  (une lecture par table, cartes triées par nom, aucune ancienne table lue, libellé corrigé
   prioritaire, tables indispensables illisibles, table de référence illisible,
   colonnes obligatoires, facultatives ou introuvables, annuaire vide expliqué,
-  doublons d'acronymes, domaines des compétences).
+  doublons d'acronymes, domaines des compétences, tâches rangées par action
+  d'après leur numéro : formats de libellé, repli « Sans action », menu à plat,
+  lectures en panne).
 - `tests/identity.test.mjs` — `readIdentity` avec un faux document Grist (adresse
   lue sur la ligne de la sonde, administrateur d'après `ACL`, établissements dont la
   personne est responsable d'après la colonne `Responsable_de`, compte Lecteur,
@@ -98,7 +105,11 @@ Sans dépendance, un fichier de tests par module :
   suppression), formules déclenchées de la sonde, pannes, écritures refusées (par
   table ou par ligne).
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : serveur
-  statique, Chromium, faux Grist injecté dans la page.
+  statique, Chromium, faux Grist injecté dans la page, console des pages relue sans
+  qu'une lecture interrompue par la fermeture de la page fasse échouer le fichier.
+- `tests/support/grouped-menu.mjs` — les aides communes aux tests des menus rangés par
+  groupe (Compétences par domaine, Tâches par action) : groupe, case, flèche,
+  nombres, éléments visibles.
 - `tests/support/fake-attachments.mjs` — les pièces jointes du faux Grist pour les tests
   navigateur : des logos dessinés à la demande (proportions variées, un logo très haut,
   une bannière très large, un SVG sans dimensions), un fichier supprimé (404), un
@@ -113,18 +124,31 @@ Sans dépendance, un fichier de tests par module :
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 62
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 69
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
-(structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
-Fondateurs/Partenaires, recherche, filtres et compteurs, menu Compétences rangé par
+(structure `BDD`) : nombre de contacts et badge établissement de chaque carte, cartes triées
+par nom (même quand Grist envoie les lignes dans le désordre), interrupteurs
+Fondateurs/Partenaires, recherche (« prénom nom » dans les deux sens, noms composés, tirets,
+apostrophe, œ), attente de la frappe (une seule mise à jour pour quatre lettres tapées d'un coup,
+champ vidé sans attendre, « Réinitialiser » qui annule l'attente), filtres et compteurs, menu Compétences rangé par
 domaine (case de domaine, détail replié, case partielle, recherche à deux niveaux,
 ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
 bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
 double clic, écriture refusée, personne sans fiche, qui voit alors une mention sans
-interrupteur).
+interrupteur), et le banc d'essai lui-même (une lecture de la console interrompue par la
+fermeture de la page ne laisse aucun rejet non traité).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
+
+`tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Tâches rangé par action,
+sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
+sept boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
+en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
+filtres, nombres de cartes, recherche d'une action, d'une tâche ou d'un numéro, tag de
+carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numéros (console
+et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
+les tâches par action.
 
 `tests/e2e-profile.test.mjs` y ajoute 61 scénarios sur la modification d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
@@ -149,13 +173,13 @@ serveur, réponse illisible, jeton refusé), le fichier resté sans servir, le r
 pendant que la fenêtre est ouverte, Échap, le double clic, le clavier et les noms accessibles, la
 mise en page de 320 à 1280px et l'absence de tout appel réseau autre que l'API simulée.
 
-`tests/responsive.test.mjs` y ajoute 19 scénarios sur la mise en page, de 280 à
+`tests/responsive.test.mjs` y ajoute 20 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
-d'outils, menus de filtres (le menu Compétences déplié compris) entièrement dans le
-cadre, cibles tactiles (écran
+d'outils, menus de filtres (les menus Compétences et Tâches dépliés compris) entièrement
+dans le cadre, cibles tactiles (écran
 tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
@@ -168,12 +192,14 @@ supprimé ou illisible, aucune trace du jeton dans la console, relecture d'une f
 `tests/branding-layout.test.mjs` y ajoute 13 scénarios sur la mise en page de l'habillage, de
 320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case,
 bandeau du bas qui se replie, rien qui dépasse du cadre.
-`tests/accessibility.test.mjs` y ajoute 4 scénarios (et 2 tests sans navigateur : les rapports de
-contraste de référence, et une garde sur les feuilles de style qui refuse tout `outline: 0` ou
-`outline: none` non justifié) sur le clavier et le lecteur d'écran : le champ de recherche nommé par son
-rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au repos, menu ouvert), et le parcours
-complet à la tabulation (page, puis menu ouvert) où chaque arrêt change de capture avec et sans focus, avec
-un anneau plein de 2 px au moins et de 3:1 au moins.
+`tests/accessibility.test.mjs` y ajoute 5 scénarios (et 4 tests sans navigateur : les rapports de
+contraste de référence, une garde sur les feuilles de style qui refuse tout `outline: 0` ou
+`outline: none` non justifié, et le contraste de chaque couleur de catégorie et du lien e-mail) sur le
+clavier, le lecteur d'écran et les couleurs : le champ de recherche nommé par son rôle, aucun contrôle sans
+nom dans l'arbre d'accessibilité (page au repos, menu ouvert), le parcours complet à la tabulation (page,
+puis menu ouvert) où chaque arrêt change de capture avec et sans focus, avec un anneau plein de 2 px au
+moins et de 3:1 au moins, et les pastilles, les titres de groupe et le lien e-mail d'une carte mesurés sur
+la page rendue (4,5:1 au moins).
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -222,8 +248,23 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 ## 2. Recherche libre
 
 - [ ] Taper un nom existant (ex. 3 premières lettres) → seuls les contacts
-      correspondants restent.
+      correspondants restent, une fraction de seconde après la dernière lettre.
 - [ ] Recherche sur le prénom, pas seulement le nom.
+- [ ] **Prénom et nom ensemble** (1.16.1) : taper « prénom nom » d'une personne réelle
+      → sa carte ; le même couple dans l'autre ordre (« nom prénom ») → la même carte ;
+      quelques lettres de chacun (« pré nom ») → la même carte ; le prénom d'une personne
+      et le nom d'une autre → aucun résultat.
+- [ ] **Écritures tolérées** (1.16.1) : pour un nom composé réel (« Marie-Christine »),
+      taper la même chose avec une espace au lieu du tiret → la carte ; pour un nom avec
+      apostrophe (« D'Arcy »), taper sans apostrophe → la carte. À défaut de tels noms dans
+      le document, le contrôle se fait sur la copie de démonstration.
+- [ ] **Cartes triées** (1.16.1) : sans filtre, les cartes se lisent de A à Z par nom de
+      famille (puis prénom) ; ajouter un contact dans Grist, au bout de la table, le place
+      à sa lettre dans les secondes qui suivent, sans recharger la page.
+- [ ] **Frappe rapide** : taper six lettres d'un coup → la liste ne scintille pas et ne
+      s'affiche qu'à la fin de la frappe ; effacer le champ (Échap ou croix) → toutes les
+      cartes reviennent tout de suite ; cliquer « Réinitialiser » juste après avoir tapé →
+      le champ est vide et toutes les cartes sont là, rien ne se refiltre ensuite.
 - [ ] Recherche insensible à la casse (`DUPONT` = `dupont`).
 - [ ] **Recherche insensible aux accents** (ex. taper `ecole` doit matcher un
       nom contenant `École`, si un tel contact existe — sinon vérifier sur
@@ -315,6 +356,37 @@ valeurs par domaine, sans second bouton.
 - [ ] Sans la colonne `Macro_competences` (essai sur une copie du document) : le
       bandeau « Colonne de libellé introuvable » s'affiche et le menu Compétences
       reste complet, mais à plat, sans domaines.
+
+Spécifique **Tâches par action** : le menu Tâches range ses valeurs par action, sans
+second bouton et sans colonne à ajouter dans Grist. Le numéro avant le point du libellé
+d'une tâche (« 2.1 … ») est celui de son action, dont le libellé commence par « Action 2 ».
+Le menu Tâches fonctionne comme le menu Compétences par domaine (ci-dessus) : reprendre
+les mêmes essais en remplaçant domaine par action et compétence par tâche, puis :
+
+- [ ] L'infobulle du bouton « Tâches » parle d'actions ; le champ de recherche du menu
+      dit « Action ou tâche… » en entier, sans être coupé.
+- [ ] Les actions sont dans l'ordre de leur numéro (« Action 2 » avant « Action 10 »),
+      chaque tâche sous l'action dont elle porte le numéro, et les tâches d'une action
+      dans l'ordre de leur numéro (« 1.2 » avant « 1.10 »). « Sans action » est **en
+      dernier** s'il existe une tâche sans numéro, ou dont le numéro ne correspond à
+      aucune action. Une action qui n'a aucune tâche ne figure pas dans le menu.
+- [ ] Le filtre **Actions** est inchangé : toujours une liste à plat, qui filtre sur les
+      actions inscrites sur les cartes, et qui ne coche pas le menu Tâches (ni
+      l'inverse). Les deux se cumulent (ET).
+- [ ] Rechercher « 2.1 » (le numéro d'une tâche) garde cette tâche sous son action ;
+      « action 2 » garde l'action avec toutes ses tâches.
+- [ ] Renuméroter une tâche dans `Taches` (par exemple « 2.1 … » devient « 1.4 … »)
+      puis recharger : elle change d'action. Une sélection qui portait l'ancien libellé
+      est retirée.
+- [ ] La console liste, par identifiant de ligne, les tâches classées sous « Sans
+      action » (`[REFS] Taches: n ligne(s) sans regroupement…`) : les numéroter dans
+      Grist, puis recharger le widget.
+- [ ] Sur une copie du document où **aucune tâche** ne commence par un numéro « n.m »
+      (ou aucune action par « Action n »), le menu Tâches reste complet, mais à plat,
+      sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches: aucune
+      ligne n'est rattachée à une action…`).
+- [ ] Dans la fenêtre « Modifier mon profil », la liste des tâches est rangée par action
+      elle aussi, et celle des actions reste à plat.
 
 ## 4. Filtres combinés
 
@@ -457,8 +529,9 @@ Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde
       `Accepte_apparaitre` dans Grist ; le recocher la fait revenir. Il n'écrit que
       cette case, sur la ligne de la personne.
 - [ ] Compte **Lecteur** : pas de bandeau, aucune ligne ajoutée à `Annuaire_Sonde`.
-- [ ] Compte connecté dont l'adresse n'est pas dans `BDD` : pas de bandeau, la
-      console l'explique sans citer d'adresse.
+- [ ] Compte connecté dont l'adresse n'est pas dans `BDD` : un bandeau « Compte
+      absent de l'annuaire » sans interrupteur ; la console l'explique sans citer
+      d'adresse.
 - [ ] Règle d'accès qui refuse la modification de `BDD` pour ce compte : l'interrupteur
       affiche « Grist a refusé la modification… » et reste dans son état réel.
 - [ ] Deux comptes dans deux navigateurs, widgets ouverts en même temps : chacun voit
@@ -486,11 +559,12 @@ iOS, Chrome Android) que les tests ne couvrent pas :
       de la rangée : il reste entièrement visible, sans être coupé à droite, et
       se referme d'un clic ailleurs. Élargir le cadre puis le rouvrir : il
       s'ouvre de nouveau sous son bouton.
-- [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit :
-      aucune barre de défilement horizontale, un nom de compétence très long
-      passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et le
-      nombre de chaque domaine restent visibles, et la flèche se touche sans
-      viser.
+- [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit
+      (et de même le menu Tâches avec une action dépliée) : aucune barre de
+      défilement horizontale, un nom de compétence, de tâche ou d'action très
+      long passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et
+      le nombre de chaque domaine ou action restent visibles, et la flèche se
+      touche sans viser.
 - [ ] Carte avec un nom, un prénom et une fonction très longs : le nom tient sur
       deux lignes au plus, le badge d'établissement reste à sa droite, rien ne
       passe sous le badge ni hors de la carte.
@@ -513,7 +587,7 @@ l'e-mail et de l'établissement sont à la section 16.
       l'adresse ne figure pas dans `BDD` : un bandeau « Compte absent de l'annuaire » sans
       interrupteur de présence ni bouton « Modifier ».
 - [ ] Ouvrir sa fiche : un bloc d'identité (initiales, nom, e-mail, et à droite le logo de
-      l'établissement, ou son nom en pastille s'il n'a pas de logo) et la
+      l'établissement, ou sa pastille s'il n'a pas de logo) et la
       phrase « Verrouillé : l'e-mail et l'établissement sont liés à votre compte… » ; les
       champs contiennent les valeurs de Grist (le téléphone avec son 0 initial et ses
       espaces). La console ne dit pas `[SCHEMA] Types de colonnes illisibles` (sinon le
@@ -647,6 +721,11 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
       de développement, onglet Rendu) : l'anneau de focus reste visible sur chaque contrôle.
 - [ ] Zoom du navigateur à 200 % : l'anneau n'est coupé par aucun bord (ni celui de la barre d'outils, ni celui
       d'une carte, ni celui d'un menu).
+- [ ] **Couleurs des étiquettes** (1.16.2) : sur une carte qui en porte plusieurs, le texte blanc des
+      pastilles (Instances, Actions, GT, Compétences, Communautés, Tâches, Rôle PUI) se lit sans effort à la
+      taille normale, comme les titres de groupe et l'adresse e-mail ; on distingue encore les catégories
+      d'un coup d'œil, et le point de chaque bouton de filtre a la couleur des pastilles de sa catégorie.
+      À comparer avec `docs/images/carte-anatomie.png`.
 
 ## 16. Mode admin, e-mail et établissement (1.15.0)
 

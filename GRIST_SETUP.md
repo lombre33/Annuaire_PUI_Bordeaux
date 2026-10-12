@@ -14,22 +14,26 @@ la faire et comment vérifier qu'elle a marché.
 
 Le widget ne crée ni ne modifie jamais la structure du document (table, colonne,
 règle d'accès) : tout ce qui est ci-dessous se fait à la main, une fois. Il n'écrit que
-des lignes et des cellules : celle de la personne dans `BDD` (son choix de présence, sa
-fiche), la ligne passagère d'`Annuaire_Sonde` et, pour un responsable d'établissement,
-la ligne de son établissement dans `Etablissements` (nom complet, visibilité, logo) et
-les lignes d'`ACL` de ses responsables. Quand un responsable remplace le logo, il ajoute
-aussi une **pièce jointe** au document. Les logos affichés (étape 5) sont lus.
+des lignes et des cellules : celle de la personne connectée dans `BDD` (son choix de présence, sa
+fiche) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
+passagère d'`Annuaire_Sonde` et, pour un responsable d'établissement, la ligne de son établissement
+dans `Etablissements` (nom complet, visibilité, logo) et les lignes d'`ACL` de ses responsables.
+Quand un responsable remplace le logo, il ajoute aussi une **pièce jointe** au document. Les logos
+affichés (étape 5) sont lus.
 
 ## 1. Les colonnes que le widget écrit : des colonnes de données
 
-Le widget écrit dans `BDD` dans deux cas :
+Le widget écrit dans `BDD` dans trois cas :
 
 - quand une personne utilise l'interrupteur « Ma présence » : la colonne
   `Accepte_apparaitre` ;
 - quand elle enregistre la modification de sa fiche : `prenom`, `nom`, `Fonction`,
   `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`,
-  `Competences`, `Communautes` et `Taches`. Jamais `email`, `Etablissement`,
-  `perimetre` ni `Accepte_apparaitre`.
+  `Competences`, `Communautes` et `Taches` ;
+- quand un administrateur, mode admin allumé, enregistre la fiche d'une autre
+  personne : les mêmes colonnes, plus `email` et `Etablissement`.
+
+Jamais `perimetre`, ni `Accepte_apparaitre` depuis la fenêtre de modification.
 
 Grist refuse d'écrire dans une colonne **à formule** : chacune doit être une colonne
 de **données**. `Accepte_apparaitre` est de type **Case à cocher** (Bascule) ;
@@ -142,7 +146,7 @@ l'en-tête (sous le titre sur un écran étroit), un bouton « Modifier » sur l
 personne, et la table `Annuaire_Sonde` vide. Pour un compte désigné responsable dans
 `ACL` (étape 3), le bandeau porte aussi « Mon établissement ».
 
-Si le bandeau manque, la console dit pourquoi :
+Si le bandeau manque ou ne propose pas de fiche, la console dit pourquoi :
 
 | Ligne `[IDENTITE]` | Cause | Remède |
 |---|---|---|
@@ -150,9 +154,11 @@ Si le bandeau manque, la console dit pourquoi :
 | `la sonde n'a pas de colonne « Responsable_de » : pas de fiche d'établissement` | la colonne facultative n'existe pas : personne ne peut modifier de fiche d'établissement | colonne `Responsable_de`, étape 2 (point 4) |
 | `la formule user.Email de Annuaire_Sonde n'a renvoyé aucune adresse` | la formule n'est pas une formule de déclenchement, ou le compte est anonyme | reprendre la colonne `Email` |
 | `lecture impossible : …` | Grist a refusé l'écriture ou la lecture (règle d'accès) | étape 4 |
-| `document ouvert en lecture seule` | compte **Lecteur** : il ne peut rien écrire | normal, aucune modification n'est proposée |
-| `Aucune ligne de BDD ne porte l'adresse…` | la personne est connectée mais son adresse n'est pas dans `BDD.email` | corriger l'adresse dans `BDD` |
-| `BDD n'a pas de colonne « email »` | la colonne n'existe pas ou a un autre nom | la rajouter sous ce nom |
+| `Aucune ligne de BDD ne porte l'adresse…` | la personne est connectée mais son adresse n'est pas dans `BDD.email` : le bandeau dit « Compte absent de l'annuaire » | corriger l'adresse dans `BDD` |
+| `BDD n'a pas de colonne « email »` | la colonne n'existe pas ou a un autre nom : le bandeau dit « Fiche introuvable » | la rajouter sous ce nom |
+
+Un compte **Lecteur** n'a ni bandeau ni ligne dans la console : le widget n'essaie rien
+(normal, aucune modification n'est proposée).
 
 ## 3. Les administrateurs dans `ACL`
 
@@ -359,12 +365,13 @@ de page. Si ce n'est pas le cas, la console dit pourquoi :
   création et une suppression dans `Annuaire_Sonde`. C'est normal. Si une page est
   fermée entre les deux, une ligne orpheline peut rester : vous pouvez vider la table
   sans risque.
-- **« Annuler » de Grist** défait le dernier changement fait par le widget, y compris
-  un changement de présence ou l'enregistrement d'une fiche (une seule action Grist).
+- **« Annuler » de Grist** défait sans doute le dernier changement fait par le widget, y
+  compris un changement de présence ou l'enregistrement d'une fiche (une seule action
+  Grist) : non constaté dans un vrai Grist.
 - **Le widget ne garde aucun historique des modifications**, ni table de demandes :
-  elles s'appliquent tout de suite. Pour savoir qui a changé quoi, c'est le journal de
-  Grist lui-même (panneau « Historique » du document, durée de conservation selon
-  votre formule).
+  elles s'appliquent tout de suite. Pour savoir qui a changé quoi, c'est l'historique de
+  Grist lui-même (onglet « Activité » du document, qui garde sans doute les changements ;
+  durée de conservation selon votre formule).
 - **Deux personnes qui modifient la même fiche en même temps** : si elles touchent
   aux mêmes champs, la seconde est ramenée à la relecture avec ce que Grist contient
   maintenant (rien n'est écrit sans qu'elle l'ait relu) ; sinon les deux modifications
@@ -383,4 +390,6 @@ de page. Si ce n'est pas le cas, la console dit pourquoi :
 - **Une adresse sur plusieurs lignes de `BDD`** : le choix de présence s'applique à
   toutes ces lignes (la console le signale). Mieux vaut corriger les doublons.
 - **Une personne connectée avec une autre adresse que celle de `BDD`** n'est pas
-  retrouvée : pas de bandeau.
+  retrouvée : le bandeau dit « Compte absent de l'annuaire » (« Administrateur » pour
+  un administrateur, « Fiche introuvable » si `BDD` n'a pas de colonne `email`), sans
+  interrupteur de présence ni bouton « Modifier ».

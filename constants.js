@@ -59,46 +59,72 @@ export const FUNDER_LOGO = { area: 1100, maxWidth: 110, maxHeight: 36 };
 // surface (la surface visée est celle de la boîte : elle ne borne jamais).
 export const CARD_LOGO = { area: 92 * 32, maxWidth: 92, maxHeight: 32 };
 
+// Recherche principale : les cartes ne se redessinent qu'une fois la frappe arrêtée depuis ce
+// nombre de millisecondes. Chaque lettre tapée redessinerait sinon toute la liste (0,15 s
+// à 400 contacts d'après l'audit) : un mot de six lettres n'en provoque plus qu'un seul.
+export const SEARCH_DELAY_MS = 200;
+
 // Page du projet, vers laquelle renvoie la phrase du bandeau du bas.
 export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos-leviers/pui-reveler-le-potentiel-du-territoire';
 
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.
-//   label, color  affichage
+//   label, color  affichage. La couleur sert de fond à du texte blanc (les pastilles) et de
+//                 couleur de texte sur blanc (les titres de groupe) : elle garde 4,5:1 au moins
+//                 avec le blanc (WCAG 1.4.3). Pour en changer une, la foncer à teinte constante
+//                 plutôt que d'en choisir une plus claire ; tests/accessibility.test.mjs le vérifie
 //   table, field  table de référence et colonne de libellé (`field` peut lister
 //                 plusieurs colonnes, essayées dans l'ordre : le libellé
 //                 corrigé d'abord, le libellé brut de l'import en repli)
 //   column        colonne ReferenceList de BDD qui y renvoie ; absente pour les
 //                 Références simples Établissement et Rôle
-//   hint          infobulle du bouton de filtre, quand son nom ne suffit pas
-//   placeholder   texte du champ de recherche du menu, quand « Rechercher dans
-//                 <label> » ne dit pas tout
 //   groups        catégorie dont celle-ci est un regroupement : elle lit une
 //                 autre colonne de la même table (les compétences macro sont
-//                 une colonne de la table Competences) ; `fallback` est alors le
-//                 libellé des lignes que ce regroupement ne couvre pas
+//                 une colonne de la table Competences) ou la déduit (voir
+//                 `numberedIn`) ; `fallback` est alors le libellé des lignes que
+//                 ce regroupement ne couvre pas
 //   grouping      l'inverse de `groups` : la catégorie qui range celle-ci en
 //                 groupes. Le menu de cette catégorie présente ses valeurs par
-//                 groupe (les compétences par domaine) ; le regroupement n'a pas
-//                 de menu à lui, il ne sert qu'à ranger et à compter
+//                 groupe (les compétences par domaine, les tâches par action) ;
+//                 le regroupement n'a pas de menu à lui, il ne sert qu'à ranger
+//                 et à compter
+//   hint,         sur un regroupement : l'infobulle du bouton et le texte du
+//   placeholder   champ de recherche du menu qu'il range, tant que ce menu est
+//                 rangé par groupe (à plat, le menu garde les textes par défaut)
+//   numberedIn    sur un regroupement sans colonne à lire (ses `field` sont ceux
+//                 des lignes qu'il range, qu'on ne relit pas) : le numéro avant
+//                 le point du libellé d'une ligne (« 1.3 Animer le réseau ») est
+//                 celui de sa ligne de cette catégorie (« Action 1 : … »), dont
+//                 le libellé nomme le groupe. Tant qu'aucune ligne n'a son
+//                 groupe, le menu reste à plat
 //
 // Les libellés lus de Grist sont rangés par clé de catégorie (referenceMaps),
 // pas par table : deux catégories peuvent lire la même table.
 export const CATEGORIES = {
-  actions: { label: 'Actions', color: '#f28a54', table: 'Actions', field: ['Actions_corrigees', 'Actions'], column: 'Actions' },
-  taches: { label: 'Tâches', color: '#ff9800', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches' },
-  communautes: { label: 'Communautés', color: '#d85b9d', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], column: 'Communautes' },
-  gt: { label: 'GT', color: '#1ba99a', table: 'GT', field: ['GT_corrige', 'GT'], column: 'GT' },
+  actions: { label: 'Actions', color: '#c84e0f', table: 'Actions', field: ['Actions_corrigees', 'Actions'], column: 'Actions' },
+  taches: {
+    label: 'Tâches', color: '#a96500', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
+    grouping: 'macroTaches'
+  },
+  communautes: { label: 'Communautés', color: '#cf3788', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], column: 'Communautes' },
+  gt: { label: 'GT', color: '#158378', table: 'GT', field: ['GT_corrige', 'GT'], column: 'GT' },
   competences: {
     label: 'Compétences', color: '#9c27b0', table: 'Competences', field: ['Competences_corrigees', 'Competences'], column: 'Competences',
-    hint: 'Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
-    placeholder: 'Domaine ou compétence…', grouping: 'macro'
+    grouping: 'macro'
   },
   macro: {
     label: 'Domaines', color: '#6a1b9a', table: 'Competences', field: ['Macro_competences'], column: 'Competences',
-    groups: 'competences', fallback: 'Autres'
+    groups: 'competences', fallback: 'Autres',
+    hint: 'Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
+    placeholder: 'Domaine ou compétence…'
   },
-  instances: { label: 'Instances', color: '#4f8ee8', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], column: 'Instances' },
+  macroTaches: {
+    label: 'Actions des tâches', color: '#9a3412', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
+    groups: 'taches', fallback: 'Sans action', numberedIn: 'actions',
+    hint: 'Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi elles',
+    placeholder: 'Action ou tâche…'
+  },
+  instances: { label: 'Instances', color: '#2271e2', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], column: 'Instances' },
   etablissement: { label: 'Établissement', color: '#147c72', table: 'Etablissements', field: ['acronyme', 'nom_complet'] },
   role: { label: 'Rôle PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
 };
@@ -110,11 +136,13 @@ export const CATEGORIES = {
 export const ETABLISSEMENT_NAMES = 'etablissementNom';
 
 // Ordre des boutons de filtre. Rôle PUI n'a pas de filtre (specs.md), ni les
-// compétences macro : leurs domaines sont les groupes du menu Compétences.
+// regroupements : les domaines sont les groupes du menu Compétences, les actions
+// celles du menu Tâches.
 const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement'];
 
 // Ordre des sections de tags d'une carte. Établissement a son badge dédié ; les
-// compétences macro n'y figurent pas : la carte garde le détail des compétences.
+// regroupements n'y figurent pas : la carte garde le détail des compétences et
+// des tâches.
 const TAG_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role'];
 
 const withKey = key => ({ key, ...CATEGORIES[key] });
@@ -127,9 +155,11 @@ export const TAG_GROUPS = TAG_KEYS.map(withKey);
 export const REFERENCE_TABLES = [...new Set(Object.values(CATEGORIES).map(({ table }) => table))];
 
 // Un libellé à lire par catégorie : { key, table, field } et, pour un
-// regroupement, { groups, fallback }.
+// regroupement, { groups, fallback } avec, s'il se déduit des numéros, numberedIn.
 export const REFERENCE_SOURCES = Object.entries(CATEGORIES)
-  .map(([key, { table, field, groups, fallback }]) => ({ key, table, field, ...(groups && { groups, fallback }) }));
+  .map(([key, { table, field, groups, fallback, numberedIn }]) => ({
+    key, table, field, ...(groups && { groups, fallback, ...(numberedIn && { numberedIn }) })
+  }));
 
 // Catégories dont BDD porte une colonne ReferenceList ; `groups` pour un
 // regroupement.

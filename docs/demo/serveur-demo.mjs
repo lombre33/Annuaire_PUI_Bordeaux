@@ -14,8 +14,10 @@
 //                                            écrivent dans le jeu de données (en mémoire,
 //                                            rechargez pour repartir de zéro)
 //   http://127.0.0.1:8080/?connecte=mehdi.bensaid@udd.example
-//                                            un administrateur (case admin de la table ACL) :
-//                                            toutes les cartes ont un bouton « ✎ Modifier »
+//                                            un administrateur (case admin de la table ACL) : bouton
+//                                            « Mode admin » dans le bandeau ; allumé, « ✎ Modifier la
+//                                            fiche » sur les cartes des autres (la sienne garde
+//                                            « ✎ Modifier »)
 //   http://127.0.0.1:8080/?connecte=sarah.colin@fdx.example
 //                                            une fiche masquée de l'annuaire : la personne la
 //                                            modifie depuis le bandeau, et la relecture dit

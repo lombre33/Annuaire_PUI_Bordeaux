@@ -36,11 +36,19 @@ function orderedValues(values, selected) {
   return sortWithCheckedFirst([...new Set(values)].sort(compareLabels), selected);
 }
 
-function buildFilterButton(filter, selectedCount) {
+// Un menu rangé par groupe dit ce qu'il offre (infobulle du bouton, champ de recherche) avec
+// les mots de son regroupement : « domaine » ou « action ». Resté à plat (colonne absente de
+// Grist, aucune ligne classée), il garde les textes par défaut, qui ne parlent d'aucun groupe.
+function groupingWording(filter, grouped) {
+  return grouped ? CATEGORIES[filter.grouping] : {};
+}
+
+function buildFilterButton(filter, selectedCount, grouped) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'filter-button';
-  if (filter.hint) button.title = filter.hint;
+  const { hint } = groupingWording(filter, grouped);
+  if (hint) button.title = hint;
 
   const dot = document.createElement('span');
   dot.className = 'filter-dot';
@@ -79,7 +87,7 @@ function buildMenuSearch(filter, menu) {
   const search = document.createElement('input');
   search.type = 'text';
   search.className = 'filter-search-input';
-  search.placeholder = filter.placeholder || `Rechercher dans ${filter.label}…`;
+  search.placeholder = groupingWording(filter, groupsByMenu.has(menu)).placeholder || `Rechercher dans ${filter.label}…`;
   search.setAttribute('aria-label', `Rechercher dans ${filter.label}`);
   search.autocomplete = 'off';
   search.addEventListener('input', () => {
@@ -254,7 +262,7 @@ function buildFilter(filter, referenceMaps, selected, counts, handlers) {
   wrapper.dataset.filterKey = filter.key;
 
   const groups = menuGroups(filter, referenceMaps);
-  const button = buildFilterButton(filter, selectionCount(selected, groups));
+  const button = buildFilterButton(filter, selectionCount(selected, groups), Boolean(groups));
   const menu = groups
     ? buildGroupedMenu(filter, groups, selected, counts, handlers)
     : buildFilterMenu(filter, referenceMaps, selected, counts, handlers.onToggle);

@@ -2,12 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CATEGORIES, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE } from '../constants.js';
 
-test('FILTERS lists the 7 filter buttons in display order: the macro skills have no button of their own, they are the groups of the skills menu', () => {
+test('FILTERS lists the 7 filter buttons in display order: a grouping has no button of its own, it is the groups of the menu it arranges', () => {
   assert.deepEqual(FILTERS.map(f => f.key), ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement']);
   assert.ok(!FILTERS.some(f => f.key === 'macro'), 'plus de filtre « Domaines » séparé');
+  assert.ok(!FILTERS.some(f => f.key === 'macroTaches'), 'pas de filtre « Actions des tâches » : les actions rangent le menu Tâches');
 });
 
-test('TAG_GROUPS lists the 7 tag sections of a card in display order, Rôle PUI included, Établissement and the macro skills excluded', () => {
+test('TAG_GROUPS lists the 7 tag sections of a card in display order, Rôle PUI included, Établissement and the groupings excluded', () => {
   assert.deepEqual(TAG_GROUPS.map(g => g.key), ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role']);
 });
 
@@ -42,6 +43,7 @@ test('each category lists its corrected label column before its raw one', () => 
     gt: ['GT_corrige', 'GT'],
     competences: ['Competences_corrigees', 'Competences'],
     macro: ['Macro_competences'],
+    macroTaches: ['Taches_corrige', 'Taches'],
     instances: ['Instances_Corrigees', 'Instances'],
     etablissement: ['acronyme', 'nom_complet'],
     role: 'Role'
@@ -57,23 +59,57 @@ test('the macro skills are a grouping of the detailed skills: same table and BDD
   assert.equal(macro.fallback, 'Autres');
   assert.notEqual(macro.color, competences.color, 'le nom d\'un domaine se distingue d\'une compétence dans le menu');
   assert.equal(macro.label, 'Domaines');
-  assert.equal(Object.values(CATEGORIES).filter(category => category.groups).length, 1);
+  assert.equal(macro.numberedIn, undefined, 'Macro_competences est une colonne : le domaine ne se déduit d\'aucun numéro');
+});
+
+test('the tasks are grouped by action from their numbers: no column of their own, the labels of Taches, « Sans action » for what is not classified', () => {
+  const { taches, macroTaches } = CATEGORIES;
+  assert.equal(macroTaches.table, taches.table);
+  assert.equal(macroTaches.column, taches.column);
+  assert.deepEqual(macroTaches.field, taches.field, 'aucune colonne à ajouter dans Grist : le numéro est dans le libellé de la tâche');
+  assert.equal(macroTaches.groups, 'taches');
+  assert.equal(macroTaches.fallback, 'Sans action');
+  assert.equal(macroTaches.numberedIn, 'actions', 'le numéro d\'une tâche désigne une ligne d\'Actions, dont le libellé nomme le groupe');
+  assert.notEqual(macroTaches.numberedIn, macroTaches.groups);
+  assert.ok(CATEGORIES[macroTaches.numberedIn], 'la catégorie visée existe');
+  assert.notEqual(macroTaches.color, taches.color, 'le nom d\'une action se distingue d\'une tâche dans le menu');
+  assert.equal(CATEGORIES.actions.groups, undefined, 'le filtre Actions reste tel quel');
+  assert.equal(CATEGORIES.actions.grouping, undefined);
+});
+
+test('only a grouping has a fallback, hint, placeholder or numbering, and its source keeps them', () => {
+  Object.entries(CATEGORIES).forEach(([key, category]) => {
+    if (category.groups) return;
+    ['numberedIn', 'fallback', 'hint', 'placeholder'].forEach(option =>
+      assert.equal(category[option], undefined, `${key} n'est pas un regroupement : pas de ${option}`));
+  });
+  REFERENCE_SOURCES.forEach(source => {
+    const { groups, fallback, numberedIn } = CATEGORIES[source.key];
+    assert.deepEqual([source.groups, source.fallback, source.numberedIn], [groups, fallback, numberedIn],
+      `la source de ${source.key} garde les réglages de son regroupement`);
+  });
 });
 
 test('a category and its grouping point at each other, and only the grouped category has a menu', () => {
   const grouped = Object.entries(CATEGORIES).filter(([, category]) => category.grouping);
-  assert.deepEqual(grouped.map(([key]) => key), ['competences']);
+  assert.deepEqual(grouped.map(([key]) => key), ['taches', 'competences']);
   grouped.forEach(([key, category]) => assert.equal(CATEGORIES[category.grouping].groups, key));
-  assert.ok(FILTERS.find(f => f.key === 'competences').grouping, 'le menu Compétences connaît son regroupement');
-  assert.ok(FILTERS.every(f => f.key !== CATEGORIES.competences.grouping), 'le regroupement n\'a pas de menu');
+  assert.deepEqual(grouped.map(([, category]) => category.grouping), ['macroTaches', 'macro']);
+  grouped.forEach(([key, category]) => {
+    assert.ok(FILTERS.find(f => f.key === key).grouping, `le menu ${key} connaît son regroupement`);
+    assert.ok(FILTERS.every(f => f.key !== category.grouping), 'le regroupement n\'a pas de menu');
+  });
+  assert.equal(Object.values(CATEGORIES).filter(category => category.groups).length, grouped.length, 'chaque regroupement range une catégorie');
 });
 
-test('the skills button says what its menu offers: domains to tick whole, and a search over both levels', () => {
-  const { hint, placeholder } = CATEGORIES.competences;
-  assert.match(hint, /domaine/);
-  assert.match(placeholder, /domaine/i);
-  assert.match(placeholder, /compétence/i);
-  assert.ok(placeholder.length <= 28, 'le champ du menu est étroit (270px) : « Rechercher un domaine ou une compétence… » y était coupé, et au tactile le texte passe à 16px');
+test('the button of a grouped menu says what it offers: groups to tick whole, and a search over both levels', () => {
+  [['macro', /domaine/i, /compétence/i], ['macroTaches', /action/i, /tâche/i]].forEach(([key, noun, detail]) => {
+    const { hint, placeholder } = CATEGORIES[key];
+    assert.match(hint, noun);
+    assert.match(placeholder, noun);
+    assert.match(placeholder, detail);
+    assert.ok(placeholder.length <= 28, `${key} : le champ du menu est étroit (270px) : un texte plus long y est coupé, et au tactile il passe à 16px`);
+  });
 });
 
 test('LIST_CATEGORIES maps each ReferenceList column of BDD to its own reference table', () => {
@@ -84,6 +120,7 @@ test('LIST_CATEGORIES maps each ReferenceList column of BDD to its own reference
     { key: 'gt', column: 'GT', table: 'GT' },
     { key: 'competences', column: 'Competences', table: 'Competences' },
     { key: 'macro', column: 'Competences', table: 'Competences', groups: 'competences' },
+    { key: 'macroTaches', column: 'Taches', table: 'Taches', groups: 'taches' },
     { key: 'instances', column: 'Instances', table: 'INSTANCES' }
   ]);
 });

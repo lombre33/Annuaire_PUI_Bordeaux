@@ -13,13 +13,14 @@
 # Le widget ÉCRIT dans quatre tables, jamais dans une autre : BDD (la colonne
 # Accepte_apparaitre, par l'interrupteur « Ma présence », et les colonnes de la fiche
 # modifiables par « Modifier ma fiche » : prénom, nom, fonction, téléphone, rôle et
-# listes de participations ; l'e-mail et l'établissement seulement quand un administrateur
-# modifie la fiche d'une autre personne), Annuaire_Sonde (une ligne ajoutée puis supprimée
-# à chaque chargement), et, depuis la 1.17.0, quand un responsable d'établissement enregistre
-# la fiche de son établissement : Etablissements (nom_complet, ok_pour_apparaitre, logo) et
-# ACL (une ligne par responsable : email et Responsable_de_l_Etablissement, jamais admin). Il
-# ajoute aussi une pièce jointe au document pour un nouveau logo. Il lit aussi les métadonnées
-# _grist_Tables et _grist_Tables_column pour écrire le téléphone dans la forme de sa
+# listes de participations ; l'e-mail et l'établissement seulement quand un
+# administrateur, mode admin allumé, modifie la fiche d'une autre personne),
+# Annuaire_Sonde (une ligne ajoutée puis supprimée à chaque chargement) et, depuis la
+# 1.17.0, quand un responsable d'établissement enregistre la fiche de son établissement :
+# Etablissements (nom_complet, ok_pour_apparaitre, logo) et ACL (une ligne par responsable :
+# email et Responsable_de_l_Etablissement, jamais admin). Il ajoute aussi une pièce jointe au
+# document pour un nouveau logo. Il lit aussi les métadonnées _grist_Tables et
+# _grist_Tables_column pour écrire le téléphone dans la forme de sa
 # colonne. Il ne crée ni ne modifie jamais une table ou une colonne : voir GRIST_SETUP.md
 # pour les créer.
 #
@@ -63,8 +64,8 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
   Competences       : ReferenceList(Competences)
   email             : Text          facultative
     Affichée sur la carte, et sert à retrouver la fiche de la personne connectée
-    (comparaison sans casse ni espaces autour). Sans elle, pas de bandeau « Ma
-    présence » : la console le dit. Voir createPeopleIndex() dans grist-data.js.
+    (comparaison sans casse ni espaces autour). Sans elle, le bandeau dit « Fiche
+    introuvable » : la console le dit aussi. Voir createPeopleIndex() dans grist-data.js.
   Fonction          : Text          facultative
 
   Colonnes facultatives, rajoutées dans BDD sous ces noms : le widget les
@@ -77,7 +78,17 @@ Tables de référence (id -> libellé, chargées via fetchTable)
   Chaque table porte un libellé brut (issu de l'import) et un libellé corrigé :
   le widget affiche le libellé corrigé quand il est rempli, le brut sinon.
   Actions            : Actions_corrigees (Choice)     puis Actions (Text)
+                       Le libellé commence par « Action n : » (ou « Action n: ») :
+                       ce numéro n rattache les tâches du même numéro à l'action
+                       (menu « Tâches » rangé par action).
   Taches             : Taches_corrige (Choice)        puis Taches (Text)
+                       Aucune colonne ne donne l'action d'une tâche : c'est le
+                       numéro avant le point de son libellé (« 1.3 Animer le
+                       réseau » est une tâche de l'action 1). Une tâche sans
+                       numéro, ou sans action de ce numéro, est classée sous
+                       « Sans action » ; si aucune tâche n'a son action, le menu
+                       Tâches reste à plat. Voir taskActionNumber() et
+                       actionNumber() dans grist-data.js.
   Communautes        : communautes_corrigees (Text)   puis communautes (Text)
   GT                 : GT_corrige (Choice)            puis GT (Text)
   Competences        : Competences_corrigees (Text)   puis Competences (Text)

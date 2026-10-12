@@ -7,7 +7,7 @@
 // logique), upload.js et image-prep.js (le logo) avec etablissement-ui.js (la fenêtre), et
 // branding.js, attachments.js et branding-ui.js (les logos : cartes, financeurs, fondateurs).
 
-import { CARD_LOGO, ETABLISSEMENT_NAMES } from './constants.js';
+import { CARD_LOGO, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS } from './constants.js';
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
@@ -155,9 +155,21 @@ elements.grid.addEventListener('click', event => {
   }
 });
 
-elements.searchInput.addEventListener('input', event => {
-  state.searchTerm = event.target.value.trim();
+// La frappe n'est appliquée qu'après SEARCH_DELAY_MS sans nouvelle lettre : un mot de six
+// lettres ne redessine la liste qu'une fois. Un champ vidé (Échap, croix du champ) l'est tout de
+// suite : il n'y a rien à attendre. « Réinitialiser » annule l'attente en cours.
+let searchTimer = null;
+
+function applySearch() {
+  clearTimeout(searchTimer);
+  state.searchTerm = elements.searchInput.value.trim();
   refreshCards();
+}
+
+elements.searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  if (elements.searchInput.value.trim() === '') applySearch();
+  else searchTimer = setTimeout(applySearch, SEARCH_DELAY_MS);
 });
 
 elements.scopeButtons.forEach(button => {
@@ -172,6 +184,7 @@ elements.scopeButtons.forEach(button => {
 
 elements.resetFilters.addEventListener('click', () => {
   Object.values(state.activeFilters).forEach(set => set.clear());
+  clearTimeout(searchTimer);
   state.searchTerm = '';
   elements.searchInput.value = '';
   // Fondateurs/Partenaires ne sont volontairement pas remis à zéro. Les menus

@@ -8,6 +8,8 @@
 //   Fondateurs seuls   → Ana, Hostile, Gina, Hugo (4)
 //   + Partenaires      → + Bob (5)
 //   domaines           → Cancérologie : Ana ; Pharmacie : Bob ; Autres : Gina
+//   actions des tâches → aucune : ses tâches et ses actions n'ont pas de numéro (voir
+//                        withTaskActions pour les tâches rangées par action)
 //   jamais affichés    → Carla (établissement « autres »), Dan (non validé),
 //                        Eve (sans établissement), Fred (hors périmètre),
 //                        le contact sans nom, Iris (a refusé d'apparaître) et
@@ -92,6 +94,28 @@ export function withoutOptionalColumns(tables) {
   return copy;
 }
 
+// Les tâches rangées par action : le numéro avant le point du libellé d'une tâche est celui
+// de son action, que la table Actions porte dans son libellé. Les deux actions de la base de
+// départ sont numérotées, et quatre tâches sont portées par BDD.Taches. Avec ces données
+// (périmètre par défaut ; Bob est partenaire) :
+//   Action 1 : Vaccination  → 1.1 Relecture (Ana), 1.2 Rappel vaccinal (Gina ; libellé corrigé)
+//   Action 2 : Audit        → 2.1 Inspection (Ana, Bob)
+//   Sans action             → Veille (Hugo), une tâche sans numéro
+export function withTaskActions(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  copy.Actions.Actions = ['Action 1 : Vaccination', 'Action 2 : Audit'];
+  copy.BDD.Actions[0] = ['L', 1]; // Ana : la ligne numérotée, plus le texte « Vaccination »
+  copy.Taches = {
+    id: [1, 2, 3, 4],
+    Taches: ['1.1 Relecture', '1.2 rappel vaccinal', '2.1 Inspection', 'Veille'],
+    Taches_corrige: ['', '1.2 Rappel vaccinal', '', ''],
+    Taches_role: ['', '', '', '']
+  };
+  const tasksOf = { 1: ['L', 1, 3], 2: ['L', 3], 9: ['L', 2], 10: ['L', 4] };
+  copy.BDD.Taches = copy.BDD.id.map(id => tasksOf[id] || ['L']);
+  return copy;
+}
+
 // Adresses de personnes de l'exemple. Ana figure dans BDD et dans ACL (administratrice et
 // responsable du CHU, écrite avec des majuscules dans ACL) ; ADMIN_EMAIL est administrateur sans
 // ligne dans BDD ; Iris a refusé d'apparaître ; Bob est partenaire (UBM) et responsable de son
@@ -137,12 +161,14 @@ export function withSchema(tables = sampleTables(), { phoneType = 'Numeric' } = 
   return copy;
 }
 
-// Noms affichés (« Prénom Nom ») dans l'ordre des cartes, périmètre par défaut.
+// Noms affichés (« Prénom Nom ») dans l'ordre des cartes, périmètre par défaut : les cartes
+// sont triées par nom de famille (Bergonié, Bernard, Hostile, Martin), pas dans l'ordre des
+// lignes de la table.
 export const DEFAULT_CARD_NAMES = [
-  'Ana Martin',
-  `${HOSTILE_FIRST_NAME} Hostile`,
   'Gina Bergonié',
-  'Hugo Bernard'
+  'Hugo Bernard',
+  `${HOSTILE_FIRST_NAME} Hostile`,
+  'Ana Martin'
 ];
 
 // Le document complété pour l'habillage (GRIST_SETUP.md) : logos et ordre du bandeau

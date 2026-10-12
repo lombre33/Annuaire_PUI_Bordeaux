@@ -1,7 +1,7 @@
 // Filtrage et comptage des contacts, sans DOM ni effet de bord.
 
 import { CATEGORIES, FILTERS } from './constants.js';
-import { normalize, labelsOf, compareLabels } from './grist-data.js';
+import { normalize, normalizeForSearch, labelsOf, compareLabels, text } from './grist-data.js';
 
 export function createEmptyFilterState() {
   const state = {};
@@ -19,8 +19,31 @@ function activeSelections(activeFilters, excludeKey) {
     .map(filter => ({ key: filter.key, values: new Set([...activeFilters[filter.key]].map(normalize)) }));
 }
 
-function matchesSearch(contact, term) {
-  return !term || [contact.nom, contact.prenom].some(value => normalize(value).includes(term));
+// Les mots de la recherche, normalisés (voir normalizeForSearch) : « Karim  Benali » donne
+// ['karim', 'benali'].
+function searchWords(term) {
+  return normalizeForSearch(term).split(' ').filter(Boolean);
+}
+
+// Ce que la recherche lit d'un contact : « prénom nom » normalisé, calculé une fois par contact
+// (une frappe parcourt tout l'annuaire : refaire la normalisation à chaque frappe coûterait
+// cher sur un grand annuaire). Les contacts sont reconstruits à chaque lecture de Grist, donc
+// la mémoire ne garde jamais un nom périmé.
+const SEARCH_KEYS = new WeakMap();
+function searchKey(contact) {
+  let key = SEARCH_KEYS.get(contact);
+  if (key === undefined) {
+    key = normalizeForSearch(`${text(contact.prenom)} ${text(contact.nom)}`);
+    SEARCH_KEYS.set(contact, key);
+  }
+  return key;
+}
+
+// Chaque mot doit se trouver dans « prénom nom », dans n'importe quel ordre : « karim benali »,
+// « benali karim » et « kar ben » trouvent Karim Benali. Un seul mot cherche toujours dans le
+// nom comme dans le prénom.
+function matchesSearch(contact, words) {
+  return words.length === 0 || words.every(word => searchKey(contact).includes(word));
 }
 
 function matchesScope(contact, scope) {
@@ -36,15 +59,16 @@ function matchesSelections(contact, selections) {
   return selections.every(({ key, values }) => labelsOf(contact, key).some(label => values.has(normalize(label))));
 }
 
-// Contacts qui correspondent à la recherche (nom, prénom), aux interrupteurs
+// Contacts qui correspondent à la recherche (« prénom nom »), aux interrupteurs
 // Fondateurs/Partenaires et aux filtres actifs. `scope` est optionnel (sans lui,
 // aucune restriction). `excludeKey` ignore une catégorie, pour compter ses
 // options sans que sa propre sélection fausse le résultat (voir computeFilterCounts).
+// L'ordre des contacts est conservé.
 export function filterContacts(contacts, activeFilters, searchTerm, scope, excludeKey) {
-  const term = normalize(searchTerm);
+  const words = searchWords(searchTerm);
   const selections = activeSelections(activeFilters, excludeKey);
   return contacts.filter(contact =>
-    matchesSearch(contact, term) && matchesScope(contact, scope) && matchesSelections(contact, selections));
+    matchesSearch(contact, words) && matchesScope(contact, scope) && matchesSelections(contact, selections));
 }
 
 // Renvoie les filtres actifs privés des valeurs qui ne sont plus une option du

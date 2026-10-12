@@ -4,7 +4,7 @@
 //   npm install --no-save playwright      (une fois ; pas une dépendance du projet)
 //   npx playwright install chromium       (ou CHROMIUM_PATH=/chemin/vers/chromium)
 //   node docs/demo/capturer.mjs                          (toutes les captures)
-//   node docs/demo/capturer.mjs fiche-etablissement.png  (seulement celles qui sont nommées)
+//   node docs/demo/capturer.mjs apercu partenaires       (seulement les captures dont le nom commence ainsi)
 //   node docs/demo/capturer.mjs --sortie=/tmp/essai      (dans un autre dossier que docs/images)
 //
 // À relancer, puis à committer, après toute modification de l'interface.
@@ -43,10 +43,13 @@ try {
 // des cadres vides ou à demi transparents (un logo apparaît en fondu). On attend que chaque logo
 // soit chargé et pleinement visible (ou remplacé par le nom de l'établissement quand Grist refuse
 // le fichier), sauf ceux des cartes hors de l'écran, que le navigateur ne charge pas avant d'en
-// approcher (loading="lazy").
+// approcher (loading="lazy") : au-dessus de l'écran comme au-dessous, si la page a défilé.
 const attendreLogos = page =>
   page.waitForFunction(() => [...document.querySelectorAll('img.logo-img')]
-    .filter(image => image.loading === 'eager' || image.getBoundingClientRect().top < window.innerHeight)
+    .filter(image => {
+      const boite = image.getBoundingClientRect();
+      return image.loading === 'eager' || (boite.bottom > 0 && boite.top < window.innerHeight);
+    })
     .every(image => image.classList.contains('loaded') && getComputedStyle(image).opacity === '1'), null, { timeout: 10_000 });
 const attendreCartes = async (page, nombre) => {
   await page.waitForFunction(attendu => document.querySelectorAll('.contact-card').length === attendu, nombre, { timeout: 10_000 });
@@ -63,6 +66,7 @@ const attendrePresence = (page, extrait) =>
       && bandeau.querySelector('.account-status').textContent === '';
   }, extrait, { timeout: 10_000 });
 const filtre = (page, cle) => page.locator(`.filter[data-filter-key="${cle}"]`);
+const carteDe = (page, nom) => page.locator('.contact-card', { has: page.locator('.name', { hasText: new RegExp(`^${nom}$`) }) });
 
 // Ouvre le menu, coche l'option, puis le referme comme le ferait un utilisateur
 // (un clic ailleurs) : un menu resté ouvert masquerait le bouton suivant.
@@ -73,12 +77,12 @@ async function cocher(page, cle, libelle) {
   await page.mouse.click(5, 5);
 }
 
-// Le menu Compétences range ses compétences par domaine : une case par domaine, qui coche
-// toutes ses compétences, et une flèche qui en déplie le détail.
-const domaine = (page, nom) => filtre(page, 'competences').locator(`.filter-group[data-value="${nom}"]`);
-const nomsDesDomaines = page => filtre(page, 'competences').locator('.group-head .option-label').allTextContents();
+// Les menus Compétences (par domaine) et Tâches (par action) rangent leurs valeurs par groupe :
+// une case par groupe, qui coche toutes ses valeurs, et une flèche qui en déplie le détail.
+const rubrique = (page, cle, nom) => filtre(page, cle).locator(`.filter-group[data-value="${nom}"]`);
+const nomsDesRubriques = (page, cle) => filtre(page, cle).locator('.group-head .option-label').allTextContents();
 // Ce que le menu montre vraiment : une ligne repliée ou masquée n'a plus de boîte à l'écran.
-const visibles = (page, selecteur) => filtre(page, 'competences').locator(selecteur).evaluateAll(lignes =>
+const visibles = (page, cle, selecteur) => filtre(page, cle).locator(selecteur).evaluateAll(lignes =>
   lignes.filter(ligne => ligne.getClientRects().length > 0).map(ligne => ligne.dataset.value));
 
 // ===== Modifier une fiche =====
@@ -90,7 +94,7 @@ const visibles = (page, selecteur) => filtre(page, 'competences').locator(select
 const BROUILLON = {
   fonction: 'Responsable de l\'innovation',
   listes: [
-    { groupe: 'Actions', ajout: 'Formation à l\'innovation', retrait: 'Recherche de financements' },
+    { groupe: 'Actions', ajout: 'Action 3: Formation à l\'innovation', retrait: 'Action 6: Recherche de financements' },
     { groupe: 'Compétences', ajout: 'Intelligence artificielle', retrait: 'Gestion de projet' }
   ]
 };
@@ -139,7 +143,8 @@ async function exigerHabillage(page, { cartes, sansLogo = 0 }) {
 }
 
 // Le bandeau propose « Modifier mon profil » et la carte de la personne, la seule à avoir
-// un bouton, porte « Votre fiche » et « ✎ Modifier » ; elle figure sur la première rangée.
+// un bouton, porte « Votre fiche » et « ✎ Modifier ». Les cartes étant triées par nom, la sienne
+// n'est pas forcément sur la première rangée.
 const attendreBoutonsModifier = (page, nom) =>
   page.waitForFunction(attendu => {
     const bouton = document.querySelector('#accountBar .account-edit');
@@ -147,11 +152,9 @@ const attendreBoutonsModifier = (page, nom) =>
     const avecBouton = cartes.filter(carte => !carte.querySelector('.card-actions').hidden);
     if (!bouton || bouton.hidden || bouton.textContent !== 'Modifier mon profil' || avecBouton.length !== 1) return false;
     const [carte] = avecBouton;
-    const premierRang = Math.min(...cartes.map(autre => Math.round(autre.getBoundingClientRect().top)));
     return carte.querySelector('.name').textContent === attendu
       && !carte.querySelector('.own-flag').hidden && carte.querySelector('.own-flag').textContent === 'Votre fiche'
-      && carte.querySelector('.card-edit').textContent === '✎ Modifier'
-      && Math.round(carte.getBoundingClientRect().top) === premierRang;
+      && carte.querySelector('.card-edit').textContent === '✎ Modifier';
   }, nom, { timeout: 10_000 });
 
 // La fenêtre est ouverte sur l'étape qui porte ce titre (« Modifier mon profil », « Relire avant de valider »).
@@ -250,9 +253,9 @@ const REPERES = [
 
 // Les pastilles sont ajoutées à la page le temps de la capture seulement :
 // le widget lui-même n'est pas modifié.
-async function poserReperes(page) {
-  await page.evaluate(reperes => {
-    const carte = document.querySelector('.contact-card');
+async function poserReperes(page, nom) {
+  await page.evaluate(({ reperes, nom }) => {
+    const carte = [...document.querySelectorAll('.contact-card')].find(autre => autre.querySelector('.name').textContent === nom);
     reperes.forEach(({ numero, selecteur, texte, dernier, placement = 'droite' }) => {
       const cibles = carte.querySelectorAll(selecteur);
       const cible = dernier ? cibles[cibles.length - 1] : cibles[0];
@@ -273,7 +276,7 @@ async function poserReperes(page) {
         + 'font:700 11px/18px Inter,system-ui,sans-serif;text-align:center;';
       document.body.appendChild(repere);
     });
-  }, REPERES);
+  }, { reperes: REPERES, nom });
 }
 
 // Chaque scène : fichier produit, adresse à ouvrir (`requete`), mise en situation
@@ -330,19 +333,19 @@ const SCENES = [
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       const menu = filtre(page, 'competences');
       await menu.locator('.filter-button').click();
-      await domaine(page, 'Recherche clinique').locator('.group-option input').check();
-      const sante = domaine(page, 'Santé numérique et données');
+      await rubrique(page, 'competences', 'Recherche clinique').locator('.group-option input').check();
+      const sante = rubrique(page, 'competences', 'Santé numérique et données');
       await sante.locator('.group-toggle').click();
       await sante.locator('.filter-option', { hasText: 'Open science' }).locator('input').check();
       await attendreCartes(page, 3);
       await page.mouse.click(5, 5);
       await menu.locator('.filter-button').click();
-      const noms = await nomsDesDomaines(page);
+      const noms = await nomsDesRubriques(page, 'competences');
       exiger(noms[0] === 'Recherche clinique' && noms[1] === 'Santé numérique et données',
         `les domaines cochés ne passent pas devant : ${noms.join(', ')}`);
-      exiger(await domaine(page, 'Recherche clinique').getAttribute('data-state') === 'all', '« Recherche clinique » n\'est pas coché en entier');
-      exiger(await domaine(page, 'Santé numérique et données').getAttribute('data-state') === 'some', '« Santé numérique et données » n\'est pas coché en partie');
-      exiger((await visibles(page, '.filter-option')).join() === 'Open science,Intelligence artificielle,Santé numérique',
+      exiger(await rubrique(page, 'competences', 'Recherche clinique').getAttribute('data-state') === 'all', '« Recherche clinique » n\'est pas coché en entier');
+      exiger(await rubrique(page, 'competences', 'Santé numérique et données').getAttribute('data-state') === 'some', '« Santé numérique et données » n\'est pas coché en partie');
+      exiger((await visibles(page, 'competences', '.filter-option')).join() === 'Open science,Intelligence artificielle,Santé numérique',
         'le détail du domaine partiel n\'est pas déplié, la compétence cochée en tête');
       exiger(await menu.locator('.filter-count').textContent() === '2', 'le bouton ne compte pas un domaine et une compétence');
     }
@@ -356,8 +359,35 @@ const SCENES = [
       const menu = filtre(page, 'competences');
       await menu.locator('.filter-button').click();
       await menu.locator('.filter-search-input').fill('sante');
-      exiger((await visibles(page, '.filter-group')).join() === 'Santé numérique et données', 'la recherche ne garde pas ce seul domaine');
-      exiger((await visibles(page, '.filter-option')).length === 3, 'la recherche ne montre pas les trois compétences du domaine');
+      exiger((await visibles(page, 'competences', '.filter-group')).join() === 'Santé numérique et données', 'la recherche ne garde pas ce seul domaine');
+      exiger((await visibles(page, 'competences', '.filter-option')).length === 3, 'la recherche ne montre pas les trois compétences du domaine');
+    }
+  },
+  {
+    // Le menu Tâches, rangé par action (le numéro d'une tâche est celui de son action) : l'action 2
+    // est cochée en entier, l'action 1 en partie (« 1.1 Animation de réseau » seule) ; les deux
+    // passent devant et l'action partielle est dépliée. « Sans action » reste en dernier.
+    fichier: 'filtre-taches.png', zone: jusquAu('.filter.open .filter-menu'),
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      const menu = filtre(page, 'taches');
+      await menu.locator('.filter-button').click();
+      await rubrique(page, 'taches', 'Action 2: Maturation de projets').locator('.group-option input').check();
+      const valorisation = rubrique(page, 'taches', 'Action 1: Valorisation de la recherche');
+      await valorisation.locator('.group-toggle').click();
+      await valorisation.locator('.filter-option', { hasText: '1.1 Animation de réseau' }).locator('input').check();
+      await attendreCartes(page, 9);
+      await page.mouse.click(5, 5);
+      await menu.locator('.filter-button').click();
+      const noms = await nomsDesRubriques(page, 'taches');
+      exiger(noms.join() === 'Action 1: Valorisation de la recherche,Action 2: Maturation de projets,'
+        + 'Action 3: Formation à l\'innovation,Action 4: Veille et propriété intellectuelle,Sans action',
+        `les actions cochées ne passent pas devant, « Sans action » n'est pas en dernier : ${noms.join(', ')}`);
+      exiger(await rubrique(page, 'taches', 'Action 2: Maturation de projets').getAttribute('data-state') === 'all', 'l\'action 2 n\'est pas cochée en entier');
+      exiger(await valorisation.getAttribute('data-state') === 'some', 'l\'action 1 n\'est pas cochée en partie');
+      exiger((await visibles(page, 'taches', '.filter-option')).join() === '1.1 Animation de réseau,1.2 Organisation d\'événements',
+        'le détail de l\'action partielle n\'est pas déplié, la tâche cochée en tête');
+      exiger(await menu.locator('.filter-count').textContent() === '2', 'le bouton ne compte pas une action et une tâche');
     }
   },
   {
@@ -442,20 +472,23 @@ const SCENES = [
     }
   },
   {
+    // La carte de Camille Rousseau, qui porte les neuf éléments légendés (les cartes sont triées par nom).
     fichier: 'carte-anatomie.png',
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
-      await poserReperes(page);
+      await poserReperes(page, 'Camille Rousseau');
     },
     async zone(page) {
-      const boite = await page.locator('.contact-card').first().boundingBox();
+      const boite = await carteDe(page, 'Camille Rousseau').boundingBox();
       return { x: boite.x - 24, y: boite.y - 14, width: boite.width + 48, height: boite.height + 28 };
     }
   },
   {
-    // L'annuaire vu par Camille Rousseau : « Modifier mon profil » dans le bandeau, et sur sa
-    // carte (la première) « Votre fiche » et « ✎ Modifier ». Aucune autre carte n'a de bouton.
-    fichier: 'modifier-fiche-bouton.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, zone: jusquALaRangee(1),
+    // La rangée de la carte de Camille Rousseau, qui porte « Votre fiche » et « ✎ Modifier » ; l'autre
+    // carte de la rangée n'a pas de bouton. Les cartes sont triées par nom : la sienne est sur la dernière
+    // rangée. Le bouton « Modifier mon profil » du bandeau est celui de ma-presence.png.
+    fichier: 'modifier-fiche-bouton.png', requete: `?connecte=${PERSONNES_DEMO.visible}`, pagePleine: true,
+    zone: autourDe('.contact-card:has(.own-flag:not([hidden]))', MARGE_RANGEE),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       await attendrePresence(page, 'Vous apparaissez dans l\'annuaire.');
@@ -526,6 +559,13 @@ const SCENES = [
       exiger(await page.locator('#toast').textContent() === 'Vos modifications sont enregistrées.', 'le message de confirmation n\'est pas celui attendu');
       await page.waitForFunction(attendu => [...document.querySelectorAll('.contact-card .fonction')].some(ligne => ligne.textContent === attendu),
         BROUILLON.fonction, { timeout: 10_000 });
+      // Les cartes sont triées par nom : celle de Camille Rousseau est sur la dernière rangée. La page
+      // descend jusqu'à elle, comme le ferait la personne pour vérifier sa fiche ; le message, lui, est
+      // fixé en bas de l'écran.
+      await carteDe(page, 'Camille Rousseau').evaluate(carte => carte.scrollIntoView({ block: 'center' }));
+      await attendreLogos(page);
+      exiger(await carteDe(page, 'Camille Rousseau').locator('.fonction').textContent() === BROUILLON.fonction, 'la carte de la personne n\'a pas sa nouvelle fonction');
+      exiger(await carteDe(page, 'Camille Rousseau').isVisible() && !(await page.locator('#toast').isHidden()), 'la carte et le message ne sont pas à l\'écran ensemble');
     }
   },
   {
@@ -601,12 +641,13 @@ const SCENES = [
   }
 ];
 
-// Sans argument, toutes les captures sont refaites ; avec des noms de fichiers, seulement celles-là ;
-// `--sortie=<dossier>` les écrit ailleurs que dans docs/images (pour comparer sans rien écraser).
+// Sans argument, toutes les captures sont refaites ; avec des débuts de noms de fichiers, seulement
+// celles dont le nom commence ainsi ; `--sortie=<dossier>` les écrit ailleurs que dans docs/images
+// (pour comparer sans rien écraser).
 const arguments_ = process.argv.slice(2);
 const dossierSortie = path.resolve(arguments_.find(argument => argument.startsWith('--sortie='))?.slice('--sortie='.length) ?? DOSSIER_IMAGES);
 const demandees = arguments_.filter(argument => !argument.startsWith('--'));
-const inconnues = demandees.filter(nom => !SCENES.some(scene => scene.fichier === nom));
+const inconnues = demandees.filter(nom => !SCENES.some(scene => scene.fichier.startsWith(nom)));
 if (inconnues.length > 0) {
   console.error(`Capture inconnue : ${inconnues.join(', ')}. Captures possibles : ${SCENES.map(scene => scene.fichier).join(', ')}.`);
   process.exit(1);
@@ -623,7 +664,7 @@ try {
   // Hermétique : seules les requêtes vers le serveur local passent.
   await contexte.route(adresse => adresse.hostname !== '127.0.0.1', route => route.abort());
 
-  for (const scene of SCENES.filter(autre => demandees.length === 0 || demandees.includes(autre.fichier))) {
+  for (const scene of SCENES.filter(autre => demandees.length === 0 || demandees.some(nom => autre.fichier.startsWith(nom)))) {
     const page = await contexte.newPage();
     if (scene.hauteur) await page.setViewportSize({ width: LARGEUR, height: scene.hauteur });
     await page.goto(`${url}/${scene.requete ?? ''}`);

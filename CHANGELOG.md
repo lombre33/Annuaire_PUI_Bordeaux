@@ -173,6 +173,205 @@ démonstration a deux responsables fictives (CHD) et un serveur d'envoi de fichi
   l'envoi d'un logo et le sert, refuse sans jeton ou au-delà de 2 Mo ; la responsable fictive modifie
   son établissement de bout en bout ; les protections de l'envoi sont vérifiées dans le code.
 
+## 1.16.2 — Pastilles et lien e-mail plus foncés, lisibles (WCAG 1.4.3)
+
+Troisième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un
+gain par version), pour la part du constat **U19** qui touche aux couleurs des étiquettes. **C'est le
+seul gain du lot qui change l'aspect de la page** : les pastilles, les titres de groupe et le lien
+e-mail sont plus sombres. Tout le reste (mise en page, textes, tailles, filtres, données) est
+inchangé. Deux fichiers portent le changement, `constants.js` et `style.css` : revenir aux couleurs
+d'avant, c'est `git revert` de la fusion de cette version.
+
+- **Pourquoi.** Le texte blanc d'une pastille mesure 8,5 px ; la norme (WCAG 1.4.3, niveau AA) exige
+  4,5:1 entre le texte et son fond, quelle que soit sa taille. Cinq des dix couleurs de catégorie
+  faisaient de 2,16:1 à 3,56:1 : l'audit comptait 134 pastilles sur 202 et 60 titres de groupe sur 80
+  sous le seuil, plus le lien e-mail à 3,30:1.
+- **Ce qui change.** Les cinq couleurs sont foncées **à teinte et saturation constantes** (on ne baisse
+  que la luminosité : chaque catégorie garde sa couleur), jusqu'à 4,6:1 au moins avec le blanc :
+
+  | Catégorie | Avant | Après |
+  |---|---|---|
+  | Actions | `#f28a54` (2,46:1) | `#c84e0f` (4,61:1) |
+  | Tâches | `#ff9800` (2,16:1) | `#a96500` (4,62:1) |
+  | Communautés | `#d85b9d` (3,56:1) | `#cf3788` (4,61:1) |
+  | GT | `#1ba99a` (2,92:1) | `#158378` (4,62:1) |
+  | Instances | `#4f8ee8` (3,30:1) | `#2271e2` (4,64:1) |
+  | Lien e-mail (`--blue`) | `#4f8ee8` (3,30:1) | `#2271e2` (4,64:1) |
+
+  Les cinq autres catégories (Compétences, Domaines, Actions des tâches, Établissement, Rôle PUI)
+  étaient déjà conformes et ne bougent pas.
+- **Où cela se voit.** Partout où le widget lit `CATEGORIES[…].color` : pastilles et titres de groupe des
+  cartes, point de couleur des boutons de filtre, filet de couleur en haut de leur menu, et, dans la
+  fenêtre de modification de fiche, titres de section et pastilles cochées. Le lien e-mail des cartes
+  prend le nouveau bleu. Les variables `--orange`, `--teal` et `--pink` de `style.css` ne changent
+  pas : elles servent à des décors qui ne portent pas de texte (filet de couleur en haut des cartes,
+  avatar, piste de l'interrupteur de présence, ✦ de l'état vide, icône de confirmation).
+- **Reste ouvert dans U19, pour d'autres lots** : le sous-titre de la page sur son dégradé (4,03:1),
+  les invites des champs (4,34:1), le nombre à droite d'une option de menu sous le survol (4,22:1) et
+  l'interrupteur de présence éteint (4,49:1, traité avec les autres constats de l'interrupteur).
+- **Pour les développeurs** : `constants.js` dit que la couleur d'une catégorie doit garder 4,5:1 avec
+  le blanc et comment en choisir une autre (la foncer à teinte constante) ; la recette « Ajouter une
+  catégorie » de `docs/developpeurs.md` et la section « Accessibilité » en parlent, et `TESTING.md`
+  a un contrôle à l'œil pour un vrai Grist.
+- **Tests** : 643 tests (221 dans un vrai navigateur, optionnels sans Playwright), 3 de plus qu'à la
+  1.16.1. Dans `tests/accessibility.test.mjs` : chaque couleur de `CATEGORIES` garde 4,5:1 avec le blanc,
+  et la couleur de `.email` lue dans `style.css` aussi (sans navigateur : une catégorie ajoutée plus tard
+  est contrôlée aussi) ; dans le navigateur, chaque pastille, chaque titre de groupe et le lien e-mail
+  d'une carte qui porte une pastille de chaque catégorie sont mesurés sur la page rendue (couleur de texte
+  et fond calculés), ce qui garde aussi le branchement de `render.js`. Douze variantes fautives ont été
+  essayées une à une, le code étant remis en état après chacune (chacune des cinq couleurs et du bleu de
+  retour à l'ancienne valeur, lien e-mail sur la variable orange ou en gris clair, titres de groupe et fond
+  des pastilles en couleur fixe, texte des pastilles en gris clair, nouvelle catégorie trop claire) : toutes
+  font échouer au moins un test.
+- **Documentation** : captures où une pastille, un titre de groupe, un point de filtre ou le lien e-mail
+  se voit (dix-huit sur vingt-trois) ; les cinq autres (« Ma présence », bandeau d'erreur, bandeau des
+  fondateurs) sont celles de la 1.16.1.
+
+## 1.16.1 — Cartes triées par nom, recherche « prénom nom »
+
+Deuxième des six « gains rapides » de l'audit UI/UX (Antoine a lancé le lot le 12 octobre 2026, un
+gain par version). Deux constats majeurs de l'audit, U31 (recherche fragile) et U32 (aucun tri),
+levés ensemble : ils tiennent au même geste, retrouver une personne. **Rien d'autre ne change** : les
+filtres, les menus, les compteurs, la mise en page et les bandeaux sont ceux de la 1.16.0.
+
+- **Les cartes sont triées par nom de famille, puis par prénom**, dans l'ordre alphabétique
+  français : « Éluard » est avec les E, « de Gaulle » avec les D (la particule compte comme une
+  lettre). Une personne sans nom de famille se range d'après son prénom ; deux homonymes parfaits
+  gardent l'ordre des lignes de `BDD`. Avant, les cartes suivaient l'ordre des lignes de la table
+  Grist, c'est-à-dire l'ordre de saisie : pour retrouver quelqu'un sans le chercher, il fallait
+  parcourir toutes les cartes. Le tri se fait une seule fois à chaque lecture de Grist
+  (`buildContacts()`), pas à chaque frappe ni à chaque filtre ; une modification de nom dans Grist
+  replace la carte à sa lettre, sans recharger la page.
+- **La recherche trouve « prénom nom ».** Elle testait le nom et le prénom séparément : aucune requête
+  ne pouvait couvrir les deux, et « Élise Marchetti » ne donnait rien (l'audit a relevé « karim benali »,
+  « benali karim », « Jean Le Cœur » et « Zoé É » : 0 résultat). Chaque mot tapé doit maintenant se
+  trouver dans « prénom nom », dans n'importe quel ordre : « élise marchetti », « marchetti élise » et
+  « eli mar » trouvent Élise Marchetti, et un mot seul cherche toujours dans le prénom comme dans le nom.
+  Tous les mots doivent être trouvés : « Élise Garnier » ne trouve personne s'il n'y a pas d'Élise Garnier.
+- **Les écritures d'un même nom se valent**, pour la recherche principale seulement. L'audit avait relevé
+  que « marie christine » ne trouvait pas « Marie-Christine », que « d'arcy » écrit avec l'apostrophe
+  typographique ne trouvait pas « D'Arcy » (l'apostrophe droite, si) et que « coeur » ne trouvait pas
+  « Cœur ». Désormais les tirets, les points et les soulignés valent des espaces, l'apostrophe (droite ou
+  typographique) disparaît, « œ », « æ », « ß », « ø », « ł » et « đ » s'écrivent comme on les tape, et les
+  espaces se réduisent à une seule (`normalizeForSearch()`). Les menus, les sélections et les compteurs
+  gardent `normalize()` tel quel : ils n'ont pas à confondre plus de libellés qu'avant.
+- **La liste ne se redessine plus à chaque lettre.** Elle attend 200 ms sans nouvelle frappe
+  (`SEARCH_DELAY_MS`) : un mot de six lettres ne reconstruit plus les cartes qu'une fois au lieu de six
+  (chaque reconstruction coûte ≈ 0,15 s à 400 contacts d'après l'audit). Un champ vidé (Échap, croix du
+  champ) s'applique tout de suite, et « Réinitialiser » annule la frappe en attente. C'est un répit, pas
+  la réponse à la lenteur à grande échelle (constat U33), qui relève de l'audit de performance prévu après
+  le mode admin : une reconstruction complète des cartes à chaque application reste le coût.
+- **Pour les développeurs** : la section « Filtres, compteurs et recherche » de `docs/developpeurs.md`
+  décrit la recherche mot par mot, la clé de recherche gardée par contact (`searchKey()` : une frappe
+  parcourt tout l'annuaire), l'ordre des cartes (`compareContacts()`, un seul `Intl.Collator` partagé) et
+  l'attente de la frappe. `docs/demo/capturer.mjs` ne suppose plus que la carte de la personne
+  connectée est sur la première rangée : les cartes étant triées, celle de Camille Rousseau est sur la
+  dernière ; la capture de son bouton montre sa rangée, celle de la confirmation défile jusqu'à sa carte,
+  celle de la carte légendée la choisit par son nom, et `node docs/demo/capturer.mjs apercu partenaires`
+  ne refait que les captures dont le nom commence ainsi.
+- **Tests** : 640 tests (220 dans un vrai navigateur, optionnels sans Playwright), 18 de plus qu'à la 1.16.0
+  (622, dont 213). Le tri : un
+  test d'unité de l'ordre (accents, particules, prénom en second critère, nom vide, valeurs vides) et un
+  test de `loadDirectory()` ; dans le navigateur, les cartes d'une table à l'envers apparaissent triées, et
+  une modification de nom dans Grist replace la carte. La recherche : huit tests de `filterContacts()` (mot
+  par mot, tous les mots, tirets, apostrophes, œ, séparateurs seuls, contacts sans prénom ou sans nom, nom
+  relu pour un contact reconstruit), un de `normalizeForSearch()` et un du compteur de menu, qui cherche
+  comme les cartes ; dans le navigateur, les requêtes de l'audit. L'attente : quatre lettres tapées dans la
+  même tâche ne provoquent qu'une mise à jour des cartes, un champ vidé s'applique sans attendre,
+  « Réinitialiser » annule l'attente et n'en laisse aucune mise à jour superflue. Les vingt variantes fautives
+  essayées une à une (tri retiré, prénom avant nom, ordre par code, `some` au lieu de `every`, apostrophe ou
+  tiret conservés, attente retirée, attente non annulée…) font toutes échouer au moins un test. Les tests
+  qui supposaient l'ordre des lignes de Grist (une carte « la première », « la troisième ») cherchent
+  maintenant la carte par son nom, et la liste des noms de référence (`DEFAULT_CARD_NAMES`) est dans l'ordre
+  alphabétique. Cinq tests du menu Tâches par action de la 1.16.0 (`tests/e2e-taches.test.mjs`) attendaient
+  aussi cet ordre : leurs listes de noms sont dans l'ordre alphabétique, la carte de la fiche relue est
+  retrouvée par son nom, et le menu est refermé avant de cliquer le badge de Bob, que le menu recouvrait
+  depuis que sa carte est la première de la rangée. Le banc d'essai (`tests/support/browser.mjs`) ne fait
+  plus échouer tout un fichier quand une page se ferme pendant la lecture d'une ligne de console : sur une
+  machine chargée, `tests/e2e.test.mjs` échouait ainsi malgré ses 68 scénarios verts. Un scénario fait
+  échouer cette lecture à la main (sans le correctif, il échoue à chaque essai).
+- **Documentation** : guide utilisateur (« Rechercher une personne », l'ordre des cartes), maintenance (limites
+  connues), spécifications, README, `TESTING.md` (section 2 du protocole manuel, à jouer dans un vrai Grist) et
+  les captures où l'ordre des cartes se voit (aperçu, filtres, partenaires, mode admin, carte légendée, bouton
+  « Modifier », confirmation, bandeau d'état, sans logos).
+
+## 1.16.0 — Les tâches rangées par action : le menu Tâches se range comme les compétences
+
+À la demande d'Antoine (« pourrais-tu faire pareil pour les tâches ? »), le menu **Tâches**
+est rangé en **groupes d'actions**, exactement comme le menu Compétences l'est par domaine
+depuis la 1.13.0 : une case par action, un détail dépliable, une recherche à deux niveaux.
+Le filtre **Actions** ne change pas. Les cartes, les tags et les données de Grist ne
+changent pas non plus, et **aucune colonne n'est à ajouter** : l'action d'une tâche se lit
+dans le **numéro** de son libellé.
+
+- **L'action d'une tâche, c'est le numéro avant le point.** « 1.3 Animer le réseau » est une
+  tâche de l'action 1, « 5.4 Veille » une tâche de l'action 5. Le numéro d'une action est le
+  début de son libellé : « Action 1 : … » (ou « Action 1: … »). Sont aussi compris « T1.3 »,
+  « Tâche n° 1.3 », « Action n° 1 », « A1 », « 1. … » et « 1 - … ». Le widget lit le libellé
+  affiché : le libellé corrigé quand il est rempli, le brut sinon. À numéro égal, la première
+  ligne d'`Actions` range les tâches.
+- **Un seul bouton, sept filtres.** Le menu « Tâches » range ses tâches par action (les actions
+  dans l'ordre de leur numéro, « Action 2 » avant « Action 10 », chacune repliée au départ).
+  À droite d'une action, le nombre de cartes qui ont **au moins une** de ses tâches. Une action
+  qui n'a aucune tâche ne figure pas dans le menu.
+- **« Sans action » en dernier.** Une tâche sans numéro, ou dont le numéro ne correspond à
+  aucune action, est rangée sous « Sans action », pour que ses personnes restent trouvables.
+  La console liste ses identifiants de ligne (`[REFS] Taches: n ligne(s) sans regroupement pour
+  macroTaches…`) : la numéroter dans Grist, puis recharger.
+- **Le même fonctionnement que les compétences.** Cocher une action coche toutes ses tâches ;
+  la flèche déplie le détail, la case de l'action est à moitié cochée quand une partie
+  seulement l'est ; un seul ensemble de tâches cochées (tout est un OU dans le menu, ET avec les
+  autres filtres) ; le badge du bouton compte une action entière pour **un** ; à l'ouverture,
+  les actions et les tâches cochées passent en tête ; une étiquette de tâche cliquée sur une
+  carte coche cette tâche. La recherche (« Action ou tâche… ») trouve une action comme une
+  tâche, et un numéro aussi : « 2.1 » retrouve la tâche, « action 2 » l'action et toutes ses
+  tâches.
+- **Le filtre Actions ne change pas.** Il reste une liste à plat, qui filtre sur les actions
+  inscrites sur les cartes (`BDD.Actions`) ; il se cumule (ET) avec le menu Tâches, sans que
+  l'un coche l'autre. Ce ne sont pas les mêmes personnes : participer à une action n'est pas
+  avoir l'une de ses tâches.
+- **Sans numéro, le menu reste à plat.** Si aucune tâche ne peut être rangée (aucune action
+  numérotée, aucune tâche numérotée, ou aucun numéro en commun), le menu Tâches reste une liste
+  à plat, comme avant, sans bandeau : la console dit pourquoi (`[REFS] Taches: aucune ligne
+  n'est rattachée à une action pour macroTaches (n sur m ont un numéro, k action(s) en ont
+  un) : le menu reste à plat.`). Son infobulle et son champ de recherche reprennent alors les
+  textes par défaut (« Rechercher dans Tâches… »), qui ne parlent pas d'actions.
+- **Les nombres dans l'ordre, dans tous les menus.** `compareLabels()` trie désormais les
+  nombres comme des nombres : « 1.2 » avant « 1.10 », « Action 2 » avant « Action 10 », et
+  aussi « GT 2 » avant « GT 10 » dans les autres menus. Rien d'autre ne change dans l'ordre
+  alphabétique.
+- **Le formulaire de modification de fiche** range aussi les tâches par action (la liste des
+  actions reste à plat), sans autre changement : la relecture avant/après et l'écriture sont
+  ceux de la 1.12.0.
+- **Pour les développeurs.** `constants.js` : « Actions des tâches » (`macroTaches`) est un
+  regroupement de `Taches` déclaré par `groups: 'taches'`, `fallback: 'Sans action'` et
+  `numberedIn: 'actions'` (le groupe d'une ligne se déduit du numéro de son libellé, pas d'une
+  colonne) ; `grouping: 'macroTaches'` sur « Tâches » ; l'infobulle et le champ de recherche
+  d'un menu rangé par groupe sont ceux de son regroupement (`hint`, `placeholder` passent de
+  « Compétences » à `macro`). `grist-data.js` : `taskActionNumber()`, `actionNumber()`,
+  `completeGroupMap()` déduit le groupe des numéros sans relire de table (une lecture ratée de
+  `Taches` ou d'`Actions` garde donc les libellés précédents). `render.js` : `groupingWording()`.
+  Le composant de la 1.13.0 (`menuGroups()`, `buildGroupedMenu()`, `toggleFilterGroup()`)
+  sert tel quel : aucun nouveau module, aucune table créée, aucune colonne lue de plus.
+- **Documentation et captures.** Le guide utilisateur gagne la section « Actions et tâches », la
+  maintenance les règles de numérotation des libellés (et leurs symptômes), le guide développeur
+  le regroupement par numéros, `TESTING.md` (section 3, spécifique Tâches par action),
+  `specs.md` et `grist_structure.txt` suivent. Le jeu de démonstration numérote ses actions et
+  ses tâches (« Action 1: … », « 1.1 … », une tâche sans numéro) : une capture nouvelle montre
+  le menu Tâches, et les autres sont régénérées, les libellés d'actions et de tâches des cartes
+  portant leur numéro.
+- **Tests** : 622 tests (dont 213 dans un vrai navigateur, optionnels sans Playwright) contre
+  555 (dont 187) avant ce lot. Les tests du rangement par numéros couvrent chaque forme de
+  libellé (positives et négatives), les actions qui se partagent un numéro, l'action 0, le repli
+  « Sans action », les trois cas de menu à plat et la console, les lectures en panne ; dans
+  Chromium, le parcours complet du menu (action entière, détail, case partielle, OU et ET,
+  nombres, recherche d'une action, d'une tâche ou d'un numéro, étiquette de carte,
+  Réinitialiser, données qui changent dans Grist, clavier, aucun contrôle sans nom accessible
+  dans le menu ouvert, formulaire de profil) et la tenue du menu de 280 à 768 px sur des noms
+  d'action très longs. Contrôle négatif : 39 modifications du code ont été essayées une à une ;
+  les tests en ont détecté 38 d'emblée et la dernière (un libellé comme « 12 réunions » pris
+  pour une tâche de l'action 1) après l'ajout de tests que ce contrôle a montrés manquants.
+
 ## 1.15.0 — Le mode admin, et la modification de fiche fidèle à la maquette
 
 Deux choses dans cette version, toutes deux demandées par Antoine le 12 octobre 2026 :
@@ -229,7 +428,7 @@ ni historique), le widget ne crée aucune table et n'ajoute aucune colonne.
 - **Fermé par défaut.** `saveProfile()` refuse d'écrire l'e-mail ou l'établissement si la
   relecture n'a pas été préparée par un administrateur. Comme tout le mode admin, ce n'est qu'un
   verrou d'interface : seules les règles d'accès de Grist protègent les données
-  (`GRIST_SETUP.md`, section 3).
+  (`GRIST_SETUP.md`, section 4).
 
 ### La modification de fiche, comme la maquette
 

@@ -17,8 +17,14 @@ import {
   sampleTables, withoutOptionalColumns, withIdentity, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL, ADMIN_EMAIL
 } from './fixtures.mjs';
 import {
-  skip, reload, cardCount, waitForCards, waitForBanner, cardNames, resultCount, bannerText, withWidget
+  skip, reload, cardCount, waitForCards, waitForBanner, cardNames, resultCount, bannerText, withWidget, openWidget
 } from './support/browser.mjs';
+import { groupedMenu, optionCounts } from './support/grouped-menu.mjs';
+import { SEARCH_DELAY_MS } from '../constants.js';
+
+// La carte d'une personne, retrouvée par son nom affiché : les cartes sont triées par nom de
+// famille, leur position ne désigne personne.
+const cardNamed = (page, name) => page.locator('.contact-card').filter({ has: page.locator('.name', { hasText: name }) });
 
 // ===== Affichage nominal =====
 
@@ -29,8 +35,8 @@ test('affiche les contacts éligibles, avec le badge établissement (Etablisseme
     assert.equal(await resultCount(page), '4 contacts');
     assert.deepEqual(
       await page.locator('.contact-card .etablissement-tag').allTextContents(),
-      ['CHU', 'CHU', 'Institut Bergonié', 'CHU'],
-      'chaque carte porte son établissement'
+      ['Institut Bergonié', 'CHU', 'CHU', 'CHU'],
+      'chaque carte porte son établissement, dans l\'ordre des noms (Bergonié, Bernard, Hostile, Martin)'
     );
     assert.equal(await page.locator('#statusBanner').isHidden(), true, 'aucun bandeau quand tout va bien');
     assert.deepEqual(await Promise.all(logs.errors), []);
@@ -96,7 +102,7 @@ test('colonne Accepte_apparaitre absente de BDD : erreur explicite, jamais l\'an
 test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    const ana = page.locator('.contact-card').first();
+    const ana = cardNamed(page, 'Ana Martin');
     assert.equal(await ana.locator('.avatar').textContent(), 'AM');
     assert.equal(await ana.locator('.fonction').textContent(), 'Pharmacienne');
     assert.equal(await ana.locator('.email').getAttribute('href'), 'mailto:ana.martin@chu-bordeaux.fr');
@@ -113,7 +119,7 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
     assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
     assert.equal(await ana.locator('.tag-static').count(), 1, 'le tag Rôle PUI n\'est pas cliquable');
 
-    const hugo = page.locator('.contact-card').nth(3);
+    const hugo = cardNamed(page, 'Hugo Bernard');
     assert.equal(await hugo.locator('.email.visible').count(), 0, 'pas de ligne email vide');
     assert.equal(await hugo.locator('.card-tags').locator('.tag').count(), 0, 'id 999 introuvable : aucun tag fantôme');
   }));
@@ -121,7 +127,7 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
 test('une carte sans téléphone ni rôle PUI n\'affiche aucune ligne vide', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    const gina = page.locator('.contact-card').nth(2);
+    const gina = cardNamed(page, 'Gina Bergonié');
     assert.equal(await gina.locator('.tel.visible').count(), 0);
     assert.equal(await gina.locator('.tag-static').count(), 0);
   }));
@@ -129,7 +135,7 @@ test('une carte sans téléphone ni rôle PUI n\'affiche aucune ligne vide', { s
 test('s\'affiche sans erreur si BDD n\'a pas les colonnes facultatives téléphone et rôle PUI', { skip }, () =>
   withWidget({ tables: withoutOptionalColumns(sampleTables()) }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    const ana = page.locator('.contact-card').first();
+    const ana = cardNamed(page, 'Ana Martin');
     assert.equal(await ana.locator('.tel.visible').count(), 0);
     assert.equal(await ana.locator('.tag-static').count(), 0);
     assert.equal(await page.locator('#statusBanner').isHidden(), true);
@@ -139,7 +145,7 @@ test('s\'affiche sans erreur si BDD n\'a pas les colonnes facultatives télépho
 test('affiche en texte brut un prénom contenant du HTML (aucune injection)', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    assert.equal(await page.locator('.contact-card .name').nth(1).textContent(), `${HOSTILE_FIRST_NAME} Hostile`);
+    assert.equal(await cardNamed(page, 'Hostile').locator('.name').textContent(), `${HOSTILE_FIRST_NAME} Hostile`);
     assert.equal(await page.locator('#cardsGrid img').count(), 0);
     assert.equal(await page.evaluate(() => window.__xss), undefined);
   }));
@@ -147,7 +153,7 @@ test('affiche en texte brut un prénom contenant du HTML (aucune injection)', { 
 test('ne crée un lien mailto que pour une adresse sans paramètre injectable', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    const gina = page.locator('.contact-card').nth(2);
+    const gina = cardNamed(page, 'Gina Bergonié');
     assert.equal(await gina.locator('.email').textContent(), 'gina@bergonie.fr?cc=intrus@example.fr');
     assert.equal(await gina.locator('.email').getAttribute('href'), null, 'adresse douteuse : texte sans lien');
   }));
@@ -180,10 +186,139 @@ test('la recherche ignore casse et accents, et se vide avec Réinitialiser', { s
     assert.equal(await page.inputValue('#searchInput'), '');
   }));
 
+// ===== Recherche « prénom nom » et tri des cartes =====
+// Des noms que la recherche d'avant ne trouvait pas (audit UI/UX, U31), ajoutés à ceux du jeu
+// d'essai sur le modèle de Hugo Bernard (CHU, sans liste) : un établissement fondateur validé et
+// un périmètre, donc affichés.
+
+const AUDIT_NAMES = [
+  ['Karim', 'Benali'], ['Aïcha', 'Benali-Haddad'], ['Jean', 'Le Cœur'],
+  ['Marie-Christine', 'de La Rochefoucauld-Montmorency'], ['Sophie', 'D\'Arcy'], ['Zoé', 'Éluard']
+];
+
+function withPeople(tables, people) {
+  const template = tables.BDD.prenom.indexOf('Hugo');
+  people.forEach(([prenom, nom], index) => {
+    Object.keys(tables.BDD).forEach(column => tables.BDD[column].push(structuredClone(tables.BDD[column][template])));
+    const row = tables.BDD.id.length - 1;
+    tables.BDD.id[row] = 100 + index;
+    tables.BDD.prenom[row] = prenom;
+    tables.BDD.nom[row] = nom;
+    tables.BDD.email[row] = `personne${index}@chu-bordeaux.fr`;
+  });
+  return tables;
+}
+
+const SORTED_NAMES = [
+  'Karim Benali', 'Aïcha Benali-Haddad', 'Gina Bergonié', 'Hugo Bernard', 'Sophie D\'Arcy',
+  'Marie-Christine de La Rochefoucauld-Montmorency', 'Zoé Éluard', `${HOSTILE_FIRST_NAME} Hostile`, 'Jean Le Cœur', 'Ana Martin'
+];
+
+const waitForNames = (page, names) => page.waitForFunction(expected =>
+  JSON.stringify([...document.querySelectorAll('.contact-card .name')].map(name => name.textContent)) === JSON.stringify(expected), names);
+
+test('les cartes sont triées par nom de famille puis prénom, quel que soit l\'ordre des lignes de la table (audit U32)', { skip }, () => {
+  const tables = withPeople(sampleTables(), AUDIT_NAMES);
+  Object.keys(tables.BDD).forEach(column => tables.BDD[column].reverse()); // lignes en ordre inverse
+  return withWidget({ tables }, async ({ page }) => {
+    await waitForCards(page, SORTED_NAMES.length);
+    assert.deepEqual(await cardNames(page), SORTED_NAMES);
+  });
+});
+
+test('une modification de nom dans Grist replace la carte à sa place alphabétique, sans recharger la page', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    assert.equal((await cardNames(page)).at(-1), 'Ana Martin');
+    await page.evaluate(() => { window.__tables.BDD.nom[0] = 'Aaron'; });
+    await reload(page);
+    await waitForNames(page, ['Ana Aaron', 'Gina Bergonié', 'Hugo Bernard', `${HOSTILE_FIRST_NAME} Hostile`]);
+  }));
+
+test('la recherche trouve « prénom nom » dans n\'importe quel ordre, les noms composés, les tirets, l\'apostrophe et œ (audit U31)', { skip }, () =>
+  withWidget({ tables: withPeople(sampleTables(), AUDIT_NAMES) }, async ({ page }) => {
+    await waitForCards(page, SORTED_NAMES.length);
+    const search = async (term, names) => {
+      await page.fill('#searchInput', term);
+      await waitForNames(page, names);
+      assert.equal(await resultCount(page), `${names.length} contact${names.length > 1 ? 's' : ''}`, term);
+    };
+    await search('karim benali', ['Karim Benali']);
+    await search('benali karim', ['Karim Benali']);
+    await search('Jean Le Cœur', ['Jean Le Cœur']);
+    await search('marie christine', ['Marie-Christine de La Rochefoucauld-Montmorency']);
+    await search('benali haddad', ['Aïcha Benali-Haddad']);
+    await search('d’arcy', ['Sophie D\'Arcy']);
+    await search('coeur', ['Jean Le Cœur']);
+    await search('Zoé É', ['Zoé Éluard']);
+    await search('benali', ['Karim Benali', 'Aïcha Benali-Haddad']);
+    await search('karim haddad', []);
+    assert.equal(await page.locator('#emptyState').isVisible(), true, 'aucune réponse : l\'état vide s\'affiche');
+    await search('', SORTED_NAMES);
+  }));
+
+test('la liste attend la fin de la frappe : quatre lettres tapées d\'un coup ne redessinent les cartes qu\'une fois', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.evaluate(() => {
+      window.__renders = 0;
+      new MutationObserver(() => { window.__renders += 1; }).observe(document.getElementById('cardsGrid'), { childList: true });
+    });
+    // Tout dans la même tâche : aucun délai n'a pu s'écouler entre deux lettres.
+    const during = await page.evaluate(() => {
+      const input = document.getElementById('searchInput');
+      ['b', 'be', 'ber', 'berg'].forEach(value => {
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      return document.querySelectorAll('.contact-card').length;
+    });
+    assert.equal(during, 4, 'rien n\'est redessiné pendant la frappe');
+    await waitForNames(page, ['Gina Bergonié']);
+    await page.waitForTimeout(SEARCH_DELAY_MS + 150); // laisse arriver un éventuel second dessin
+    assert.equal(await page.evaluate(() => window.__renders), 1, 'une seule mise à jour des cartes pour quatre lettres');
+  }));
+
+test('« Réinitialiser » pendant l\'attente de la frappe annule la recherche en cours', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.evaluate(() => {
+      window.__renders = 0;
+      new MutationObserver(() => { window.__renders += 1; }).observe(document.getElementById('cardsGrid'), { childList: true });
+      const input = document.getElementById('searchInput');
+      input.value = 'berg';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.getElementById('resetFilters').click(); // avant la fin du délai
+    });
+    const renderedByReset = await page.evaluate(() => window.__renders);
+    assert.equal(renderedByReset, 1, 'le clic redessine les cartes une fois');
+    await page.waitForTimeout(SEARCH_DELAY_MS + 200);
+    assert.equal(await cardCount(page), 4, 'la frappe annulée ne revient pas filtrer après coup');
+    assert.equal(await page.inputValue('#searchInput'), '');
+    assert.equal(await resultCount(page), '4 contacts');
+    // Le délai en attente lisait le champ, déjà vidé : sans l'annuler, il aurait seulement
+    // redessiné les cartes pour rien.
+    assert.equal(await page.evaluate(() => window.__renders), renderedByReset, 'l\'attente annulée ne redessine rien');
+  }));
+
+test('vider le champ de recherche (Échap, croix) réaffiche toutes les cartes tout de suite, sans attendre', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.fill('#searchInput', 'berg');
+    await waitForCards(page, 1);
+    const after = await page.evaluate(() => {
+      const input = document.getElementById('searchInput');
+      input.value = '';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      return document.querySelectorAll('.contact-card').length; // lu dans la même tâche : aucun délai
+    });
+    assert.equal(after, 4);
+  }));
+
 test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ; Réinitialiser le décoche', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    await page.locator('.contact-card').first().locator('.tag-instances').click();
+    await cardNamed(page, 'Ana Martin').locator('.tag-instances').click();
     await waitForCards(page, 1);
     const filter = page.locator('.filter[data-filter-key="instances"]');
     assert.equal(await filter.locator('.filter-count').textContent(), '1');
@@ -202,23 +337,17 @@ test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ;
 // fixtures.mjs) : Cancérologie (Oncologie, Hématologie : Ana), Pharmacie (Pharmacovigilance :
 // Bob, partenaire) et Autres (Divers : Gina, la compétence que Macro_competences ne classe pas).
 
-const skillsFilter = page => page.locator('.filter[data-filter-key="competences"]');
-const domain = (page, label) => skillsFilter(page).locator(`.filter-group[data-value="${label}"]`);
-const domainBox = (page, label) => domain(page, label).locator('.group-option input');
-const skill = (page, label) => skillsFilter(page).locator('.filter-option', { hasText: label });
-const openSkills = page => skillsFilter(page).locator('.filter-button').click();
-const optionCounts = filter => filter.locator('.filter-option').evaluateAll(options =>
-  Object.fromEntries(options.map(option => [option.querySelector('.option-label').textContent,
-    option.querySelector('.option-count').textContent])));
-const domainCounts = page => skillsFilter(page).locator('.group-head').evaluateAll(heads =>
-  Object.fromEntries(heads.map(head => [head.querySelector('.option-label').textContent,
-    head.querySelector('.option-count').textContent])));
-const domainNames = page => skillsFilter(page).locator('.group-head .option-label').allTextContents();
-const visibleDomains = page => skillsFilter(page).locator('.filter-group').evaluateAll(groups =>
-  groups.filter(group => !group.hidden).map(group => group.dataset.value));
-const visibleSkills = page => skillsFilter(page).locator('.filter-option').evaluateAll(options =>
-  options.filter(option => option.getClientRects().length > 0).map(option => option.dataset.value));
-const badge = page => skillsFilter(page).locator('.filter-count');
+const skills = groupedMenu('competences');
+const skillsFilter = skills.filter;
+const domain = skills.group;
+const domainBox = skills.box;
+const skill = skills.item;
+const openSkills = skills.open;
+const domainCounts = skills.groupCounts;
+const domainNames = skills.groupNames;
+const visibleDomains = skills.visibleGroups;
+const visibleSkills = skills.visibleItems;
+const badge = skills.badge;
 
 test('le filtre Compétences propose le libellé corrigé de la table Competences et filtre dessus', { skip }, () =>
   withWidget({}, async ({ page }) => {
@@ -337,11 +466,11 @@ test('les domaines et les compétences s\'additionnent (OU) dans le menu, et le 
     await domain(page, 'Cancérologie').locator('.group-toggle').click();
     await skill(page, 'Oncologie').locator('input').check();
     await waitForCards(page, 2);
-    assert.deepEqual(await cardNames(page), ['Ana Martin', 'Gina Bergonié'], 'OU entre un domaine et une compétence d\'un autre domaine');
+    assert.deepEqual(await cardNames(page), ['Gina Bergonié', 'Ana Martin'], 'OU entre un domaine et une compétence d\'un autre domaine');
     assert.equal(await badge(page).textContent(), '2');
 
     await page.mouse.click(5, 5);
-    await page.locator('.contact-card').first().locator('.tag-instances').click(); // Instances : CME, que seule Ana a
+    await cardNamed(page, 'Ana Martin').locator('.tag-instances').click(); // Instances : CME, que seule Ana a
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin'], 'ET avec un autre filtre');
   }));
@@ -549,7 +678,9 @@ test('sans colonne Macro_competences : le bandeau le dit, le menu Compétences r
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
     assert.equal(await badge(page).textContent(), '1');
-    assert.equal(await skillsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Domaine ou compétence…');
+    assert.equal(await skillsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Rechercher dans Compétences…',
+      'plus de domaine à chercher : le champ n\'en parle plus');
+    assert.equal(await skillsFilter(page).locator('.filter-button').getAttribute('title'), null, 'ni l\'infobulle sur les domaines à cocher');
   });
 });
 
@@ -700,7 +831,7 @@ test('colonne de libellé introuvable dans une table de référence : le bandeau
     assert.match(await bannerText(page), /Actions \(Actions_corrigees ou Actions\)/);
     assert.equal(await page.locator('.filter[data-filter-key="actions"] .filter-option').count(), 0, 'le menu Actions n\'a aucune option');
     assert.ok(await page.locator('.filter[data-filter-key="instances"] .filter-option').count() > 0, 'les autres menus restent');
-    assert.equal(await page.locator('.contact-card').first().locator('.tag-group-title', { hasText: 'Instances' }).count(), 1);
+    assert.equal(await cardNamed(page, 'Ana Martin').locator('.tag-group-title', { hasText: 'Instances' }).count(), 1);
   });
 });
 
@@ -932,3 +1063,27 @@ test('le bandeau suit les modifications faites dans Grist : l\'accord retiré à
     await page.waitForFunction(() => document.querySelector('.presence-switch').getAttribute('aria-checked') === 'false');
     assert.equal(await accountMessage(page), 'Vous n\'apparaissez pas dans l\'annuaire.');
   }));
+
+// ===== Banc d'essai =====
+
+// La console est relue en différé (tests/support/browser.mjs) : quand la page se ferme avant la
+// réponse, la lecture échoue (« Target page, context or browser has been closed »). Sans personne
+// pour l'attendre, ce rejet ferait échouer tout le fichier, au hasard de la charge de la machine.
+// Le hasard ne se commande pas : on fait échouer la lecture d'un message à la main.
+test('une lecture de la console interrompue par la fermeture de la page ne laisse aucun rejet non traité', { skip }, async () => {
+  const rejected = [];
+  const note = reason => rejected.push(String(reason));
+  process.on('unhandledRejection', note);
+  try {
+    const { page, context, logs } = await openWidget();
+    const closed = new Error('jsHandle.jsonValue: Target page, context or browser has been closed');
+    page.emit('console', { type: () => 'warning', args: () => [{ jsonValue: () => Promise.reject(closed) }], text: () => '' });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.deepEqual(rejected, []);
+    // Qui relit la console voit toujours l'erreur : seul le rejet non traité disparaît.
+    await assert.rejects(Promise.all(logs.warnings), { message: closed.message });
+    await context.close();
+  } finally {
+    process.off('unhandledRejection', note);
+  }
+});
