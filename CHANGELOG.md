@@ -42,7 +42,8 @@ filtres, les menus, les compteurs, la mise en page et les bandeaux sont ceux de 
   dernière ; la capture de son bouton montre sa rangée, celle de la confirmation défile jusqu'à sa carte,
   celle de la carte légendée la choisit par son nom, et `node docs/demo/capturer.mjs apercu partenaires`
   ne refait que les captures dont le nom commence ainsi.
-- **Tests** : 572 tests (193 dans un vrai navigateur, optionnels sans Playwright), 17 de plus. Le tri : un
+- **Tests** : 639 tests (219 dans un vrai navigateur, optionnels sans Playwright), 17 de plus qu'à la 1.16.0
+  (622, dont 213). Le tri : un
   test d'unité de l'ordre (accents, particules, prénom en second critère, nom vide, valeurs vides) et un
   test de `loadDirectory()` ; dans le navigateur, les cartes d'une table à l'envers apparaissent triées, et
   une modification de nom dans Grist replace la carte. La recherche : huit tests de `filterContacts()` (mot
@@ -55,7 +56,10 @@ filtres, les menus, les compteurs, la mise en page et les bandeaux sont ceux de 
   tiret conservés, attente retirée, attente non annulée…) font toutes échouer au moins un test. Les tests
   qui supposaient l'ordre des lignes de Grist (une carte « la première », « la troisième ») cherchent
   maintenant la carte par son nom, et la liste des noms de référence (`DEFAULT_CARD_NAMES`) est dans l'ordre
-  alphabétique.
+  alphabétique. Cinq tests du menu Tâches par action de la 1.16.0 (`tests/e2e-taches.test.mjs`) attendaient
+  aussi cet ordre : leurs listes de noms sont dans l'ordre alphabétique, la carte de la fiche relue est
+  retrouvée par son nom, et le menu est refermé avant de cliquer le badge de Bob, que le menu recouvrait
+  depuis que sa carte est la première de la rangée.
 - **Documentation** : guide utilisateur (« Rechercher une personne », l'ordre des cartes), maintenance (limites
   connues), spécifications, README, `TESTING.md` (section 2 du protocole manuel, à jouer dans un vrai Grist) et
   les captures où l'ordre des cartes se voit (aperçu, filtres, partenaires, mode admin, carte légendée, bouton
