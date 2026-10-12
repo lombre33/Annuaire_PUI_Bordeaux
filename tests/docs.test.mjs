@@ -6,8 +6,9 @@
 //   3. Le jeu de données fictif de docs/demo est lu sans incident par le vrai
 //      loadDirectory(), donne le nombre de cartes annoncé et reste fictif.
 //   4. Le serveur de démonstration ne sert que les fichiers du widget.
-//   5. Les documents suivent le code : nombre et noms des filtres, modules,
-//      tables et colonnes de libellé.
+//   5. Les documents suivent le code : nombre et noms des filtres dans le guide
+//      utilisateur (le README reste générique : les filtres pourraient devenir
+//      personnalisables), vocabulaire du PUI, modules, tables et colonnes de libellé.
 // Un échec dit quoi corriger : la documentation (docs/maintenance.md, « Maintenir
 // la documentation ») ou le jeu fictif (docs/developpeurs.md, « Données et
 // captures de démonstration »).
@@ -214,25 +215,39 @@ test('le serveur de démonstration sert le widget avec l\'API Grist simulée, et
 
 const NUMBER_WORDS = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze'];
 
-test('les documents annoncent le bon nombre de filtres', () => {
-  const problems = [];
-  let mentions = 0;
-  ['README.md', 'docs/utilisateurs.md'].forEach(file => {
-    for (const [, word] of read(file).matchAll(/\b(zéro|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze) filtres(?=\*{0,2}\s*[:,.;)])/gi)) {
-      mentions++;
-      if (NUMBER_WORDS.indexOf(word.toLowerCase()) !== FILTERS.length) {
-        problems.push(`${file} : « ${word} filtres », alors que le widget en propose ${FILTERS.length}`);
-      }
-    }
-  });
-  assert.ok(mentions > 0, 'Aucune mention du nombre de filtres : ce test ne vérifie plus rien.');
-  assert.deepEqual(problems, [], 'Corrigez le nombre de filtres dans le README et le guide utilisateur.');
+const FILTER_COUNT = /\b(zéro|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze) filtres(?=\*{0,2}\s*[:,.;)])/gi;
+
+test('le guide utilisateur annonce le bon nombre de filtres', () => {
+  const mentions = [...read('docs/utilisateurs.md').matchAll(FILTER_COUNT)];
+  const problems = mentions
+    .filter(([, word]) => NUMBER_WORDS.indexOf(word.toLowerCase()) !== FILTERS.length)
+    .map(([, word]) => `« ${word} filtres », alors que le widget en propose ${FILTERS.length}`);
+  assert.ok(mentions.length > 0, 'Aucune mention du nombre de filtres : ce test ne vérifie plus rien.');
+  assert.deepEqual(problems, [], 'Corrigez le nombre de filtres dans le guide utilisateur.');
 });
 
 test('le guide utilisateur présente chaque filtre', () => {
   const guide = read('docs/utilisateurs.md');
   const missing = FILTERS.map(filter => filter.label).filter(label => !guide.includes(label));
   assert.deepEqual(missing, [], 'Ajoutez ces filtres au guide utilisateur (« Découvrir l\'écran », « Filtrer »).');
+});
+
+// Demande d'Antoine : dans une V2 les filtres seront peut-être personnalisables, donc le
+// README ne dit ni combien il y en a ni lesquels. Le détail vit dans docs/utilisateurs.md.
+test('le README reste générique : ni nombre de filtres, ni liste de leurs noms', () => {
+  const readme = read('README.md');
+  const counts = [...readme.matchAll(FILTER_COUNT)].map(([mention]) => `« ${mention} »`);
+  const lists = readme.split('\n')
+    .filter(line => FILTERS.filter(({ label }) => new RegExp(`(?<![\\p{L}])${label}(?![\\p{L}])`, 'u').test(line)).length >= 3)
+    .map(line => `« ${line.trim().slice(0, 60)}… »`);
+  assert.deepEqual([...counts, ...lists], [],
+    'Le README ne nomme ni ne compte les filtres (ils pourraient devenir personnalisables) : renvoyez au guide utilisateur.');
+});
+
+test('le guide utilisateur définit le vocabulaire du PUI (GT, fondateur, partenaire, « autres »)', () => {
+  const lexique = read('docs/utilisateurs.md').split(/^## /m).find(part => part.startsWith('Lexique du PUI')) ?? '';
+  const missing = ['PUI', 'GT', 'fondateur', 'partenaire', 'autres'].filter(word => !lexique.toLowerCase().includes(word.toLowerCase()));
+  assert.deepEqual(missing, [], 'Ces mots doivent être définis dans la section « Lexique du PUI » de docs/utilisateurs.md.');
 });
 
 test('la documentation développeur cite chaque module du widget', () => {

@@ -11,7 +11,7 @@
 ![JavaScript natif, sans build](https://img.shields.io/badge/JavaScript-natif%2C%20sans%20build-f28a54)
 ![Aucune dépendance à l'exécution](https://img.shields.io/badge/d%C3%A9pendances%20d'ex%C3%A9cution-0-1ba99a)
 
-![Aperçu de l'annuaire : recherche, filtres, interrupteurs Fondateurs et Partenaires, cartes de contact](docs/images/apercu.png)
+![Aperçu de l'annuaire : recherche, filtres, choix des établissements affichés et cartes de contact](docs/images/apercu.png)
 
 <sub>Toutes les captures de ce dépôt utilisent des données fictives.</sub>
 
@@ -22,9 +22,9 @@
 L'annuaire affiche les accompagnateurs de l'innovation du PUI sous forme de **cartes** : on retrouve chaque personne par son nom ou par ce qu'elle fait.
 
 - 🔎 **Recherche** par nom ou prénom, sans souci d'accents ni de majuscules.
-- 🎛️ **Huit filtres** : Actions, Tâches, Communautés, GT (groupes de travail), Domaines, Compétences, Instances et Établissement. Les valeurs d'un même filtre s'additionnent (« ou »), les filtres se cumulent entre eux (« et »), et chaque option indique combien de cartes portent cette valeur. « Domaines » regroupe les compétences par domaine.
-- 🏛️ **Fondateurs et Partenaires** : deux interrupteurs permettent de choisir les établissements affichés. Seuls les établissements qui ont validé leur apparition sont montrés.
-- 📇 **Cartes de contact** : initiales, fonction, e-mail, téléphone, établissement et participations. Un clic sur une étiquette filtre sur sa valeur (sauf pour le rôle PUI).
+- 🎛️ **Filtres** : chaque menu liste les valeurs d'une catégorie, avec le nombre de cartes qui portent chacune. Les valeurs d'un même menu s'additionnent (« ou »), les menus se cumulent entre eux (« et »).
+- 🏛️ **Fondateurs et Partenaires** : deux interrupteurs permettent de choisir les établissements affichés, fondateurs du PUI ou partenaires. Seuls les établissements qui ont validé leur apparition sont montrés.
+- 📇 **Cartes de contact** : identité, fonction, e-mail, téléphone, établissement et participations. Un clic sur une étiquette filtre sur sa valeur.
 - 🛡️ **Fiable** : si Grist ne répond pas, si une table est illisible ou si une colonne indispensable manque, un bandeau le dit. Un annuaire vide alors que la table contient des lignes est toujours expliqué.
 - 🔒 **Lecture seule**, sans dépendance à l'exécution : le widget n'écrit rien dans Grist et ne stocke rien dans le navigateur.
 
@@ -32,8 +32,8 @@ L'annuaire affiche les accompagnateurs de l'innovation du PUI sous forme de **ca
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/filtre-menu.png" alt="Menu du filtre Domaines avec le nombre de cartes de chaque option"><br><sub><b>Un filtre</b> : champ de recherche, options à cocher, nombre de cartes par option (ici, les domaines de compétences).</sub></td>
-    <td width="50%"><img src="docs/images/filtres-combines.png" alt="Communauté Santé numérique et établissement CHD cochés : trois contacts restent affichés"><br><sub><b>Des filtres combinés</b> : une communauté et un établissement, trois contacts.</sub></td>
+    <td width="50%"><img src="docs/images/filtre-menu.png" alt="Menu d'un filtre ouvert avec le nombre de cartes de chaque option"><br><sub><b>Un filtre</b> : champ de recherche, options à cocher, nombre de cartes par option.</sub></td>
+    <td width="50%"><img src="docs/images/filtres-combines.png" alt="Deux filtres cochés : trois contacts restent affichés"><br><sub><b>Des filtres combinés</b> : les critères se cumulent.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/images/recherche.png" alt="Recherche « elise » qui trouve Élise Marchetti"><br><sub><b>La recherche</b> ignore accents et majuscules : « elise » trouve « Élise ».</sub></td>
@@ -41,7 +41,7 @@ L'annuaire affiche les accompagnateurs de l'innovation du PUI sous forme de **ca
   </tr>
   <tr>
     <td width="50%"><img src="docs/images/carte-anatomie.png" alt="Une carte de contact avec neuf repères numérotés"><br><sub><b>Une carte</b> : identité, coordonnées, participations (<a href="docs/utilisateurs.md#lire-une-carte">légende</a>).</sub></td>
-    <td width="50%"><img src="docs/images/bandeau-donnees-partielles.png" alt="Bandeau rouge « Tables illisibles (Actions) » au-dessus des cartes"><br><sub><b>Un bandeau d'état</b> prévient quand une lecture Grist échoue.</sub></td>
+    <td width="50%"><img src="docs/images/bandeau-donnees-partielles.png" alt="Bandeau rouge « Tables illisibles » au-dessus des cartes"><br><sub><b>Un bandeau d'état</b> prévient quand une lecture Grist échoue.</sub></td>
   </tr>
 </table>
 
@@ -91,7 +91,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 
 | Pour… | Lire |
 |---|---|
-| **Utiliser l'annuaire** : rechercher, filtrer, comprendre un message | [Guide utilisateur](docs/utilisateurs.md) |
+| **Utiliser l'annuaire** : rechercher, filtrer, comprendre un message, vocabulaire du PUI | [Guide utilisateur](docs/utilisateurs.md) |
 | **Comprendre et modifier le code** : architecture, chargement des données, règles, tests, recettes | [Documentation développeur](docs/developpeurs.md) |
 | **Évaluer les risques** : accès demandé à Grist, données personnelles, recommandations | [Sécurité et confidentialité](docs/securite.md) |
 | **Faire vivre l'annuaire** : règles de visibilité, diagnostic, publication, retour arrière | [Maintenance](docs/maintenance.md) |
