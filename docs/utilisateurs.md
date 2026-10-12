@@ -417,6 +417,10 @@ Oui : désactivez l'interrupteur de [Ma présence](#ma-présence--apparaître-ou
 
 L'annuaire ne vous propose rien quand il ne peut pas vous reconnaître : compte qui ne peut que consulter (rôle Lecteur), adresse de votre compte absente de l'annuaire, ou réglage manquant dans Grist. Voir [Ma présence](#ma-présence--apparaître-ou-non).
 
+**L'annuaire utilise-t-il l'intelligence artificielle ?**
+
+Pas quand vous l'utilisez : l'annuaire n'appelle aucune IA et n'envoie vos informations nulle part. Le PUI indique qu'aucune IA ne traite le document Grist en temps réel. Les compétences, elles, sont traitées par une IA au moment de leur export depuis Résana, hors de l'annuaire, via un service tiers (Mammouth AI). Voir [L'intelligence artificielle dans ce projet](securite.md#lintelligence-artificielle-dans-ce-projet).
+
 **Que sait l'annuaire de moi quand je l'ouvre ?**
 
 Pour savoir qui vous êtes, l'annuaire demande à Grist l'adresse de votre compte : il ajoute puis supprime une ligne de service dans le document, qui porte cette adresse. Elle n'est ni conservée dans votre navigateur ni envoyée ailleurs, mais cette ligne peut rester visible dans l'historique du document Grist. Voir [sécurité et confidentialité](securite.md#écritures-et-règles-daccès). Quand vous modifiez votre fiche, l'annuaire relit votre ligne dans Grist puis y écrit, en une seule action, les champs que vous avez relus ; il n'en garde ni copie ni historique.
