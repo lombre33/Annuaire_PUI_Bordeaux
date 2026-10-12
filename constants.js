@@ -42,6 +42,11 @@ export const CARD_LOGO = { area: 92 * 32, maxWidth: 92, maxHeight: 32 };
 // à 400 contacts d'après l'audit) : un mot de six lettres n'en provoque plus qu'un seul.
 export const SEARCH_DELAY_MS = 200;
 
+// « Ma présence » : le résultat d'une bascule réussie reste dans la région d'état du bandeau,
+// lue par les lecteurs d'écran et invisible à l'écran, ce nombre de millisecondes (comme le message
+// d'enregistrement d'une fiche, qui reste six secondes à l'écran).
+export const PRESENCE_ANNOUNCE_MS = 6000;
+
 // Page du projet, vers laquelle renvoie la phrase du bandeau du bas.
 export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos-leviers/pui-reveler-le-potentiel-du-territoire';
 

@@ -863,6 +863,14 @@ const waitForAccountBar = (page, visible = true) =>
 const isSwitchOn = async page => (await presenceSwitch(page).getAttribute('aria-checked')) === 'true';
 const accountMessage = page => page.locator('#accountBar .account-detail').textContent();
 const accountStatus = page => page.locator('#accountBar .account-status').textContent();
+// Le message est-il à l'écran ? Réduit à un pixel et rogné (.sr-only), il n'est que lu par les
+// lecteurs d'écran. Le rognage compte : une erreur garde ses marges et sa bordure, donc une boîte
+// de plus d'un pixel, même rognée.
+const isStatusOnScreen = page => page.locator('#accountBar .account-status').evaluate(element =>
+  getComputedStyle(element).clipPath === 'none' && element.getBoundingClientRect().height > 4);
+// Ce que la région d'état annonce aux lecteurs d'écran quand une bascule a réussi.
+const SAVED_ON = 'Modification enregistrée. Vous avez accepté d\'apparaître dans l\'annuaire.';
+const SAVED_OFF = 'Modification enregistrée. Vous n\'apparaissez plus dans l\'annuaire.';
 const grist = page => page.evaluate(() => window.__fake.calls);
 const writesTo = async (page, table) => (await grist(page)).filter(call => call.table === table);
 const identityLogs = async logs => (await Promise.all([...logs.warnings, ...logs.infos])).filter(line => line.includes('[IDENTITE]'));
@@ -929,7 +937,7 @@ test('l\'interrupteur fait apparaître puis disparaître la personne, en écriva
     assert.ok((await cardNames(page)).includes('Iris Refus'), 'sa carte apparaît sans rechargement manuel');
     assert.equal(await isSwitchOn(page), true);
     assert.equal(await accountMessage(page), 'Vous apparaissez dans l\'annuaire.');
-    assert.equal(await accountStatus(page), '');
+    assert.equal(await accountStatus(page), SAVED_ON, 'la réussite est annoncée par la région d\'état');
     assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), true);
 
     await presenceSwitch(page).click();
@@ -961,6 +969,62 @@ test('l\'interrupteur se range pendant l\'écriture : un double clic n\'écrit q
     assert.equal(await presenceSwitch(page).isEnabled(), true, 'l\'interrupteur redevient utilisable');
   }));
 
+test('l\'interrupteur garde le focus pendant et après l\'écriture, et une frappe de plus pendant qu\'elle dure est ignorée (WCAG 2.4.3)', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: IRIS_EMAIL, delay: 300 }, async ({ page }) => {
+    await waitForAccountBar(page);
+    const hasFocus = () => presenceSwitch(page).evaluate(button => button === document.activeElement);
+    const isBusy = value => page.waitForFunction(expected =>
+      document.querySelector('#accountBar .presence-switch').getAttribute('aria-busy') === expected, value);
+    await presenceSwitch(page).focus();
+    await page.keyboard.press('Space');
+    await isBusy('true');
+    assert.equal(await accountStatus(page), 'Enregistrement…');
+    assert.equal(await isStatusOnScreen(page), true, 'l\'attente se voit : seule la réussite est réservée aux lecteurs d\'écran');
+    // Un bouton désactivé perd le focus : le bouton est « hors service » sans l'être.
+    assert.equal(await presenceSwitch(page).getAttribute('aria-disabled'), 'true');
+    assert.equal(await presenceSwitch(page).evaluate(button => button.disabled), false);
+    assert.deepEqual(await presenceSwitch(page).evaluate(button => { const style = getComputedStyle(button); return [style.cursor, style.opacity]; }),
+      ['progress', '0.65'], 'pendant l\'écriture le bouton est grisé et le pointeur indique l\'attente');
+    assert.equal(await hasFocus(), true, 'le focus reste sur l\'interrupteur pendant l\'écriture');
+    await page.keyboard.press('Space');
+    await page.keyboard.press('Enter');
+    await waitForCards(page, 5);
+    await isBusy('false');
+    assert.equal(await hasFocus(), true, 'et après la relecture de l\'annuaire');
+    assert.equal(await presenceSwitch(page).getAttribute('aria-disabled'), null, 'il redevient utilisable');
+    assert.equal((await writesTo(page, 'BDD')).length, 1, 'les frappes faites pendant l\'écriture n\'ont rien écrit');
+    await page.keyboard.press('Space');
+    await waitForCards(page, 4);
+    assert.equal(await isSwitchOn(page), false, 'la frappe suivante bascule de nouveau');
+    assert.equal(await hasFocus(), true);
+  }));
+
+test('le résultat d\'une bascule est dit par la région d\'état, sans rien ajouter à l\'écran, puis s\'efface (WCAG 4.1.3)', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForAccountBar(page);
+    await page.clock.install();
+    const status = page.locator('#accountBar .account-status');
+    assert.equal(await status.getAttribute('role'), 'status', 'une région d\'état annonce son texte');
+
+    await presenceSwitch(page).click();
+    await waitForCards(page, 3);
+    assert.equal(await accountStatus(page), SAVED_OFF);
+    assert.equal(await isStatusOnScreen(page), false, 'le message est lu mais n\'occupe aucune place à l\'écran');
+    assert.equal(await accountMessage(page), 'Vous n\'apparaissez pas dans l\'annuaire.', 'l\'écran dit déjà la même chose');
+
+    // Une autre bascule remplace le message et relance son délai ; l'ancien délai ne le retire pas trop tôt.
+    await page.clock.fastForward(4000);
+    assert.equal(await accountStatus(page), SAVED_OFF);
+    await presenceSwitch(page).click();
+    await waitForCards(page, 4);
+    assert.equal(await accountStatus(page), SAVED_ON);
+    await page.clock.fastForward(4000);
+    assert.equal(await accountStatus(page), SAVED_ON, 'le délai est reparti de la dernière bascule');
+    await page.clock.fastForward(3000);
+    assert.equal(await accountStatus(page), '', 'le message s\'efface de lui-même');
+    assert.equal(await status.evaluate(element => element.classList.contains('sr-only')), false, 'et la région redevient celle des messages visibles');
+  }));
+
 test('écriture refusée par les règles d\'accès de Grist : message clair, rien ne change, l\'interrupteur reste utilisable', { skip }, () =>
   withWidget({ tables: withIdentity(), user: IRIS_EMAIL, denyWrites: ['BDD'] }, async ({ page, logs }) => {
     await waitForAccountBar(page);
@@ -968,6 +1032,7 @@ test('écriture refusée par les règles d\'accès de Grist : message clair, rie
     await page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent !== '');
     assert.match(await accountStatus(page), /^Grist a refusé la modification/);
     assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'error');
+    assert.equal(await isStatusOnScreen(page), true, 'une erreur se voit à l\'écran');
     assert.equal(await isSwitchOn(page), false, 'l\'interrupteur montre l\'état réel, pas le souhait');
     assert.equal(await cardCount(page), 4);
     assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), false);
@@ -975,7 +1040,7 @@ test('écriture refusée par les règles d\'accès de Grist : message clair, rie
     assert.ok((await Promise.all(logs.errors)).some(line => line.includes('[PRESENCE]')), 'le détail est dans la console');
   }));
 
-test('après une erreur, un nouvel essai réussi efface le message d\'erreur', { skip }, () =>
+test('après une erreur, un nouvel essai réussi remplace le message d\'erreur par la confirmation', { skip }, () =>
   withWidget({ tables: withIdentity(), user: IRIS_EMAIL, denyWrites: ['BDD'] }, async ({ page }) => {
     await waitForAccountBar(page);
     await presenceSwitch(page).click();
@@ -983,8 +1048,24 @@ test('après une erreur, un nouvel essai réussi efface le message d\'erreur', {
     await page.evaluate(() => { window.__denyWrites = []; });
     await presenceSwitch(page).click();
     await waitForCards(page, 5);
-    assert.equal(await accountStatus(page), '');
+    assert.equal(await accountStatus(page), SAVED_ON, 'plus d\'erreur : la confirmation prend sa place');
+    assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'done');
     assert.equal(await isSwitchOn(page), true);
+  }));
+
+test('écriture réussie mais annuaire impossible à relire : le bandeau le dit, à l\'écran, sans annoncer de réussite', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: IRIS_EMAIL }, async ({ page }) => {
+    await waitForAccountBar(page);
+    await page.evaluate(() => { window.__failTables = ['Etablissements']; });
+    await presenceSwitch(page).click();
+    await page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent !== 'Enregistrement…');
+    assert.equal(await accountStatus(page), 'Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.');
+    assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'info',
+      'ce n\'est pas une réussite confirmée : l\'annuaire montre encore l\'ancien état');
+    assert.equal(await isStatusOnScreen(page), true, 'et le message se voit');
+    assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), true, 'le choix est bien dans Grist');
+    await waitForBanner(page);
+    assert.equal(await presenceSwitch(page).getAttribute('aria-disabled'), null, 'l\'interrupteur est de nouveau utilisable');
   }));
 
 test('une personne identifiée sans fiche dans BDD voit une mention sans interrupteur, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
