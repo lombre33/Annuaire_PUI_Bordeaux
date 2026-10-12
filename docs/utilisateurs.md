@@ -44,6 +44,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Établissement fondateur** | L'un des 16 établissements qui ont fondé le PUI |
 | **Établissement partenaire** | Un partenaire du PUI |
 | **Structure « autres »** | Une structure extérieure au PUI, qui a collaboré à certaines tâches. Son statut est « autres » : ses contacts n'apparaissent pas dans l'annuaire |
+| **Domaine (compétences macro)** | Un regroupement de compétences. Le menu Compétences range les compétences par domaine ([Domaines et compétences](#domaines-et-compétences)) |
 | **Accord d'apparaître** | Le choix de chaque personne de figurer ou non dans l'annuaire. Sans son accord, une personne n'apparaît pas, même si son établissement a validé son apparition |
 | **Instances** | *À compléter* |
 | **Actions** | *À compléter* |
@@ -54,7 +55,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 ## Découvrir l'écran
 
-![Vue d'ensemble de l'annuaire : en-tête, barre de recherche, huit filtres, interrupteurs Fondateurs et Partenaires, bouton Réinitialiser et cartes de contact](images/apercu.png)
+![Vue d'ensemble de l'annuaire : en-tête, barre de recherche, sept filtres, interrupteurs Fondateurs et Partenaires, bouton Réinitialiser et cartes de contact](images/apercu.png)
 
 | Élément | À quoi il sert |
 |---|---|
@@ -62,7 +63,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Financeurs** (au centre de l'en-tête) | La phrase de financement et les logos des financeurs ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
-| **Actions, Tâches, Communautés, GT, Domaines, Compétences, Instances, Établissement** | Huit filtres : chaque bouton ouvre un menu de valeurs à cocher |
+| **Actions, Tâches, Communautés, GT, Compétences, Instances, Établissement** | Sept filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
 | **Réinitialiser** | Efface la recherche et décoche tous les filtres |
 | **Cartes** | Une carte par personne, trois par ligne, dans l'ordre de la liste des contacts dans Grist (sans tri) |
@@ -85,7 +86,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 Sur une carte que vous pouvez modifier, une ligne s'ajoute en bas : la mention **Votre fiche** (sur la vôtre) et le bouton **✎ Modifier** ([Modifier ma fiche](#modifier-ma-fiche)).
 
-Une information absente n'est pas remplacée par une ligne vide : elle n'apparaît simplement pas. Les **domaines** de compétences ne figurent pas sur la carte, qui garde le détail des compétences : ils servent à filtrer (voir [Domaines et compétences](#domaines-et-compétences)).
+Une information absente n'est pas remplacée par une ligne vide : elle n'apparaît simplement pas. Les **domaines** de compétences ne figurent pas sur la carte, qui garde le détail des compétences : ils rangent le menu Compétences et permettent de filtrer par domaine (voir [Domaines et compétences](#domaines-et-compétences)).
 
 ## Les logos et le bandeau du bas
 
@@ -120,7 +121,7 @@ Tapez dans **Rechercher par nom ou prénom…** : les cartes se mettent à jour 
 
 Un clic sur un bouton de filtre ouvre son menu ; ouvrir un menu referme les autres, et un clic en dehors le referme.
 
-![Menu du filtre Domaines ouvert : champ de recherche, options à cocher et nombre de cartes à droite de chaque option](images/filtre-menu.png)
+![Menu du filtre Instances ouvert : champ de recherche, options à cocher et nombre de cartes à droite de chaque option](images/filtre-menu.png)
 
 - **Cochez** une ou plusieurs valeurs : les cartes se mettent à jour immédiatement.
 - Dans un **même** menu, les valeurs s'additionnent (**ou**) : cocher deux instances affiche les personnes qui sont dans l'une *ou* l'autre.
@@ -135,13 +136,24 @@ Ici, la communauté « Santé numérique » **et** l'établissement « CHD » so
 
 ### Domaines et compétences
 
-Le filtre **Domaines** regroupe les compétences par domaine (on parle aussi de *compétences macro*). Cochez un domaine pour voir toutes les personnes qui ont **au moins une compétence** dans ce domaine, sans avoir à connaître chacune d'elles. Cochez plusieurs domaines : les valeurs s'additionnent (**ou**), comme dans tout menu.
+Le menu **Compétences** range les compétences par **domaine** (on parle aussi de *compétences macro*) et se cherche à deux niveaux : par domaine, quand on ne connaît pas chaque compétence, ou par compétence, quand on sait laquelle on veut. Un seul bouton sert aux deux : il n'y a pas de filtre « Domaines » à part.
 
-![Domaine Recherche clinique coché et menu Compétences ouvert : deux contacts, et un compteur à 0 pour les compétences d'autres domaines](images/filtre-domaines.png)
+![Le menu Compétences ouvert : le domaine « Recherche clinique » est coché, « Santé numérique et données » est coché en partie (« Open science » seule), le bouton affiche 2 et trois contacts restent affichés](images/filtre-competences.png)
 
-Le filtre **Compétences** reste disponible pour affiner. Ici, « Domaines › Recherche clinique » est coché : deux personnes restent affichées, et le menu Compétences compte, pour chaque compétence, les personnes **de ce domaine** qui l'ont. Cocher « Essais cliniques » garde alors celles du domaine qui ont cette compétence.
+- Chaque ligne en violet est un **domaine**. Le nombre à sa droite est celui des cartes qui ont **au moins une compétence** dans ce domaine : une personne qui en a deux n'est comptée qu'une fois.
+- **Cocher un domaine** coche d'un coup toutes ses compétences : les personnes qui ont l'une d'elles restent affichées, sans avoir à connaître chacune.
+- La **flèche** à droite d'un domaine déplie ses compétences. Cochez-en une, et la case du domaine passe à moitié cochée (un tiret) : seules les personnes qui ont cette compétence comptent. Un clic sur la case d'un domaine à moitié coché le complète, un clic de plus décoche tout.
+- Tout s'additionne (**ou**), comme dans tout menu : avec « Recherche clinique » et « Open science » cochés, on voit les personnes de l'un ou de l'autre. Le chiffre du bouton compte un domaine coché en entier pour **un**, quel que soit le nombre de ses compétences.
+- Les domaines et les compétences cochés **remontent en tête** quand on rouvre le menu, et un domaine coché en partie s'ouvre de lui-même, pour montrer lesquelles.
+- Une compétence dont le domaine n'est pas renseigné dans Grist est rangée sous **Autres**, en fin de liste : ses personnes restent ainsi trouvables.
 
-Une compétence dont le domaine n'est pas renseigné dans Grist est rangée sous **Autres** : ses personnes restent ainsi trouvables.
+**La recherche du menu trouve un domaine comme une compétence.** Tapez quelques lettres, sans souci des accents ni des majuscules : le menu ne garde que ce qui correspond, et déplie les domaines concernés.
+
+![Recherche « sante » dans le menu Compétences : seul le domaine « Santé numérique et données » reste, avec ses trois compétences](images/filtre-competences-recherche.png)
+
+- Si le mot figure dans le **nom d'un domaine**, le domaine reste avec **toutes** ses compétences : « sante » garde « Santé numérique et données » et ses trois compétences, dont deux ne contiennent pas le mot.
+- Si le mot figure dans le **nom d'une compétence**, elle reste sous son domaine : « contrat » garde « Droit des contrats » sous « Valorisation et partenariats », sans les autres compétences du domaine.
+- La recherche ne coche rien : il faut cocher ensuite. Videz le champ pour retrouver la liste complète.
 
 ## Gagner du temps : cliquer sur une étiquette
 
@@ -446,6 +458,10 @@ Oui : désactivez l'interrupteur de [Ma présence](#ma-présence--apparaître-ou
 **Pourquoi n'ai-je pas de bandeau « Ma présence » ?**
 
 L'annuaire ne vous propose rien quand il ne peut pas vous reconnaître : compte qui ne peut que consulter (rôle Lecteur), adresse de votre compte absente de l'annuaire, ou réglage manquant dans Grist. Voir [Ma présence](#ma-présence--apparaître-ou-non).
+
+**L'annuaire utilise-t-il l'intelligence artificielle ?**
+
+Pas quand vous l'utilisez : l'annuaire n'appelle aucune IA et n'envoie vos informations nulle part. Le PUI indique qu'aucune IA ne traite le document Grist en temps réel. Les compétences, elles, sont traitées par une IA au moment de leur export depuis Résana, hors de l'annuaire, via un service tiers (Mammouth AI), sans aucune donnée personnelle d'après le PUI. Voir [L'intelligence artificielle dans ce projet](securite.md#lintelligence-artificielle-dans-ce-projet).
 
 **Que sait l'annuaire de moi quand je l'ouvre ?**
 

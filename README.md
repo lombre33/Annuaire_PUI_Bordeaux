@@ -106,8 +106,8 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 | **Utiliser l'annuaire** : rechercher, filtrer, modifier sa fiche, comprendre un message, vocabulaire du PUI | [Guide utilisateur](docs/utilisateurs.md) |
 | **Comprendre et modifier le code** : architecture, chargement des données, règles, tests, recettes | [Documentation développeur](docs/developpeurs.md) |
 | **Régler le document Grist** : colonne de consentement, table-sonde, administrateurs, règles d'accès, logos | [`GRIST_SETUP.md`](GRIST_SETUP.md) |
-| **Évaluer les risques** : accès demandé à Grist, écritures, données personnelles, recommandations | [Sécurité et confidentialité](docs/securite.md) |
-| **Faire vivre l'annuaire** : règles de visibilité, diagnostic, publication, retour arrière, continuité (départs, absence d'administrateur) | [Maintenance](docs/maintenance.md) |
+| **Évaluer les risques** : accès demandé à Grist, écritures, usage de l'IA, données personnelles, recommandations | [Sécurité et confidentialité](docs/securite.md) |
+| **Faire vivre l'annuaire** : règles de visibilité, diagnostic, publication, retour arrière, continuité (départs, absence d'administrateur), hébergement | [Maintenance](docs/maintenance.md) |
 | **Consulter le cahier des charges** | [`specs.md`](specs.md) |
 | **Tester à la main avant un déploiement** | [`TESTING.md`](TESTING.md) |
 | **Retrouver l'historique des versions** | [`CHANGELOG.md`](CHANGELOG.md), [`VERSION.md`](VERSION.md) |
@@ -176,6 +176,15 @@ Ces tests ne remplacent pas un essai dans un vrai document Grist : voir [`TESTIN
 - **Pas de test contre un vrai Grist** : les tests simulent l'API, et seul le protocole de [`TESTING.md`](TESTING.md) valide le comportement dans Grist.
 
 Le détail, avec les cas que le bandeau ne signale pas, est dans [Maintenance](docs/maintenance.md#limites-connues).
+
+## Usage de l'IA et hébergement
+
+- **Aucune IA en temps réel.** Le widget n'appelle aucun service d'IA, et le PUI indique qu'aucune IA ne traite le document Grist en temps réel ni n'y a d'accès MCP (Model Context Protocol).
+- **Les compétences passent par une IA à l'export seulement**, au moment de leur export depuis Résana, via [Mammouth AI](https://mammouth.ai) avec le modèle Claude Opus 5.0. D'après le PUI, aucune donnée personnelle n'est transmise et la conversation est supprimée après usage (mode « no log ») ; selon la [politique de confidentialité de Mammouth AI](https://info.mammouth.ai/docs/privacy-policy/), des données supprimées peuvent être conservées jusqu'à 30 jours.
+- **Le code est co-créé avec Claude Code**, un assistant de programmation fondé sur l'IA. Les tests automatiques sont son filet de sécurité.
+- **Un hébergement fragile à ce jour.** Le dépôt et le site GitHub Pages appartiennent au compte personnel de la personne qui a créé le widget ; une migration vers le GitLab UB est impossible, faute de module « Pages », et la piste proposée est un GitHub DIESE. Dans Grist, les administrateurs sont uniquement des agents en poste.
+
+Le détail est dans [Sécurité et confidentialité](docs/securite.md#lintelligence-artificielle-dans-ce-projet) et dans [Maintenance](docs/maintenance.md#hébergement-et-risques-à-ce-jour).
 
 ## Règles du projet
 

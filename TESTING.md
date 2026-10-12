@@ -27,7 +27,8 @@ Sans dépendance, un fichier de tests par module :
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
   libellé), `isEtablissementEligible`, `filterVisibleEstablishments`.
 - `tests/filters.test.mjs` — `filterContacts`, `pruneStaleFilters`,
-  `computeFilterCounts` (dont le filtre « Domaines » et ses compteurs).
+  `computeFilterCounts` (dont les compteurs des domaines) et le menu rangé par
+  domaine : `menuGroups`, `groupState`, `toggleGroup`, `selectionCount`.
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
   (une lecture par table, aucune ancienne table lue, libellé corrigé
   prioritaire, tables indispensables illisibles, table de référence illisible,
@@ -81,10 +82,12 @@ Sans dépendance, un fichier de tests par module :
   colonne `nom_de_domaine`.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 51
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 62
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, interrupteurs
-Fondateurs/Partenaires, recherche, filtres et compteurs, texte HTML affiché
+Fondateurs/Partenaires, recherche, filtres et compteurs, menu Compétences rangé par
+domaine (case de domaine, détail replié, case partielle, recherche à deux niveaux,
+ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
 bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
 double clic, écriture refusée, personne sans fiche).
@@ -99,12 +102,13 @@ action, la fiche modifiée par un administrateur, le téléphone numérique ou t
 refus de Grist, un changement concurrent, une fiche supprimée, le double clic, Échap,
 un prénom piégé, le focus, la tabulation dans la fenêtre et l'affichage de 280 à 360px.
 
-`tests/responsive.test.mjs` y ajoute 16 scénarios sur la mise en page, de 280 à
+`tests/responsive.test.mjs` y ajoute 19 scénarios sur la mise en page, de 280 à
 1920px de large, sur un jeu de données chargé (`tests/fixtures-responsive.mjs` :
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
-d'outils, menus de filtres entièrement dans le cadre, cibles tactiles (écran
+d'outils, menus de filtres (le menu Compétences déplié compris) entièrement dans le
+cadre, cibles tactiles (écran
 tactile émulé), tailles de texte, bandeau d'erreur et état vide à 320px, et
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
@@ -152,9 +156,9 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
       `BDD`, et le nombre de cartes affichées (`#resultCount`) est
       inférieur ou égal à N (seuls les contacts avec `perimetre` non
       vide s'affichent — voir `isInScope()`).
-- [ ] Les 8 boutons de filtre (Actions, Tâches, Communautés, GT, Domaines,
-      Compétences, Instances, Établissement) sont présents dans la barre
-      d'outils.
+- [ ] Les 7 boutons de filtre (Actions, Tâches, Communautés, GT, Compétences,
+      Instances, Établissement) sont présents dans la barre d'outils. Il n'y a
+      pas de bouton « Domaines » : les domaines sont dans le menu Compétences.
 - [ ] Sur une carte avec toutes les infos renseignées : initiales correctes
       dans l'avatar, nom + prénom, fonction visible, logo (ou pastille)
       de l'établissement en haut à droite, email en lien `mailto:`, téléphone visible.
@@ -178,8 +182,8 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 
 ## 3. Chaque filtre, seul
 
-Pour chacun des 8 filtres (Actions, Tâches, Communautés, GT, Domaines,
-Compétences, Instances, Établissement) :
+Pour chacun des 7 filtres (Actions, Tâches, Communautés, GT, Compétences,
+Instances, Établissement) :
 
 - [ ] Ouvrir le menu (clic sur le bouton) → seul ce menu est ouvert (les
       autres se ferment).
@@ -210,19 +214,54 @@ référence) :
 - [ ] Cocher une compétence dans le menu garde exactement les contacts dont
       la carte affiche cette compétence.
 
-Spécifique **Domaines** (compétences macro, colonne `Macro_competences`) :
+Spécifique **Compétences par domaine** (compétences macro, colonne
+`Macro_competences` de la table `Competences`) : le menu Compétences range ses
+valeurs par domaine, sans second bouton.
 
-- [ ] Le bouton « Domaines » est juste avant « Compétences » ; son infobulle
-      parle de compétences macro.
+- [ ] L'infobulle du bouton « Compétences » parle de domaines ; le champ de
+      recherche du menu dit « Domaine ou compétence… » en entier, sans être
+      coupé.
 - [ ] Le menu liste chaque domaine une seule fois (pas de doublon dû à la casse
-      ou aux accents), plus « Autres » s'il existe une compétence sans domaine.
-- [ ] Cocher un domaine garde les contacts qui ont au moins une compétence de
-      ce domaine ; son nombre est celui des contacts, pas des compétences.
-- [ ] Le menu « Compétences » reste complet et filtrable en plus du domaine :
-      cocher un domaine puis une compétence de ce domaine garde ses contacts.
+      ou aux accents), triés alphabétiquement, plus « Autres » **en dernier** s'il
+      existe une compétence sans domaine. Les domaines sont repliés ; à droite de
+      chacun, le nombre de contacts (pas de compétences) qui ont au moins une
+      compétence de ce domaine.
+- [ ] La flèche d'un domaine (ou la touche Entrée sur elle) déplie ses
+      compétences, triées alphabétiquement, avec leur nombre de contacts ; un
+      second clic les replie.
+- [ ] Cocher la case d'un domaine coche toutes ses compétences et garde les
+      contacts qui ont l'une d'elles. Le badge du bouton affiche 1, quel que
+      soit le nombre de compétences. La recocher décoche tout.
+- [ ] Déplier un domaine et cocher une seule de ses compétences : la case du
+      domaine passe à moitié cochée (un tiret) ; un clic dessus la complète.
+      Décocher la dernière compétence décoche le domaine.
+- [ ] Tout est un OU : un domaine coché et une compétence d'un **autre** domaine
+      cochée montrent les contacts de l'un ou de l'autre ; badge = 2.
+- [ ] Les contacts d'un même domaine qui ont deux compétences de ce domaine ne
+      sont comptés qu'une fois.
+- [ ] Fermer puis rouvrir le menu : les domaines qui contiennent une valeur
+      cochée sont en tête, la valeur cochée en tête de son domaine, et un domaine
+      coché en partie s'ouvre de lui-même pour montrer lesquelles. Rien ne bouge
+      pendant qu'on coche.
+- [ ] Recherche du menu : « sante » (sans accent) garde le domaine
+      « Santé… » avec **toutes** ses compétences ; le nom d'une compétence seule
+      garde cette compétence sous son domaine, sans les autres. Les flèches
+      disparaissent et tout est déplié pendant la recherche ; vider le champ
+      rétablit l'état précédent. La recherche ne coche rien.
+- [ ] Réinitialiser décoche domaines et compétences, vide la recherche du menu
+      et le badge disparaît.
+- [ ] Cliquer sur une étiquette de compétence d'une carte coche cette
+      compétence : sa case est cochée dans son domaine, le domaine passe à moitié
+      coché (ou coché si c'est sa seule compétence).
+- [ ] Au clavier : Tabulation passe de la case d'un domaine à sa flèche, puis à ses
+      compétences si elles sont dépliées ; Espace coche une case ; un lecteur d'écran annonce « Détail
+      de <domaine> » et l'état déplié ou replié de la flèche.
 - [ ] La console liste, par identifiant de ligne, les compétences que
       `Macro_competences` ne classe pas (`[REFS] Competences : n ligne(s) sans
       regroupement…`) : les classer dans Grist, puis recharger le widget.
+- [ ] Sans la colonne `Macro_competences` (essai sur une copie du document) : le
+      bandeau « Colonne de libellé introuvable » s'affiche et le menu Compétences
+      reste complet, mais à plat, sans domaines.
 
 ## 4. Filtres combinés
 
@@ -231,7 +270,7 @@ Spécifique **Domaines** (compétences macro, colonne `Macro_competences`) :
       correspondent aux deux restent.
 - [ ] Recherche libre + un filtre catégorie en même temps → les deux
       s'appliquent ensemble.
-- [ ] Les 8 filtres cochés simultanément (au moins une valeur chacun) →
+- [ ] Les 7 filtres cochés simultanément (au moins une valeur chacun) →
       résultat cohérent (potentiellement vide, mais sans erreur console).
 
 ## 5. Interactions carte → filtre
@@ -394,6 +433,11 @@ iOS, Chrome Android) que les tests ne couvrent pas :
       de la rangée : il reste entièrement visible, sans être coupé à droite, et
       se referme d'un clic ailleurs. Élargir le cadre puis le rouvrir : il
       s'ouvre de nouveau sous son bouton.
+- [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit :
+      aucune barre de défilement horizontale, un nom de compétence très long
+      passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et le
+      nombre de chaque domaine restent visibles, et la flèche se touche sans
+      viser.
 - [ ] Carte avec un nom, un prénom et une fonction très longs : le nom tient sur
       deux lignes au plus, le badge d'établissement reste à sa droite, rien ne
       passe sous le badge ni hors de la carte.
@@ -460,7 +504,7 @@ administrateur) dans deux navigateurs, console ouverte.
       sont l'une sous l'autre, « Valider » reste accessible.
 - [ ] La console ne montre aucune erreur ni aucune adresse e-mail.
 
-## 14. Logos et habillage (1.13.0)
+## 14. Logos et habillage (1.14.0)
 
 Réglages d'abord : `GRIST_SETUP.md`, étape 5 (colonnes `logo` et `ordre_bandeau` d'`Etablissements`, table
 facultative `Financeurs`). À jouer sur une **copie** du document, avec la console et l'onglet Réseau du
@@ -470,7 +514,7 @@ la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
 
 - [ ] Document sans aucune colonne ni table de logos : aucune erreur, aucune ligne `[LOGOS]`, aucune demande de
       jeton dans l'onglet Réseau, pas de financeurs en tête de page, les pastilles texte sur les cartes comme
-      avant la 1.13.0, et en bas de page le bandeau des fondateurs validés **en texte** (leurs acronymes).
+      avant la 1.14.0, et en bas de page le bandeau des fondateurs validés **en texte** (leurs acronymes).
 - [ ] Un logo (PNG ou SVG) ajouté dans la colonne `logo` de deux établissements fondateurs validés, puis le
       widget rechargé : le logo remplace la pastille sur leurs cartes, **seul** (ni nom dessous) ; les autres
       établissements gardent leur pastille. Cliquer le logo filtre sur l'établissement, comme la pastille.

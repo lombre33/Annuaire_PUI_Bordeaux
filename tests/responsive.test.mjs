@@ -340,7 +340,7 @@ test('barre d\'outils : sous 600px chaque rangée va d\'un bord à l\'autre, de 
 test('chaque menu de filtre s\'ouvre en entier dans le cadre, de 280px à 1920px', { skip }, () =>
   withWidget({}, async ({ page }) => {
     const filters = await page.locator('.filter').count();
-    assert.equal(filters, 8, 'les 8 filtres du widget');
+    assert.equal(filters, 7, 'les 7 filtres du widget');
     // 280px : un panneau Grist plus étroit que le plus petit téléphone, le menu se réduit alors à lui.
     await atEachWidth(page, [280, 320, 360, 414, 600, 768, 1024, 1280, 1480, 1920], async width => {
       for (let index = 0; index < filters; index++) {
@@ -369,10 +369,16 @@ test('chaque menu de filtre s\'ouvre en entier dans le cadre, de 280px à 1920px
 
 test('un menu n\'est décalé que s\'il déborderait, et revient en place quand le cadre s\'élargit', { skip }, () =>
   withWidget({ width: 360 }, async ({ page }) => {
-    const last = page.locator('.filter').last();
+    // Le filtre le plus à droite du cadre étroit : celui dont le menu déborderait. Ce n'est
+    // pas toujours le dernier de la barre, qui peut tenir seul sur sa rangée.
+    const rightmost = await page.evaluate(() => {
+      const lefts = [...document.querySelectorAll('.filter')].map(filter => filter.getBoundingClientRect().left);
+      return lefts.indexOf(Math.max(...lefts));
+    });
+    const last = page.locator('.filter').nth(rightmost);
     const menuLeft = () => last.locator('.filter-menu').evaluate(menu => menu.style.left);
 
-    // Dans un cadre étroit, le dernier filtre (au bord droit) est décalé vers la gauche.
+    // Dans un cadre étroit, ce filtre (au bord droit) est décalé vers la gauche.
     await last.locator('.filter-button').click();
     assert.match(await menuLeft(), /^-\d+(\.\d+)?px$/, 'menu décalé vers la gauche à 360px');
     // Il garde une marge de 8px avec le bord du cadre.
@@ -388,6 +394,84 @@ test('un menu n\'est décalé que s\'il déborderait, et revient en place quand 
       Math.abs(filter.querySelector('.filter-menu').getBoundingClientRect().left - filter.querySelector('.filter-button').getBoundingClientRect().left));
     assert.ok(aligned < 1, 'le menu reste sous son bouton');
   }));
+
+// Le menu Compétences, rangé par domaine : le jeu de données a neuf domaines, des libellés
+// longs et un sans point de coupure (50 caractères).
+const openedSkills = async page => {
+  await closeMenus(page);
+  const filter = page.locator('.filter[data-filter-key="competences"]');
+  await filter.locator('.filter-button').click();
+  return filter;
+};
+
+test('le menu Compétences, tout déplié, tient dans son cadre étroit : libellés longs à la ligne, nombres et boutons dans le menu', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await atEachWidth(page, [280, 320, 360, 414, 768], async width => {
+      const filter = await openedSkills(page);
+      await filter.locator('.group-toggle').evaluateAll(buttons => buttons.forEach(button => {
+        if (button.getAttribute('aria-expanded') !== 'true') button.click();
+      }));
+      const report = await filter.locator('.filter-menu').evaluate(menu => {
+        // Le bord droit de la zone utile du menu : sans sa bordure ni sa barre de défilement.
+        const clientRight = menu.getBoundingClientRect().left + menu.clientLeft + menu.clientWidth;
+        const inside = selector => [...menu.querySelectorAll(selector)]
+          .filter(element => element.getClientRects().length > 0)
+          .filter(element => element.getBoundingClientRect().right > clientRight + 0.5);
+        return {
+          scrollWidth: menu.scrollWidth,
+          clientWidth: menu.clientWidth,
+          groups: menu.querySelectorAll('.filter-group').length,
+          shownSkills: [...menu.querySelectorAll('.filter-option')].filter(option => option.getClientRects().length > 0).length,
+          outside: ['.group-toggle', '.option-count', '.option-label'].flatMap(selector => inside(selector).map(element => selector))
+        };
+      });
+      assert.equal(report.groups, 9, 'neuf domaines');
+      assert.equal(report.shownSkills, 13, 'toutes les compétences, une fois dépliées');
+      assert.ok(report.scrollWidth <= report.clientWidth, `à ${width}px, le menu défile horizontalement (${report.scrollWidth}px pour ${report.clientWidth}px)`);
+      assert.deepEqual(report.outside, [], `à ${width}px, des éléments du menu sortent à droite`);
+      await closeMenus(page);
+    });
+  }));
+
+test('écran tactile : dans le menu Compétences, la case d\'un domaine et son bouton de dépli sont assez grands pour un doigt', { skip }, () =>
+  withWidget({ width: 414, touch: true }, async ({ page }) => {
+    const filter = await openedSkills(page);
+    const sizes = await filter.locator('.filter-menu').evaluate(menu => {
+      const size = selector => menu.querySelector(selector).getBoundingClientRect();
+      return {
+        domainHeight: size('.group-option').height,
+        toggleWidth: size('.group-toggle').width,
+        toggleHeight: size('.group-toggle').height,
+        checkbox: size('.group-option input').width,
+        optionFont: getComputedStyle(menu.querySelector('.group-option')).fontSize,
+        width: menu.getBoundingClientRect().width
+      };
+    });
+    assert.ok(sizes.domainHeight >= 44, `la ligne d'un domaine fait ${sizes.domainHeight}px de haut`);
+    assert.ok(sizes.toggleWidth >= 28 && sizes.toggleHeight >= 28, `le bouton de dépli fait ${sizes.toggleWidth}×${sizes.toggleHeight}px`);
+    assert.ok(sizes.checkbox >= 18, `la case d'un domaine fait ${sizes.checkbox}px`);
+    assert.equal(sizes.optionFont, '14px', 'comme une option de menu');
+    assert.ok(sizes.width >= 320, `le menu fait ${sizes.width}px de large`);
+    // Déplier un domaine garde les compétences à portée de doigt.
+    await filter.locator('.group-toggle').first().tap();
+    const skill = await filter.locator('.filter-option').first().boundingBox();
+    assert.ok(skill.height >= 44, `une compétence fait ${skill.height}px de haut`);
+  }));
+
+test('le survol colore la ligne d\'un domaine à la souris, et ne reste pas collé au tactile', { skip }, async () => {
+  const backgroundAfterHover = async options => {
+    let background;
+    await withWidget(options, async ({ page }) => {
+      const filter = await openedSkills(page);
+      const domain = filter.locator('.group-option').first();
+      await domain.hover();
+      background = await domain.evaluate(element => getComputedStyle(element).backgroundColor);
+    });
+    return background;
+  };
+  assert.equal(await backgroundAfterHover({ width: 1480 }), 'rgb(241, 240, 255)', 'souris : survol coloré');
+  assert.equal(await backgroundAfterHover({ width: 414, touch: true }), 'rgba(0, 0, 0, 0)', 'tactile : rien ne reste coloré');
+});
 
 // ===== Écran tactile et petits écrans =====
 

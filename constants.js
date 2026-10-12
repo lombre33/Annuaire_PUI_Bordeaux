@@ -49,10 +49,16 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 //   column        colonne ReferenceList de BDD qui y renvoie ; absente pour les
 //                 Références simples Établissement et Rôle
 //   hint          infobulle du bouton de filtre, quand son nom ne suffit pas
+//   placeholder   texte du champ de recherche du menu, quand « Rechercher dans
+//                 <label> » ne dit pas tout
 //   groups        catégorie dont celle-ci est un regroupement : elle lit une
 //                 autre colonne de la même table (les compétences macro sont
 //                 une colonne de la table Competences) ; `fallback` est alors le
 //                 libellé des lignes que ce regroupement ne couvre pas
+//   grouping      l'inverse de `groups` : la catégorie qui range celle-ci en
+//                 groupes. Le menu de cette catégorie présente ses valeurs par
+//                 groupe (les compétences par domaine) ; le regroupement n'a pas
+//                 de menu à lui, il ne sert qu'à ranger et à compter
 //
 // Les libellés lus de Grist sont rangés par clé de catégorie (referenceMaps),
 // pas par table : deux catégories peuvent lire la même table.
@@ -61,18 +67,23 @@ export const CATEGORIES = {
   taches: { label: 'Tâches', color: '#ff9800', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches' },
   communautes: { label: 'Communautés', color: '#d85b9d', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], column: 'Communautes' },
   gt: { label: 'GT', color: '#1ba99a', table: 'GT', field: ['GT_corrige', 'GT'], column: 'GT' },
-  competences: { label: 'Compétences', color: '#9c27b0', table: 'Competences', field: ['Competences_corrigees', 'Competences'], column: 'Competences' },
+  competences: {
+    label: 'Compétences', color: '#9c27b0', table: 'Competences', field: ['Competences_corrigees', 'Competences'], column: 'Competences',
+    hint: 'Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
+    placeholder: 'Domaine ou compétence…', grouping: 'macro'
+  },
   macro: {
     label: 'Domaines', color: '#6a1b9a', table: 'Competences', field: ['Macro_competences'], column: 'Competences',
-    hint: 'Compétences macro : les compétences regroupées par domaine', groups: 'competences', fallback: 'Autres'
+    groups: 'competences', fallback: 'Autres'
   },
   instances: { label: 'Instances', color: '#4f8ee8', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], column: 'Instances' },
   etablissement: { label: 'Établissement', color: '#147c72', table: 'Etablissements', field: ['acronyme', 'nom_complet'] },
   role: { label: 'Rôle PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
 };
 
-// Ordre des boutons de filtre. Rôle PUI n'a pas de filtre (specs.md).
-const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'macro', 'competences', 'instances', 'etablissement'];
+// Ordre des boutons de filtre. Rôle PUI n'a pas de filtre (specs.md), ni les
+// compétences macro : leurs domaines sont les groupes du menu Compétences.
+const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement'];
 
 // Ordre des sections de tags d'une carte. Établissement a son badge dédié ; les
 // compétences macro n'y figurent pas : la carte garde le détail des compétences.
