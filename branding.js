@@ -112,3 +112,34 @@ export function logoSize(ratio, { area, maxWidth, maxHeight }) {
   }
   return { width, height };
 }
+
+// Un pixel qui ne fait pas partie du logo : transparent, ou à peu près blanc (le fond d'un JPEG, d'un PNG sans transparence).
+const MIN_ALPHA = 24;
+const NEAR_WHITE = 235;
+const isClear = (pixels, index) => pixels[index + 3] < MIN_ALPHA
+  || Math.min(pixels[index], pixels[index + 1], pixels[index + 2]) >= NEAR_WHITE;
+
+// Le plus petit rectangle qui contient tout ce qui se voit d'un logo, sans ses marges transparentes ou blanches.
+// `pixels` : les octets RGBA de l'image (getImageData), `width` et `height` ses dimensions. Renvoie
+// { x, y, width, height }, ou null quand il n'y a rien à retirer : une image dont un coin porte une couleur
+// (le fond fait alors partie du logo) ou une image vide.
+export function inkBounds(pixels, width, height) {
+  if (!(width > 0 && height > 0) || pixels.length < width * height * 4) return null;
+  const last = width * height - 1;
+  if (![0, width - 1, last - (width - 1), last].every(pixel => isClear(pixels, pixel * 4))) return null;
+  let left = width;
+  let right = -1;
+  let top = height;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (isClear(pixels, (y * width + x) * 4)) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      bottom = y;
+    }
+  }
+  if (right < 0) return null;
+  return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
+}

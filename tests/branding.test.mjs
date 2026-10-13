@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildBranding, logoForContact, logoSize } from '../branding.js';
+import { buildBranding, logoForContact, logoSize, inkBounds } from '../branding.js';
 import { BAND_LOGO } from '../constants.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { sampleTables, withBranding } from './fixtures.mjs';
@@ -239,4 +239,26 @@ test('logoSize: never beyond the bounds, whatever the ratio', () => {
     assert.ok(box.width <= BAND_LOGO.maxWidth + 1e-9 && box.height <= BAND_LOGO.maxHeight + 1e-9, `ratio ${ratio}: ${box.width} x ${box.height}`);
     assert.ok(Math.abs(box.width / box.height - ratio) < 1e-6 * Math.max(1, ratio), `ratio ${ratio} conservé`);
   }
+});
+
+// Les pixels d'une image de `width` x `height` : transparente (ou blanche), avec des rectangles de couleur.
+function pixelsOf(width, height, { background = [0, 0, 0, 0], rects = [] }) {
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < width * height; i++) pixels.set(background, i * 4);
+  for (const { x, y, w, h, color } of rects) {
+    for (let row = y; row < y + h; row++) for (let column = x; column < x + w; column++) pixels.set(color, (row * width + column) * 4);
+  }
+  return pixels;
+}
+
+test('inkBounds : le cadre de l\'encre d\'un logo, sans ses marges transparentes ou blanches', () => {
+  const ink = { x: 30, y: 40, w: 50, h: 20, color: [20, 60, 110, 255] };
+  assert.deepEqual(inkBounds(pixelsOf(200, 100, { rects: [ink] }), 200, 100), { x: 30, y: 40, width: 50, height: 20 }, 'fond transparent');
+  assert.deepEqual(inkBounds(pixelsOf(200, 100, { background: [255, 255, 255, 255], rects: [ink] }), 200, 100), { x: 30, y: 40, width: 50, height: 20 }, 'fond blanc d\'un JPEG');
+  assert.deepEqual(inkBounds(pixelsOf(200, 100, { background: [250, 250, 248, 255], rects: [ink] }), 200, 100), { x: 30, y: 40, width: 50, height: 20 }, 'blanc légèrement bruité');
+  assert.deepEqual(inkBounds(pixelsOf(200, 100, { rects: [{ x: 0, y: 30, w: 200, h: 40, color: [20, 60, 110, 255] }] }), 200, 100), { x: 0, y: 30, width: 200, height: 40 }, 'une bannière qui touche les bords');
+  assert.equal(inkBounds(pixelsOf(200, 100, { rects: [{ x: 0, y: 0, w: 200, h: 100, color: [20, 60, 110, 255] }] }), 200, 100), null, 'une image pleine : rien à retirer');
+  assert.equal(inkBounds(pixelsOf(200, 100, { background: [20, 120, 114, 255], rects: [ink] }), 200, 100), null, 'un fond coloré fait partie du logo');
+  assert.equal(inkBounds(pixelsOf(200, 100, {}), 200, 100), null, 'image vide');
+  assert.equal(inkBounds(new Uint8ClampedArray(8), 200, 100), null, 'pixels manquants');
 });

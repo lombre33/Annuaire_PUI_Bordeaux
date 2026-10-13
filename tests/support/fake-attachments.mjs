@@ -94,12 +94,14 @@ export async function routeAttachments(context) {
     const id = Number(url.pathname.split('/').at(-2));
     record.hits[id] = (record.hits[id] ?? 0) + 1;
     record.tokens.push(url.searchParams.get('auth'));
-    if (id === MISSING_FILE) return route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not found' });
-    if (id === BROKEN_FILE) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: 'ceci n\'est pas une image' });
+    // Comme Grist, qui laisse le widget lire les fichiers avec un jeton d'accès (CORS), donc leurs pixels.
+    const headers = cors;
+    if (id === MISSING_FILE) return route.fulfill({ status: 404, headers, contentType: 'text/plain', body: 'Not found' });
+    if (id === BROKEN_FILE) return route.fulfill({ status: 200, headers, contentType: 'image/svg+xml', body: 'ceci n\'est pas une image' });
     const stored = record.stored[id];
-    if (stored) return route.fulfill({ status: 200, contentType: stored.contentType, body: stored.bytes });
-    if (isPortrait(id)) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: portraitSvg(id) });
-    return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: logoSvg(id) });
+    if (stored) return route.fulfill({ status: 200, headers, contentType: stored.contentType, body: stored.bytes });
+    if (isPortrait(id)) return route.fulfill({ status: 200, headers, contentType: 'image/svg+xml', body: portraitSvg(id) });
+    return route.fulfill({ status: 200, headers, contentType: 'image/svg+xml', body: logoSvg(id) });
   });
 
   await context.route(url => url.origin === ORIGIN && url.pathname === `${PATH}/attachments`, async route => {

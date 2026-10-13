@@ -601,8 +601,7 @@ button.avatar:hover {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  max-width: calc(min(120px, 38cqw) + 16px);
-  height: 36px;
+  height: auto;
   padding: 2px 4px;
   color: inherit;
   background: none;
@@ -613,37 +612,36 @@ button.avatar:hover {
 .etablissement-tag.has-logo:focus-visible {
   border-color: var(--line);
 }
-/* Tous les logos ont la même hauteur, et la largeur que donnent leurs proportions. Un logo très
-   large garde ses proportions dans une case plus étroite (object-fit) : jamais plus qu'une part de
-   la largeur de la carte, pour que le nom garde sa place. La hauteur suit la place de la carte :
-   32 px sur une carte étroite (hauteur de la maquette), 48 px dès 330 px de large, 64 px dès 380 px
-   (le double de la maquette, à la demande d'Antoine le 13 octobre 2026). */
+/* Tous les logos ont le même poids visuel. Un logo dont les marges ont été retirées (branding-ui.js,
+   fitCardLogo, classe `sized`) reçoit de la feuille de style sa taille --w x --h, de même surface que
+   les autres (CARD_LOGO) : --k la réduit à 85 % dès 330 px de large de carte et à 70 % en dessous, pour que
+   le nom garde sa place. Tant que le logo n'est pas lu, ou quand Grist refuse de donner ses pixels, il
+   tient dans une case de la taille maximale (object-fit) : un logo large est borné par la largeur, un
+   logo haut par la hauteur. */
 .etablissement-tag .logo-img {
+  --k: 0.7;
   display: block;
-  width: auto;
-  height: 32px;
-  max-width: min(120px, 38cqw);
+  width: calc(104px * var(--k));
+  height: calc(42px * var(--k));
   object-fit: contain;
   object-position: right center;
 }
+.etablissement-tag .logo-img.sized {
+  width: calc(var(--w) * var(--k) * 1px);
+  height: calc(var(--h) * var(--k) * 1px);
+}
+.etablissement-tag.visible.has-logo.fitted {
+  height: auto;
+  max-width: none;
+}
 @container (min-width: 330px) {
-  .etablissement-tag.visible.has-logo {
-    max-width: calc(min(180px, 45cqw) + 16px);
-    height: 52px;
-  }
   .etablissement-tag .logo-img {
-    height: 48px;
-    max-width: min(180px, 45cqw);
+    --k: 0.85;
   }
 }
 @container (min-width: 380px) {
-  .etablissement-tag.visible.has-logo {
-    max-width: calc(min(240px, 50cqw) + 16px);
-    height: 68px;
-  }
   .etablissement-tag .logo-img {
-    height: 64px;
-    max-width: min(240px, 50cqw);
+    --k: 1;
   }
 }
 /* Un logo n'apparaît qu'une fois chargé. */

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.21.4 — Logos des cartes : même taille visuelle, quelles que soient leurs marges
+
+Demande d'Antoine du 13 octobre 2026 (capture à l'appui) : malgré la hauteur commune de 1.21.0, les logos paraissaient de
+tailles très différentes (Inserm et l'ENSAP énormes, Bordeaux Sciences Agro et Bordeaux Montaigne minuscules). La cause
+est dans les fichiers : certains logos sont coupés au ras, d'autres posés au milieu d'un grand carré transparent. Repères
+d'Antoine : environ 1,5 fois Bordeaux Sciences Agro et 0,85 fois Bordeaux INP, tels qu'ils s'affichaient. Le widget lit
+maintenant chaque logo de carte (une fois par fichier) : il en retire les marges transparentes ou blanches (`inkBounds`
+dans `branding.js`, une copie recadrée de 320 px au plus), puis lui donne une surface de 3 200 px² répartie selon ses
+proportions, bornée à 104 x 42 px (`CARD_LOGO` dans `constants.js`, la même règle que le bandeau du bas) ; un logo large est donc plus
+large et moins haut qu'un logo carré, et tous ont le même poids. Sur une carte de 330 à 380 px de large la taille est
+réduite à 85 %, en dessous à 70 %, pour que le nom garde sa place. Un fond coloré fait partie du logo et n'est pas retiré.
+Le widget demande les logos des cartes en CORS (`crossorigin`) pour lire leurs pixels : **non essayé dans un vrai Grist**.
+Si Grist refuse, le logo se charge comme avant, sans recadrage, dans une case de 104 x 42 px (`object-fit: contain`).
+Seuls les logos des cartes changent. Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.21.3 — Recherche : le texte tapé reste lisible sur Firefox mobile
 
 Signalé par Antoine le 13 octobre 2026 (06 h 32) : sur Firefox mobile, « quand on tape dans la barre de recherche, le filtre marche mais on

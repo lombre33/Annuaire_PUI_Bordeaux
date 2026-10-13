@@ -1,4 +1,4 @@
-# Version 1.21.3 — Recherche : le texte tapé reste lisible sur Firefox mobile (voir CHANGELOG.md)
+# Version 1.21.4 — Logos des cartes à la même taille visuelle, marges retirées (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -47,4 +47,7 @@ Depuis la 1.21.2, les cases à cocher sont dessinées par la feuille de style (f
 son thème clair : plus de carré noir sur Firefox Android.
 Depuis la 1.21.3, les boutons et les champs prennent la couleur du texte de la page et le texte d'invite est gris foncé : ce qu'on tape
 dans la recherche reste lisible sur Firefox mobile en thème sombre (rejoué dans Chromium en schéma sombre imposé, pas essayé dans Firefox).
-899 tests (dont 323 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.21.4, les logos des cartes ont tous la même surface visuelle : le widget retire les marges transparentes ou blanches de
+chaque logo, puis lui donne 3 200 px² répartis selon ses proportions, dans une case de 104 x 42 px au plus (non essayé dans un vrai Grist :
+il lit les pixels des logos, ce que Grist doit autoriser).
+901 tests (dont 324 dans un vrai navigateur, optionnels sans Playwright).
