@@ -433,10 +433,10 @@ test('prepareReview for an administrator shows the new address and the new étab
     etab: { before: 'UBM', after: 'CHU' },
     email: { before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@u-bordeaux-montaigne.fr' }
   });
-  // Le détail des changements dit les noms complets ; la carte, elle, garde les acronymes.
+  // Le détail des changements parle d'acronymes comme la liste du formulaire et la carte.
   assert.deepEqual(next.lines.map(line => [line.key, line.before, line.after]), [
     ['email', 'bob@u-bordeaux-montaigne.fr', 'nouveau@u-bordeaux-montaigne.fr'],
-    ['Etablissement', 'Université Bordeaux Montaigne', 'CHU de Bordeaux']
+    ['Etablissement', 'UBM', 'CHU']
   ]);
   assert.deepEqual(writes(w), []);
 });
@@ -844,6 +844,51 @@ test('createProfile adds one row to BDD with the address of the account and what
   assert.deepEqual(unsavedLabels(next, tableToRows(w.tables.BDD).find(row => row.id === 13), w.referenceMaps), []);
   const { people } = await loadDirectory(w.docApi, { log: quiet });
   assert.equal(people.findByEmail(NEW_EMAIL).length, 1, 'la personne retrouve sa fiche par son adresse');
+});
+
+test('a fiche created with « Apparaître dans l\'annuaire » ticked is written with Accepte_apparaitre true, and unticked with false, as a choice and not as a field of the fiche', async () => {
+  const fill = { prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 };
+  const w = await newcomer();
+  const published = await creation(w, { ...fill, Accepte_apparaitre: true });
+  assert.equal(published.accepted, true);
+  assert.equal(published.visibility.accepted, true, 'la relecture compte la fiche comme acceptée');
+  assert.equal(published.visibility.visible, false, 'mais sans périmètre, elle reste masquée : le widget n\'écrit jamais le périmètre');
+  assert.deepEqual(Object.keys(published.champs), ['prenom', 'nom', 'Etablissement'], 'le choix n\'est pas un champ de la fiche');
+  assert.deepEqual(published.lines.map(line => line.key), ['prenom', 'nom', 'Etablissement']);
+  assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien');
+  await createProfile(w.docApi, published, { log: quiet });
+  assert.deepEqual(writes(w), [{
+    action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
+    values: { email: NEW_EMAIL, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 }
+  }]);
+  assert.equal(w.tables.BDD.Accepte_apparaitre[12], true);
+  assert.equal('perimetre' in writes(w)[0].values, false, 'aucun périmètre écrit : il décide de qui apparaît');
+
+  const quietly = await newcomer();
+  const unticked = await creation(quietly, { ...fill, Accepte_apparaitre: false });
+  assert.equal(unticked.accepted, false);
+  assert.equal(unticked.visibility.accepted, false);
+  await createProfile(quietly.docApi, unticked, { log: quiet });
+  assert.deepEqual(writes(quietly).map(call => call.values.Accepte_apparaitre), [false], 'le refus s\'écrit aussi : la colonne ne dépend pas de ce que Grist met par défaut');
+
+  const silent = await newcomer();
+  const without = await creation(silent, fill); // un brouillon qui ne parle pas du choix : rien n'est écrit
+  assert.equal(without.accepted, false);
+  assert.equal('Accepte_apparaitre' in without.values, false);
+});
+
+test('unsavedLabels notices that Grist did not keep the choice to appear of a fiche that was created ticked, and only then', async () => {
+  const fill = { prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 };
+  const w = await newcomer();
+  const published = await creation(w, { ...fill, Accepte_apparaitre: true });
+  await createProfile(w.docApi, published, { log: quiet });
+  const saved = tableToRows(w.tables.BDD).find(row => row.id === 13);
+  assert.deepEqual(unsavedLabels(published, saved, w.referenceMaps), []);
+  assert.deepEqual(unsavedLabels(published, { ...saved, Accepte_apparaitre: false }, w.referenceMaps), ['Apparaître dans l’annuaire']);
+  assert.deepEqual(unsavedLabels(published, { ...saved, Accepte_apparaitre: null }, w.referenceMaps), ['Apparaître dans l’annuaire']);
+  const other = await newcomer();
+  const unticked = await creation(other, { ...fill, Accepte_apparaitre: false });
+  assert.deepEqual(unsavedLabels(unticked, { ...saved, Accepte_apparaitre: false }, other.referenceMaps), [], 'qui n\'a rien demandé n\'a rien à perdre');
 });
 
 test('createProfile writes nothing when a fiche already carries the address, when the draft is incomplete, or when Grist refuses', async () => {

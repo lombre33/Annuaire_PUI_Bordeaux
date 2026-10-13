@@ -476,7 +476,7 @@ test('le nom et la fonction ne passent jamais sous le logo de l\'établissement,
     });
   }));
 
-// La pastille du rôle (1.24.1) : petite, hors de la colonne du logo. Une carte large (480px ou plus) la
+// La pastille du rôle (1.25.1) : petite, hors de la colonne du logo. Une carte large (480px ou plus) la
 // pose à droite, sous le logo ou le sigle, sans écarter le nom de l'avatar ; une carte étroite lui
 // donne sa ligne sous l'e-mail. Rôle court, pour que le contrôle ne dépende pas de la police.
 const withShortRole = tables => {

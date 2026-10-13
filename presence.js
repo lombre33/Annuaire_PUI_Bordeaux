@@ -98,8 +98,11 @@ export function describeUnknownAccount({ email, admin, emailColumn = true }) {
 // de la personne qui relit ; `etablissement` est le nom de son établissement après la
 // modification. Les deux causes les plus courantes ont la phrase de la maquette : un
 // établissement qui n'a pas validé sa présence (quand c'est la seule raison), puis une
-// personne qui n'a pas accepté d'apparaître. Renvoie '' quand la fiche figure dans l'annuaire.
-export function describeHiddenFiche(status, { own, etablissement = '' }) {
+// personne qui n'a pas accepté d'apparaître. `creating` : la personne crée sa fiche et a coché
+// « Apparaître dans l'annuaire » ; si la fiche reste masquée, c'est que quelqu'un d'autre doit régler
+// un point (le plus souvent le périmètre, que le widget n'écrit jamais). Renvoie '' quand la fiche
+// figure dans l'annuaire.
+export function describeHiddenFiche(status, { own, etablissement = '', creating = false }) {
   if (status.visible) return '';
   if (status.etablissement === 'not_validated' && status.named && status.inScope) {
     return own
@@ -113,7 +116,20 @@ export function describeHiddenFiche(status, { own, etablissement = '' }) {
   }
   const reasons = hiddenReasons([status], own ? VOICES.own : VOICES.admin);
   const why = reasons.length ? ` : ${reasons.join(' ; ')}` : '';
+  if (creating) return `Votre fiche sera publiée, mais elle restera masquée de l’annuaire${why}. Un administrateur doit d’abord régler ce point.`;
   return `${own ? 'Votre fiche reste masquée' : 'Cette fiche reste masquée'} de l'annuaire${why}.`;
+}
+
+// Ce que la personne lit une fois sa fiche créée. `accepted` : elle a coché « Apparaître dans l'annuaire » ;
+// `status` : describeVisibility() de sa fiche relue dans Grist, null quand elle n'a pas pu l'être. Publier
+// n'est pas afficher : tant que le périmètre (ou autre chose) manque, la fiche existe mais reste masquée, et
+// le message le dit au lieu de promettre qu'elle apparaît.
+export function describeCreated(status, accepted) {
+  if (!accepted) return 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
+  if (!status) return 'Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire.';
+  if (status.visible) return 'Votre fiche est publiée : elle apparaît dans l’annuaire.';
+  const reasons = hiddenReasons([status]);
+  return `Votre fiche est publiée, mais elle reste masquée de l’annuaire${reasons.length ? ` : ${reasons.join(' ; ')}` : ''}. Contactez un administrateur.`;
 }
 
 // Erreur d'écriture dont le message est une phrase française destinée à la
