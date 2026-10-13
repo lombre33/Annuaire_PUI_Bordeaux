@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.23.0 — Filtre « Rôle PUI », et le rôle de la personne sous le logo de sa carte
+## 1.24.0 — Filtre « Rôle PUI », et le rôle de la personne sous le logo de sa carte
 
 Demande d'Antoine du 13 octobre 2026, après sa démo (point 1 de sa liste).
 

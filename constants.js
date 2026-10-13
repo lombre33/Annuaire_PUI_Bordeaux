@@ -151,7 +151,7 @@ export const ETABLISSEMENT_NAMES = 'etablissementNom';
 
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
 // groupes du menu Compétences, les actions celles du menu Tâches. Rôle PUI en a un depuis la
-// 1.23.0 (demande d'Antoine du 13 octobre 2026).
+// 1.24.0 (demande d'Antoine du 13 octobre 2026).
 const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role'];
 
 // Les sections de tags d'une carte, dans l'ordre. Établissement a son badge dédié ; les

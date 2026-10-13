@@ -451,7 +451,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       case est bien cochée (pas seulement mise en évidence visuellement), et
       le badge de comptage sur le bouton du filtre est à jour — même
       résultat qu'en cochant la case directement dans le menu.
-- [ ] **Le rôle PUI d'une carte (pastille sous le logo) est cliquable** (1.23.0) :
+- [ ] **Le rôle PUI d'une carte (pastille sous le logo) est cliquable** (1.24.0) :
       curseur "main" au survol, un clic coche la valeur dans le filtre
       « Rôle PUI » et la grille se filtre ; un second clic la décoche. Un
       rôle long (« Référent innovation et valorisation ») passe à la ligne
