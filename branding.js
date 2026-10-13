@@ -113,6 +113,9 @@ export function logoSize(ratio, { area, maxWidth, maxHeight }) {
   return { width, height };
 }
 
+// hasInk et inkBounds ne servent plus à rien depuis la 1.26.1 (les logos des cartes ne sont plus lus, ni recadrés). Gardés
+// avec CARD_LOGO et fitCardLogo tant qu'un navigateur peut garder dix minutes l'ancien branding-ui.js, qui les importe :
+// retirer un nom exporté ferait échouer le chargement de tout le widget.
 // Un pixel qui ne fait pas partie du logo : transparent, ou à peu près blanc (le fond d'un JPEG, d'un PNG sans transparence).
 const MIN_ALPHA = 24;
 const NEAR_WHITE = 235;

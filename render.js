@@ -4,7 +4,7 @@ import { CATEGORIES, TAG_GROUPS, FILTERS } from './constants.js';
 import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, shownEmail, sortWithCheckedFirst, normalize, uniqueLabels } from './grist-data.js';
 import { el } from './dom.js';
 import { groupState, menuGroups, selectionCount } from './filters.js';
-import { createLogoImage, fitCardLogo } from './branding-ui.js';
+import { createLogoImage } from './branding-ui.js';
 import { createAvatar } from './avatar-ui.js';
 import { avatarIdOf } from './attachments.js';
 
@@ -437,8 +437,7 @@ function fillEtablissement(badge, label, onToggle, logo) {
   badge.classList.add('visible', 'has-logo');
   body?.classList.add('with-logo');
   badge.title = logo.name;
-  const onLoad = (image, show) => fitCardLogo(image, logo.attachment, show);
-  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { onLoad }));
+  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName));
 }
 
 // Sans `onToggle` (carte de relecture), l'adresse est du texte : un clic ne doit pas
