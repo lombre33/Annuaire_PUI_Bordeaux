@@ -1,5 +1,8 @@
 /* Variables et base */
 :root {
+  /* Le widget n'a qu'un thème, clair : les contrôles natifs (cases, champs, défilement) ne suivent pas
+     le thème sombre du téléphone. */
+  color-scheme: light;
   --ink: #172033;
   --muted: #68738a;
   --line: #e4e8f0;
@@ -43,6 +46,34 @@ input {
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--violet);
   outline-offset: 2px;
+}
+/* Cases à cocher : dessinées par la feuille de style, pas par le navigateur. Firefox pour Android
+   affichait les cases vides en carré noir (couleurs de thème du téléphone) : fond blanc, bordure à
+   3:1 au moins sur blanc (WCAG 1.4.11) et coche blanche sur la couleur du contrôle (`--check-color`),
+   donc les mêmes partout. En contraste forcé, le navigateur reprend la main (voir plus bas). */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  background: #fff center / 12px 12px no-repeat;
+  border: 1.5px solid #6b7094;
+  border-radius: 4px;
+  cursor: pointer;
+}
+input[type="checkbox"]:checked,
+input[type="checkbox"]:indeterminate {
+  background-color: var(--check-color, var(--violet));
+  border-color: var(--check-color, var(--violet));
+}
+input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.2 6.2l2.5 2.5 5-5.2' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:indeterminate {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.8 6h6.4' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 /* Texte réservé aux lecteurs d'écran */
 .sr-only {
@@ -378,9 +409,6 @@ h1 {
 }
 .filter-option:hover {
   background: #f1f0ff;
-}
-.filter-option input {
-  accent-color: var(--violet);
 }
 .option-label {
   flex: 1;
@@ -743,9 +771,6 @@ button.avatar:hover {
 }
 .group-option:hover {
   background: #f1f0ff;
-}
-.group-option input {
-  accent-color: var(--violet);
 }
 .group-option .option-label {
   color: var(--group-color);
@@ -1164,6 +1189,10 @@ button.avatar:hover {
 /* Couleurs imposées (mode contraste élevé) : la piste et le curseur y prendraient le même fond et
    l'interrupteur ne montrerait plus son état. On les pose en couleurs système, que le mode respecte. */
 @media (forced-colors: active) {
+  input[type="checkbox"] {
+    -webkit-appearance: auto;
+    appearance: auto;
+  }
   .presence-track {
     background: Canvas;
     border: 1px solid ButtonText;

@@ -1,4 +1,4 @@
-# Version 1.21.1 — Logos des cartes deux fois plus grands (voir CHANGELOG.md)
+# Version 1.21.2 — Cases à cocher dessinées par le widget, plus de carré noir sur Firefox Android (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -43,4 +43,6 @@ widget, sans table `Financeurs` dans Grist ; tous les logos des cartes ont la m�
 les deux règles d'accès d'`Annuaire_Sonde` (ajouter, lire et supprimer sa propre ligne, ne rien modifier).
 Depuis la 1.21.1, les logos des cartes font 64 px de haut sur une carte d'au moins 380 px de large (48 px dès 330 px, 32 px
 en dessous), pour garder la place du nom.
-896 tests (dont 321 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.21.2, les cases à cocher sont dessinées par la feuille de style (fond blanc, bordure, coche) et le widget impose
+son thème clair : plus de carré noir sur Firefox Android.
+898 tests (dont 322 dans un vrai navigateur, optionnels sans Playwright).

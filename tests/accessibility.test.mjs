@@ -391,3 +391,47 @@ test('sur la carte de la personne connectée, « Votre fiche » et les boutons �
     }
   });
 });
+
+// ===== Cases à cocher =====
+
+// Firefox pour Android affichait les cases vides des menus de filtre en carré noir (couleurs de thème du
+// téléphone) : la feuille de style les dessine donc elle-même, fond blanc, bordure et coche explicites, et
+// le widget impose son thème clair.
+test('les cases à cocher sont dessinées par la feuille de style : thème clair imposé, fond blanc, bordure à 3:1 sur blanc (WCAG 1.4.11)', () => {
+  const css = readCss('style.css');
+  assert.match(css, /:root\s*\{\s*color-scheme:\s*light;/, 'le widget n\'a qu\'un thème, clair');
+  const base = css.match(/input\[type="checkbox"\]\s*\{([^}]*)\}/)?.[1] ?? '';
+  assert.match(base, /\bappearance:\s*none/, 'la case n\'est plus celle du navigateur');
+  assert.match(base, /background:\s*#fff\b/, 'fond blanc explicite');
+  const border = base.match(/border:\s*[\d.]+px solid (#[0-9a-f]{3,6})\b/i)?.[1];
+  assert.ok(border, 'bordure de couleur explicite');
+  assert.ok(contrastRatio(border, '#fff') >= 3, `bordure à ${contrastRatio(border, '#fff').toFixed(2)}:1 sur blanc, 3:1 exigés`);
+  assert.ok(contrastRatio('#6257d9', '#fff') >= 3, 'la coche blanche reste lisible sur le violet');
+});
+
+test('sur la page rendue, une case de filtre vide est blanche à bordure visible, même avec le thème sombre du téléphone, et cochée elle prend le violet', { skip }, async () => {
+  await withWidget({ tables: sampleTables() }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.locator('.filter-button', { hasText: 'Instances' }).click();
+    const box = page.locator('.filter.open .filter-option input').first();
+    const look = () => box.evaluate(input => {
+      const style = getComputedStyle(input);
+      return {
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+        appearance: style.appearance,
+        background: style.backgroundColor,
+        border: style.borderTopColor,
+        borderVisible: parseFloat(style.borderTopWidth) >= 1,
+        tick: style.backgroundImage.startsWith('url("data:image/svg+xml')
+      };
+    });
+    assert.deepEqual(await look(), {
+      scheme: 'light', appearance: 'none', background: 'rgb(255, 255, 255)', border: 'rgb(107, 112, 148)', borderVisible: true, tick: false
+    }, 'case vide');
+    await box.check();
+    assert.deepEqual(await look(), {
+      scheme: 'light', appearance: 'none', background: 'rgb(98, 87, 217)', border: 'rgb(98, 87, 217)', borderVisible: true, tick: true
+    }, 'case cochée : violet et coche');
+  });
+});
