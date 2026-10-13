@@ -7,7 +7,7 @@
 
 import { CATEGORIES, CONSENT_COLUMN, CONSENT_LABEL, IMAGE_RULES } from './constants.js';
 import { formatPhone, normalize } from './grist-data.js';
-import { button, el, foundText, matchesTerm, notice, searchField } from './dom.js';
+import { button, dropdown, el, foundText, notice, searchField } from './dom.js';
 import { megabytes, prepareImage } from './image-prep.js';
 import { frenchPhoneDigits, ETABLISSEMENT_REQUIRED, NAME_REQUIRED } from './profile.js';
 import { renderChangeList } from './changes-ui.js';
@@ -277,41 +277,28 @@ export function createProfileDialog(dialog) {
     return wrap;
   }
 
-  // Un choix parmi une liste : la liste déroulante et, à côté, une recherche qui n'y garde que les valeurs qui lui
-  // répondent. L'option vide (« Choisir… », « Non renseigné ») et la valeur choisie y restent toujours : la liste
-  // montre ce que contient le brouillon, et chercher ne change rien au choix.
+  // Un choix parmi une liste : une liste déroulante dont le panneau porte la recherche (dropdown(), dom.js), comme les
+  // menus de filtre. Une valeur requise (l'établissement) ne se vide pas : « Choisir… » n'est qu'une invite tant que
+  // rien n'est choisi ; une valeur facultative a son choix « Non renseigné ».
   function referenceField(field) {
     const id = `profile-${field.key}`;
-    const wrap = el('div', 'fld fld-wide');
+    const wrap = el('div', 'fld');
     const label = el('label', 'fld-label', field.label);
     label.htmlFor = id;
-    const select = document.createElement('select');
-    select.id = id;
-    // Une valeur requise (l'établissement) ne se vide pas : l'option vide n'existe que si la
-    // fiche n'en a pas encore.
-    const empty = field.required
-      ? (field.value === 0 ? [{ id: 0, label: 'Choisir…' }] : [])
-      : [{ id: 0, label: 'Non renseigné' }];
-    const choices = [...empty, ...field.options];
-    const found = el('p', 'fld-found');
-    found.setAttribute('role', 'status');
-    const paint = term => {
-      const chosen = draft[field.key];
-      const shown = choices.filter(choice => choice.id === 0 || choice.id === chosen || matchesTerm(choice.label, term));
-      select.replaceChildren(...shown.map(choice => {
-        const node = document.createElement('option');
-        node.value = String(choice.id);
-        node.textContent = choice.label;
-        return node;
-      }));
-      select.value = String(chosen);
-      found.textContent = foundText(term, choices.filter(choice => choice.id !== 0 && matchesTerm(choice.label, term)).length);
-    };
-    paint('');
-    const search = searchField({ label: `Rechercher dans ${field.label}`, placeholder: `Rechercher dans ${field.label}…`, onTerm: paint });
-    search.setAttribute('aria-controls', id);
-    const pair = el('div', 'fld-pair');
-    pair.append(search, select);
+    label.id = `${id}-label`;
+    const choice = dropdown({
+      id,
+      labelId: label.id,
+      options: field.required ? field.options : [{ id: 0, label: 'Non renseigné' }, ...field.options],
+      value: draft[field.key],
+      placeholder: 'Choisir…',
+      searchLabel: `Rechercher dans ${field.label}`,
+      color: CATEGORIES[field.category].color,
+      onChange: next => {
+        draft[field.key] = next;
+        refresh();
+      }
+    });
     const error = el('p', 'fld-err');
     error.id = `${id}-error`;
     error.hidden = true;
@@ -320,14 +307,10 @@ export function createProfileDialog(dialog) {
       warning.id = `${id}-warning`;
       warning.hidden = true;
     }
-    select.setAttribute('aria-describedby', warning ? `${error.id} ${warning.id}` : error.id);
-    select.addEventListener('change', () => {
-      draft[field.key] = Number(select.value);
-      refresh();
-    });
-    wrap.append(label, pair, found, error);
+    choice.trigger.setAttribute('aria-describedby', warning ? `${error.id} ${warning.id}` : error.id);
+    wrap.append(label, choice.element, error);
     if (warning) wrap.append(warning);
-    ui.fields[field.key] = { input: select, error, warning };
+    ui.fields[field.key] = { input: choice.trigger, error, warning };
     return wrap;
   }
 

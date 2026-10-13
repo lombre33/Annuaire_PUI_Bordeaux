@@ -70,6 +70,17 @@ const focusReturnsTo = (page, selector) => page.waitForFunction(
 const press = (page, name) => dialog(page).getByRole('button', { name, exact: true });
 const closeSaved = page => dialog(page).locator('.dlg-foot').getByRole('button', { name: 'Fermer', exact: true });
 const field = (page, key) => page.locator(`#profile-${key}`);
+// Une liste déroulante à recherche (dropdown(), dom.js) : son bouton est `field`, son panneau `listOf`. Les valeurs montrées sont
+// celles qui répondent à la recherche ; le bouton montre le choix.
+const listOf = (page, key) => page.locator(`#profile-${key}-list`);
+const optionOf = (page, key, label) => listOf(page, key).locator('.dd-option').filter({ hasText: new RegExp(`^${label}$`) });
+const shownOptions = (page, key) => listOf(page, key).locator('.dd-option:not([hidden])').allTextContents();
+const chosenOf = (page, key) => field(page, key).locator('.dd-value').textContent();
+const noneOf = (page, key) => page.locator('.dd').filter({ has: field(page, key) }).locator('.dd-none');
+async function pickOption(page, key, label) {
+  await field(page, key).click();
+  await optionOf(page, key, label).click();
+}
 // La confirmation d'un enregistrement sans réserve : la fenêtre se ferme et un message
 // (visuel, plus une zone `status` pour les lecteurs d'écran) le dit.
 const toast = page => page.locator('#toast');
@@ -533,7 +544,7 @@ test('« Modifier mon profil » ouvre le formulaire avec les valeurs de la fiche
     assert.equal(await field(page, 'nom').inputValue(), 'Martin');
     assert.equal(await field(page, 'Fonction').inputValue(), 'Pharmacienne');
     assert.equal(await field(page, 'numero_de_telephone').inputValue(), '05 56 78 90 12');
-    assert.equal(await field(page, 'Role_dans_le_PUI').evaluate(select => select.selectedOptions[0].textContent), 'Référent qualité');
+    assert.equal(await chosenOf(page, 'Role_dans_le_PUI'), 'Référent qualité');
 
     assert.deepEqual(await dialog(page).locator('.grp-title').allTextContents(),
       ['Instances', 'Actions', 'GT', 'Compétences', 'Communautés', 'Tâches']);
@@ -975,7 +986,7 @@ async function openOther(page, name) {
   await dialog(page).waitFor();
 }
 
-const selectedLabel = page => field(page, 'Etablissement').evaluate(select => select.selectedOptions[0].textContent);
+const selectedLabel = page => chosenOf(page, 'Etablissement');
 
 test('un administrateur voit l\'e-mail et l\'établissement d\'une autre personne comme des champs à modifier, une personne ne les voit pas', { skip }, async () => {
   await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
@@ -983,10 +994,13 @@ test('un administrateur voit l\'e-mail et l\'établissement d\'une autre personn
     assert.equal(await field(page, 'email').getAttribute('type'), 'email');
     assert.equal(await field(page, 'email').inputValue(), 'hostile@chu-bordeaux.fr');
     assert.equal(await selectedLabel(page), 'CHU');
-    assert.deepEqual(await field(page, 'Etablissement').locator('option').allTextContents(),
+    await field(page, 'Etablissement').click();
+    assert.deepEqual(await shownOptions(page, 'Etablissement'),
       ['CHU', 'INSERM', 'Institut Bergonié', 'UBM'],
       'les acronymes (le nom complet de celui qui n\'en a pas) des seuls établissements fondateurs ou partenaires (pas la Clinique, une structure « autres »), sans option vide : celui d\'une personne ne se vide pas');
-    assert.equal(await dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement"]').count(), 1, 'la liste des établissements a sa recherche');
+    assert.equal(await dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement-list"]').isVisible(), true, 'la liste des établissements a sa recherche, en haut du panneau');
+    await page.keyboard.press('Escape');
+    assert.equal(await field(page, 'Etablissement').getAttribute('aria-expanded'), 'false');
     assert.equal(await dialog(page).locator('.ident-lock').count(), 0, 'rien n\'est verrouillé pour un administrateur');
     assert.equal(await dialog(page).locator('#profile-email-hint').count(), 0, 'la mise en garde sur les droits est dite à la relecture, pas dans le formulaire');
     assert.equal(await field(page, 'email').getAttribute('aria-describedby'), 'profile-email-error');
@@ -1016,7 +1030,7 @@ test('le nouvel e-mail et le nouvel établissement se voient sur la carte après
     await openOther(page, 'Hugo Bernard'); // pas d'adresse, au CHU
     assert.equal(await field(page, 'email').inputValue(), '');
     await field(page, 'email').fill('  Hugo.Bernard@CHU-Bordeaux.fr ');
-    await field(page, 'Etablissement').selectOption({ label: 'Institut Bergonié' });
+    await pickOption(page, 'Etablissement', 'Institut Bergonié');
     assert.equal(await summary(page), '2 champs modifiés');
     await press(page, 'Relire les modifications').click();
     await headingIs(page, 'Relire avant de valider');
@@ -1078,12 +1092,12 @@ test('déplacer une personne dans un établissement qui n\'a pas validé sa pré
     await openOther(page, 'Hugo Bernard');
     const warning = page.locator('#profile-Etablissement-warning');
     assert.equal(await warning.isHidden(), true, 'CHU a validé sa présence : rien à dire');
-    await field(page, 'Etablissement').selectOption({ label: 'INSERM' });
+    await pickOption(page, 'Etablissement', 'INSERM');
     assert.equal(await warning.textContent(), 'Cet établissement n’a pas validé sa présence : la fiche ne sera pas visible dans l’annuaire.');
     assert.equal(await warning.isVisible(), true, 'la mise en garde se lit dès le formulaire');
-    await field(page, 'Etablissement').selectOption({ label: 'Institut Bergonié' });
+    await pickOption(page, 'Etablissement', 'Institut Bergonié');
     assert.equal(await warning.isHidden(), true);
-    await field(page, 'Etablissement').selectOption({ label: 'INSERM' });
+    await pickOption(page, 'Etablissement', 'INSERM');
     await press(page, 'Relire les modifications').click();
     await headingIs(page, 'Relire avant de valider');
     assert.deepEqual(await notices(page).allTextContents(), [
@@ -1169,7 +1183,7 @@ for (const width of [280, 360]) {
       const FITS = { inside: true, pageOverflow: 0, outside: [] };
       assert.deepEqual(await fits(), FITS);
       await field(page, 'email').fill('une.adresse.assez.longue.pour.mettre.la.mise.en.page.a.l.epreuve@laboratoire-de-recherche-bordeaux.example.fr');
-      await field(page, 'Etablissement').selectOption({ label: 'Institut Bergonié' });
+      await pickOption(page, 'Etablissement', 'Institut Bergonié');
       assert.deepEqual(await fits(), FITS);
       await press(page, 'Relire les modifications').click();
       await headingIs(page, 'Relire avant de valider');
@@ -1242,7 +1256,7 @@ test('changer le rôle ou le nom se voit sur la carte après, et le retirer barr
   withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
     await field(page, 'prenom').fill('Anna');
-    await field(page, 'Role_dans_le_PUI').selectOption('0');
+    await pickOption(page, 'Role_dans_le_PUI', 'Non renseigné');
     await review(page);
     const after = column(page, 'after').locator('.contact-card');
     assert.equal(await after.locator('.name').textContent(), 'Anna Martin modifié');
@@ -1524,7 +1538,7 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     assert.equal(await dialog(page).locator('#profile-email').count(), 0);
     assert.equal(await summary(page), 'Aucun champ rempli', 'la case « Apparaître dans l’annuaire » n\'est pas un champ à remplir');
     assert.equal(await press(page, 'Relire ma fiche').isDisabled(), true);
-    assert.equal(await field(page, 'Etablissement').evaluate(select => select.selectedOptions[0].textContent), 'Choisir…');
+    assert.equal(await chosenOf(page, 'Etablissement'), 'Choisir…');
     const publish = field(page, 'Accepte_apparaitre');
     assert.equal(await publish.isChecked(), true, 'cochée d\'avance : la fiche se publie');
     assert.equal(await dialog(page).getByRole('checkbox', { name: 'Apparaître dans l’annuaire' }).count(), 1, 'la case a son nom accessible');
@@ -1537,25 +1551,27 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     assert.equal(await summary(page), 'Choisissez votre établissement');
     assert.equal(await page.locator('#profile-Etablissement-error').textContent(), 'Choisissez votre établissement.');
 
-    // La liste n'offre que les acronymes (le nom complet de l'établissement qui n'en a pas) des établissements
-    // fondateurs ou partenaires, jamais une structure « autres » (la Clinique), avec une recherche à côté
-    // qui ne garde que ce qui répond, sans toucher au choix.
+    // La liste déroulante n'offre que les acronymes (le nom complet de l'établissement qui n'en a pas) des établissements
+    // fondateurs ou partenaires, jamais une structure « autres » (la Clinique). Sa recherche, en haut du panneau, ne garde
+    // en direct que ce qui répond.
     const etablissements = field(page, 'Etablissement');
-    const search = dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement"]');
-    const found = dialog(page).locator('.fld').filter({ has: etablissements }).locator('.fld-found');
-    assert.equal(await search.isVisible(), true, 'le champ de recherche des établissements est affiché');
-    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…', 'CHU', 'INSERM', 'Institut Bergonié', 'UBM']);
+    const search = dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement-list"]');
+    assert.equal(await search.isHidden(), true, 'la recherche est dans le panneau, fermé tant que la liste n\'est pas ouverte');
+    await etablissements.click();
+    assert.equal(await search.isVisible(), true, 'le panneau ouvert montre la recherche');
+    assert.deepEqual(await shownOptions(page, 'Etablissement'), ['CHU', 'INSERM', 'Institut Bergonié', 'UBM']);
     await search.fill('ber');
-    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…', 'Institut Bergonié']);
-    assert.equal(await found.textContent(), '1 résultat');
+    assert.deepEqual(await shownOptions(page, 'Etablissement'), ['Institut Bergonié']);
     await search.fill('cl');
-    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…'], 'la Clinique, une structure « autres », n\'est pas proposée, même cherchée');
-    assert.equal(await found.textContent(), 'Aucun résultat');
+    assert.deepEqual(await shownOptions(page, 'Etablissement'), [], 'la Clinique, une structure « autres », n\'est pas proposée, même cherchée');
+    assert.equal(await noneOf(page, 'Etablissement').isVisible(), true);
     await search.fill('chu');
-    await etablissements.selectOption({ label: 'CHU' });
-    await search.fill('');
-    assert.equal(await selectedLabel(page), 'CHU', 'chercher, puis vider la recherche, laisse le choix');
-    assert.equal(await etablissements.locator('option').count(), 5, 'la recherche vidée rend toute la liste');
+    await optionOf(page, 'Etablissement', 'CHU').click();
+    assert.equal(await selectedLabel(page), 'CHU');
+    assert.equal(await etablissements.getAttribute('aria-expanded'), 'false', 'choisir referme le panneau');
+    await etablissements.click();
+    assert.deepEqual(await shownOptions(page, 'Etablissement'), ['CHU', 'INSERM', 'Institut Bergonié', 'UBM'], 'rouverte, la liste est entière : la recherche est vidée');
+    await page.keyboard.press('Escape');
     assert.equal(await summary(page), '4 champs remplis');
     await press(page, 'Relire ma fiche').click();
 
@@ -1595,6 +1611,86 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     assert.ok(!JSON.stringify(await Promise.all([...logs.warnings, ...logs.infos])).includes('@'), 'aucune adresse dans la console');
   }));
 
+// La liste déroulante à recherche (dropdown(), dom.js), au clavier et à la souris : la recherche trie en direct, les flèches et
+// Entrée choisissent, Échap ne referme que le panneau, un clic ailleurs aussi.
+test('la liste déroulante des établissements : recherche en direct, flèches et Entrée, Échap ne ferme que le panneau, un clic ailleurs le referme', { skip }, () =>
+  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.locator('#accountBar .account-create').click();
+    await dialog(page).waitFor();
+    const trigger = field(page, 'Etablissement');
+    const search = dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement-list"]');
+    const active = () => dialog(page).locator('.dd-option.active').textContent();
+    assert.equal(await trigger.evaluate(node => node.tagName), 'BUTTON', 'une seule liste : plus de champ de recherche à côté ni de liste native');
+    assert.equal(await dialog(page).locator('select').count(), 0);
+
+    // Entrée ouvre le panneau et met le focus dans la recherche ; chaque frappe trie ; Entrée choisit le premier résultat.
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
+    assert.equal(await search.evaluate(node => node === document.activeElement), true, 'le focus est dans la recherche');
+    await page.keyboard.type('ber');
+    assert.deepEqual(await shownOptions(page, 'Etablissement'), ['Institut Bergonié']);
+    assert.equal(await search.getAttribute('aria-activedescendant'), await optionOf(page, 'Etablissement', 'Institut Bergonié').getAttribute('id'));
+    await page.keyboard.press('Enter');
+    assert.equal(await chosenOf(page, 'Etablissement'), 'Institut Bergonié');
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+    assert.equal(await focusedId(page), 'profile-Etablissement', 'le focus revient au bouton');
+
+    // Rouvert, le panneau désigne le choix actuel ; les flèches parcourent ; Échap referme le panneau sans fermer la fenêtre
+    // ni changer le choix.
+    await page.keyboard.press('ArrowDown');
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
+    assert.equal(await active(), 'Institut Bergonié');
+    await page.keyboard.press('ArrowDown');
+    assert.equal(await active(), 'UBM');
+    await page.keyboard.press('ArrowDown');
+    assert.equal(await active(), 'UBM', 'la dernière valeur est le bout de la liste');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    assert.equal(await active(), 'INSERM');
+    await page.keyboard.press('Escape');
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+    assert.equal(await isOpen(page), true, 'Échap ne referme que le panneau : la fenêtre reste ouverte');
+    assert.equal(await chosenOf(page, 'Etablissement'), 'Institut Bergonié', 'Échap ne change pas le choix');
+    assert.equal(await focusedId(page), 'profile-Etablissement');
+
+    // Un clic ailleurs referme le panneau ; à la réouverture la recherche est vide.
+    await trigger.click();
+    await search.fill('zzz');
+    assert.equal(await noneOf(page, 'Etablissement').isVisible(), true);
+    await dialog(page).locator('.dlg-sub').click();
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+    await trigger.click();
+    assert.equal(await search.inputValue(), '');
+    assert.equal((await shownOptions(page, 'Etablissement')).length, 4);
+
+    // Tabulation vers le champ suivant : le panneau se referme.
+    await page.keyboard.press('Tab');
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+    assert.equal(await isOpen(page), true);
+  }));
+
+test('la liste déroulante sur un écran tactile : le panneau s\'ouvre sans prendre le focus, et un appui sur une valeur la choisit', { skip }, () =>
+  withWidget({
+    tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL, contextOptions: { hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } }
+  }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.locator('#accountBar .account-create').tap();
+    await dialog(page).waitFor();
+    const trigger = field(page, 'Etablissement');
+    await trigger.tap();
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
+    assert.equal(await dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement-list"]').evaluate(node => node === document.activeElement), false,
+      'le clavier du téléphone ne s\'ouvre pas tout seul : il cacherait les valeurs');
+    assert.deepEqual(await shownOptions(page, 'Etablissement'), ['CHU', 'INSERM', 'Institut Bergonié', 'UBM']);
+    const box = await optionOf(page, 'Etablissement', 'INSERM').boundingBox();
+    assert.ok(box.height >= 40, `une cible pour un doigt (${box.height} px)`);
+    await optionOf(page, 'Etablissement', 'INSERM').tap();
+    assert.equal(await chosenOf(page, 'Etablissement'), 'INSERM');
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
+  }));
+
 test('« Créer ma fiche » avec la case « Apparaître dans l’annuaire » décochée : la fiche est créée sans accord, le bouton reste « Créer ma fiche »', { skip }, () =>
   withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
@@ -1602,7 +1698,7 @@ test('« Créer ma fiche » avec la case « Apparaître dans l’annuaire » dé
     await dialog(page).waitFor();
     await field(page, 'prenom').fill('Zoé');
     await field(page, 'nom').fill('Nouvelle');
-    await field(page, 'Etablissement').selectOption({ label: 'CHU' });
+    await pickOption(page, 'Etablissement', 'CHU');
     await field(page, 'Accepte_apparaitre').uncheck();
     assert.equal(await summary(page), '3 champs remplis', 'la case ne change pas ce qui est rempli');
     await press(page, 'Relire ma fiche').click();
