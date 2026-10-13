@@ -135,7 +135,7 @@ function withSameCorrectedLabel() {
   tables.Taches = {
     id: [1, 2, 3, 4],
     Taches: ['Pilotage', 'pilotage/suivi', 'Pilotage / Suivi', 'Veille'],
-    Taches_corrige: ['Tâche 1.1 : Pilotage/Suivi', 'Tâche 1.1 : Pilotage/Suivi', 'tâche 1.1 : pilotage/suivi', ''],
+    Taches_corrige: ['Tâche 1.1 : Pilotage/Suivi', 'Tâche 1.1 : Pilotage/Suivi', 'tâche 1.1 : pilotage/suivi', 'Veille'],
     Taches_role: ['', '', '', '']
   };
   tables.BDD.Taches[0] = ['L', 2];
