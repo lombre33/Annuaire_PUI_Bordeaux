@@ -139,10 +139,23 @@ test('la première demande d\'un logo reste sans réponse : une autre est faite,
     assert.deepEqual(await errorsOf(logs), []);
   }));
 
-test('un logo chargé qui ne se charge plus sur la carte laisse la place au sigle après huit secondes, avec un seul avertissement', { skip }, () =>
-  withWidget({ downloadAgain: 'hang' }, async ({ page, logs }) => {
+// Une image de logo à qui le navigateur a annulé la demande sans rien dire : elle a reçu son adresse et ne charge ni n'échoue jamais.
+// Seules les images de classe `logo-img` (celles des cartes et du bandeau) sont ainsi ; le chargement à part (`new Image()`) se fait
+// normalement. (Un faux Grist qui ne répondrait pas à la deuxième demande ne ferait pas l'affaire : un navigateur récent donne à
+// l'image le fichier que le chargement à part a déjà en mémoire, sans nouvelle demande.)
+const SILENT_LOGO_IMAGES = `
+const source = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+Object.defineProperty(HTMLImageElement.prototype, 'src', {
+  ...source,
+  set(value) { if (this.classList.contains('logo-img')) this.dataset.silent = value; else source.set.call(this, value); }
+});
+`;
+
+test('une image de logo qui ne dit plus rien après avoir reçu son adresse laisse la place au sigle après huit secondes, avec un seul avertissement', { skip }, () =>
+  withWidget({ initScript: SILENT_LOGO_IMAGES }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    // Le fichier a été reçu une fois (le chargement à part) : les images qui le montrent attendent en vain. Aucune ne reste invisible pour de bon.
+    assert.ok(await page.locator('.logo-img[data-silent]').count() > 0, 'les images ont reçu leur adresse et se taisent');
+    // Aucune ne reste invisible pour de bon.
     await page.waitForFunction(() => [...document.querySelectorAll('.contact-card .etablissement-tag')]
       .filter(badge => badge.textContent.trim() === 'CHU').length === 3, undefined, { timeout: 20000 });
     assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['Institut Bergonié', 'CHU', 'CHU', 'CHU']);

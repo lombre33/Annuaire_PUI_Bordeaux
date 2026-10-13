@@ -92,12 +92,11 @@ after(async () => {
 // vieille version de Grist n'a pas ; `downloadCors` faux ou 'hang', un Grist qui ne donne pas les pièces jointes
 // en CORS (refus, ou pas de réponse), donc qui ne laisse pas lire les pixels d'un logo ; `downloadHold` : aucun fichier ne part avant
 // `files.release()` ; `downloadFirst` : 'abort' ou 'hang', la première demande de chaque fichier échoue ou n'a jamais de réponse (les
-// suivantes passent) ; `downloadAgain` : 'hang', plus aucune réponse à partir de la deuxième demande d'un fichier ; `initScript` : un
-// script (texte) exécuté dans la page avant tout autre ; `contextOptions` : les options du contexte Playwright (un écran tactile,
-// sans survol : { hasTouch: true, isMobile: true }).
+// suivantes passent) ; `initScript` : un script (texte) exécuté dans la page avant tout autre ; `contextOptions` : les options du
+// contexte Playwright (un écran tactile, sans survol : { hasTouch: true, isMobile: true }).
 export async function openWidget({
   tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false,
-  accessToken, withoutMethods = [], downloadCors = true, downloadHold = false, downloadFirst = null, downloadAgain = null, initScript = null,
+  accessToken, withoutMethods = [], downloadCors = true, downloadHold = false, downloadFirst = null, initScript = null,
   contextOptions = {}
 } = {}) {
   const context = await browser.newContext(contextOptions);
@@ -108,7 +107,6 @@ export async function openWidget({
   files.download.cors = downloadCors;
   files.download.hold = downloadHold;
   files.download.first = downloadFirst;
-  files.download.again = downloadAgain;
   const page = await context.newPage();
   const logs = { errors: [], warnings: [], infos: [] };
   page.on('pageerror', error => logs.errors.push(error.message));

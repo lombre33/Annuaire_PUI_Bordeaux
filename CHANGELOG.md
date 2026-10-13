@@ -29,7 +29,7 @@ bien avant ». Il a collé seize lignes `NS_BINDING_ABORTED`, une par logo (`…
   courante) ou dans le document (aucune ne les montre). **À supprimer dès que le diagnostic est fait.**
 - Tests : `tests/logos-preload-e2e.test.mjs`, qui reproduit la cause plutôt que le navigateur : un `MutationObserver` compte les images de logo retirées du document avant d'avoir fini de
   charger, pendant que Grist est retenu (`downloadHold`) et que l'annuaire se redessine (seize fondateurs, 48 cartes, trois lectures de Grist et une recherche) : aucune, une seule demande par
-  logo ; première demande annulée ou sans réponse (`downloadFirst`), demandes suivantes sans réponse (`downloadAgain`, le sigle prend la place), fichier supprimé redemandé trois fois au plus,
+  logo ; première demande annulée ou sans réponse (`downloadFirst`), image de logo qui ne dit plus rien après avoir reçu son adresse (le sigle prend la place après huit secondes), fichier supprimé redemandé trois fois au plus,
   ligne `Bilan` (information, avertissement), version en bas de page ; `attachments.stats()`. Sept des huit nouveaux tests échouent sur le code de la 1.28.0 (vérifié), le huitième, celui du fichier supprimé, borne un
   comportement qui existait déjà ; l'assertion `loading` des logos de carte devient `eager` (le fichier est déjà là). **Non essayé dans le vrai Grist d'Antoine ni dans Firefox.** Revenir en arrière : `git revert` de la fusion de cette version.
 

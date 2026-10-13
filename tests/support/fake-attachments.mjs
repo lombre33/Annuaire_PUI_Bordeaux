@@ -99,7 +99,6 @@ function readUpload(request) {
 //             `hold`   vrai, aucune réponse ne part avant `release()` (le temps de redessiner l'annuaire autant qu'on veut
 //                      pendant que les fichiers « arrivent ») ; la page fermée, la retenue tombe
 //             `first`  'abort' ou 'hang' : la première demande de chaque fichier échoue, ou reste sans réponse (les suivantes passent)
-//             `again`  'hang' : de la deuxième demande d'un fichier à la dernière, aucune réponse (la première aboutit)
 //   release   met fin à `hold`
 //   requests  les demandes de téléchargement reçues : { id, crossOrigin, probe, answered }, selon que le navigateur a joint
 //             l'en-tête Origin (une demande CORS) ou non, que l'adresse porte le paramètre de la lecture des pixels d'un
@@ -107,7 +106,7 @@ function readUpload(request) {
 export async function routeAttachments(context) {
   const record = {
     hits: {}, tokens: [], uploads: [], stored: {}, upload: { mode: 'ok', cors: true, delay: 0 },
-    download: { cors: true, hold: false, first: null, again: null }, requests: [], failed: new Set(),
+    download: { cors: true, hold: false, first: null }, requests: [], failed: new Set(),
     release() { record.download.hold = false; }
   };
   const cors = { 'access-control-allow-origin': '*' };
@@ -130,8 +129,6 @@ export async function routeAttachments(context) {
       if (record.download.first === 'abort') return route.abort('failed');
       if (record.download.first === 'hang') return undefined;
     }
-    // Un Grist qui répond une fois puis plus : l'image qui redemande le fichier (une carte, après son chargement à part) attend en vain.
-    if (record.download.again === 'hang' && record.hits[id] > 1) return undefined;
     entry.answered = true;
     // Comme Grist, qui laisse le widget lire les fichiers avec un jeton d'accès (CORS), donc leurs pixels ;
     // `download.cors` faux ou 'hang' simule un Grist qui ne le fait pas.
