@@ -119,31 +119,32 @@ function exiger(condition, message) {
   if (!condition) throw new Error(`Écran inattendu : ${message}`);
 }
 
-// ===== L'habillage : logos des financeurs, des fondateurs et des cartes =====
+// ===== L'habillage : financeurs (images fixes), logos des fondateurs et des cartes =====
 
-// Ce que la page montre de l'habillage, lu dans le DOM : le logo chargé de chaque emplacement
-// (son texte alternatif ou l'infobulle de l'établissement), ou « texte : … » quand le nom
-// remplace le logo.
+// Ce que la page montre de l'habillage, lu dans le DOM : le logo chargé de chaque fondateur du
+// bandeau (l'infobulle de l'établissement), ou « texte : … » quand le nom remplace le logo ;
+// les deux images fixes des financeurs (en tête de page, et le rond du bandeau du bas) sont-elles
+// affichées ?
 const lireHabillage = page => page.evaluate(() => {
   const emplacement = (item, nom) => (item.querySelector('img.loaded') ? nom : `texte : ${item.textContent}`);
+  const affichee = image => Boolean(image && image.complete && image.naturalWidth > 0);
   return {
-    financeurs: [...document.querySelectorAll('#fundersLogos .funder')].map(item => emplacement(item, item.querySelector('img')?.alt)),
+    financeurs: affichee(document.querySelector('#funders .funders-img')),
     bandeau: [...document.querySelectorAll('#bandLogos .band-item')].map(item => emplacement(item, item.title)),
-    rond: [...document.querySelectorAll('#bandRoundel img.loaded')].length,
+    rond: affichee(document.querySelector('#bandRoundel img')),
     cartesAvecLogo: document.querySelectorAll('.contact-card .etablissement-tag.has-logo').length,
     cartesSansLogo: document.querySelectorAll('.contact-card .etablissement-tag.visible:not(.has-logo)').length
   };
 });
 
-// Les logos sont affichés comme le jeu de démonstration les décrit : les financeurs et les
-// fondateurs dans leur ordre, le rond du bandeau, un logo sur chaque carte sauf `sansLogo`.
+// Les logos sont affichés comme le jeu de démonstration les décrit : les fondateurs dans leur
+// ordre, un logo sur chaque carte sauf `sansLogo`, et les deux images fixes des financeurs.
 async function exigerHabillage(page, { cartes, sansLogo = 0 }) {
   const habillage = await lireHabillage(page);
-  exiger(JSON.stringify(habillage.financeurs) === JSON.stringify(HABILLAGE_ATTENDU.financeurs),
-    `les financeurs sont « ${habillage.financeurs.join(' | ')} »`);
+  exiger(habillage.financeurs, 'le bandeau des financeurs, en tête de page, est absent');
   exiger(JSON.stringify(habillage.bandeau) === JSON.stringify(HABILLAGE_ATTENDU.bandeau),
     `le bandeau des fondateurs est « ${habillage.bandeau.join(' | ')} »`);
-  exiger(habillage.rond === 1, 'le rond qui ferme le bandeau est absent');
+  exiger(habillage.rond, 'le rond qui ferme le bandeau est absent');
   exiger(habillage.cartesSansLogo === sansLogo && habillage.cartesAvecLogo === cartes - sansLogo,
     `${habillage.cartesAvecLogo} cartes ont un logo et ${habillage.cartesSansLogo} le nom de l'établissement, au lieu de ${cartes - sansLogo} et ${sansLogo}`);
 }
@@ -360,13 +361,13 @@ const SCENES = [
     }
   },
   {
-    // Grist ne donne pas le jeton d'accès aux pièces jointes : les noms remplacent les logos partout.
+    // Grist ne donne pas le jeton d'accès aux pièces jointes : les noms remplacent les logos des
+    // établissements. Les financeurs, deux images du dépôt, n'en dépendent pas et restent affichés.
     fichier: 'sans-logos.png', requete: '?sanslogos', zone: jusquALaRangee(1),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       const habillage = await lireHabillage(page);
-      exiger(habillage.financeurs.length === HABILLAGE_ATTENDU.financeurs.length && habillage.financeurs.every(nom => nom.startsWith('texte : ')),
-        'les financeurs ne sont pas écrits en toutes lettres');
+      exiger(habillage.financeurs && habillage.rond, 'les financeurs, images fixes du dépôt, doivent rester affichés');
       exiger(habillage.bandeau.length === HABILLAGE_ATTENDU.bandeau.length && habillage.bandeau.every(nom => nom.startsWith('texte : ')),
         'les fondateurs du bandeau ne sont pas écrits en toutes lettres');
       exiger(habillage.cartesAvecLogo === 0 && habillage.cartesSansLogo === CARTES_ATTENDUES.fondateurs,

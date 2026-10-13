@@ -76,7 +76,11 @@ export function responsableIds(cell) {
 //   status 'unavailable'  `reason` dit pourquoi (pour la console)
 // Ne lève jamais : une identité introuvable n'est pas une panne du widget.
 export async function readIdentity(docApi, { readOnly = false, log = console } = {}) {
-  if (readOnly) return { status: 'viewer', email: '', admin: false, etablissements: [], reason: 'document ouvert en lecture seule' };
+  if (readOnly) {
+    log.info('[IDENTITE] Grist a ouvert le widget en lecture seule (readonly=true dans l\'adresse du cadre) : '
+      + 'personne n\'est identifié et aucune modification n\'est proposée.');
+    return { status: 'viewer', email: '', admin: false, etablissements: [], reason: 'document ouvert en lecture seule' };
+  }
 
   let rowId = null;
   try {

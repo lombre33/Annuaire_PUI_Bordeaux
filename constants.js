@@ -13,21 +13,15 @@ export const PROBE_TABLE = 'Annuaire_Sonde';
 // connectée est responsable (formule de déclenchement, comme `Admin`, d'après la table ACL).
 export const PROBE_RESPONSABLE_COLUMN = 'Responsable_de';
 
-// Habillage : logos des établissements et des financeurs, bandeau des fondateurs.
-// Tout est facultatif (GRIST_SETUP.md) : sans ces colonnes ni cette table, le
-// widget affiche les noms à la place des logos et rien à la place des financeurs.
+// Habillage : logos des établissements (cartes et bandeau des fondateurs), lus dans Grist.
+// Tout est facultatif (GRIST_SETUP.md) : sans ces colonnes, le widget affiche les noms à la
+// place des logos.
 //   Etablissements   `logo` (Pièces jointes) et `ordre_bandeau` (Numérique)
-//   Financeurs       `nom`, `logo` (Pièces jointes) et `ordre` (Numérique)
-// La table Financeurs se crée à la main : le widget n'écrit jamais dedans.
+// Les financeurs (le visuel du haut de page, le rond France 2030 du bandeau du bas) ne
+// viennent pas de Grist : deux images fixes du dépôt (assets/, index.html).
 export const BRANDING = {
   logoColumn: 'logo',
-  bandOrderColumn: 'ordre_bandeau',
-  fundersTable: 'Financeurs',
-  funderNameColumn: 'nom',
-  funderLogoColumn: 'logo',
-  funderOrderColumn: 'ordre',
-  // Le financeur dont le logo ferme le bandeau du bas.
-  roundelFunder: 'France 2030'
+  bandOrderColumn: 'ordre_bandeau'
 };
 
 // Fiche d'un établissement, modifiée par ses responsables (1.17.0). Le widget y écrit trois
@@ -55,14 +49,10 @@ export const IMAGE_RULES = {
 };
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
-// logos, 1 014 pour la largeur du bandeau fourni par le PUI) et des financeurs (pixels) :
-// surface visée et bornes en largeur et en hauteur, voir logoSize() dans branding.js. Ces
-// valeurs reproduisent, à une dizaine de pour cent près, les tailles du bandeau fourni.
+// logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
+// largeur et en hauteur, voir logoSize() dans branding.js. Ces valeurs reproduisent, à une
+// dizaine de pour cent près, les tailles du bandeau fourni.
 export const BAND_LOGO = { area: 4150, maxWidth: 118, maxHeight: 58 };
-export const FUNDER_LOGO = { area: 1100, maxWidth: 110, maxHeight: 36 };
-// Sur une carte, le logo tient dans 92 x 32 px à ses proportions, sans autre règle de
-// surface (la surface visée est celle de la boîte : elle ne borne jamais).
-export const CARD_LOGO = { area: 92 * 32, maxWidth: 92, maxHeight: 32 };
 
 // Recherche principale : les cartes ne se redessinent qu'une fois la frappe arrêtée depuis ce
 // nombre de millisecondes. Chaque lettre tapée redessinerait sinon toute la liste (0,15 s

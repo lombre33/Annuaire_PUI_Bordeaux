@@ -108,16 +108,14 @@ h1 {
   white-space: nowrap;
 }
 
-/* Financeurs : une légende et leurs logos, discrets. */
+/* Financeurs : une légende et le visuel des financeurs de la maquette (assets/financeurs.png),
+   déjà en gris : discret en haut de page. */
 .funders {
   grid-area: funders;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 36px;
-}
-.funders[hidden] {
-  display: none;
 }
 .funders-label {
   max-width: 142px;
@@ -126,38 +124,10 @@ h1 {
   font-weight: 600;
   line-height: 1.3;
 }
-.funders-logos {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-  list-style: none;
-}
-.funder {
-  display: flex;
-  align-items: center;
-}
-.funder .logo-img {
+.funders-img {
   display: block;
   width: auto;
-  height: 32px;
-  max-width: 110px;
-  object-fit: contain;
-  /* Discrets en haut de page, comme sur la maquette, quelle que soit la version du logo
-     déposée dans Grist : le rond du bandeau du bas, lui, garde ses couleurs. */
-  filter: grayscale(1);
-}
-/* Dimensions calculées à partir des proportions du fichier (--w et --h, en pixels :
-   voir logoSize() dans branding.js) ; --scale les réduit sur téléphone. */
-.funder .logo-img.sized {
-  width: calc(var(--w) * 1px * var(--scale, 1));
-  height: calc(var(--h) * 1px * var(--scale, 1));
-  max-width: none;
-}
-.funder-name {
-  color: #566177;
-  font-size: 11px;
-  font-weight: 800;
+  height: 36px;
 }
 
 /* « Ma présence » (voir plus bas) vit dans l'en-tête, à droite : la zone « me ». */
@@ -443,6 +413,8 @@ h1 {
   margin-top: 44px;
 }
 .contact-card {
+  /* La place du logo d'établissement se mesure sur la carte (cqw, voir .logo-img plus bas) */
+  container-type: inline-size;
   overflow: hidden;
   background: #fff;
   border: 1px solid #e8eaf2;
@@ -582,7 +554,7 @@ button.avatar:hover {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  max-width: 108px;
+  max-width: calc(min(120px, 38cqw) + 16px);
   height: 36px;
   padding: 2px 4px;
   color: inherit;
@@ -594,19 +566,17 @@ button.avatar:hover {
 .etablissement-tag.has-logo:focus-visible {
   border-color: var(--line);
 }
-/* Dimensions calculées d'après les proportions du fichier (--w et --h, voir sizeLogo() dans
-   branding-ui.js) ; à défaut, 32 px de haut et la largeur que donnent ses proportions. */
+/* Tous les logos ont la même hauteur, 32 px comme sur la maquette, et la largeur que donnent
+   leurs proportions. Un logo très large garde ses proportions dans une case plus étroite
+   (object-fit) : jamais plus de 120 px ni plus de 38 % de la largeur de la carte, pour que
+   le nom garde sa place sur une carte étroite. */
 .etablissement-tag .logo-img {
   display: block;
   width: auto;
   height: 32px;
-  max-width: 92px;
+  max-width: min(120px, 38cqw);
   object-fit: contain;
   object-position: right center;
-}
-.etablissement-tag .logo-img.sized {
-  width: calc(var(--w) * 1px);
-  height: calc(var(--h) * 1px);
 }
 /* Un logo n'apparaît qu'une fois chargé. */
 .logo-img {
@@ -1290,10 +1260,7 @@ button.avatar:hover {
   width: 100%;
   max-width: 120px;
 }
-.band-roundel .logo-holder {
-  height: auto;
-}
-.band-roundel .logo-img {
+.band-roundel img {
   display: block;
   width: 100%;
   height: auto;
@@ -1328,13 +1295,15 @@ button.avatar:hover {
 }
 @media (max-width: 599px) {
   .funders {
-    --scale: 0.8;
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
   }
   .funders-label {
     max-width: none;
+  }
+  .funders-img {
+    height: 29px;
   }
   .band {
     padding: 18px 14px 16px;

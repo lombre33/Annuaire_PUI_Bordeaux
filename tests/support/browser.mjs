@@ -17,7 +17,7 @@ import { sampleTables } from '../fixtures.mjs';
 import { routeAttachments } from './fake-attachments.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
 const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 
 // Remplace grist-plugin-api.js : le faux document que partagent les tests Node

@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.21.0 — Financeurs en éléments fixes, logos des cartes à la même hauteur, règles de la sonde
+
+Demandes d'Antoine du 13 octobre 2026 (05 h 20 à 05 h 27), captures à l'appui.
+
+- **Les financeurs sont des éléments fixes (écart à la maquette corrigé).** Le bandeau des financeurs
+  manquait : il dépendait d'une table facultative `Financeurs` absente du document d'Antoine, et cette absence ne
+  se voyait nulle part, alors que c'était un écart à la maquette v5 qui aurait dû être signalé. Décision
+  d'Antoine : « des éléments fixes qui ne bougent pas, pas de table ». Le visuel des financeurs (République
+  française, ANR, Bpifrance, France 2030) avec sa phrase de financement, en tête de page, et le rond France 2030 du
+  bandeau du bas sont désormais deux images du dépôt (`assets/financeurs.png`, `assets/france-2030.png`), reprises
+  telles quelles de la maquette v5 et affichées dans tous les documents, sans jeton ni lecture de Grist. Le widget
+  ne lit plus de table `Financeurs` (neuf lectures par chargement au lieu de dix ; une table restée dans le
+  document est ignorée) : `BRANDING` ne garde que les deux colonnes d'`Etablissements`, et `FUNDER_LOGO` comme le repli
+  « nom en texte » des financeurs disparaissent. Ces deux images sont les seules exceptions à la règle « aucun logo dans le dépôt » ; les logos des
+  établissements restent des pièces jointes lues dans Grist.
+- **Logos des cartes à la même hauteur.** Un logo d'établissement fait 32 px de haut (la hauteur de la maquette),
+  quelle que soit sa forme, avec la largeur de ses proportions, bornée à 120 px et à 38 % de la largeur de la carte
+  pour qu'une bannière très large ne déborde pas sur le nom de la personne. C'est du CSS seul : la taille des logos
+  des cartes n'est plus calculée en JavaScript (`CARD_LOGO` disparaît ; `logoSize()` ne sert plus qu'au bandeau du
+  bas, inchangé). La fenêtre de la fiche d'un établissement garde son cadre de 92 px.
+- **Sonde : les règles exactes (`GRIST_SETUP.md`, étape 4).** Deux règles sur `Annuaire_Sonde` empêchent de s'y
+  faire passer pour quelqu'un d'autre : chacun peut ajouter une ligne, lire et supprimer **la sienne**
+  (`rec.Email == user.Email`), personne ne peut rien modifier. Un test montre que le widget fonctionne avec ces
+  droits (ajout, relecture de sa seule ligne, suppression). L'étape 2 précise qu'il n'y a **rien à saisir** dans la
+  sonde et que `Admin` et `Responsable_de` ne doublent pas `ACL` : ce sont des formules de déclenchement qui la
+  lisent à la création de la ligne ; `ACL` reste le seul endroit où l'on nomme administrateurs et responsables.
+- **« Voir en tant que ».** Quand Grist ouvre le widget en lecture seule (`readonly=true`), le widget n'écrit pas la
+  ligne de la sonde : personne n'est identifié, donc ni bandeau en haut à droite ni bouton « Modifier ma fiche ».
+  Ce cas était silencieux ; la console dit désormais `[IDENTITE] Grist a ouvert le widget en lecture seule…`. Si
+  Grist ouvre au contraire le widget en écriture et refuse la ligne, la console dit
+  `[IDENTITE] lecture impossible : …` (déjà le cas). **Non vérifié dans un vrai Grist** : lequel des deux se produit
+  en « Voir en tant que » ne se lit que dans la console.
+- **Tests.** 896 tests (321 dans un vrai navigateur, optionnels sans Playwright), 8 de moins qu'à la 1.20.1 :
+  les tests de la table `Financeurs` (ordre, rond, repli, nom en HTML, rechargement) laissent la place à ceux des deux
+  images fixes (présentes dans tous les documents, hauteur et légende à chaque largeur, table `Financeurs` ignorée,
+  bandeau des fondateurs sans financeurs) ; nouveaux aussi : la hauteur identique des logos des cartes (navigateur),
+  le widget qui fonctionne avec les règles strictes de la sonde et le journal du mode lecture seule.
+- **Pour la passe de documentation** (pas relues ici, elles parlent encore de la table `Financeurs`, de
+  `FUNDER_LOGO` ou de `CARD_LOGO`) : `README.md`, `specs.md`, `docs/utilisateurs.md`, `docs/maintenance.md`,
+  `docs/securite.md` (nombre de lectures, « Minimisation »), `docs/developpeurs.md` (`constants.js`, `branding.js`,
+  `branding-ui.js`, `grist-data.js`, section Habillage). `GRIST_SETUP.md`, `grist_structure.txt` et `TESTING.md`
+  (sections 11 et 14) sont à jour.
+- **Revenir en arrière** : `git revert` de la fusion de cette version (la table `Financeurs` ne serait relue que si
+  elle existe encore dans le document).
+
 ## 1.20.1 — Menu « Tâches » : les actions préfixées « [ PUI ] » rangent de nouveau les tâches
 
 Signalé par Antoine le 13 octobre 2026 (captures à l'appui) : depuis qu'il a ajouté « [ PUI ] » devant le libellé

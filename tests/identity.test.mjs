@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readIdentity, isReadOnlyAddress, responsableIds } from '../identity.js';
 import { createFakeGrist } from './support/fake-grist.js';
+import { PROBE_TABLE } from '../constants.js';
 import { withIdentity, ANA_EMAIL, BOB_EMAIL, ADMIN_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 
 // ===== readIdentity : qui est connecté ? (table-sonde à formules déclenchées) =====
@@ -125,6 +126,36 @@ test('readIdentity does not even try for a read-only (viewer) account', async ()
   assert.equal(identity.status, 'viewer');
   assert.equal(identity.email, '');
   assert.deepEqual(s.calls, [], 'un Lecteur ne peut rien écrire : aucune tentative');
+  assert.match(s.log.infos[0][0], /^\[IDENTITE\].*lecture seule.*readonly=true/, 'la console dit pourquoi aucun bouton n\'est proposé');
+  assert.deepEqual(s.log.warnings, []);
+});
+
+// La règle d'accès que GRIST_SETUP.md (étape 4) donne à la sonde : toute personne peut ajouter et supprimer
+// une ligne, personne ne peut en modifier une, et chacune ne lit que les lignes à son adresse.
+test('readIdentity works with the strictest rule on the probe: add and delete only, a person reads only the rows at their own address', async () => {
+  const tables = withIdentity();
+  tables.Annuaire_Sonde = { id: [7], Email: [ANA_EMAIL], Admin: [true], Responsable_de: ['1'] }; // la ligne d'une autre personne
+  const s = session(BOB_EMAIL, tables);
+  const actions = [];
+  const strict = {
+    ...s.docApi,
+    applyUserActions: async userActions => {
+      actions.push(...userActions.map(action => action[0]));
+      if (userActions.some(action => !['AddRecord', 'RemoveRecord'].includes(action[0]))) throw new Error('Blocked by table update access rules');
+      return s.docApi.applyUserActions(userActions);
+    },
+    fetchTable: async name => {
+      const table = await s.docApi.fetchTable(name);
+      if (name !== PROBE_TABLE) return table;
+      const own = table.id.map((_, index) => table.Email[index] === BOB_EMAIL);
+      return Object.fromEntries(Object.entries(table).map(([column, values]) => [column, values.filter((_, index) => own[index])]));
+    }
+  };
+  const identity = await readIdentity(strict, { log: s.log });
+  await settle();
+  assert.deepEqual(identity, { status: 'ready', email: BOB_EMAIL, admin: false, etablissements: [2], reason: '' });
+  assert.deepEqual(actions, ['AddRecord', 'RemoveRecord'], 'le widget n\'ajoute que sa ligne et ne fait que la supprimer');
+  assert.deepEqual(s.tables.Annuaire_Sonde.id, [7], 'la ligne de l\'autre personne est intacte, la nôtre est retirée');
 });
 
 // ===== La table-sonde absente : le widget la crée (GRIST_SETUP.md, étape 2), la seule table qu'il crée =====

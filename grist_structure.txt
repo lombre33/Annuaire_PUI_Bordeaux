@@ -25,9 +25,10 @@
 # colonne. Il ne crée ni ne modifie jamais une table ou une colonne : voir GRIST_SETUP.md
 # pour les créer.
 #
-# Les logos (1.14.0) sont des pièces jointes du document : le widget lit les colonnes
-# facultatives logo et ordre_bandeau d'Etablissements et la table facultative Financeurs
-# (jamais écrite). Pour afficher un fichier, il demande à Grist un jeton d'accès en
+# Les logos des établissements (1.14.0) sont des pièces jointes du document : le widget lit les
+# colonnes facultatives logo et ordre_bandeau d'Etablissements. Les financeurs (le visuel du haut de
+# page, le rond France 2030 du bandeau du bas) n'y sont plus : depuis la 1.21.0 ce sont deux images
+# fixes du widget (assets/), sans table. Pour afficher un fichier, il demande à Grist un jeton d'accès en
 # lecture seule (getAccessToken, attachments.js). Les photos de profil (1.19.0) sont lues de la
 # même façon (colonne facultative Avatar de BDD). Pour envoyer un nouveau logo (1.17.0) ou une
 # nouvelle photo (1.19.0), il demande un jeton en écriture, le temps de l'envoi seul (upload.js).
@@ -134,18 +135,6 @@ Tables de référence (id -> libellé, chargées via fetchTable)
                                     (fondateur ET ok_pour_apparaitre) y figurent ; sans numéro
                                     valable, ils passent après les autres, dans l'ordre de la table.
   Role_Dans_le_PUI   : Role (Text)
-
-Table Financeurs (facultative, à créer dans Grist à la main, voir GRIST_SETUP.md ; lue, jamais écrite)
-  nom   : Text         le nom du financeur : affiché à la place du logo quand le fichier manque,
-                       et lu par les lecteurs d'écran. Le financeur dont le nom est « France 2030 »
-                       (casse et accents ignorés) ferme aussi le bandeau du bas, sous la forme d'un rond
-                       (BRANDING.roundelFunder dans constants.js).
-  logo  : Attachments  le logo du financeur (le premier fichier)
-  ordre : Numeric      l'ordre des logos en haut de la page, de gauche à droite (1, 2, 3…)
-  Pas de table Financeurs : l'en-tête n'a simplement pas de financeurs, sans aucun message.
-  Pourquoi une table : les financeurs ne sont pas des établissements, les ranger dans
-  Etablissements les ferait apparaître dans le filtre « Établissement » et dans les règles de
-  visibilité. Voir branding.js.
 
 Table Annuaire_Sonde (à créer dans Grist, voir GRIST_SETUP.md ; vide au repos)
   Email : Text    formule de déclenchement `user.Email`, appliquée aux nouvelles

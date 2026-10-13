@@ -1,4 +1,4 @@
-// Pièces jointes de Grist (logos des établissements et des financeurs, photos de profil).
+// Pièces jointes de Grist (logos des établissements, photos de profil).
 // Une colonne « Pièces jointes » contient une liste d'identifiants ['L', 12, 13] ; le fichier se
 // télécharge avec un jeton d'accès en lecture seule que Grist délivre au widget
 // (docApi.getAccessToken). Rien ici ne touche le DOM : les images sont construites par

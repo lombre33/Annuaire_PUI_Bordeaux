@@ -10,7 +10,7 @@ la faire et comment vérifier qu'elle a marché.
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement : **le widget la crée lui-même** au premier chargement, ouvert par un compte qui peut modifier la structure du document | si le widget n'a pas pu la créer, personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, et depuis la 1.17.0 une fiche d'établissement aussi |
-| 5 | Les logos : colonnes `logo` et `ordre_bandeau` dans `Etablissements`, table `Financeurs` (facultatif) ; le remplacement d'un logo depuis le widget en dépend | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas, pas de financeurs en tête de page ; un responsable ne peut plus changer le logo de son établissement depuis le widget (la fenêtre le dit) ; rien d'autre ne change |
+| 5 | Les logos des établissements : colonnes `logo` et `ordre_bandeau` dans `Etablissements` (facultatif) ; le remplacement d'un logo depuis le widget en dépend. Les financeurs n'en dépendent pas : ce sont deux images fixes du widget | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas ; un responsable ne peut plus changer le logo de son établissement depuis le widget (la fenêtre le dit) ; rien d'autre ne change |
 | 6 | La photo de profil : colonne `Avatar` (Pièces jointes) dans `BDD` (facultatif) | les cartes gardent les initiales et le formulaire de modification n'a pas de carte « Photo de profil » ; rien d'autre ne change |
 
 Le widget ne modifie jamais la structure du document (colonne, règle d'accès) et ne crée
@@ -87,6 +87,13 @@ C'est la seule table que le widget crée ; elle apparaît dans les données brut
 Le nom de la table et des colonnes est exact : `Annuaire_Sonde`, `Email`, `Admin` et,
 pour la fiche d'un établissement (1.17.0), `Responsable_de` (facultative : sans elle,
 tout le reste fonctionne et personne ne modifie de fiche d'établissement).
+
+**Rien n'est à saisir dans cette table**, et `Admin` comme `Responsable_de` ne doublent pas
+`ACL` : ce sont des formules de déclenchement qui **lisent** `ACL` à l'instant où le widget
+ajoute sa ligne (adresse de la personne connectée, puis ses droits d'après `ACL`). `ACL` reste
+le seul endroit où l'on nomme les administrateurs et les responsables d'établissement. Ces deux
+colonnes existent pour que le widget connaisse les droits de la personne connectée sans lui
+ouvrir la lecture de tout `ACL` ; la ligne est supprimée aussitôt lue, la table est vide au repos.
 
 **À la main** (si vous préférez créer la table vous-même, ou si le widget n'en a pas le droit)
 
@@ -224,7 +231,7 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 
 | Où | Qui peut | Pourquoi |
 |---|---|---|
-| `Annuaire_Sonde` : créer, lire, supprimer des lignes | toute personne qui peut modifier le document | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
+| `Annuaire_Sonde` : ajouter une ligne, lire et supprimer **la sienne**, ne rien modifier | toute personne qui peut modifier le document (les deux règles exactes sont plus bas) | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
 | `BDD` : modifier `prenom`, `nom`, `Fonction`, `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Avatar` (si vous l'avez ajoutée, étape 6), `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
 | `BDD` : modifier `email`, `Etablissement` | les administrateurs | c'est ce que le widget écrit quand un administrateur, mode admin allumé, change l'adresse ou l'établissement d'une autre personne. `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` décide de qui apparaît |
 | `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais ; il décide de qui apparaît |
@@ -234,6 +241,24 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 | `Etablissements` : modifier `nom_complet`, `ok_pour_apparaitre` et `logo` d'**une ligne** | les responsables de cette ligne, et les administrateurs | c'est ce que le widget écrit pour la fiche d'un établissement. `ok_pour_apparaitre` décide de qui apparaît ; `acronyme`, `fondateur`, `partenaire` et `autres` : l'équipe du PUI seulement, le widget ne les écrit pas |
 | Ajouter une pièce jointe au document | les responsables et les administrateurs (le logo) ; toute personne qui modifie sa fiche (sa photo de profil, étape 6) | c'est ce que fait l'envoi d'un logo ou d'une photo. Un compte au rôle **Lecteur** du document ne peut rien écrire, pas même cela |
 | `ACL` : lire et modifier les lignes des autres | les administrateurs | la formule d'`Annuaire_Sonde` la lit pour son propre compte, sans passer par les droits de la personne |
+
+**Les deux règles d'`Annuaire_Sonde`.** Dans « Règles d'accès », ajoutez la table
+`Annuaire_Sonde` avec ces deux règles, dans cet ordre (pour chaque droit, la première règle qui
+s'applique et qui se prononce l'emporte) :
+
+| Règle | Condition | Lire | Créer | Modifier | Supprimer |
+|---|---|---|---|---|---|
+| 1 | `rec.Email == user.Email` (la ligne est la sienne) | autorisé | (laisser vide) | **refusé** | autorisé |
+| 2 | tout le monde (aucune condition) | refusé | **autorisé** | refusé | refusé |
+
+Chacun peut ainsi ajouter une ligne, la lire et la supprimer, mais personne ne peut en modifier
+une (l'adresse que Grist y inscrit ne se réécrit pas) ni lire celles des autres. Sans ces règles,
+toute personne qui peut écrire dans le document lirait les adresses des autres et pourrait
+réécrire une ligne. Cela ne lui donnerait pas pour autant les droits de quelqu'un d'autre sur les
+fiches : le widget ne lit que la ligne qu'il vient d'ajouter, et ce sont les règles de `BDD`,
+`Etablissements` et `ACL` (ci-dessus) qui protègent les données. La création ne porte aucune
+condition (une ligne qui n'existe pas encore n'a pas d'adresse à comparer). Le widget fonctionne
+avec ces droits : il ajoute une ligne, la relit, puis la supprime. À essayer sur une copie.
 
 Pour « un responsable de cette ligne d'`Etablissements` » (ou de cette ligne d'`ACL`), un
 attribut d'utilisateur qui cherche `user.Email` dans la colonne `email` d'`ACL` ne rend que
@@ -267,17 +292,23 @@ l'envoi du fichier que Grist refuse, le message est un autre (« Grist a refusé
 droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. »)
 et rien n'a été envoyé.
 
-## 5. Les logos (facultatif)
+## 5. Les logos des établissements (facultatif)
 
 Le widget est aux couleurs du consortium plutôt qu'à celles d'un établissement : le logo
-de chaque établissement figure sur ses cartes, les financeurs sont rappelés en haut de
-la page et les logos des fondateurs forment un bandeau en bas. Ces logos sont des
-**pièces jointes du document Grist** : le dépôt du widget n'en contient aucun (il est
-public, et un logo réel n'y a pas sa place sans l'accord de son titulaire). Sans ces
-colonnes, sans cette table ou sans fichier, rien ne casse : le **nom** de l'établissement
-remplace son logo (la pastille de toujours sur ses cartes, son acronyme en texte dans le
-bandeau du bas), et il n'y a pas de financeurs en tête de page. Le bandeau du bas, lui,
-est affiché dès qu'un établissement fondateur a validé sa présence, même sans aucun logo.
+de chaque établissement figure sur ses cartes, et les logos des fondateurs forment un
+bandeau en bas de page. Ces logos sont des **pièces jointes du document Grist** : le dépôt
+du widget n'en contient aucun (il est public, et un logo réel n'y a pas sa place sans
+l'accord de son titulaire). Sans ces colonnes ou sans fichier, rien ne casse : le **nom** de
+l'établissement remplace son logo (la pastille de toujours sur ses cartes, son acronyme en
+texte dans le bandeau du bas). Le bandeau du bas, lui, est affiché dès qu'un établissement
+fondateur a validé sa présence, même sans aucun logo.
+
+**Les financeurs ne sont pas dans Grist.** Depuis la 1.21.0, le visuel des financeurs en
+tête de page (République française, ANR, Bpifrance, France 2030, avec sa phrase) et le rond
+France 2030 du bandeau du bas sont deux images fixes du widget (`assets/financeurs.png` et
+`assets/france-2030.png`), reprises de la maquette : ce sont des éléments qui ne bougent pas.
+Rien n'est à créer ni à remplir, et une table `Financeurs` restée dans le document est
+ignorée (vous pouvez la supprimer).
 
 **Dans `Etablissements`**, deux colonnes à ajouter (noms exacts) :
 
@@ -293,38 +324,16 @@ sur les cartes de ses membres. Les logos se rangent sur une ou deux rangées sel
 largeur du cadre (huit colonnes, quatre sur un cadre étroit), et s'ajustent d'eux-mêmes :
 le bandeau reste lisible avec seize logos.
 
-**Une table `Financeurs`**, créée à la main (une ligne par financeur ; nom de la table et
-des colonnes exacts) :
-
-| Colonne | Type | Rôle |
-|---|---|---|
-| `nom` | Texte | Le nom du financeur : affiché à la place du logo quand le fichier manque, et lu par les lecteurs d'écran |
-| `logo` | Pièces jointes | Le logo du financeur |
-| `ordre` | Numérique | L'ordre des logos en haut de la page, de gauche à droite : 1, 2, 3… |
-
-Le financeur dont le `nom` est exactement `France 2030` (casse et accents ignorés) ferme
-aussi le bandeau du bas, sous la forme d'un rond : c'est celui du bandeau que le PUI a
-fourni. Un financeur d'un autre nom ne figure qu'en haut de page.
-
-Déposez les logos **en couleurs** : en haut de page, les financeurs doivent rester discrets,
-le widget les y affiche donc en niveaux de gris (comme sur la maquette), alors que le rond du
-bandeau du bas, qui est le même fichier, garde ses couleurs.
-
-*Pourquoi une table, alors que le widget n'en crée jamais ?* Les financeurs ne sont pas
-des établissements : les ranger dans `Etablissements` les ferait apparaître dans le filtre
-« Établissement » et dans les règles de visibilité. Une petite table, créée une fois à la
-main, que le widget **lit sans jamais y écrire** et dont l'absence ne gêne rien, est le
-plus simple. Le widget ne crée pas cette table : si elle manque, il n'affiche simplement
-pas de financeurs.
-
 **Préparer les fichiers**
 
 - **PNG ou SVG**, de préférence **SVG** (net à toute taille), sur **fond transparent**,
-  **rognés au plus près du dessin**. Le widget ajuste lui-même la taille de chaque logo
-  pour qu'une rangée de logos de formes différentes (un emblème carré, une bannière
-  large, une signature haute) ait un poids visuel voisin : une marge blanche autour d'un
-  logo le ferait paraître plus petit que les autres, et un fond blanc opaque dessinerait
-  un rectangle blanc sur le fond de la page.
+  **rognés au plus près du dessin**. Sur les cartes, le widget donne à tous les logos la
+  même hauteur (32 px), quelle que soit leur forme, et en borne la largeur pour qu'une
+  bannière très large ne déborde pas ; dans le bandeau du bas, il ajuste la taille de chacun
+  pour qu'une rangée de logos de formes différentes (un emblème carré, une bannière large,
+  une signature haute) ait un poids visuel voisin. Une marge blanche autour d'un logo le
+  ferait paraître plus petit que les autres, et un fond blanc opaque dessinerait un
+  rectangle blanc sur le fond de la page.
 - Un SVG doit déclarer sa taille (`width` et `height`, ou au moins un `viewBox`).
 - Une cellule peut contenir plusieurs fichiers, mais seul le premier est affiché : pour
   changer un logo, **remplacez** le fichier au lieu d'en ajouter un.
@@ -332,10 +341,10 @@ pas de financeurs.
   ses pièces jointes.
 
 **Ajouter ou changer un logo.** Dans Grist, cliquez la cellule `logo` de l'établissement
-ou du financeur, puis le « + » (ou glissez le fichier). Modifier ces tables ne rafraîchit
+puis le « + » (ou glissez le fichier). Modifier cette table ne rafraîchit
 pas le widget tout seul : rechargez la page. Depuis la 1.17.0, un **responsable
 d'établissement** remplace aussi le logo de son établissement depuis le widget (fiche de
-l'établissement, voir plus bas) ; les logos des financeurs ne se changent que dans Grist.
+l'établissement, voir plus bas).
 
 **Comment le widget les lit.** Il demande à Grist un jeton d'accès **en lecture seule**
 (`getAccessToken`) et affiche chaque logo par une balise `<img>` à l'adresse que Grist
@@ -366,17 +375,16 @@ widget affiche une phrase qui dit quoi faire (le plus souvent « Déposez le fic
 dans Grist ») et le logo se change dans Grist, comme avant.
 
 Vérifier : ouvrez le widget, console ouverte. Les logos des établissements apparaissent
-sur les cartes, ceux des financeurs au centre de l'en-tête, ceux des fondateurs en bas
-de page. Si ce n'est pas le cas, la console dit pourquoi :
+sur les cartes (tous à la même hauteur), ceux des fondateurs en bas de page ; le visuel des
+financeurs est au centre de l'en-tête et le rond France 2030 dans le bandeau du bas, quoi
+qu'il y ait dans Grist. Si les logos ne s'affichent pas, la console dit pourquoi :
 
 | Ce que vous voyez | Cause | Remède |
 |---|---|---|
 | `[LOGOS] Jeton d'accès aux pièces jointes indisponible : les logos sont remplacés par le texte.` et des noms à la place de tous les logos | Grist ne donne pas de jeton (version de Grist sans `getAccessToken`, ou règle d'accès qui interdit la lecture des pièces jointes) | Vérifier l'accès du widget (`full`) et la version de Grist ; essayer avec un compte qui peut modifier le document |
 | Le nom d'**un seul** établissement à la place de son logo, ou un message « Failed to load resource » du navigateur | Le fichier est absent de la cellule `logo`, a été supprimé, ou n'est pas une image lisible (PNG, SVG, JPEG…) | Remplacer le fichier dans Grist |
 | `[LOGOS] Impossible d'afficher les logos : …` | Une erreur inattendue en construisant l'habillage ; les cartes restent affichées | Transmettre la ligne au mainteneur du code |
-| Pas de financeurs en tête de page | La table `Financeurs` n'existe pas (ou son nom diffère), ou elle est vide | Reprendre les noms exacts ci-dessus |
 | Pas de bandeau en bas de page | Aucun établissement n'est à la fois `fondateur` et `ok_pour_apparaitre` | Cocher les deux cases pour les fondateurs |
-| Le rond du bandeau manque | Le financeur ne s'appelle pas exactement `France 2030` | Corriger le `nom` |
 | Un logo paraît trop petit, ou entouré de blanc | Marge ou fond blanc dans le fichier | Rogner l'image, fond transparent |
 
 ## 6. La photo de profil (facultatif)

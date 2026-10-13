@@ -15,11 +15,11 @@
 // listes ['L', id, ...], téléphone Numeric sans son 0 initial, pièces jointes
 // ['L', numéro du fichier].
 //
-// Les logos des établissements et des financeurs sont des dessins inventés
-// (logos-fictifs.mjs), jamais ceux de vraies structures ; les photos de profil sont des visages
-// dessinés (portraits-fictifs.mjs), jamais ceux de vraies personnes.
+// Les logos des établissements sont des dessins inventés (logos-fictifs.mjs), jamais ceux de
+// vraies structures ; les photos de profil sont des visages dessinés (portraits-fictifs.mjs),
+// jamais ceux de vraies personnes. Les financeurs ne viennent pas de ce jeu : le bandeau du haut
+// et le rond du bas sont deux images fixes du dépôt (assets/), identiques dans tout document.
 
-import { BRANDING } from '../../constants.js';
 import { IDS_LOGOS } from './logos-fictifs.mjs';
 import { PREMIER_PORTRAIT } from './portraits-fictifs.mjs';
 
@@ -44,16 +44,6 @@ const ETABLISSEMENTS = [
   { acronyme: 'ASD', nomComplet: 'AgroSciences Démo', statut: 'fondateur', valide: true, ordreBandeau: 6 },
   { acronyme: 'PTD', nomComplet: 'Polytechnique de Démonstration', statut: 'fondateur', valide: true, ordreBandeau: 7 },
   { acronyme: 'MND', nomComplet: 'Métropole de Démonstration', statut: 'fondateur', valide: true, ordreBandeau: 8 }
-];
-
-// La table facultative Financeurs (GRIST_SETUP.md), dans l'ordre de la colonne `ordre`. Celui
-// dont le nom est BRANDING.roundelFunder ferme aussi le bandeau du bas : son dessin est un
-// rond inventé, pas le logo du programme du même nom.
-const FINANCEURS = [
-  { nom: 'République Démo', logo: 'REPUBLIQUE', ordre: 1 },
-  { nom: 'Agence Démo de la Recherche', logo: 'ADR', ordre: 2 },
-  { nom: 'Banque Démo de l\'Innovation', logo: 'BDI', ordre: 3 },
-  { nom: BRANDING.roundelFunder, logo: 'ROND', ordre: 4 }
 ];
 
 // Une entrée par table de référence dont BDD porte une colonne ReferenceList.
@@ -380,12 +370,6 @@ export function tablesFictives({ photos = false } = {}) {
       logo: ETABLISSEMENTS.map(etablissement => (IDS_LOGOS[etablissement.acronyme] ? ['L', IDS_LOGOS[etablissement.acronyme]] : null)),
       ordre_bandeau: ETABLISSEMENTS.map(etablissement => etablissement.ordreBandeau ?? 0)
     },
-    Financeurs: {
-      id: FINANCEURS.map((_, index) => index + 1),
-      nom: FINANCEURS.map(financeur => financeur.nom),
-      logo: FINANCEURS.map(financeur => ['L', IDS_LOGOS[financeur.logo]]),
-      ordre: FINANCEURS.map(financeur => financeur.ordre)
-    },
     Competences: {
       ...tableDeReference({ corrigee: 'Competences_corrigees', brute: 'Competences' }, COMPETENCES.map(competence => competence.libelle)),
       Macro_competences: COMPETENCES.map(competence => competence.domaine)
@@ -420,12 +404,10 @@ export const PERSONNES_AVEC_PHOTO = CONTACTS.filter(contact => contact.portrait 
 export const CARTES_ATTENDUES = { fondateurs: 14, fondateursEtPartenaires: 18 };
 
 // Ce que l'habillage montre avec ce jeu de données (les captures le vérifient de même) :
-//   financeurs                 les logos du haut, dans l'ordre de la colonne `ordre`
 //   bandeau                    les fondateurs du bandeau du bas, dans l'ordre d'ordre_bandeau :
 //                              les noms complets, qui sont l'infobulle de chaque logo
 //   cartesPartenairesSansLogo  les cartes de partenaires qui gardent le nom de l'établissement
 export const HABILLAGE_ATTENDU = {
-  financeurs: [...FINANCEURS].sort((a, b) => a.ordre - b.ordre).map(financeur => financeur.nom),
   bandeau: ETABLISSEMENTS.filter(etablissement => etablissement.statut === 'fondateur' && etablissement.valide)
     .sort((a, b) => a.ordreBandeau - b.ordreBandeau).map(etablissement => etablissement.nomComplet),
   cartesPartenairesSansLogo: CONTACTS.filter(contact => {

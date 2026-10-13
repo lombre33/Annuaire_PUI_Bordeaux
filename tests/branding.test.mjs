@@ -1,20 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { buildBranding, logoForContact, logoSize } from '../branding.js';
-import { BAND_LOGO, FUNDER_LOGO, CARD_LOGO } from '../constants.js';
+import { BAND_LOGO } from '../constants.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { sampleTables, withBranding } from './fixtures.mjs';
 
-// ===== buildBranding : logos, bandeau des fondateurs, financeurs =====
+// ===== buildBranding : logos des cartes et bandeau des fondateurs =====
 
 const quiet = { info() {}, warn() {} };
 
 // Lignes lues comme le fait loadDirectory (colonnes → lignes).
 function brandingOf(tables) {
-  return buildBranding({
-    etablissementRows: tableToRows(tables.Etablissements),
-    financeurRows: tables.Financeurs ? tableToRows(tables.Financeurs) : null
-  });
+  return buildBranding({ etablissementRows: tableToRows(tables.Etablissements) });
 }
 
 test('the founders band lists the validated founders in the order of ordre_bandeau', () => {
@@ -122,54 +120,40 @@ test('logoForContact uses the enriched label when the row id is not among the ro
   assert.equal(logoForContact(branding, { Etablissement: 777, etablissement_label: 'UBM' }).logo, 12);
 });
 
-// ===== les financeurs =====
+// ===== les financeurs : deux images fixes du dépôt, jamais lues dans Grist =====
 
-test('the funders come in the order of the ordre column', () => {
-  const { funders } = brandingOf(withBranding());
-  assert.deepEqual(funders.map(f => f.name), ['République française', 'ANR', 'Bpifrance', 'France 2030']);
-  assert.deepEqual(funders.map(f => f.logo), [21, 22, null, 23]);
-});
+const FUNDER_IMAGES = [
+  { file: 'assets/financeurs.png', width: 487, height: 80 },
+  { file: 'assets/france-2030.png', width: 136, height: 134 }
+];
 
-test('the roundel of the band is the funder named France 2030, whatever the case and accents', () => {
-  for (const name of ['France 2030', 'FRANCE 2030', ' france 2030 ']) {
-    const tables = withBranding();
-    tables.Financeurs.nom[2] = name;
-    assert.equal(brandingOf(tables).roundel?.logo, 23, JSON.stringify(name));
+test('the funders band and the France 2030 roundel are the mockup\'s two images, fixed in index.html', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  for (const { file, width, height } of FUNDER_IMAGES) {
+    const png = fs.readFileSync(new URL(`../${file}`, import.meta.url));
+    assert.equal(png.subarray(1, 4).toString(), 'PNG', `${file} est un PNG`);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [width, height], `${file} : les dimensions de la maquette`);
+    assert.ok(html.includes(`src="${file}"`), `index.html affiche ${file}`);
   }
-  const tables = withBranding();
-  tables.Financeurs.nom[2] = 'France 2040';
-  assert.equal(brandingOf(tables).roundel, null);
+  assert.match(html, /<div id="funders" class="funders">/, 'le bandeau des financeurs n\'est jamais masqué');
+  assert.ok(html.includes('alt="République française, ANR, Bpifrance, France 2030"'));
+  assert.ok(html.includes('alt="France 2030"'));
+  assert.ok(html.includes('Projet financé par l\'État dans le cadre de France 2030'));
 });
 
-test('without the Financeurs table there are no funders and no roundel, and nothing fails', () => {
-  const branding = brandingOf(sampleTables());
-  assert.deepEqual(branding.funders, []);
-  assert.equal(branding.roundel, null);
-  assert.deepEqual(buildBranding().funders, []);
-  assert.deepEqual(buildBranding({ financeurRows: null, etablissementRows: [] }).founders, []);
-});
-
-test('a funder with neither name nor logo is ignored; a funder with only a logo is kept', () => {
+test('the branding no longer carries funders: a Financeurs table in the document changes nothing', () => {
   const tables = withBranding();
-  tables.Financeurs.id.push(5, 6);
-  tables.Financeurs.nom.push('', '   ');
-  tables.Financeurs.logo.push(null, ['L', 24]);
-  tables.Financeurs.ordre.push(0, 0);
-  const { funders } = brandingOf(tables);
-  assert.equal(funders.length, 5);
-  assert.deepEqual(funders.at(-1), { id: 6, name: '', logo: 24, order: Infinity });
-});
-
-test('names and files are carried as plain data, never interpreted', () => {
-  const tables = withBranding();
-  tables.Financeurs.nom[0] = '<img src=x onerror="window.__xss=1">';
+  const before = brandingOf(tables);
+  tables.Financeurs = { id: [1], nom: ['Autre financeur'], logo: [['L', 99]], ordre: [1] };
   const branding = brandingOf(tables);
-  assert.equal(branding.funders[0].name, '<img src=x onerror="window.__xss=1">');
+  assert.deepEqual(Object.keys(branding).sort(), ['founders', 'logos', 'signature']);
+  assert.equal(branding.signature, before.signature);
+  assert.deepEqual(buildBranding().founders, []);
 });
 
 // ===== la signature : ne reconstruire les logos que s'ils ont changé =====
 
-test('the signature stays the same while nothing visible changes, and changes when a logo, a name or the order does', () => {
+test('the signature stays the same while nothing visible changes, and changes when a logo or a name of the band, or its order, does', () => {
   const base = brandingOf(withBranding()).signature;
   assert.equal(brandingOf(withBranding()).signature, base);
 
@@ -181,8 +165,6 @@ test('the signature stays the same while nothing visible changes, and changes wh
     'logo d\'un fondateur': t => { t.Etablissements.logo[0] = ['L', 99]; },
     'ordre du bandeau': t => { t.Etablissements.ordre_bandeau = [1, 0, 0, 0, 2]; },
     'nom d\'un fondateur': t => { t.Etablissements.nom_complet[0] = 'CHU Pellegrin'; },
-    'logo d\'un financeur': t => { t.Financeurs.logo[0] = ['L', 98]; },
-    'nom d\'un financeur': t => { t.Financeurs.nom[1] = 'Agence nationale'; },
     'établissement devenu fondateur': t => { t.Etablissements.fondateur[1] = true; }
   };
   for (const [name, change] of Object.entries(changes)) {
@@ -194,44 +176,29 @@ test('the signature stays the same while nothing visible changes, and changes wh
 
 // ===== loadDirectory fournit les lignes dont l'habillage a besoin =====
 
-function docApiOf(tables, { failing = [] } = {}) {
+function docApiOf(tables) {
   const calls = {};
   return {
     calls,
     async fetchTable(name) {
       calls[name] = (calls[name] || 0) + 1;
-      if (failing.includes(name)) throw new Error(`échec ${name}`);
       if (!tables[name]) throw new Error(`Table inconnue : ${name}`);
       return structuredClone(tables[name]);
     }
   };
 }
 
-test('loadDirectory returns the Etablissements and Financeurs rows the branding needs, from a single read each', async () => {
-  const docApi = docApiOf(withBranding());
+test('loadDirectory returns the Etablissements rows the branding needs, from a single read, and never reads a Financeurs table', async () => {
+  const tables = withBranding();
+  tables.Financeurs = { id: [1], nom: ['Autre financeur'], logo: [['L', 99]], ordre: [1] };
+  const docApi = docApiOf(tables);
   const directory = await loadDirectory(docApi, { log: quiet });
   assert.equal(directory.etablissementRows.length, 5);
   assert.equal(directory.etablissementRows[0].logo.join(), 'L,11');
-  assert.deepEqual(directory.financeurRows.map(row => row.nom), ['République française', 'ANR', 'France 2030', 'Bpifrance']);
   assert.equal(docApi.calls.Etablissements, 1);
-  assert.equal(docApi.calls.Financeurs, 1);
+  assert.equal(docApi.calls.Financeurs, undefined, 'les financeurs ne se lisent plus dans Grist');
+  assert.ok(!('financeurRows' in directory));
   assert.deepEqual(directory.issues, []);
-});
-
-test('a document without the Financeurs table loads exactly as before: no banner message, no warning', async () => {
-  const warnings = [];
-  const directory = await loadDirectory(docApiOf(sampleTables()), { log: { info() {}, warn: (...args) => warnings.push(args) } });
-  assert.equal(directory.financeurRows, null);
-  assert.deepEqual(directory.issues, []);
-  assert.deepEqual(warnings.filter(args => /Financeurs/.test(JSON.stringify(args))), [], 'rien dans la console sur la table absente');
-  assert.equal(directory.contacts.length, 5);
-});
-
-test('an unreadable Financeurs table costs nothing: the directory loads, the funders are simply missing', async () => {
-  const directory = await loadDirectory(docApiOf(withBranding(), { failing: ['Financeurs'] }), { log: quiet });
-  assert.equal(directory.financeurRows, null);
-  assert.deepEqual(directory.issues, []);
-  assert.equal(directory.contacts.length, 5);
 });
 
 test('the logo and order columns are optional: their absence is not reported', async () => {
@@ -267,25 +234,9 @@ test('logoSize: a tall logo is capped in height and a banner in width, keeping t
 });
 
 test('logoSize: never beyond the bounds, whatever the ratio', () => {
-  for (const limits of [BAND_LOGO, FUNDER_LOGO, CARD_LOGO]) {
-    for (const ratio of [0.01, 0.1, 0.3, 0.5, 1, 1.2, 2, 2.875, 4, 6, 10, 100]) {
-      const box = logoSize(ratio, limits);
-      assert.ok(box.width <= limits.maxWidth + 1e-9 && box.height <= limits.maxHeight + 1e-9, `ratio ${ratio}: ${box.width} x ${box.height}`);
-      assert.ok(Math.abs(box.width / box.height - ratio) < 1e-6 * Math.max(1, ratio), `ratio ${ratio} conservé`);
-    }
+  for (const ratio of [0.01, 0.1, 0.3, 0.5, 1, 1.2, 2, 2.875, 4, 6, 10, 100]) {
+    const box = logoSize(ratio, BAND_LOGO);
+    assert.ok(box.width <= BAND_LOGO.maxWidth + 1e-9 && box.height <= BAND_LOGO.maxHeight + 1e-9, `ratio ${ratio}: ${box.width} x ${box.height}`);
+    assert.ok(Math.abs(box.width / box.height - ratio) < 1e-6 * Math.max(1, ratio), `ratio ${ratio} conservé`);
   }
-});
-
-test('logoSize: on a card the logo fits the 92 x 32 box at its own proportions', () => {
-  assert.deepEqual(logoSize(1, CARD_LOGO), { width: 32, height: 32 });
-  assert.deepEqual(logoSize(2.4, CARD_LOGO), { width: 76.8, height: 32 });
-  assert.equal(logoSize(92 / 32, CARD_LOGO).width, 92);
-  const wide = logoSize(5, CARD_LOGO);
-  assert.equal(wide.width, 92);
-  assert.ok(Math.abs(wide.height - 18.4) < 1e-9);
-});
-
-test('logoSize: the optical weights of the funders stay close, from the roundel to the flat banner', () => {
-  const areas = [1, 1.5, 2, 3, 4].map(ratio => area(logoSize(ratio, FUNDER_LOGO)));
-  assert.ok(Math.max(...areas) / Math.min(...areas) < 1.6, areas.map(Math.round).join(' '));
 });

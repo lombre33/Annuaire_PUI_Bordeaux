@@ -1,4 +1,4 @@
-# Version 1.20.1 — Menu Tâches : actions préfixées « [ PUI ] » (voir CHANGELOG.md)
+# Version 1.21.0 — Financeurs fixes, logos des cartes à la même hauteur, règles de la sonde (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -7,7 +7,7 @@ s'adapte à la largeur de son cadre (1.9.1), n'affiche que les personnes qui ont
 accepté d'apparaître (1.10.0), laisse la personne connectée, identifiée par son
 adresse e-mail, choisir d'apparaître ou non (1.11.0), puis modifier sa fiche directement,
 après une relecture de la carte avant et après (1.12.0, réglages dans `GRIST_SETUP.md`),
-et affiche les logos des établissements, des financeurs et des fondateurs, des pièces
+et affiche les logos des établissements et des fondateurs, des pièces
 jointes du document lues avec un jeton d'accès en lecture seule (1.14.0, facultatif,
 étape 5 de `GRIST_SETUP.md`). Le champ de recherche a un nom pour les lecteurs d'écran et
 un anneau violet montre le contrôle actif au clavier (1.14.1, audit UI/UX). Depuis la
@@ -38,4 +38,7 @@ Depuis la 1.20.0, le widget crée lui-même la table `Annuaire_Sonde` (qui est c
 quand elle manque, avec ses trois colonnes à formule de déclenchement ; c'est la seule table qu'il crée.
 Depuis la 1.20.1, le menu « Tâches » range de nouveau les tâches par action quand le libellé des actions commence par un
 préfixe entre crochets (« [ PUI ] Action 1: … ») : le préfixe est ignoré pour lire le numéro, et reste dans le libellé affiché.
-904 tests (dont 323 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.21.0, les financeurs (le visuel de l'en-tête et le rond France 2030 du bandeau du bas) sont deux images fixes du
+widget, sans table `Financeurs` dans Grist ; tous les logos des cartes ont la même hauteur (32 px) ; `GRIST_SETUP.md` donne
+les deux règles d'accès d'`Annuaire_Sonde` (ajouter, lire et supprimer sa propre ligne, ne rien modifier).
+896 tests (dont 321 dans un vrai navigateur, optionnels sans Playwright).

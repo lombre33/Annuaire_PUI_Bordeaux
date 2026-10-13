@@ -1,8 +1,8 @@
 // Logos 100 % fictifs de la démonstration (voir donnees-fictives.mjs et serveur-demo.mjs) :
-// des dessins inventés pour les établissements et les financeurs imaginaires, jamais le
-// logo d'une vraie structure. Chaque logo est un petit SVG dessiné ici, aux proportions
-// différentes (large, carré, haut), comme le sont les vrais : de quoi montrer comment le
-// widget leur donne un poids visuel voisin.
+// des dessins inventés pour les établissements imaginaires, jamais le logo d'une vraie
+// structure. Chaque logo est un petit SVG dessiné ici, aux proportions différentes (large,
+// carré, haut), comme le sont les vrais : de quoi montrer comment le widget leur donne la
+// même hauteur sur les cartes.
 //
 // Les textes ont une largeur imposée (textLength, mesurée avec la police Inter) : le logo
 // garde ses proportions quelle que soit la police disponible sur la machine qui régénère les
@@ -101,45 +101,14 @@ const fdx = svg(126, 44,
   + texte('Fondation', 48, 20, 15, 800, '#8a6200', 74)
   + texte('Exemple', 48, 37, 15, 500, '#8a6200', 61));
 
-// ===== Financeurs =====
-
-const republique = svg(120, 40,
-  '<clipPath id="disque"><circle cx="20" cy="20" r="17"/></clipPath>'
-  + '<g clip-path="url(#disque)"><rect x="3" y="3" width="12" height="34" fill="#33405c"/>'
-  + '<rect x="15" y="3" width="11" height="34" fill="#e9edf5"/><rect x="26" y="3" width="12" height="34" fill="#8a96b4"/></g>'
-  + texte('RÉPUBLIQUE', 42, 18, 12, 800, '#33405c', 75.4)
-  + texte('DÉMO', 42, 32, 12, 500, '#33405c', 36));
-
-const agence = svg(130, 40,
-  texte('ADR', 2, 27, 20, 800, '#0b6b57', 43)
-  + '<path d="M52 6V34" stroke="#0b6b57" stroke-width="1.5"/>'
-  + texte('Agence Démo', 58, 18, 9, 600, '#0b6b57', 61)
-  + texte('de la Recherche', 58, 30, 9, 500, '#0b6b57', 69));
-
-const banque = svg(136, 40,
-  texte('BDI', 2, 27, 20, 800, '#b4531a', 33.5)
-  + '<path d="M40 31L48 23L54 28L63 17M56 16H63V23" fill="none" stroke="#b4531a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
-  + texte('Banque Démo', 70, 18, 9, 600, '#b4531a', 61)
-  + texte('de l\'Innovation', 70, 30, 9, 500, '#b4531a', 63));
-
-// Le rond qui ferme le bandeau du bas (le financeur nommé « France 2030 » dans la table :
-// c'est ce nom qui le désigne). Le dessin est inventé : ce n'est pas le logo du programme.
-const rond = svg(72, 72,
-  '<circle cx="36" cy="36" r="34" fill="#1b2a4e"/>'
-  + '<circle cx="36" cy="36" r="29" fill="none" stroke="#ffffff" stroke-width="1.5"/>'
-  + texte('2030', 13.3, 42, 17, 800, '#ffffff', 45.5)
-  + texte('DÉMO', 23.9, 55, 8, 700, '#cdd6ee', 24.3));
-
 // Dans l'ordre : le numéro de pièce jointe d'un dessin est sa position + 101.
 const FICHIERS = [
   ['CHD', chd], ['UDD', udd], ['ISD', isd], ['EDD', edd], ['IND', ind], ['ASD', asd], ['PTD', ptd], ['MND', mnd],
-  ['CLEX', clex], ['FDX', fdx],
-  ['REPUBLIQUE', republique], ['ADR', agence], ['BDI', banque], ['ROND', rond]
+  ['CLEX', clex], ['FDX', fdx]
 ];
 const PREMIER_NUMERO = 101;
 
-// { clé du dessin → numéro de pièce jointe } : les acronymes des établissements, puis
-// REPUBLIQUE, ADR, BDI et ROND pour les financeurs.
+// { acronyme de l'établissement → numéro de pièce jointe }.
 export const IDS_LOGOS = Object.fromEntries(FICHIERS.map(([cle], index) => [cle, PREMIER_NUMERO + index]));
 
 // Le SVG de la pièce jointe `id`, ou null si ce numéro n'existe pas.

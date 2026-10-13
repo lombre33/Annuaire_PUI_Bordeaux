@@ -5,10 +5,10 @@
 // fiche, profile.js / profile-save.js / preview.js (la logique) avec profile-ui.js (la
 // fenêtre), pour celle d'un établissement etablissement.js / etablissement-save.js (la
 // logique), upload.js et image-prep.js (le logo, la photo) avec etablissement-ui.js (la
-// fenêtre), branding.js, attachments.js et branding-ui.js (les logos : cartes, financeurs,
+// fenêtre), branding.js, attachments.js et branding-ui.js (les logos : cartes et
 // fondateurs) et avatar-ui.js (les photos de profil).
 
-import { CARD_LOGO, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS } from './constants.js';
+import { ETABLISSEMENT_NAMES, SEARCH_DELAY_MS } from './constants.js';
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
@@ -24,7 +24,7 @@ import { createEtablissementDialog } from './etablissement-ui.js';
 import { uploadAttachment } from './upload.js';
 import { buildBranding, logoForContact } from './branding.js';
 import { avatarIdOf, createAttachments } from './attachments.js';
-import { createBrandingUI, createLogoImage, sizeLogo } from './branding-ui.js';
+import { createBrandingUI, createLogoImage } from './branding-ui.js';
 import { createAvatar, createPhotoViewer, createThumb } from './avatar-ui.js';
 
 const state = {
@@ -44,7 +44,7 @@ const state = {
   // retrouver sa fiche.
   identity: null,
   people: null,
-  // Logos et financeurs (branding.js), vides tant que Grist n'a pas répondu.
+  // Logos des établissements (branding.js), vides tant que Grist n'a pas répondu.
   branding: buildBranding(),
   // Ce que la personne connectée peut faire de chaque fiche (profile.js) : rien tant
   // qu'elle n'est pas identifiée. Un administrateur n'a le droit de modifier les fiches
@@ -94,11 +94,8 @@ const etablissementDialog = createEtablissementDialog(document.getElementById('e
 
 const photoViewer = createPhotoViewer(document.getElementById('photoDialog'), attachments);
 const brandingUI = createBrandingUI({
-  funders: document.getElementById('funders'),
-  fundersLogos: document.getElementById('fundersLogos'),
   band: document.getElementById('foundersBand'),
   bandLogos: document.getElementById('bandLogos'),
-  bandRoundel: document.getElementById('bandRoundel'),
   bandLink: document.getElementById('bandLink')
 }, attachments);
 
@@ -240,16 +237,16 @@ window.grist.ready({ requiredAccess: 'full' });
 
 // Les logos sont un habillage : une erreur ici ne doit jamais empêcher les cartes
 // de s'afficher.
-function applyBranding({ etablissementRows, financeurRows }) {
+function applyBranding({ etablissementRows }) {
   try {
-    state.branding = buildBranding({ etablissementRows, financeurRows });
+    state.branding = buildBranding({ etablissementRows });
     brandingUI.render(state.branding);
   } catch (error) {
     console.error('[LOGOS] Impossible d\'afficher les logos :', error);
   }
 }
 
-function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissementRows, financeurRows }) {
+function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissementRows }) {
   const filterReferenceMaps = {
     ...referenceMaps,
     etablissement: filterVisibleEstablishments(referenceMaps.etablissement, etabFlags)
@@ -266,7 +263,7 @@ function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissem
   state.allContacts = contacts;
   state.people = people;
   state.etabFlags = etabFlags;
-  applyBranding({ etablissementRows, financeurRows });
+  applyBranding({ etablissementRows });
   if (referenceMapsChanged) rebuildFilterUI();
   refreshCards();
   refreshAccount();
@@ -515,8 +512,7 @@ function etablissementBadge(row, label) {
   const holder = document.createElement('span');
   holder.className = 'et-logo';
   holder.title = brand.name;
-  holder.append(createLogoImage(attachments, brand.logo, label, () => holder.replaceWith(pill()),
-    { eager: true, onLoad: image => sizeLogo(image, CARD_LOGO) }));
+  holder.append(createLogoImage(attachments, brand.logo, label, () => holder.replaceWith(pill()), { eager: true }));
   return holder;
 }
 

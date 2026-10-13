@@ -1,6 +1,6 @@
 // Test navigateur de la mise en page de l'habillage : charge le vrai index.html dans
 // Chromium à plusieurs largeurs de cadre, avec le jeu « chargé » de la mise en page
-// (tests/fixtures-responsive.mjs) complété de logos de formes variées et de financeurs,
+// (tests/fixtures-responsive.mjs) complété de logos de formes variées,
 // et vérifie ce que voit l'utilisateur : l'en-tête (titre, compteur, financeurs), les
 // logos sur les cartes, le bandeau des fondateurs en bas. Rien ne dépasse du cadre, les
 // logos restent dans leur case quelle que soit leur forme, le bandeau se replie.
@@ -21,10 +21,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crowdedTables, crowdedBranding, crowdedIdentity } from './fixtures-responsive.mjs';
 import { routeAttachments, TALL_FILE, WIDE_FILE, UNSIZED_FILE } from './support/fake-attachments.mjs';
-import { BAND_LOGO, FUNDER_LOGO } from '../constants.js';
+import { BAND_LOGO } from '../constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
 const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 
 const FAKE_GRIST = fs.readFileSync(path.join(ROOT, 'tests/support/fake-grist.js'), 'utf8').replace(/^export /gm, '');
@@ -249,27 +249,16 @@ test('en-tête avec « Ma présence » : sous les financeurs à droite de 860 à
     });
   }));
 
-test('financeurs : un logo par financeur dans l\'ordre, de taille bornée, en une rangée dès 600px', { skip }, () =>
+test('financeurs : le visuel de la maquette à sa hauteur (36px, 29px sur téléphone), la légende à sa gauche dès 600px', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await atEachWidth(page, [320, 360, 599, 600, 768, 1024, 1480], async width => {
-      const scale = width <= 599 ? 0.8 : 1;
       const message = `à ${width}px`;
-      const alts = await page.locator('#fundersLogos img').evaluateAll(images => images.map(image => image.alt));
-      assert.deepEqual(alts, ['République française', 'ANR', 'Bpifrance', 'France 2030'], `${message} : dans l'ordre de la table`);
-      const logos = await rects(page, '#fundersLogos img');
-      logos.forEach((logo, index) => {
-        assert.ok(logo.height <= FUNDER_LOGO.maxHeight * scale + 0.5, `${message} : le logo ${index + 1} fait ${Math.round(logo.height)}px de haut`);
-        assert.ok(logo.width <= FUNDER_LOGO.maxWidth * scale + 0.5, `${message} : le logo ${index + 1} fait ${Math.round(logo.width)}px de large`);
-        assert.ok(logo.height >= 8 && logo.width >= 20, `${message} : le logo ${index + 1} reste lisible (${Math.round(logo.width)}x${Math.round(logo.height)})`);
-      });
-      if (width >= 600) {
-        assert.ok(logos.every(logo => Math.abs(centerY(logo) - centerY(logos[0])) <= 2), `${message} : en une seule rangée`);
-        const label = await rectOf(page, '.funders-label');
-        assert.ok(label.right <= logos[0].left + 0.5, `${message} : la légende est à gauche des logos`);
-      } else {
-        const label = await rectOf(page, '.funders-label');
-        assert.ok(label.bottom <= logos[0].top + 0.5, `${message} : la légende est au-dessus des logos`);
-      }
+      const image = await rectOf(page, '#funders img');
+      const label = await rectOf(page, '.funders-label');
+      assert.ok(Math.abs(image.height - (width <= 599 ? 29 : 36)) <= 0.5, `${message} : le visuel fait ${Math.round(image.height)}px de haut`);
+      assert.ok(Math.abs(image.width / image.height - 487 / 80) <= 0.05, `${message} : proportions du fichier (${Math.round(image.width)}x${Math.round(image.height)})`);
+      if (width >= 600) assert.ok(label.right <= image.left + 0.5, `${message} : la légende est à gauche du visuel`);
+      else assert.ok(label.bottom <= image.top + 0.5, `${message} : la légende est au-dessus du visuel`);
     });
   }));
 
@@ -322,10 +311,38 @@ test('à 1480px avec logos : trois colonnes, logo dans le coin haut droit comme 
     assert.ok(card.badgeFromRight >= 9 && card.badgeFromRight <= 13, `logo à ${card.badgeFromRight}px du bord droit`);
     assert.ok(card.badgeFromTop >= 12 && card.badgeFromTop <= 16, `logo à ${card.badgeFromTop}px du haut`);
     assert.ok(card.imageFromBadgeRight >= 0 && card.imageFromBadgeRight <= 6, `l'image est calée à droite de son cadre (${card.imageFromBadgeRight}px)`);
-    assert.ok(card.image.width <= 92.5 && card.image.height <= 32.5, `le logo fait ${Math.round(card.image.width)}x${Math.round(card.image.height)}px`);
+    assert.ok(card.image.width <= 120.5 && card.image.height <= 32.5, `le logo fait ${Math.round(card.image.width)}x${Math.round(card.image.height)}px`);
     assert.ok(card.image.height >= 14, `le logo reste lisible (${Math.round(card.image.height)}px de haut)`);
     assert.ok(Math.abs(card.nameVsAvatar) <= 2, `nom décalé de ${card.nameVsAvatar}px par rapport à l'avatar`);
     assert.ok(Math.abs(card.nameAndFunctionVsAvatar) <= 3, `nom et fonction décalés de ${card.nameAndFunctionVsAvatar}px par rapport à l'avatar`);
+  }));
+
+// Les logos ont des formes différentes (de 1,2 à 6 fois plus larges que hauts dans ces fichiers) : sur
+// la carte, tous gardent la même hauteur. Seul un logo que la largeur maximale (120px, et 38% de la
+// carte pour qu'une carte étroite garde la place du nom) empêche d'avoir cette hauteur est plus petit,
+// à ses proportions.
+test('cartes : tous les logos ont la même hauteur de 32px, à leurs proportions, tant que la largeur maximale le permet', { skip }, () =>
+  withWidget({ tables: crowdedBranding() }, async ({ page }) => {
+    await atEachWidth(page, [320, 600, 840, 1024, 1280, 1480], async width => {
+      const logos = await page.locator('.contact-card').evaluateAll(cards => cards.map(card => {
+        const image = card.querySelector('.etablissement-tag img');
+        const box = image.getBoundingClientRect();
+        const ratio = image.naturalWidth / image.naturalHeight;
+        // Ce qui se voit : l'image tient dans sa case (object-fit: contain), à ses proportions.
+        const shown = Math.min(box.width / ratio, box.height);
+        return { alt: image.alt, boxWidth: box.width, boxHeight: box.height, ratio, shown, cap: Math.min(120, 0.38 * card.getBoundingClientRect().width) };
+      }));
+      assert.ok(logos.length >= 12, `à ${width}px : assez de cartes pour comparer (${logos.length})`);
+      logos.forEach(({ alt, boxWidth, boxHeight, ratio, shown, cap }) => {
+        const message = `à ${width}px, ${alt}`;
+        assert.ok(Math.abs(boxHeight - 32) <= 0.5, `${message} : la case fait ${Math.round(boxHeight)}px de haut`);
+        assert.ok(boxWidth <= cap + 0.5, `${message} : ${Math.round(boxWidth)}px de large, plus que le maximum (${Math.round(cap)}px)`);
+        if (32 * ratio <= cap) assert.ok(Math.abs(shown - 32) <= 0.5, `${message} : ${shown.toFixed(1)}px de haut au lieu de 32`);
+        else assert.ok(Math.abs(shown - cap / ratio) <= 0.5 && shown < 32, `${message} : réduit à ses proportions (${shown.toFixed(1)}px de haut)`);
+      });
+      // Le test n'est pas vide : sur une carte large, la plupart des formes ont bien 32px de haut.
+      if (width >= 1280) assert.ok(logos.filter(({ shown }) => Math.abs(shown - 32) <= 0.5).length >= 8, `à ${width}px : trop peu de logos à 32px de haut`);
+    });
   }));
 
 test('sur téléphone avec logos, le nom reste centré sur l\'avatar et le logo dans le coin de la carte', { skip }, () =>
@@ -456,15 +473,12 @@ test('bandeau : le logo France 2030 à droite des logos, ou centré dessous sous
 // ===== Des logos de toutes formes =====
 
 // Un logo en hauteur, une bannière très large et un SVG sans dimensions, à la place des
-// trois premiers fondateurs et des deux premiers financeurs.
+// trois premiers fondateurs.
 function extremeBranding() {
   const tables = crowdedBranding();
   tables.Etablissements.logo[0] = ['L', TALL_FILE];
   tables.Etablissements.logo[1] = ['L', WIDE_FILE];
   tables.Etablissements.logo[2] = ['L', UNSIZED_FILE];
-  tables.Financeurs.logo[0] = ['L', TALL_FILE];
-  tables.Financeurs.logo[1] = ['L', WIDE_FILE];
-  tables.Financeurs.logo[2] = ['L', UNSIZED_FILE];
   return tables;
 }
 
@@ -487,27 +501,20 @@ test('un logo très haut, une bannière très large ou un SVG sans dimensions re
         assert.ok(Math.abs(ratio / expected[index] - 1) <= 0.15, `${message}, fondateur ${index + 1} : proportions déformées (${ratio.toFixed(2)} au lieu de ${expected[index].toFixed(2)})`);
       });
 
-      const scale = width <= 599 ? 0.8 : 1;
-      const funders = await rects(page, '#fundersLogos img');
-      funders.slice(0, 3).forEach((logo, index) => {
-        const name = `${message}, financeur ${index + 1}`;
-        assert.ok(logo.height <= FUNDER_LOGO.maxHeight * scale + 0.5 && logo.width <= FUNDER_LOGO.maxWidth * scale + 0.5,
-          `${name} : ${Math.round(logo.width)}x${Math.round(logo.height)} dépasse les bornes`);
-        assert.ok(logo.height >= 8 && logo.width >= 8, `${name} : visible`);
-      });
-
       const cards = await page.locator('.etablissement-tag img').evaluateAll(images => images.map(image => {
         const { width, height } = image.getBoundingClientRect();
-        return { alt: image.alt, width, height };
+        // Ce qui se voit : l'image tient dans sa case (object-fit: contain), à ses proportions.
+        const ratio = image.naturalWidth / image.naturalHeight;
+        return { alt: image.alt, width, height, shown: { width: Math.min(width, height * ratio), height: Math.min(height, width / ratio) } };
       }));
-      assert.ok(cards.every(({ width, height }) => width <= 92.5 && height <= 32.5 && height >= 4), `${message} : logos des cartes bornés`);
+      assert.ok(cards.every(({ width, height }) => width <= 120.5 && height <= 32.5 && height >= 4), `${message} : logos des cartes bornés`);
       // Même sur une carte, le logo en hauteur, la bannière et le SVG sans dimensions gardent leurs proportions.
       const expectedRatios = { UB: 40 / 120, 'Bordeaux INP': 300 / 30, BSA: 100 / 50 };
       Object.entries(expectedRatios).forEach(([alt, expectedRatio]) => {
         const logo = cards.find(card => card.alt === alt);
         assert.ok(logo, `${message} : le logo de ${alt} s'affiche sur une carte`);
-        assert.ok(Math.abs(logo.width / logo.height / expectedRatio - 1) <= 0.15,
-          `${message}, carte ${alt} : proportions déformées (${(logo.width / logo.height).toFixed(2)} au lieu de ${expectedRatio.toFixed(2)})`);
+        assert.ok(Math.abs(logo.shown.width / logo.shown.height / expectedRatio - 1) <= 0.15,
+          `${message}, carte ${alt} : proportions déformées (${(logo.shown.width / logo.shown.height).toFixed(2)} au lieu de ${expectedRatio.toFixed(2)})`);
       });
       // Les bornes du bandeau sont en millièmes de la largeur du bloc de logos (1 014 = huit colonnes).
       const main = await rectOf(page, '.band-main');
@@ -524,17 +531,16 @@ test('un logo très haut, une bannière très large ou un SVG sans dimensions re
 function namesOnly() {
   const tables = crowdedBranding();
   tables.Etablissements.logo = tables.Etablissements.id.map(() => null);
-  tables.Financeurs.logo = tables.Financeurs.id.map(() => null);
   return tables;
 }
 
-test('sans aucun logo, les noms des fondateurs et des financeurs restent dans leur case', { skip }, () =>
+test('sans aucun logo, les noms des fondateurs restent dans leur case', { skip }, () =>
   withWidget({ tables: namesOnly(), waitLogos: false }, async ({ page }) => {
     await page.waitForFunction(() => document.querySelectorAll('#bandLogos .band-name').length > 0);
     await atEachWidth(page, [320, 360, 414, 600, 768, 1024, 1480], async width => {
       const message = `à ${width}px`;
       assert.equal(await page.locator('img.logo-img').count(), 0, `${message} : aucune image`);
-      const overflowing = await page.evaluate(() => [...document.querySelectorAll('.band-name, .funder-name')]
+      const overflowing = await page.evaluate(() => [...document.querySelectorAll('.band-name')]
         .filter(name => name.scrollWidth > name.clientWidth + 1 || name.getBoundingClientRect().right > name.parentElement.getBoundingClientRect().right + 1)
         .map(name => name.textContent));
       assert.deepEqual(overflowing, [], `${message} : un nom dépasse de sa case`);
@@ -542,7 +548,5 @@ test('sans aucun logo, les noms des fondateurs et des financeurs restent dans le
       assert.deepEqual(names, ACRONYMS, `${message} : les noms des fondateurs, dans l'ordre`);
       const { client, scroll } = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
       assert.ok(scroll <= client, `${message} : la page déborde de ${scroll - client}px`);
-      const funders = await page.locator('#fundersLogos .funder-name').allTextContents();
-      assert.deepEqual(funders, ['République française', 'ANR', 'Bpifrance', 'France 2030'], `${message} : les noms des financeurs`);
     });
   }));
