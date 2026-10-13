@@ -549,6 +549,11 @@ button.avatar:hover {
 .card-body.with-logo .fonction {
   grid-column: 2;
 }
+/* Un logo haut agrandit les deux rangées : le nom et la fonction se rejoignent au milieu, l'avatar
+   se centre donc sur elles au lieu de rester en haut. */
+.card-body.with-logo .avatar {
+  align-self: center;
+}
 /* Le logo seul : ni fond ni pastille, un cadre léger au survol et au clavier. */
 .etablissement-tag.visible.has-logo {
   display: flex;
@@ -566,10 +571,11 @@ button.avatar:hover {
 .etablissement-tag.has-logo:focus-visible {
   border-color: var(--line);
 }
-/* Tous les logos ont la même hauteur, 32 px comme sur la maquette, et la largeur que donnent
-   leurs proportions. Un logo très large garde ses proportions dans une case plus étroite
-   (object-fit) : jamais plus de 120 px ni plus de 38 % de la largeur de la carte, pour que
-   le nom garde sa place sur une carte étroite. */
+/* Tous les logos ont la même hauteur, et la largeur que donnent leurs proportions. Un logo très
+   large garde ses proportions dans une case plus étroite (object-fit) : jamais plus qu'une part de
+   la largeur de la carte, pour que le nom garde sa place. La hauteur suit la place de la carte :
+   32 px sur une carte étroite (hauteur de la maquette), 48 px dès 330 px de large, 64 px dès 380 px
+   (le double de la maquette, à la demande d'Antoine le 13 octobre 2026). */
 .etablissement-tag .logo-img {
   display: block;
   width: auto;
@@ -577,6 +583,26 @@ button.avatar:hover {
   max-width: min(120px, 38cqw);
   object-fit: contain;
   object-position: right center;
+}
+@container (min-width: 330px) {
+  .etablissement-tag.visible.has-logo {
+    max-width: calc(min(180px, 45cqw) + 16px);
+    height: 52px;
+  }
+  .etablissement-tag .logo-img {
+    height: 48px;
+    max-width: min(180px, 45cqw);
+  }
+}
+@container (min-width: 380px) {
+  .etablissement-tag.visible.has-logo {
+    max-width: calc(min(240px, 50cqw) + 16px);
+    height: 68px;
+  }
+  .etablissement-tag .logo-img {
+    height: 64px;
+    max-width: min(240px, 50cqw);
+  }
 }
 /* Un logo n'apparaît qu'une fois chargé. */
 .logo-img {
