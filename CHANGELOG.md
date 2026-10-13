@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.21.7 — La sonde supprime sa ligne en attendant la réponse de Grist, et dit pourquoi quand Grist refuse
+
+Signalé par Antoine le 13 octobre 2026 (capture à l'appui) : `Annuaire_Sonde` gardait ses lignes, 27 en quelques heures, dont 19 à son
+adresse, qui est celle d'un propriétaire du document. Le widget ajoute une ligne pour savoir qui est connecté, la relit, puis la supprime.
+La suppression partait sans qu'on en attende la réponse et sans qu'un refus soit jamais dit (`.catch(() => {})`) : un refus de Grist, ou une
+réponse qui n'arrive pas, restaient invisibles. La cause exacte du refus ne peut pas s'établir sans le vrai Grist (aucun n'est à portée) :
+cette version la rend visible, retente, et nettoie ce qui reste.
+
+- Le widget **attend la réponse de Grist** à la suppression (au plus 8 secondes : sans réponse, la personne est identifiée quand même),
+  **la retente une fois** et, si Grist la refuse, écrit dans la console du navigateur (F12), sans adresse :
+  `[IDENTITE] la ligne N de Annuaire_Sonde n'a pas pu être supprimée : <raison donnée par Grist>`. Une règle d'accès qui n'autorise pas
+  « Supprimer » se lit là (`GRIST_SETUP.md`, étape 4).
+- Au chargement suivant, il supprime aussi, en une seule action, les **anciennes lignes à l'adresse de la personne** que d'autres chargements
+  ont laissées, et seulement si la sienne est partie ; jamais les lignes des autres (`removeProbeRows` dans `identity.js`). Les lignes déjà
+  présentes partent donc d'elles-mêmes, une personne après l'autre ; on peut aussi les supprimer à la main sans risque : le widget ne les relit pas.
+- Une ligne ajoutée qui a disparu avant d'être relue (une autre fenêtre de la même personne l'a balayée) est dite comme telle, au lieu de
+  « la formule user.Email n'a renvoyé aucune adresse ».
+- Cinq tests de non-régression (`tests/identity.test.mjs`) échouent sur la 1.21.6 (la réponse n'est pas attendue, un refus est muet, rien n'est
+  balayé, une réponse qui ne vient pas n'est pas bornée) et passent maintenant ; le faux Grist des tests sait supprimer plusieurs lignes à la fois
+  (`BulkRemoveRecord`).
+- **Non essayé dans le vrai Grist d'Antoine.** Si des lignes restent après cette version, la phrase de la console dit pourquoi. Revenir en
+  arrière : `git revert` de la fusion de cette version.
+
 ## 1.21.6 — Modifier mon profil : une seule entrée par libellé
 
 Signalé par Antoine le 13 octobre 2026 (capture à l'appui) : dans la fenêtre « Modifier mon profil », une même tâche apparaissait
