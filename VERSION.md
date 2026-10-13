@@ -1,4 +1,4 @@
-# Version 1.25.1 — Logos des cartes : l'image qu'on voit ne dépend plus de la lecture de ses pixels (voir CHANGELOG.md)
+# Version 1.25.2 — Logos des cartes : l'image qu'on voit ne dépend plus de la lecture de ses pixels (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -60,10 +60,12 @@ dit dans la console pourquoi si Grist la refuse, et supprime les anciennes ligne
 Depuis la 1.22.0, les filtres, les cartes et la fenêtre de modification ne lisent que la colonne « corrigé » des tables de référence dès qu'une
 table en remplit une : une ligne sans libellé corrigé n'apparaît plus (une table qui n'en remplit aucune garde ses libellés bruts).
 Depuis la 1.24.0, un huitième filtre, « Rôle PUI » (table `Role_Dans_le_PUI`), ferme la barre, et le rôle de la personne s'affiche en
-pastille sous le logo de son établissement ; les menus de filtre réunissent deux libellés qui ne diffèrent que par la casse ou les accents.
+pastille ; les menus de filtre réunissent deux libellés qui ne diffèrent que par la casse ou les accents.
 Depuis la 1.25.0, la fenêtre « Créer ma fiche » a une case « Apparaître dans l'annuaire », cochée d'avance, qui renseigne `Accepte_apparaitre` et change le
 bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son périmètre rempli par un administrateur, et les messages le disent) ; les listes
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
-Depuis la 1.25.1, le logo qu'on voit sur une carte est une image ordinaire (sans CORS) : ses pixels sont lus à part, et si Grist ou le navigateur
+Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite : à droite de la fonction et de l'e-mail, sous le logo, sur une carte de 480 px ou
+plus ; sous l'e-mail sur une carte plus étroite.
+Depuis la 1.25.2, le logo qu'on voit sur une carte est une image ordinaire (sans CORS) : ses pixels sont lus à part, et si Grist ou le navigateur
 refuse ou tarde (3 s), le logo se montre quand même, sans recadrage (rejoué dans Chromium, pas essayé dans un vrai Grist ni sur Firefox).
-929 tests (dont 333 dans un vrai navigateur, optionnels sans Playwright).
+931 tests (dont 335 dans un vrai navigateur, optionnels sans Playwright).
