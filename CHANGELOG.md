@@ -1,22 +1,26 @@
 # Changelog
 
-## 1.21.2 — Firefox sur téléphone : recherche lisible, cases à cocher claires
+## 1.21.3 — Recherche : le texte tapé reste lisible sur Firefox mobile
 
-Retours d'Antoine du 13 octobre 2026 (06 h 31 et 06 h 32), sur Firefox mobile : « les cases à cocher des filtres, quand elles sont
-vides, apparaissent comme un carré noir » et « quand on tape dans la barre de recherche, le filtre marche mais on ne voit pas les
-caractères tapés ». Même cause : le widget laissait le navigateur choisir la couleur du texte des champs et le dessin des
-cases ; Firefox sur téléphone en thème sombre y mettait du blanc et du noir, sur nos fonds clairs. Corrigé sans essai possible sur
-Firefox ni sur un vrai téléphone (le cas est rejoué dans Chromium en lui imposant un schéma sombre) : à confirmer à l'œil.
+Signalé par Antoine le 13 octobre 2026 (06 h 32) : sur Firefox mobile, « quand on tape dans la barre de recherche, le filtre marche mais on
+ne voit pas les caractères tapés ». Même famille que les cases noires de la 1.21.2 : le widget ne fixait pas la couleur du texte des champs, que
+le navigateur choisissait, et Firefox sur téléphone en thème sombre y mettait du blanc, sur le fond clair du champ. Le thème clair imposé par la
+1.21.2 n'y suffisait pas à coup sûr (non essayé sur Firefox) ; la couleur est maintenant écrite par le widget.
 
-- **Le widget se déclare clair** : `color-scheme: light` dans `style.css` et dans une balise `<meta>` d'`index.html`. Le navigateur n'applique
-  plus ses couleurs sombres à nos champs, nos défilements ni nos menus déroulants.
-- **Texte des champs** : les boutons et les champs prennent la couleur du texte de la page (`color: inherit`, sans effet sur ceux qui fixent la leur), et le
-  texte d'invite des champs de recherche est gris foncé (5,9:1), plein, au lieu de la couleur que choisissait chaque navigateur.
-- **Cases à cocher dessinées par le widget** : fond blanc, bordure grise (4,8:1 sur blanc), violette et pleine une fois cochée, avec une coche
-  blanche, ou un tiret quand un domaine n'a qu'une partie de ses compétences cochée ; la case de la fenêtre d'un établissement reste verte. Seul
-  écart visible sur ordinateur : la case fait 16 px au lieu de 13 px (18 px au doigt, comme avant). En contraste élevé de Windows, le navigateur reprend le dessin.
-- Deux tests de non-régression (`tests/accessibility.test.mjs`) échouent sur l'ancien code : le widget se déclare clair, et, sous un schéma sombre imposé,
-  la recherche reste lisible (4,5:1 au moins, texte et invite) et les cases vides sont blanches et bordées. Revenir en arrière : `git revert` de la fusion de cette version.
+- Les boutons et les champs prennent la couleur du texte de la page (`color: inherit`, sans effet sur ceux qui fixent la leur) : le texte tapé dans la
+  recherche, dans la recherche d'un menu de filtre et dans les champs des fenêtres est celui du widget, 15:1 sur le fond du champ.
+- Le texte d'invite (« Rechercher par nom ou prénom… ») est gris foncé et plein (5,9:1) au lieu de la couleur que choisissait chaque navigateur.
+- Un test de non-régression (`tests/accessibility.test.mjs`) rejoue le cas dans Chromium en lui imposant un schéma sombre sur la page : il échoue sur la
+  1.21.2 (texte blanc sur fond clair) et passe maintenant. Non essayé sur un vrai Firefox mobile : à confirmer à l'œil. Revenir en arrière : `git revert`.
+
+## 1.21.2 — Cases à cocher des filtres : plus de carré noir sur Firefox Android
+
+Signalé par Antoine le 13 octobre 2026 : sur Firefox pour Android, les cases à cocher vides des menus de filtre
+s'affichaient comme un carré noir. Les cases étaient celles du navigateur, qui reprenait les couleurs du thème du
+téléphone. Elles sont désormais dessinées par la feuille de style (`style.css`) : fond blanc, bordure à 3:1 au moins sur
+blanc, coche blanche sur le violet (le vert foncé dans la fiche d'un établissement), et le widget impose son thème clair
+(`color-scheme: light`) ; en contraste forcé, le navigateur reprend la main. Non essayé sur un vrai Firefox Android : les
+tests vérifient les couleurs rendues dans Chromium, thème sombre émulé compris. Revenir en arrière : `git revert`.
 
 ## 1.21.1 — Logos des cartes deux fois plus grands
 

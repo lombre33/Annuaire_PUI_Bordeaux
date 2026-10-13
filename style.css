@@ -1,7 +1,7 @@
 /* Variables et base */
 :root {
-  /* Le widget n'a qu'un thème, le clair : sans cette ligne, un navigateur en thème sombre (Firefox sur
-     téléphone) peint les champs et les cases avec ses couleurs sombres sur nos fonds clairs. */
+  /* Le widget n'a qu'un thème, clair : les contrôles natifs (cases, champs, défilement) ne suivent pas
+     le thème sombre du téléphone. */
   color-scheme: light;
   --ink: #172033;
   --muted: #68738a;
@@ -36,47 +36,18 @@ input {
   font: inherit;
 }
 /* Les boutons et les champs prennent la couleur du texte de la page, jamais celle du navigateur : en
-   thème sombre, Firefox sur téléphone y mettait du blanc, invisible sur nos fonds clairs (la recherche).
-   Une règle de classe qui fixe sa propre couleur l'emporte. Le texte d'invite est lisible lui aussi. */
+   thème sombre, Firefox sur téléphone y mettait du blanc, invisible sur nos fonds clairs (ce qu'on
+   tape dans la recherche). Une règle de classe qui fixe sa propre couleur l'emporte. */
 button,
 input,
 select,
 textarea {
   color: inherit;
 }
+/* Texte d'invite : plein et foncé, au lieu du texte du champ rendu translucide par le navigateur. */
 ::placeholder {
-  color: #566177; /* 5,9:1 sur le fond du champ, 4,5:1 exigés (WCAG 1.4.3) */
+  color: #566177; /* 5,9:1 sur le fond du champ de recherche, 4,5:1 exigés (WCAG 1.4.3) */
   opacity: 1;
-}
-/* Les cases à cocher sont dessinées par le widget (fond blanc, bordure, coche), pas par le navigateur :
-   Firefox sur téléphone en thème sombre peignait les cases vides en noir. `--check` : la couleur d'une case
-   cochée ou partielle. En contraste élevé, on rend la main au navigateur, qui impose ses couleurs. */
-input[type="checkbox"] {
-  --check: var(--violet);
-  flex: none;
-  width: 16px;
-  height: 16px;
-  background: #fff center / 100% no-repeat;
-  border: 1.5px solid var(--muted); /* 4,8:1 sur blanc, 3:1 exigés (WCAG 1.4.11) */
-  border-radius: 4px;
-  cursor: pointer;
-  appearance: none;
-}
-input[type="checkbox"]:checked,
-input[type="checkbox"]:indeterminate {
-  background-color: var(--check);
-  border-color: var(--check);
-}
-input[type="checkbox"]:checked {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.4 6.4l2.5 2.5 4.7-5.2' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-}
-input[type="checkbox"]:indeterminate {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.8 6h6.4' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E");
-}
-@media (forced-colors: active) {
-  input[type="checkbox"] {
-    appearance: auto;
-  }
 }
 /* Un élément `hidden` le reste, même quand une classe lui donne un affichage. */
 [hidden] {
@@ -89,6 +60,34 @@ input[type="checkbox"]:indeterminate {
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--violet);
   outline-offset: 2px;
+}
+/* Cases à cocher : dessinées par la feuille de style, pas par le navigateur. Firefox pour Android
+   affichait les cases vides en carré noir (couleurs de thème du téléphone) : fond blanc, bordure à
+   3:1 au moins sur blanc (WCAG 1.4.11) et coche blanche sur la couleur du contrôle (`--check-color`),
+   donc les mêmes partout. En contraste forcé, le navigateur reprend la main (voir plus bas). */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  background: #fff center / 12px 12px no-repeat;
+  border: 1.5px solid #6b7094;
+  border-radius: 4px;
+  cursor: pointer;
+}
+input[type="checkbox"]:checked,
+input[type="checkbox"]:indeterminate {
+  background-color: var(--check-color, var(--violet));
+  border-color: var(--check-color, var(--violet));
+}
+input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.2 6.2l2.5 2.5 5-5.2' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:indeterminate {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.8 6h6.4' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 /* Texte réservé aux lecteurs d'écran */
 .sr-only {
@@ -1204,6 +1203,10 @@ button.avatar:hover {
 /* Couleurs imposées (mode contraste élevé) : la piste et le curseur y prendraient le même fond et
    l'interrupteur ne montrerait plus son état. On les pose en couleurs système, que le mode respecte. */
 @media (forced-colors: active) {
+  input[type="checkbox"] {
+    -webkit-appearance: auto;
+    appearance: auto;
+  }
   .presence-track {
     background: Canvas;
     border: 1px solid ButtonText;

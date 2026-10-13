@@ -1,4 +1,4 @@
-# Version 1.21.2 — Firefox sur téléphone : recherche lisible, cases à cocher claires (voir CHANGELOG.md)
+# Version 1.21.3 — Recherche : le texte tapé reste lisible sur Firefox mobile (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -43,7 +43,8 @@ widget, sans table `Financeurs` dans Grist ; tous les logos des cartes ont la m�
 les deux règles d'accès d'`Annuaire_Sonde` (ajouter, lire et supprimer sa propre ligne, ne rien modifier).
 Depuis la 1.21.1, les logos des cartes font 64 px de haut sur une carte d'au moins 380 px de large (48 px dès 330 px, 32 px
 en dessous), pour garder la place du nom.
-Depuis la 1.21.2, le widget se déclare clair (`color-scheme: light`), les champs prennent la couleur du texte de la page et les cases à cocher
-sont dessinées par le widget (blanches et bordées, violettes une fois cochées) : sur Firefox en thème sombre, la recherche n'est plus invisible
-et les cases vides ne sont plus noires (rejoué dans Chromium en schéma sombre imposé, pas essayé dans Firefox).
-896 tests (dont 321 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.21.2, les cases à cocher sont dessinées par la feuille de style (fond blanc, bordure, coche) et le widget impose
+son thème clair : plus de carré noir sur Firefox Android.
+Depuis la 1.21.3, les boutons et les champs prennent la couleur du texte de la page et le texte d'invite est gris foncé : ce qu'on tape
+dans la recherche reste lisible sur Firefox mobile en thème sombre (rejoué dans Chromium en schéma sombre imposé, pas essayé dans Firefox).
+899 tests (dont 323 dans un vrai navigateur, optionnels sans Playwright).

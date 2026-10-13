@@ -392,27 +392,62 @@ test('sur la carte de la personne connectée, « Votre fiche » et les boutons �
   });
 });
 
-// ===== Navigateur en thème sombre (Firefox sur téléphone, 1.21.2) =====
+// ===== Cases à cocher =====
 
-// Sur Firefox mobile en thème sombre, ce qu'on tapait dans la recherche restait invisible (texte blanc sur
-// fond clair) et les cases vides des filtres étaient noires : le widget laissait le navigateur choisir ces
-// couleurs. Chromium ne passe pas ses champs en sombre de lui-même ; on lui impose donc le schéma sombre sur
-// la page (`!important` passe devant la déclaration du widget) pour rejouer le cas : seules des couleurs
-// écrites par le widget tiennent.
-const FORCE_DARK = ':root { color-scheme: dark !important }';
-
-test('le widget se déclare clair : la balise et la feuille de style ne laissent pas le navigateur choisir ses couleurs', () => {
-  assert.match(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), /<meta name="color-scheme" content="light">/);
-  assert.match(readCss('style.css'), /:root\s*\{\s*color-scheme:\s*light;/);
+// Firefox pour Android affichait les cases vides des menus de filtre en carré noir (couleurs de thème du
+// téléphone) : la feuille de style les dessine donc elle-même, fond blanc, bordure et coche explicites, et
+// le widget impose son thème clair.
+test('les cases à cocher sont dessinées par la feuille de style : thème clair imposé, fond blanc, bordure à 3:1 sur blanc (WCAG 1.4.11)', () => {
+  const css = readCss('style.css');
+  assert.match(css, /:root\s*\{\s*color-scheme:\s*light;/, 'le widget n\'a qu\'un thème, clair');
+  const base = css.match(/input\[type="checkbox"\]\s*\{([^}]*)\}/)?.[1] ?? '';
+  assert.match(base, /\bappearance:\s*none/, 'la case n\'est plus celle du navigateur');
+  assert.match(base, /background:\s*#fff\b/, 'fond blanc explicite');
+  const border = base.match(/border:\s*[\d.]+px solid (#[0-9a-f]{3,6})\b/i)?.[1];
+  assert.ok(border, 'bordure de couleur explicite');
+  assert.ok(contrastRatio(border, '#fff') >= 3, `bordure à ${contrastRatio(border, '#fff').toFixed(2)}:1 sur blanc, 3:1 exigés`);
+  assert.ok(contrastRatio('#6257d9', '#fff') >= 3, 'la coche blanche reste lisible sur le violet');
 });
 
-test('même si le navigateur passe en sombre, la recherche reste lisible et les cases à cocher restent claires (Firefox mobile, 1.21.2)', { skip }, async () => {
+test('sur la page rendue, une case de filtre vide est blanche à bordure visible, même avec le thème sombre du téléphone, et cochée elle prend le violet', { skip }, async () => {
   await withWidget({ tables: sampleTables() }, async ({ page }) => {
     await waitForCards(page, 4);
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.addStyleTag({ content: FORCE_DARK });
+    await page.locator('.filter-button', { hasText: 'Instances' }).click();
+    const box = page.locator('.filter.open .filter-option input').first();
+    const look = () => box.evaluate(input => {
+      const style = getComputedStyle(input);
+      return {
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+        appearance: style.appearance,
+        background: style.backgroundColor,
+        border: style.borderTopColor,
+        borderVisible: parseFloat(style.borderTopWidth) >= 1,
+        tick: style.backgroundImage.startsWith('url("data:image/svg+xml')
+      };
+    });
+    assert.deepEqual(await look(), {
+      scheme: 'light', appearance: 'none', background: 'rgb(255, 255, 255)', border: 'rgb(107, 112, 148)', borderVisible: true, tick: false
+    }, 'case vide');
+    await box.check();
+    assert.deepEqual(await look(), {
+      scheme: 'light', appearance: 'none', background: 'rgb(98, 87, 217)', border: 'rgb(98, 87, 217)', borderVisible: true, tick: true
+    }, 'case cochée : violet et coche');
+  });
+});
+
+// ===== Texte des champs, navigateur en thème sombre =====
+
+// Sur Firefox mobile en thème sombre, ce qu'on tapait dans la recherche restait invisible : le navigateur y
+// mettait du blanc, sur le fond clair du champ, parce que le widget ne fixait pas la couleur du texte. Chromium
+// ne passe pas ses champs en sombre de lui-même : on lui impose le schéma sombre sur la page (`!important`
+// passe devant la déclaration du widget) pour rejouer le cas. Seules des couleurs écrites par le widget tiennent.
+test('même si le navigateur passe en sombre, ce qu\'on tape dans la recherche et son texte d\'invite restent lisibles (Firefox mobile, 1.21.3)', { skip }, async () => {
+  await withWidget({ tables: sampleTables() }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.addStyleTag({ content: ':root { color-scheme: dark !important }' });
     await page.locator('.filter-button', { hasText: 'Compétences' }).click();
-    await page.locator('.filter.open .group-toggle').first().click();
     const looks = await page.evaluate(() => {
       const background = element => {
         for (let node = element; node; node = node.parentElement) {
@@ -421,37 +456,20 @@ test('même si le navigateur passe en sombre, la recherche reste lisible et les 
         }
         return 'rgb(255, 255, 255)';
       };
-      const field = element => ({
-        color: getComputedStyle(element).color,
-        background: background(element),
-        placeholder: getComputedStyle(element, '::placeholder').color,
-        placeholderOpacity: getComputedStyle(element, '::placeholder').opacity
-      });
-      const box = element => {
-        const style = getComputedStyle(element);
-        return { appearance: style.appearance, background: style.backgroundColor, border: style.borderTopColor,
-          borderWidth: parseFloat(style.borderTopWidth), image: style.backgroundImage };
-      };
-      const value = document.querySelector('.filter.open .filter-option input');
-      const head = document.querySelector('.filter.open .group-option input');
-      const result = { search: field(document.getElementById('searchInput')), menuSearch: field(document.querySelector('.filter.open .filter-search-input')), empty: box(value) };
-      value.checked = true;
-      result.checked = box(value);
-      head.indeterminate = true;
-      result.partial = box(head);
-      return result;
+      return [['la recherche', document.getElementById('searchInput')], ['la recherche d\'un menu', document.querySelector('.filter.open .filter-search-input')]]
+        .map(([name, field]) => ({
+          name,
+          color: getComputedStyle(field).color,
+          background: background(field),
+          placeholder: getComputedStyle(field, '::placeholder').color,
+          placeholderOpacity: getComputedStyle(field, '::placeholder').opacity
+        }));
     });
-    for (const [name, field] of [['la recherche', looks.search], ['la recherche d’un menu', looks.menuSearch]]) {
-      assert.ok(contrastRatio(field.color, field.background) >= 4.5, `${name} : texte ${field.color} sur ${field.background}`);
-      assert.ok(contrastRatio(field.placeholder, field.background) >= 4.5 && field.placeholderOpacity === '1', `${name} : texte d’invite ${field.placeholder} sur ${field.background}`);
+    assert.equal(looks.length, 2);
+    for (const field of looks) {
+      assert.ok(contrastRatio(field.color, field.background) >= 4.5, `${field.name} : texte ${field.color} sur ${field.background}`);
+      assert.ok(contrastRatio(field.placeholder, field.background) >= 4.5 && field.placeholderOpacity === '1',
+        `${field.name} : texte d'invite ${field.placeholder} (opacité ${field.placeholderOpacity}) sur ${field.background}`);
     }
-    assert.equal(looks.empty.appearance, 'none', 'une case vide est dessinée par le widget, pas par le navigateur');
-    assert.equal(looks.empty.background, 'rgb(255, 255, 255)', 'une case vide est blanche');
-    assert.ok(looks.empty.borderWidth >= 1 && contrastRatio(looks.empty.border, '#fff') >= 3, `bordure d’une case vide : ${looks.empty.borderWidth}px ${looks.empty.border}`);
-    for (const [name, state] of [['cochée', looks.checked], ['partielle', looks.partial]]) {
-      assert.equal(state.background, 'rgb(98, 87, 217)', `une case ${name} est violette`);
-      assert.match(state.image, /^url\("data:image\/svg\+xml/, `une case ${name} porte sa coche`);
-    }
-    assert.notEqual(looks.checked.image, looks.partial.image, 'la coche et le tiret sont deux dessins');
   });
 });
