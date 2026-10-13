@@ -11,7 +11,8 @@ import { avatarIdOf } from './attachments.js';
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
 
-// Le rôle dans le PUI n'est pas une section du bas de la carte : c'est une pastille sous le logo.
+// Le rôle dans le PUI n'est pas une section du bas de la carte : c'est une petite pastille à côté de la fonction
+// et de l'e-mail (ou sous l'e-mail sur une carte étroite), hors de la colonne du logo.
 const ROLE_GROUP = TAG_GROUPS.find(group => group.key === 'role');
 
 // ===== Menus de filtres =====
@@ -509,18 +510,25 @@ function buildTagGroup(group, labels, onToggle, change, roles) {
   return section;
 }
 
-// Le rôle dans le PUI, sous le logo (ou le nom) de l'établissement, dans la colonne de droite de la
-// carte : une pastille qui filtre comme les autres tags. Sur la carte « Après » d'une relecture,
-// un rôle ajouté porte son contour, un rôle retiré reste barré (`change` : { added, removed }).
-function fillRole(column, contact, onToggle, change) {
-  const before = column.querySelector('.etab-actions');
+// Le rôle dans le PUI : une petite pastille qui filtre comme les autres tags. Elle n'est pas dans la
+// colonne du logo (sa hauteur écarterait le nom de l'avatar) mais dans sa propre boîte, qui prend sa
+// place en CSS : à droite de la fonction et de l'e-mail sur une carte large, sous l'e-mail sur une carte
+// étroite. Sur la carte « Après » d'une relecture, un rôle ajouté porte son contour, un rôle retiré reste
+// barré (`change` : { added, removed }).
+function fillRole(body, contact, onToggle, change) {
   const added = new Set((change?.added ?? []).map(normalize));
-  const place = tag => {
+  const tags = [
+    ...labelsOf(contact, ROLE_GROUP.key).map(value => buildTag(ROLE_GROUP, value, onToggle, added.has(normalize(value)))),
+    ...(change?.removed ?? []).map(value => buildRemovedTag(ROLE_GROUP, value))
+  ];
+  if (tags.length === 0) return;
+  const column = el('div', 'role-col');
+  tags.forEach(tag => {
     tag.classList.add('role-tag');
-    column.insertBefore(tag, before);
-  };
-  labelsOf(contact, ROLE_GROUP.key).forEach(value => place(buildTag(ROLE_GROUP, value, onToggle, added.has(normalize(value)))));
-  (change?.removed ?? []).forEach(value => place(buildRemovedTag(ROLE_GROUP, value)));
+    column.append(tag);
+  });
+  body.insertBefore(column, body.querySelector('.card-tags'));
+  body.classList.add('has-role');
 }
 
 function fillTags(container, contact, onToggle, changes) {
@@ -630,7 +638,7 @@ function buildCard(template, contact, onToggle, view = {}) {
   if (marks?.texts.tel) showTextChange(tel, marks.texts.tel, value => `☎ ${value}`);
   else if (phone) reveal(tel, `☎ ${phone}`);
 
-  fillRole(card.querySelector('.etab-col'), contact, onToggle, marks?.tags.role);
+  fillRole(card.querySelector('.card-body'), contact, onToggle, marks?.tags.role);
   fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags);
   if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);
   // Fermé par défaut : seul un établissement dont la personne est responsable (et dont la carte

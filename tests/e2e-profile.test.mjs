@@ -703,7 +703,7 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     // Avant : la carte de l'annuaire, sans aucun repère.
     assert.equal(await before.locator('.name').textContent(), 'Ana Martin');
     assert.equal(await before.locator('.fonction').textContent(), 'Pharmacienne');
-    // Le rôle est la première pastille de la carte : il se lit sous le logo, en haut à droite.
+    // Le rôle est la première pastille de la carte : sa boîte (.role-col) précède celle des tags.
     assert.deepEqual(await before.locator('.tag').allTextContents(), ['Référent qualité', 'CME', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur']);
     assert.equal(await before.locator('.mk, .mk-gone, .mk-pill, .tag-add, .tag-del, .rv-ring').count(), 0);
 
@@ -1249,7 +1249,7 @@ test('changer le rôle ou le nom se voit sur la carte après, et le retirer barr
     assert.equal(await after.locator('.name').textContent(), 'Anna Martin modifié');
     assert.equal(await after.locator('.name .mk').textContent(), 'Anna Martin');
     assert.deepEqual(await after.locator('.tag.tag-del').allTextContents(), ['Référent qualité (retiré)']);
-    assert.equal(await after.locator('.etab-col .role-tag.tag-del').count(), 1, 'le rôle retiré reste barré sous le logo, là où la carte le montre');
+    assert.equal(await after.locator('.role-col .role-tag.tag-del').count(), 1, 'le rôle retiré reste barré, dans la boîte du rôle de la carte');
     await press(page, 'Valider').click();
     await savedWith(page, 'Vos modifications sont enregistrées.');
     assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ prenom: 'Anna', Role_dans_le_PUI: 0 }]);

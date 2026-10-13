@@ -476,6 +476,69 @@ test('le nom et la fonction ne passent jamais sous le logo de l\'établissement,
     });
   }));
 
+// La pastille du rôle (1.25.1) : petite, hors de la colonne du logo. Une carte large (480px ou plus) la
+// pose à droite, sous le logo ou le sigle, sans écarter le nom de l'avatar ; une carte étroite lui
+// donne sa ligne sous l'e-mail. Rôle court, pour que le contrôle ne dépende pas de la police.
+const withShortRole = tables => {
+  tables.Role_Dans_le_PUI.Role = ['Référent qualité'];
+  return tables;
+};
+
+const roleCards = page => page.evaluate(() => [...document.querySelectorAll('.contact-card')]
+  .filter(card => card.querySelector('.role-tag'))
+  .map(card => {
+    const box = element => {
+      const { left, right, top, bottom } = element.getBoundingClientRect();
+      return { left, right, top, bottom };
+    };
+    const measure = () => ({ height: card.getBoundingClientRect().height, nameTop: card.querySelector('.name').getBoundingClientRect().top });
+    const withRole = measure();
+    const roleBox = card.querySelector('.role-col');
+    roleBox.style.display = 'none';
+    const without = measure();
+    roleBox.style.display = '';
+    const email = card.querySelector('.email.visible');
+    return {
+      card: box(card),
+      pill: box(card.querySelector('.role-tag')),
+      name: box(card.querySelector('.name')),
+      badge: box(card.querySelector('.etablissement-tag.visible')),
+      email: email && box(email),
+      inColumnOfLogo: Boolean(card.querySelector('.etab-col .role-tag')),
+      grown: withRole.height - without.height,
+      nameMoved: withRole.nameTop - without.nameTop
+    };
+  }));
+
+for (const [label, tables, waitLogos] of [['avec logos', withShortRole(crowdedBranding()), true], ['avec le sigle seul', withShortRole(crowdedTables()), false]]) {
+  test(`la pastille du rôle ne déstructure pas la carte (${label}) : à droite sous le logo sur une carte large, sous l'e-mail sur une carte étroite`, { skip }, () =>
+    withWidget({ tables, waitLogos }, async ({ page }) => {
+      const seen = { wide: 0, narrow: 0 };
+      await atEachWidth(page, [320, 414, 600, 768, 840, 1280, 1640, 1920], async width => {
+        const cards = await roleCards(page);
+        assert.ok(cards.length > 0, `à ${width}px, des cartes portent un rôle`);
+        cards.forEach(card => {
+          const wide = card.card.right - card.card.left >= 480;
+          seen[wide ? 'wide' : 'narrow']++;
+          const message = `à ${width}px (carte de ${Math.round(card.card.right - card.card.left)}px)`;
+          assert.equal(card.inColumnOfLogo, false, `${message} : la pastille n'est pas dans la colonne du logo`);
+          assert.ok(card.pill.left >= card.card.left && card.pill.right <= card.card.right + 0.5, `${message} : la pastille reste dans la carte`);
+          assert.ok(card.pill.top >= card.badge.bottom - 0.5, `${message} : la pastille est sous le logo ou le sigle`);
+          if (wide) {
+            assert.ok(card.pill.left >= card.name.right - 0.5, `${message} : la pastille est à droite du nom`);
+            if (card.email) assert.ok(card.email.right <= card.pill.left + 0.5, `${message} : l'e-mail ne passe pas sous la pastille`);
+            assert.ok(card.grown <= 4, `${message} : la pastille agrandit la carte de ${Math.round(card.grown)}px`);
+            assert.ok(Math.abs(card.nameMoved) <= 1, `${message} : la pastille déplace le nom de ${Math.round(card.nameMoved)}px`);
+          } else if (card.email) {
+            assert.ok(card.pill.top >= card.email.bottom - 0.5, `${message} : la pastille est sous l'e-mail`);
+            assert.ok(Math.abs(card.pill.left - card.email.left) <= 1, `${message} : la pastille s'aligne sur l'e-mail`);
+          }
+        });
+      });
+      assert.ok(seen.wide > 0 && seen.narrow > 0, `les deux dispositions sont contrôlées (${JSON.stringify(seen)})`);
+    }));
+}
+
 test('écran tactile : le logo de l\'établissement est une cible d\'au moins 28px', { skip }, () =>
   withWidget({ width: 414, touch: true }, async ({ page }) => {
     await atEachWidth(page, [414, 820], async width => {

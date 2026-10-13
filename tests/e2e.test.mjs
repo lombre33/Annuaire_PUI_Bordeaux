@@ -99,7 +99,7 @@ test('colonne Accepte_apparaitre absente de BDD : erreur explicite, jamais l\'an
   });
 });
 
-test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI sous le logo', { skip }, () =>
+test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI (une pastille à part, hors de la colonne du logo)', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const ana = cardNamed(page, 'Ana Martin');
@@ -116,8 +116,8 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
       ['Communautés', ['Réseau douleur']]
     ]);
     assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
-    const role = ana.locator('.etab-col .role-tag');
-    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est sous l\'établissement, plus dans le bas de la carte');
+    const role = ana.locator('.role-col .role-tag');
+    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est une pastille à part (.role-col), plus une section du bas de la carte');
     assert.equal(await role.evaluate(tag => tag.tagName), 'BUTTON', 'il filtre comme les autres tags');
     assert.equal(await ana.locator('.tag-static').count(), 0);
     assert.equal(await cardNamed(page, 'Hugo Bernard').locator('.role-tag').count(), 0, 'pas de rôle : pas de pastille');
@@ -333,7 +333,7 @@ test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ;
     assert.equal(await page.locator('.filter-count:not([hidden])').count(), 0);
   }));
 
-test('le filtre Rôle PUI propose les rôles de la table Role_Dans_le_PUI ; le rôle sous le logo d\'une carte le coche, et il filtre', { skip }, () =>
+test('le filtre Rôle PUI propose les rôles de la table Role_Dans_le_PUI ; la pastille du rôle d\'une carte le coche, et il filtre', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const filter = page.locator('.filter[data-filter-key="role"]');
@@ -341,7 +341,7 @@ test('le filtre Rôle PUI propose les rôles de la table Role_Dans_le_PUI ; le r
     assert.deepEqual(await filter.locator('.filter-option .option-label').allTextContents(), ['Référent qualité']);
     assert.equal(await filter.locator('.filter-option .option-count').textContent(), '1', 'une seule personne a ce rôle');
 
-    await cardNamed(page, 'Ana Martin').locator('.etab-col .role-tag').click();
+    await cardNamed(page, 'Ana Martin').locator('.role-col .role-tag').click();
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
     assert.equal(await filter.locator('.filter-count').textContent(), '1');
