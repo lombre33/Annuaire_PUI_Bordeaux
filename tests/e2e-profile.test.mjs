@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withIdentity, withSchema, withShownEmail, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
-import { assertFooterWraps, cardCount, skip, reload, waitForCards, withWidget } from './support/browser.mjs';
+import { assertFooterWraps, skip, reload, waitForCards, withWidget } from './support/browser.mjs';
 
 // ===== Outils =====
 
@@ -56,7 +56,12 @@ const heading = page => page.locator('#profileTitle');
 const headingIs = (page, expected) =>
   page.waitForFunction(value => document.getElementById('profileTitle').textContent === value, expected);
 const focusedId = page => page.evaluate(() => document.activeElement.id);
-const closed = page => page.waitForFunction(() => !document.getElementById('profileDialog').open);
+// « Fermée » veut dire aussi que l'événement « close » est passé : Chromium l'envoie à l'image suivante, pas dans la tâche qui ferme
+// la fenêtre, et c'est lui qui la vide. Un test rapide qui la rouvre ou la compte aussitôt la verrait vidée par cet événement en retard.
+const closed = page => page.waitForFunction(() => {
+  const dialog = document.getElementById('profileDialog');
+  return !dialog.open && dialog.querySelector('.dlg-body').childElementCount === 0;
+});
 // Le focus revient à l'élément voulu (sélecteur CSS) : l'événement « close » qui le rend est
 // envoyé après que la fenêtre a cessé d'être ouverte, d'où l'attente.
 const focusReturnsTo = (page, selector) => page.waitForFunction(
@@ -1570,7 +1575,7 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
       values: { email: NEW_EMAIL, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission' }
     }]);
     assert.deepEqual(await page.evaluate(() => window.__fake.calls.filter(call => !['BDD', 'Annuaire_Sonde'].includes(call.table))), []);
-    assert.equal(await cardCount(page), 4, 'sans périmètre, le nombre de contacts affichés ne change pas');
+    assert.equal(await page.locator('#cardsGrid .contact-card').count(), 4, 'sans périmètre, le nombre de contacts affichés ne change pas');
 
     // Le bandeau a changé : la fiche existe, l'interrupteur est déjà allumé, plus de bouton « Créer ».
     await page.locator('#accountBar .presence-switch').waitFor();

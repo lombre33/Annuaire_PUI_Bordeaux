@@ -38,7 +38,12 @@ const summary = page => dlg(page).locator('.dlg-summary').textContent();
 const alertText = page => dlg(page).locator('.dlg-alert').textContent();
 const toast = page => page.locator('#toast');
 const isOpen = page => page.evaluate(() => document.getElementById('etabDialog').open);
-const closed = page => page.waitForFunction(() => !document.getElementById('etabDialog').open);
+// « Fermée » veut dire aussi que l'événement « close » est passé : Chromium l'envoie à l'image suivante, pas dans la tâche qui ferme
+// la fenêtre, et c'est lui qui la vide. Un test rapide qui la rouvre aussitôt la verrait vidée par cet événement en retard.
+const closed = page => page.waitForFunction(() => {
+  const dialog = document.getElementById('etabDialog');
+  return !dialog.open && dialog.querySelector('.dlg-body').childElementCount === 0;
+});
 const rows = page => dlg(page).locator('.es-resp');
 const rowFor = (page, email) => dlg(page).locator(`.es-resp[data-mail="${email}"]`);
 const focusReturnsTo = (page, selector) => page.waitForFunction(

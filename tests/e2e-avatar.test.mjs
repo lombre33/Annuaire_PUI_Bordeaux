@@ -33,10 +33,16 @@ const viewer = page => page.locator('#photoDialog');
 const press = (page, name) => dialog(page).getByRole('button', { name, exact: true });
 const heading = page => page.locator('#profileTitle');
 const headingIs = (page, expected) => page.waitForFunction(value => document.getElementById('profileTitle').textContent === value, expected);
-const closed = page => page.waitForFunction(() => !document.getElementById('profileDialog').open);
-const viewerClosed = page => page.waitForFunction(() => !document.getElementById('photoDialog').open);
-// L'image est retirée dans l'événement « close », une tâche après la fermeture et le retour du focus : on l'attend.
-const viewerEmptied = page => page.waitForFunction(() => document.querySelector('#photoDialog .photo-stage').childElementCount === 0, null, { timeout: 3000 });
+// « Fermée » veut dire aussi que l'événement « close » est passé : Chromium l'envoie à l'image suivante, pas dans la tâche qui ferme
+// la fenêtre, et c'est lui qui la vide. Un test rapide qui la rouvre aussitôt la verrait vidée par cet événement en retard.
+const closed = page => page.waitForFunction(() => {
+  const dialog = document.getElementById('profileDialog');
+  return !dialog.open && dialog.querySelector('.dlg-body').childElementCount === 0;
+});
+const viewerClosed = page => page.waitForFunction(() => {
+  const dialog = document.getElementById('photoDialog');
+  return !dialog.open && dialog.querySelector('.photo-stage').childElementCount === 0;
+});
 const summary = page => dialog(page).locator('.dlg-summary').textContent();
 const notices = page => dialog(page).locator('.notice');
 const alertText = page => dialog(page).locator('.dlg-alert [role="alert"]').textContent();
@@ -280,7 +286,7 @@ test('un clic sur la photo d\'une carte l\'agrandit avec le nom, la fonction et 
     await viewerClosed(page);
     await activeIs(page, '.contact-card .avatar-zoom');
     assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Agrandir la photo de Ana Martin');
-    await viewerEmptied(page); // l'image est retirée à la fermeture
+    assert.equal(await viewer(page).locator('.photo-stage').evaluate(node => node.childElementCount), 0, 'l\'image est retirée à la fermeture');
 
     await ana.click();
     await viewer(page).locator('img.photo-img').waitFor();
