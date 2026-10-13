@@ -7,14 +7,15 @@ la faire et comment vérifier qu'elle a marché.
 | Étape | Quoi | Sans elle |
 |---|---|---|
 | 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** | l'interrupteur « Ma présence » ou l'enregistrement d'une fiche échoue, avec un message qui renvoie ici |
-| 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement | personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
+| 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement : **le widget la crée lui-même** au premier chargement, ouvert par un compte qui peut modifier la structure du document | si le widget n'a pas pu la créer, personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, et depuis la 1.17.0 une fiche d'établissement aussi |
 | 5 | Les logos : colonnes `logo` et `ordre_bandeau` dans `Etablissements`, table `Financeurs` (facultatif) ; le remplacement d'un logo depuis le widget en dépend | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas, pas de financeurs en tête de page ; un responsable ne peut plus changer le logo de son établissement depuis le widget (la fenêtre le dit) ; rien d'autre ne change |
 | 6 | La photo de profil : colonne `Avatar` (Pièces jointes) dans `BDD` (facultatif) | les cartes gardent les initiales et le formulaire de modification n'a pas de carte « Photo de profil » ; rien d'autre ne change |
 
-Le widget ne crée ni ne modifie jamais la structure du document (table, colonne,
-règle d'accès) : tout ce qui est ci-dessous se fait à la main, une fois. Il n'écrit que
+Le widget ne modifie jamais la structure du document (colonne, règle d'accès) et ne crée
+qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2) : tout le reste de ce qui
+est ci-dessous se fait à la main, une fois. Hors cette création, il n'écrit que
 des lignes et des cellules : celle de la personne connectée dans `BDD` (son choix de présence, sa
 fiche) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
 passagère d'`Annuaire_Sonde` et, pour un responsable d'établissement, la ligne de son établissement
@@ -73,11 +74,21 @@ de déclenchement** `user.Email`. Grist la calcule à la création d'une ligne, 
 l'identité de qui l'a créée. Le widget, à chaque chargement, ajoute une ligne, la
 relit puis la supprime. La table est vide au repos.
 
+**Depuis la 1.20.0, le widget crée cette table lui-même quand elle manque.** Au premier
+chargement, ouvert par un compte qui peut modifier la structure du document (le propriétaire,
+ou un éditeur que les règles d'accès n'en empêchent pas), il ajoute la table `Annuaire_Sonde`
+avec les trois colonnes ci-dessous, formules de déclenchement comprises, puis continue comme
+si elle avait toujours été là. Il ne crée rien si elle existe déjà et ne modifie jamais ses
+colonnes ni ses formules : si vous en changez une, il la respecte. Un compte Lecteur n'essaie
+rien. Si Grist refuse la création, personne n'est identifié et la console le dit (tableau
+plus bas) : faites alors ouvrir le widget par un propriétaire, ou créez la table à la main.
+C'est la seule table que le widget crée ; elle apparaît dans les données brutes du document.
+
 Le nom de la table et des colonnes est exact : `Annuaire_Sonde`, `Email`, `Admin` et,
 pour la fiche d'un établissement (1.17.0), `Responsable_de` (facultative : sans elle,
 tout le reste fonctionne et personne ne modifie de fiche d'établissement).
 
-**À la main**
+**À la main** (si vous préférez créer la table vous-même, ou si le widget n'en a pas le droit)
 
 1. Ajoutez une table vide, identifiant `Annuaire_Sonde`. Supprimez ses colonnes
    `A`, `B` et `C`.
@@ -140,7 +151,8 @@ class Annuaire_Sonde:
 ```
 
 Vérifier : ouvrez le widget avec un compte qui peut modifier le document et dont
-l'adresse figure dans la colonne `email` de `BDD`, console du navigateur ouverte. Vous
+l'adresse figure dans la colonne `email` de `BDD`, console du navigateur ouverte. Au tout
+premier chargement, la console dit d'abord que la table est créée. Vous
 devez voir `[IDENTITE] personne identifiée (administrateur : oui|non, responsable de N
 établissement(s))` (jamais l'adresse elle-même), la zone « Ma présence » à droite de
 l'en-tête (sous le titre sur un écran étroit), un bouton « Modifier » sur la carte de la
@@ -151,7 +163,7 @@ Si le bandeau manque ou ne propose pas de fiche, la console dit pourquoi :
 
 | Ligne `[IDENTITE]` | Cause | Remède |
 |---|---|---|
-| `table « Annuaire_Sonde » introuvable` | la table n'existe pas, ou son identifiant diffère | étape 2 |
+| `table « Annuaire_Sonde » introuvable, et Grist n'a pas permis de la créer` | la table n'existait pas, et le compte qui a ouvert le widget n'a pas le droit de créer une table (règle d'accès, compte qui n'est pas propriétaire) | faites ouvrir le widget par un propriétaire du document, ou créez la table à la main (étape 2) |
 | `la sonde n'a pas de colonne « Responsable_de » : pas de fiche d'établissement` | la colonne facultative n'existe pas : personne ne peut modifier de fiche d'établissement | colonne `Responsable_de`, étape 2 (point 4) |
 | `la formule user.Email de Annuaire_Sonde n'a renvoyé aucune adresse` | la formule n'est pas une formule de déclenchement, ou le compte est anonyme | reprendre la colonne `Email` |
 | `lecture impossible : …` | Grist a refusé l'écriture ou la lecture (règle d'accès) | étape 4 |

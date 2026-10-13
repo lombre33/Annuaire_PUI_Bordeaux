@@ -4,8 +4,9 @@
 //
 // Il reproduit ce dont le widget dépend, pas Grist en entier :
 //   - fetchTable / listTables, avec des tables en colonnes ({ id: [...], nom: [...] }) ;
-//   - applyUserActions pour AddRecord, UpdateRecord et RemoveRecord, atomique (un
-//     lot refusé ne change rien) et qui renvoie retValues comme Grist ;
+//   - applyUserActions pour AddRecord, UpdateRecord, RemoveRecord, AddTable (l'identifiant
+//     est numéroté s'il est pris, comme Grist) et RemoveTable, atomique (un lot refusé ne
+//     change rien) et qui renvoie retValues comme Grist ;
 //   - les formules déclenchées de la table-sonde (GRIST_SETUP.md) : Email prend
 //     l'adresse de la personne connectée, Admin et Responsable_de se déduisent de la
 //     table ACL ;
@@ -110,10 +111,24 @@ export function createFakeGrist(options = {}) {
       const index = rowIndex(table, rowId);
       Object.keys(table).forEach(column => table[column].splice(index, 1));
       return null;
+    },
+    // Comme Grist : un identifiant déjà pris est numéroté (« Annuaire_Sonde2 »), la table existante reste
+    // intacte ; la valeur renvoyée porte l'identifiant obtenu. Les formules de déclenchement de la sonde
+    // sont celles de `builtInTriggers`, quel que soit ce que les colonnes déclarent.
+    AddTable(all, tableName, columns) {
+      let id = tableName;
+      for (let number = 2; all[id]; number += 1) id = `${tableName}${number}`;
+      all[id] = { id: [], ...Object.fromEntries(columns.map(column => [column.id, []])) };
+      return { table_ref: Object.keys(all).length, id, columns: columns.map(column => column.id), views: [] };
+    },
+    RemoveTable(all, tableName) {
+      requireTable(all, tableName);
+      delete all[tableName];
+      return null;
     }
   };
 
-  const verbs = { AddRecord: 'add', UpdateRecord: 'update', RemoveRecord: 'remove' };
+  const verbs = { AddRecord: 'add', UpdateRecord: 'update', RemoveRecord: 'remove', AddTable: 'create', RemoveTable: 'remove' };
 
   const docApi = {
     async fetchTable(name) {
@@ -153,7 +168,9 @@ export function createFakeGrist(options = {}) {
             throw new Error(`Blocked by row ${verbs[action]} access rules`);
           }
           const value = applyers[action](draft, tableName, rowId, values);
-          done.push({ action, table: tableName, rowId: action === 'AddRecord' ? value : rowId, values, ok: true });
+          // AddTable porte ses colonnes à la place de l'identifiant de ligne : on les garde dans `values`.
+          const table = action === 'AddTable';
+          done.push({ action, table: tableName, rowId: action === 'AddRecord' ? value : (table ? null : rowId), values: table ? rowId : values, ok: true });
           return value;
         });
       } catch (error) {

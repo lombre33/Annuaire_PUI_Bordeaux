@@ -2,7 +2,9 @@
 // ni son nom (le jeton d'accès est celui du document, pas de la session). La
 // seule voie est une table-sonde dont une colonne a pour formule de déclenchement
 // `user.Email` : Grist la calcule à la création d'une ligne, avec l'identité de
-// qui l'a créée. Le widget ajoute une ligne, la relit, puis la supprime.
+// qui l'a créée. Le widget ajoute une ligne, la relit, puis la supprime. Quand la
+// table-sonde manque, il la crée d'abord (`createProbeTable`, GRIST_SETUP.md étape 2) :
+// c'est la seule table qu'il ait le droit de créer.
 //
 // Ce n'est qu'un verrou d'interface. N'importe qui peut ouvrir la console de son
 // navigateur et le contourner : seules les règles d'accès de Grist protègent
@@ -16,6 +18,29 @@ import { PROBE_RESPONSABLE_COLUMN, PROBE_TABLE } from './constants.js';
 import { tableToRows, text } from './grist-data.js';
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/;
+
+// La table-sonde telle que GRIST_SETUP.md (étape 2) la décrit. Chaque colonne est une colonne de DONNÉES
+// (`isFormula: false`) dont `formula` est une formule de déclenchement : sans `recalcWhen` ni `recalcDeps`,
+// Grist ne la calcule qu'à la création d'une ligne, avec l'identité de qui la crée.
+const PROBE_COLUMNS = [
+  { id: 'Email', type: 'Text', isFormula: false, formula: 'user.Email' },
+  {
+    id: 'Admin', type: 'Bool', isFormula: false,
+    formula: [
+      'mail = (user.Email or "").strip().lower()',
+      'return bool(mail) and any(bool(r.admin) for r in ACL.all if (r.email or "").strip().lower() == mail)'
+    ].join('\n')
+  },
+  {
+    id: PROBE_RESPONSABLE_COLUMN, type: 'Text', isFormula: false,
+    formula: [
+      'mail = (user.Email or "").strip().lower()',
+      'ids = sorted({r.Responsable_de_l_Etablissement.id for r in ACL.all',
+      '              if mail and (r.email or "").strip().lower() == mail and r.Responsable_de_l_Etablissement})',
+      'return ",".join(str(i) for i in ids)'
+    ].join('\n')
+  }
+];
 
 // Grist ouvre le widget d'un compte Lecteur avec `readonly=true` dans l'adresse
 // du cadre (la dernière valeur est la sienne). Un Lecteur ne peut rien écrire,
@@ -57,7 +82,8 @@ export async function readIdentity(docApi, { readOnly = false, log = console } =
   try {
     const tables = await docApi.listTables();
     if (!tables.includes(PROBE_TABLE)) {
-      return reportUnavailable(log, `table « ${PROBE_TABLE} » introuvable (voir GRIST_SETUP.md)`);
+      const failure = await createProbeTable(docApi, log);
+      if (failure) return reportUnavailable(log, failure);
     }
     const added = await docApi.applyUserActions([['AddRecord', PROBE_TABLE, null, {}]]);
     rowId = added?.retValues?.[0];
@@ -83,6 +109,26 @@ export async function readIdentity(docApi, { readOnly = false, log = console } =
   } finally {
     // Nettoyage au mieux : une ligne oubliée ne gêne personne.
     if (rowId !== null) Promise.resolve(docApi.applyUserActions([['RemoveRecord', PROBE_TABLE, rowId]])).catch(() => {});
+  }
+}
+
+// Crée la table-sonde absente. Renvoie '' si elle existe désormais, sinon la raison de l'échec (par
+// exemple un compte sans droit sur la structure du document : Grist refuse). Si une autre personne l'a
+// créée au même instant, Grist numérote la nôtre (« Annuaire_Sonde2 ») : on la retire, la table
+// d'origine sert à tous.
+async function createProbeTable(docApi, log) {
+  try {
+    const created = await docApi.applyUserActions([['AddTable', PROBE_TABLE, PROBE_COLUMNS]]);
+    const made = created?.retValues?.[0]?.id;
+    if (typeof made === 'string' && made !== PROBE_TABLE) {
+      await Promise.resolve(docApi.applyUserActions([['RemoveTable', made]])).catch(() => {});
+      log.info(`[IDENTITE] table « ${PROBE_TABLE} » déjà créée par une autre personne.`);
+    } else {
+      log.info(`[IDENTITE] table « ${PROBE_TABLE} » absente : créée (GRIST_SETUP.md, étape 2).`);
+    }
+    return '';
+  } catch (error) {
+    return `table « ${PROBE_TABLE} » introuvable, et Grist n'a pas permis de la créer : ${error?.message || error} (voir GRIST_SETUP.md)`;
   }
 }
 
