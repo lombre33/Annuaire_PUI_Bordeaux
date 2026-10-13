@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.27.1 — Le rôle PUI, plus discret : du texte à droite de la ligne de l'e-mail
+
+Retour d'Antoine du 13 octobre 2026 (11 h 24) sur la pastille de la 1.25.1 : « un peu plus discrète, peut-être pas de fond en mode bulle mais juste
+le même style que la fonction. Et finalement aligné juste au-dessus de la ligne de séparation en dessous de l'e-mail, [...] sur la même ligne que
+l'e-mail finalement, et ça ne devrait jamais générer de saut de ligne ».
+
+- **Plus de pastille.** Le rôle est du texte : même couleur (violet), même corps (12 px) et même graisse que la fonction, ni fond, ni bordure, ni coins
+  arrondis. Il reste un bouton, qui filtre toujours comme avant : souligné au survol et au clavier, curseur « main ».
+- **Sur la ligne de l'e-mail, à droite**, juste au-dessus du trait qui sépare les coordonnées des tags (le téléphone, quand il y en a un, reste dessous).
+  Il ne quitte plus cette ligne, à aucune largeur : plus de colonne à droite du logo, plus de ligne sous l'e-mail sur une carte étroite. Le nom,
+  la fonction, le logo et la hauteur de la carte ne bougent donc plus du tout avec le rôle. L'e-mail garde sa place entière : le rôle prend le reste.
+- **Trop long, il est coupé par « … »** et le rôle entier s'affiche en passant la souris dessus (`title`). C'est le seul texte de carte coupé exprès :
+  le test « le texte des cartes reste dans sa carte » ne le voit pas (la coupure est dans le bloc `.role-text` du tag) et un test à part
+  vérifie la coupure, l'infobulle et la ligne unique. Sur un téléphone, qui ne survole pas, le rôle coupé ne se lit pas en entier ; un appui le
+  prend pour filtre, et le menu « Rôle PUI » le donne en entier.
+- **Quand l'e-mail prend presque toute la ligne** (44 px ou moins pour le rôle, soit quelques lettres), le rôle disparaît de la carte plutôt que de
+  s'afficher en miette ou de faire passer l'e-mail à la ligne : `@container` sur la colonne du rôle, qui ne dépend pas de la police. À reculer si
+  Antoine préfère voir quelques lettres : c'est la seule règle (`style.css`, `.role-col`).
+- Comment : `fillRole()` pose la colonne du rôle dans `.details`, juste après l'e-mail, et `roleTag()` (`render.js`) retire au tag la couleur de sa
+  catégorie et le met en forme ; `.details.has-role` est une grille `auto minmax(0, 1fr)`. La colonne est un conteneur `size` (ni sa largeur ni sa
+  hauteur ne viennent du rôle) et le tag, haut de 24 px au moins (28 px au doigt) comme tout tag, la déborde sans l'agrandir : la règle des cibles
+  de 24 px de l'audit est respectée. Les tests de taille de cible ne comptent plus les éléments masqués (`display: none`).
+- Tests : `tests/branding-layout.test.mjs` contrôle, de 320 px à 1 920 px avec logos puis avec le sigle seul, que le rôle est à droite de l'e-mail,
+  sur sa ligne, aligné à droite, sans fond ni bordure, au style de la fonction, que ni la carte, ni le nom, ni l'e-mail ne bougent, qu'un e-mail très long
+  fait disparaître le rôle et qu'un rôle long est coupé par « … » avec son infobulle. Les captures du guide `apercu.png` et `carte-anatomie.png`
+  sont refaites. **Non essayé dans le vrai Grist d'Antoine ni sur Firefox mobile.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.27.0 — La fiche créée apparaît tout de suite, et la liste des établissements ne propose que les fondateurs et les partenaires
 
 Retours d'Antoine du 13 octobre 2026 (09 h 24), ses points 3 et 4.

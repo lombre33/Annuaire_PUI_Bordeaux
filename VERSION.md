@@ -1,4 +1,4 @@
-# Version 1.27.0 — La fiche créée apparaît tout de suite, et la liste des établissements ne propose que les fondateurs et les partenaires (voir CHANGELOG.md)
+# Version 1.27.1 — Le rôle PUI, plus discret : du texte à droite de la ligne de l'e-mail (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -63,8 +63,7 @@ pastille ; les menus de filtre réunissent deux libellés qui ne diffèrent que 
 Depuis la 1.25.0, la fenêtre « Créer ma fiche » a une case « Apparaître dans l'annuaire », cochée d'avance, qui renseigne `Accepte_apparaitre` et change le
 bouton en « Publier ma fiche » (la 1.27.0 a levé la condition du périmètre : une fiche publiée apparaît tout de suite) ; les listes
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
-Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite : à droite de la fonction et de l'e-mail, sous le logo, sur une carte de 480 px ou
-plus ; sous l'e-mail sur une carte plus étroite.
+Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite.
 Depuis la 1.25.2, le logo qu'on voit sur une carte était une image ordinaire (sans CORS), ses pixels étant lus à part (retiré en 1.26.1).
 Depuis la 1.26.0, l'étiquette d'une tâche dit le rôle de la personne dans cette tâche (colonne facultative `Taches_role` de `Taches`, lue sur les lignes brutes
 que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bulle à la souris et au clavier, sous le nom de la tâche sur un téléphone.
@@ -75,4 +74,6 @@ Depuis la 1.27.0, le périmètre (`BDD.perimetre`) ne décide plus de rien : une
 validé, fondateur ou partenaire, donc celle qu'elle vient de créer apparaît tout de suite ; la colonne n'est plus lue ni indispensable. La liste des établissements des
 fenêtres de profil ne propose que les fondateurs et les partenaires (et celui que la fiche porte déjà), et sa recherche est dans « Créer ma fiche » et dans la fiche d'une
 autre personne en mode admin (non essayé dans le vrai Grist).
-941 tests (dont 337 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.27.1, le rôle PUI n'est plus une pastille mais du texte, comme la fonction, à droite de la ligne de l'e-mail : jamais sur une autre ligne, coupé par « … »
+quand il est trop long (le rôle entier au survol), masqué quand l'e-mail ne lui laisse presque rien.
+943 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).

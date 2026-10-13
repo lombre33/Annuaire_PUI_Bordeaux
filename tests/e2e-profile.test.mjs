@@ -702,7 +702,7 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     // Avant : la carte de l'annuaire, sans aucun repère.
     assert.equal(await before.locator('.name').textContent(), 'Ana Martin');
     assert.equal(await before.locator('.fonction').textContent(), 'Pharmacienne');
-    // Le rôle est la première pastille de la carte : sa boîte (.role-col) précède celle des tags.
+    // Le rôle est le premier tag de la carte : sa boîte (.role-col) précède celle des tags.
     assert.deepEqual(await before.locator('.tag').allTextContents(), ['Référent qualité', 'CME', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur']);
     assert.equal(await before.locator('.mk, .mk-gone, .mk-pill, .tag-add, .tag-del, .rv-ring').count(), 0);
 

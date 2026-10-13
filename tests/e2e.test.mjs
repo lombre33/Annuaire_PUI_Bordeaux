@@ -99,7 +99,7 @@ test('colonne Accepte_apparaitre absente de BDD : erreur explicite, jamais l\'an
   });
 });
 
-test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI (une pastille à part, hors de la colonne du logo)', { skip }, () =>
+test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI (du texte à part, sur la ligne de l\'e-mail)', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const ana = cardNamed(page, 'Ana Martin');
@@ -117,10 +117,11 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
     ]);
     assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
     const role = ana.locator('.role-col .role-tag');
-    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est une pastille à part (.role-col), plus une section du bas de la carte');
+    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est un texte à part (.role-col), plus une section du bas de la carte');
     assert.equal(await role.evaluate(tag => tag.tagName), 'BUTTON', 'il filtre comme les autres tags');
+    assert.equal(await role.getAttribute('title'), 'Référent qualité', 'le rôle entier est en infobulle : coupé par « … » sur une ligne trop courte');
     assert.equal(await ana.locator('.tag-static').count(), 0);
-    assert.equal(await cardNamed(page, 'Hugo Bernard').locator('.role-tag').count(), 0, 'pas de rôle : pas de pastille');
+    assert.equal(await cardNamed(page, 'Hugo Bernard').locator('.role-tag').count(), 0, 'pas de rôle : pas de tag de rôle');
 
     const hugo = cardNamed(page, 'Hugo Bernard');
     assert.equal(await hugo.locator('.email.visible').count(), 0, 'pas de ligne email vide');
@@ -333,7 +334,7 @@ test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ;
     assert.equal(await page.locator('.filter-count:not([hidden])').count(), 0);
   }));
 
-test('le filtre Rôle PUI propose les rôles de la table Role_Dans_le_PUI ; la pastille du rôle d\'une carte le coche, et il filtre', { skip }, () =>
+test('le filtre Rôle PUI propose les rôles de la table Role_Dans_le_PUI ; le rôle d\'une carte le coche, et il filtre', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const filter = page.locator('.filter[data-filter-key="role"]');
