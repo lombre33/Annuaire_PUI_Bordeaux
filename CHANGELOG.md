@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.25.1 — La pastille du rôle, plus petite et à sa place sur la carte
+
+Retour d'Antoine du 13 octobre 2026 sur la 1.24.0 : « la pastille pour le rôle fonctionne. Par contre c'est beaucoup trop gros […] il ne faut
+pas que ça déstructure la carte, pour moi c'est sur la même ligne que la fonction et si deux lignes sur les lignes fonction et email ».
+
+- **La pastille n'est plus dans la colonne du logo.** En 1.24.0 elle s'y empilait sous le logo : un rôle long (« Souhaite être informé des
+  avancements ») faisait trois lignes de 136 px, la colonne devenait plus haute que le nom et la fonction réunis, et le nom se retrouvait
+  loin de l'avatar. Elle a maintenant sa propre boîte (`.role-col`, posée par `fillRole()` dans `render.js`, entre les coordonnées et les tags).
+- **Plus petite** : marges réduites (2 px de haut), coins moins arrondis (une pastille de deux lignes n'est plus une bulle) et, sur une carte
+  large, 164 px de large au plus, donc deux lignes pour un rôle de quarante caractères ; jamais coupée par « … ».
+- **Sur une carte large (480 px ou plus ; la carte de 498 px de sa capture en fait partie)** elle se lit à droite, sous le logo ou le sigle : à la hauteur de la
+  fonction, et de l'e-mail si elle fait deux lignes (avec un logo, qui couvre déjà la fonction, à la hauteur de l'e-mail). La fonction, l'e-mail
+  et la ligne « Votre fiche » lui laissent la colonne de droite. Le nom et la fonction ne bougent plus : la carte garde la même hauteur.
+- **Sur une carte plus étroite** (téléphone, ou trois cartes côte à côte dans un cadre de Grist étroit), la colonne de droite lui manquerait pour
+  le nom, la fonction et l'e-mail : la pastille a sa propre ligne, sous l'e-mail, comme une étiquette.
+- Tests : `tests/branding-layout.test.mjs` contrôle, de 320 px à 1 920 px avec logos puis avec le sigle seul, que la pastille est dans la carte, sous
+  le logo ou le sigle, à droite du nom sur une carte large (l'e-mail ne passe pas dessous, la carte ne grandit pas de plus de 4 px, le nom ne
+  bouge pas) et sous l'e-mail sur une carte étroite ; les tests existants visent la nouvelle boîte (`.role-col`).
+- Hors de cette version : le chargement des logos (autre fil). Deux captures du guide (`apercu.png`, `carte-anatomie.png`) sont refaites ; les
+  autres le seront à la passe finale de la documentation. Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.25.0 — Créer sa fiche : « Publier ma fiche », et une recherche dans chaque liste à choix
 
 Demande d'Antoine du 13 octobre 2026 (08 h 07, ses points 7 et 8).
