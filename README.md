@@ -68,7 +68,7 @@ Prérequis : un document Grist qui contient les tables décrites dans [`grist_st
    ```
 4. Accordez l'accès **Full document access** quand Grist le demande : le widget lit plusieurs tables, pas seulement celle de sa section, et il écrit dans le document.
 5. Pour que chaque personne puisse gérer sa présence et modifier sa fiche, suivez [`GRIST_SETUP.md`](GRIST_SETUP.md) : la case `Accepte_apparaitre` en colonne de données, la table `Annuaire_Sonde`, les administrateurs, les règles d'accès. Sans la table-sonde, l'annuaire s'affiche normalement, mais personne n'est identifié : ni bandeau ni bouton « Modifier ». Pour que les responsables d'établissement modifient la fiche de leur établissement, ajoutez la colonne `Responsable_de` de la sonde et leurs lignes dans `ACL` (mêmes réglages).
-6. Pour afficher les logos (facultatif), suivez l'étape 5 de [`GRIST_SETUP.md`](GRIST_SETUP.md) : les colonnes `logo` et `ordre_bandeau` d'`Etablissements` et la table `Financeurs`. Sans elles, le widget affiche les noms à la place des logos.
+6. Pour afficher les logos (facultatif), suivez l'étape 5 de [`GRIST_SETUP.md`](GRIST_SETUP.md) : les colonnes `logo` et `ordre_bandeau` d'`Etablissements`. Sans elles, le widget affiche les noms à la place des logos. Les financeurs, eux, sont deux images fixes du widget : rien à créer dans Grist.
 7. Pour que les personnes puissent ajouter leur photo de profil (facultatif), suivez l'étape 6 de [`GRIST_SETUP.md`](GRIST_SETUP.md) : la colonne `Avatar` (Pièces jointes) de `BDD`. Sans elle, les cartes gardent les initiales.
 
 Les libellés ci-dessus sont ceux de l'interface anglaise de Grist ; ils peuvent différer dans une autre langue. Le widget est déclaré dans [`manifest.yml`](manifest.yml) (nom, adresse, niveau d'accès).

@@ -1,8 +1,8 @@
 // Test navigateur de l'habillage : charge le vrai index.html dans Chromium, avec un Grist
 // simulé dont les pièces jointes (logos) sont servies par tests/support/fake-attachments.mjs,
 // et vérifie ce que voit l'utilisateur : le logo sur les cartes (ou le nom à défaut), les
-// financeurs en haut, le bandeau des fondateurs en bas, et les repli quand Grist ne donne
-// pas les fichiers.
+// financeurs fixes en haut, le bandeau des fondateurs en bas, et les repli quand Grist ne
+// donne pas les fichiers.
 //
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md). Sans lui ces
 // tests sont ignorés et `node --test` reste vert.
@@ -15,7 +15,7 @@ import { MISSING_FILE, BROKEN_FILE } from './support/fake-attachments.mjs';
 import { skip, reload, waitForCards, withWidget as withWidgetOn } from './support/browser.mjs';
 import { PUI_URL } from '../constants.js';
 
-// Sans autre précision, un document complété de logos (GRIST_SETUP.md) et de financeurs.
+// Sans autre précision, un document complété de logos (GRIST_SETUP.md).
 const withWidget = (options, run) => withWidgetOn({ tables: withBranding(), ...options }, run);
 
 const waitForLogos = (page, count) =>
@@ -88,25 +88,25 @@ test('le logo est un bouton qu\'on atteint au clavier, nommé par l\'établissem
 test('une pièce jointe n\'est demandée à Grist qu\'avec un jeton en lecture seule, obtenu une seule fois pour toutes les images', { skip }, () =>
   withWidget({}, async ({ page, files }) => {
     await waitForCards(page, 4);
-    await waitForLogos(page, 8); // 3 cartes, 1 logo de fondateur, 3 financeurs, le rond France 2030
+    await waitForLogos(page, 4); // 3 cartes, 1 logo de fondateur
     assert.deepEqual(await tokenRequests(page), [{ readOnly: true }]);
-    assert.deepEqual(Object.keys(files.hits).sort(), ['11', '21', '22', '23'], 'un téléchargement par fichier, pas un de plus');
-    assert.ok(files.tokens.length >= 4 && files.tokens.every(token => token === 'fake-token'));
+    assert.deepEqual(Object.keys(files.hits), ['11'], 'un téléchargement par fichier, pas un de plus');
+    assert.ok(files.tokens.length >= 1 && files.tokens.every(token => token === 'fake-token'));
   }));
 
 test('les logos des cartes se chargent à l\'approche de l\'écran, ceux de l\'en-tête et du bandeau tout de suite, aucun ne dit d\'où il vient', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    await waitForLogos(page, 8);
+    await waitForLogos(page, 4);
     const attribute = (selector, name) => page.locator(selector).evaluateAll((images, property) => images.map(image => image[property]), name);
     assert.deepEqual(await attribute('.etablissement-tag img', 'loading'), ['lazy', 'lazy', 'lazy']);
-    assert.deepEqual(await attribute('#fundersLogos img, #bandLogos img, #bandRoundel img', 'loading'), Array(5).fill('eager'));
+    assert.deepEqual(await attribute('#bandLogos img', 'loading'), ['eager']);
     const policies = await attribute('.logo-img', 'referrerPolicy');
-    assert.equal(policies.length, 8);
+    assert.equal(policies.length, 4);
     assert.ok(policies.every(policy => policy === 'no-referrer'), 'l\'adresse du widget n\'est pas envoyée au serveur de Grist');
   }));
 
-test('sans aucun logo ni financeur dans le document, Grist n\'est jamais sollicité pour un jeton', { skip }, () =>
+test('sans aucun logo dans le document, Grist n\'est jamais sollicité pour un jeton', { skip }, () =>
   withWidget({ tables: sampleTables() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await tokenRequests(page), []);
@@ -117,50 +117,32 @@ test('sans aucun logo ni financeur dans le document, Grist n\'est jamais sollici
 
 // ===== Financeurs, en haut =====
 
-test('les financeurs s\'affichent dans l\'ordre de la table, un logo chacun et le nom à défaut', { skip }, () =>
-  withWidget({}, async ({ page }) => {
+// Les financeurs sont les deux images de la maquette, fixes dans le dépôt (assets/) : aucune table de
+// Grist, aucun jeton, et le document n'a rien à contenir pour qu'ils s'affichent.
+test('les financeurs s\'affichent dans tous les documents : le visuel de la maquette, sa légende, sans jeton ni message', { skip }, () =>
+  withWidget({ tables: sampleTables() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    await waitForLogos(page, 3);
     assert.equal(await page.locator('#funders').isVisible(), true);
-    assert.deepEqual(await entriesOf(page, '#fundersLogos li'), ['République française', 'ANR', 'Bpifrance', 'France 2030'],
-      'Bpifrance n\'a pas de logo : son nom prend sa place');
-    assert.equal(await page.locator('#fundersLogos li').nth(0).locator('img').getAttribute('src'), logoUrl(21));
     assert.equal(await page.locator('#funders .funders-label').textContent(), 'Projet financé par l\'État dans le cadre de France 2030');
-  }));
-
-// La maquette validée par Antoine montre les financeurs en gris, discrets, et le rond de France 2030
-// du bandeau du bas en couleurs : la même pièce jointe sert aux deux, la feuille de style désature
-// seulement celle du haut.
-test('les logos des financeurs sont en niveaux de gris en haut de page, le rond du bandeau du bas garde ses couleurs', { skip }, () =>
-  withWidget({}, async ({ page }) => {
-    await waitForCards(page, 4);
-    await waitForLogos(page, 3);
-    const filterOf = selector => page.locator(selector).first().evaluate(image => getComputedStyle(image).filter);
-    assert.equal(await filterOf('#fundersLogos img'), 'grayscale(1)');
-    assert.equal(await filterOf('#bandRoundel img'), 'none');
-    assert.equal(await filterOf('#bandLogos img'), 'none');
-    assert.equal(await filterOf('.contact-card .etablissement-tag img'), 'none');
-  }));
-
-test('sans table Financeurs, l\'en-tête n\'a pas de financeurs et rien n\'est signalé', { skip }, () => {
-  const tables = withBranding();
-  delete tables.Financeurs;
-  return withWidget({ tables }, async ({ page, logs }) => {
-    await waitForCards(page, 4);
-    assert.equal(await page.locator('#funders').isHidden(), true);
-    assert.equal(await page.locator('#statusBanner').isHidden(), true);
+    const image = page.locator('#funders img.funders-img');
+    assert.equal(await image.getAttribute('alt'), 'République française, ANR, Bpifrance, France 2030');
+    assert.equal(await image.getAttribute('src'), 'assets/financeurs.png');
+    await page.waitForFunction(() => document.querySelector('#funders img').naturalWidth > 0);
+    assert.equal(await image.evaluate(element => element.getBoundingClientRect().height), 36, 'la hauteur de la maquette');
+    assert.equal(await image.evaluate(element => getComputedStyle(element).filter), 'none', 'l\'image est déjà grise : aucun filtre');
+    assert.deepEqual(await tokenRequests(page), []);
     assert.deepEqual(await errorsOf(logs), []);
-  });
-});
+    assert.deepEqual(await warningsOf(logs, /LOGOS|Financeurs|logo/i), []);
+  }));
 
-test('un nom de financeur contenant du HTML s\'affiche en texte brut', { skip }, () => {
+test('une table Financeurs restée dans le document ne change rien : les financeurs sont ceux du dépôt', { skip }, () => {
   const tables = withBranding();
-  tables.Financeurs.nom[3] = HOSTILE_FIRST_NAME;
+  tables.Financeurs = { id: [1], nom: [HOSTILE_FIRST_NAME], logo: [['L', 21]], ordre: [1] };
   return withWidget({ tables }, async ({ page }) => {
     await waitForCards(page, 4);
-    await waitForLogos(page, 3);
-    assert.equal(await page.locator('#fundersLogos .funder-name').textContent(), HOSTILE_FIRST_NAME);
-    assert.equal(await page.locator('#fundersLogos [src="x"]').count(), 0);
+    assert.equal(await page.locator('#funders img').count(), 1);
+    assert.equal(await page.locator('#funders img').getAttribute('src'), 'assets/financeurs.png');
+    assert.equal(await page.locator('#funders').textContent().then(text => text.includes(HOSTILE_FIRST_NAME)), false);
     assert.equal(await page.evaluate(() => window.__xss), undefined);
   });
 });
@@ -182,8 +164,9 @@ test('le logo de France 2030 ferme le bandeau, avec la phrase de financement et 
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     await waitForLogos(page, 3);
-    assert.equal(await page.locator('#bandRoundel img').getAttribute('src'), logoUrl(23));
+    assert.equal(await page.locator('#bandRoundel img').getAttribute('src'), 'assets/france-2030.png', 'l\'image fixe du dépôt');
     assert.equal(await page.locator('#bandRoundel img').getAttribute('alt'), 'France 2030');
+    assert.equal(await page.locator('#bandRoundel img').evaluate(element => getComputedStyle(element).filter), 'none', 'le rond garde ses couleurs');
     assert.equal(await page.locator('.band-sentence').textContent(),
       'Le Pôle universitaire d\'innovation Bordeaux est un projet financé par l\'État dans le cadre de France 2030.');
     const link = page.locator('#bandLink');
@@ -196,20 +179,22 @@ test('sans logo dans le document, le bandeau garde les noms des fondateurs, dans
   withWidget({ tables: sampleTables() }, async ({ page }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await entriesOf(page, '#bandLogos li'), ['CHU', 'Institut Bergonié']);
-    assert.equal(await page.locator('#foundersBand img').count(), 0);
-    assert.equal(await page.locator('#bandRoundel').textContent(), '');
+    assert.equal(await page.locator('#bandLogos img').count(), 0);
+    assert.equal(await page.locator('#bandRoundel img').count(), 1, 'le rond France 2030 est une image du dépôt : il ne dépend d\'aucun logo');
   }));
 
-test('sans aucun fondateur dans Etablissements, le bandeau n\'est pas affiché, les financeurs si', { skip }, () => {
-  const tables = withBranding();
-  // Plus de fondateur : les contacts ne sont plus éligibles non plus (fondateur ou partenaire).
-  tables.Etablissements.fondateur = tables.Etablissements.fondateur.map(() => false);
-  return withWidget({ tables }, async ({ page }) => {
-    await page.waitForFunction(() => !document.getElementById('funders').hidden);
-    assert.equal(await page.locator('#foundersBand').isHidden(), true);
+test('sans aucun fondateur dans Etablissements, le bandeau disparaît à la lecture suivante, les financeurs restent', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => !document.getElementById('foundersBand').hidden);
+    // Plus de fondateur : les contacts ne sont plus éligibles non plus (fondateur ou partenaire).
+    await page.evaluate(() => { window.__tables.Etablissements.fondateur = window.__tables.Etablissements.fondateur.map(() => false); });
+    await reload(page);
+    await waitForCards(page, 0);
+    await page.waitForFunction(() => document.getElementById('foundersBand').hidden);
     assert.equal(await page.locator('#bandLogos li').count(), 0);
-  });
-});
+    assert.equal(await page.locator('#funders').isVisible(), true);
+  }));
 
 test('un fondateur qui retire sa présence (ok_pour_apparaitre) disparaît du bandeau à la lecture suivante', { skip }, () =>
   withWidget({}, async ({ page }) => {
@@ -229,8 +214,8 @@ test('si Grist refuse le jeton, les logos laissent la place aux noms, une seule 
     await page.waitForFunction(() => !document.querySelector('.etablissement-tag.has-logo') && !document.querySelector('.logo-holder img'));
     assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['Institut Bergonié', 'CHU', 'CHU', 'CHU']);
     assert.deepEqual(await entriesOf(page, '#bandLogos li'), ['Institut Bergonié', 'CHU']);
-    assert.deepEqual(await entriesOf(page, '#fundersLogos li'), ['République française', 'ANR', 'Bpifrance', 'France 2030']);
-    assert.equal(await page.locator('#bandRoundel').textContent(), 'France 2030');
+    assert.equal(await page.locator('#funders img').getAttribute('src'), 'assets/financeurs.png', 'les financeurs fixes ne dépendent pas de Grist');
+    assert.equal(await page.locator('#bandRoundel img').getAttribute('src'), 'assets/france-2030.png');
     assert.equal((await tokenRequests(page)).length, 1);
     assert.equal((await warningsOf(logs, /\[LOGOS\]/)).length, 1);
     assert.deepEqual(await errorsOf(logs), []);
@@ -267,7 +252,6 @@ test('ni le jeton ni l\'adresse d\'un logo ne passent par la console du widget, 
     await waitForCards(page, 4);
     await page.waitForFunction(() => [...document.querySelectorAll('.contact-card .etablissement-tag')]
       .filter(badge => badge.textContent.trim() === 'CHU').length === 3);
-    await waitForLogos(page, 4); // les 3 financeurs et le rond : les logos du CHU, absents, ont laissé place au nom
     assert.ok((await tokenRequests(page)).length >= 1, 'le test doit avoir exercé le jeton');
     const everything = (await Promise.all([...logs.errors, ...logs.warnings, ...logs.infos])).join('\n');
     assert.doesNotMatch(everything, /fake-token|auth=|\/attachments\//);
@@ -318,20 +302,16 @@ test('une version de Grist sans getAccessToken s\'affiche avec les noms, sans er
 
 // ===== Mises à jour =====
 
-test('une lecture de Grist qui ne change aucun logo ne reconstruit ni le bandeau ni les financeurs', { skip }, () =>
+test('une lecture de Grist qui ne change aucun logo ne reconstruit pas le bandeau', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     await waitForLogos(page, 3);
-    await page.evaluate(() => {
-      document.querySelector('#bandLogos li').dataset.kept = 'oui';
-      document.querySelector('#fundersLogos li').dataset.kept = 'oui';
-    });
+    await page.evaluate(() => { document.querySelector('#bandLogos li').dataset.kept = 'oui'; });
     await page.evaluate(() => { window.__tables.BDD.Fonction[0] = 'Cheffe de projet'; });
     await reload(page);
     await page.waitForFunction(() => [...document.querySelectorAll('.contact-card')].some(card =>
       card.querySelector('.name').textContent === 'Ana Martin' && card.querySelector('.fonction').textContent === 'Cheffe de projet'));
     assert.equal(await page.locator('#bandLogos li').first().getAttribute('data-kept'), 'oui');
-    assert.equal(await page.locator('#fundersLogos li').first().getAttribute('data-kept'), 'oui');
   }));
 
 test('changer un logo dans Grist change l\'image du bandeau et des cartes à la lecture suivante', { skip }, () =>
@@ -344,20 +324,6 @@ test('changer un logo dans Grist change l\'image du bandeau et des cartes à la 
     await badgeOf(page, 'Ana Martin').locator('img.loaded').waitFor();
     assert.equal(await badgeOf(page, 'Ana Martin').locator('img').getAttribute('src'), logoUrl(31));
   }));
-
-test('ajouter la table Financeurs dans Grist fait apparaître les financeurs sans recharger la page', { skip }, () => {
-  const tables = withBranding();
-  const financeurs = tables.Financeurs;
-  delete tables.Financeurs;
-  return withWidget({ tables }, async ({ page }) => {
-    await waitForCards(page, 4);
-    assert.equal(await page.locator('#funders').isHidden(), true);
-    await page.evaluate(value => { window.__tables.Financeurs = value; }, financeurs);
-    await reload(page);
-    await page.waitForFunction(() => !document.getElementById('funders').hidden);
-    assert.equal(await page.locator('#fundersLogos li').count(), 4);
-  });
-});
 
 // ===== Relecture d'une modification =====
 

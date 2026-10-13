@@ -252,8 +252,8 @@ textarea {
   justify-content: flex-end;
   max-width: 108px;
 }
-/* Mêmes dimensions que sur les cartes : d'après les proportions du fichier (--w et --h, voir
-   sizeLogo() dans branding-ui.js), à défaut 32 px de haut. */
+/* 32 px de haut et la largeur que donnent les proportions du fichier, dans une case de 92 px
+   au plus (le logo large garde ses proportions : object-fit). */
 .et-logo .logo-img {
   display: block;
   width: auto;
@@ -261,10 +261,6 @@ textarea {
   max-width: 92px;
   object-fit: contain;
   object-position: right center;
-}
-.et-logo .logo-img.sized {
-  width: calc(var(--w) * 1px);
-  height: calc(var(--h) * 1px);
 }
 .et-pill {
   flex: none;

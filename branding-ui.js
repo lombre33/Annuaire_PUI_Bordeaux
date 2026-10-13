@@ -1,9 +1,9 @@
 // Affichage de l'habillage : les logos (une image, ou le nom en texte quand le logo
-// manque ou ne se charge pas), les financeurs du bandeau du haut et les fondateurs
-// du bandeau du bas. branding.js décide quoi montrer, attachments.js donne les
-// adresses des fichiers ; ici on ne construit que le DOM, avec textContent.
+// manque ou ne se charge pas) et les fondateurs du bandeau du bas. branding.js décide
+// quoi montrer, attachments.js donne les adresses des fichiers ; ici on ne construit que
+// le DOM, avec textContent. Les financeurs sont deux images fixes de index.html.
 
-import { BAND_LOGO, FUNDER_LOGO, PUI_URL } from './constants.js';
+import { BAND_LOGO, PUI_URL } from './constants.js';
 import { logoSize } from './branding.js';
 
 // Un logo : une <img> invisible tant qu'elle n'est pas chargée (ni cadre cassé ni texte
@@ -80,55 +80,41 @@ function textNode(tag, className, text) {
   return element;
 }
 
-// Le logo d'un emplacement, ou son nom (un <span> de classe `className`) quand il n'y
-// en a pas, ou quand le fichier ne se charge pas. `limits` : la surface et les bornes du
-// logo (constants.js) ; le logo reçoit alors ses dimensions en variables CSS --w et --h
-// (classe `sized`) et la feuille de style en tire sa taille.
-function logoOrName(attachments, logo, name, className, limits) {
-  const asName = () => textNode('span', className, name);
+// Le logo d'un fondateur du bandeau, ou son nom (un <span> de classe `band-name`) quand il
+// n'y en a pas, ou quand le fichier ne se charge pas. Le logo reçoit ses dimensions en
+// variables CSS --w et --h (classe `sized`, BAND_LOGO) et la feuille de style en tire sa taille.
+function logoOrName(attachments, logo, name) {
+  const asName = () => textNode('span', 'band-name', name);
   if (logo === null || !attachments) return asName();
   const holder = document.createElement('span');
   holder.className = 'logo-holder';
-  const onLoad = limits ? image => sizeLogo(image, limits) : undefined;
+  const onLoad = image => sizeLogo(image, BAND_LOGO);
   holder.append(createLogoImage(attachments, logo, name, () => holder.replaceChildren(asName()), { eager: true, onLoad }));
   return holder;
-}
-
-function funderItem(funder, attachments) {
-  const item = document.createElement('li');
-  item.className = 'funder';
-  item.append(logoOrName(attachments, funder.logo, funder.name, 'funder-name', FUNDER_LOGO));
-  return item;
 }
 
 function founderItem(founder, attachments) {
   const item = document.createElement('li');
   item.className = 'band-item';
   item.title = founder.name;
-  item.append(logoOrName(attachments, founder.logo, founder.label || founder.name, 'band-name', BAND_LOGO));
+  item.append(logoOrName(attachments, founder.logo, founder.label || founder.name));
   return item;
 }
 
-// `roots` : { funders, fundersLogos, band, bandLogos, bandRoundel, bandLink }, les
-// éléments de index.html. Masqués tant qu'ils n'ont rien à montrer : un document sans
-// logo ni financeur garde l'en-tête et le pied de page d'avant.
+// `roots` : { band, bandLogos, bandLink }, les éléments de index.html. Le bandeau reste
+// masqué tant qu'aucun fondateur n'a validé sa présence.
 export function createBrandingUI(roots, attachments) {
   roots.bandLink.href = PUI_URL;
   let shown = null;
 
   return {
-    // Reconstruit les financeurs et le bandeau, seulement si quelque chose a changé :
-    // refaire les images à chaque lecture de Grist les ferait clignoter.
+    // Reconstruit le bandeau, seulement si quelque chose a changé : refaire les images à
+    // chaque lecture de Grist les ferait clignoter.
     render(branding) {
       if (branding.signature === shown) return;
       shown = branding.signature;
 
-      roots.fundersLogos.replaceChildren(...branding.funders.map(funder => funderItem(funder, attachments)));
-      roots.funders.hidden = branding.funders.length === 0;
-
       roots.bandLogos.replaceChildren(...branding.founders.map(founder => founderItem(founder, attachments)));
-      const roundel = branding.roundel;
-      roots.bandRoundel.replaceChildren(...(roundel ? [logoOrName(attachments, roundel.logo, roundel.name, 'band-name', null)] : []));
       roots.band.hidden = branding.founders.length === 0;
     }
   };

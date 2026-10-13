@@ -105,9 +105,9 @@ Sans dépendance, un fichier de tests par module :
   adresse `blob:` fabriquée par le navigateur sont les seules sources d'une photo ; toute autre
   adresse, tout autre type et toute forme vide donnent « pas de photo ».
 - `tests/branding.test.mjs` — `buildBranding` (fondateurs validés du bandeau du bas dans
-  l'ordre, financeurs, rond « France 2030 », logo de chaque établissement),
-  `logoForContact`, `logoSize` et le branchement sur `loadDirectory` (table `Financeurs`
-  facultative).
+  l'ordre, logo de chaque établissement), `logoForContact`, `logoSize` (bandeau du bas), les
+  deux images fixes des financeurs et le branchement sur `loadDirectory` (qui ne lit plus de
+  table `Financeurs`).
 - `tests/support/fake-grist.js` — le faux document Grist commun aux tests Node et
   au test navigateur : lectures, `applyUserActions` atomique (ajout, modification,
   suppression), formules déclenchées de la sonde, pannes, écritures refusées (par
@@ -567,7 +567,14 @@ Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde
 - [ ] Interrupteur : le décocher retire la carte de la personne et décoche
       `Accepte_apparaitre` dans Grist ; le recocher la fait revenir. Il n'écrit que
       cette case, sur la ligne de la personne.
-- [ ] Compte **Lecteur** : pas de bandeau, aucune ligne ajoutée à `Annuaire_Sonde`.
+- [ ] Compte **Lecteur** : pas de bandeau, aucune ligne ajoutée à `Annuaire_Sonde` ; la console dit
+      `[IDENTITE] Grist a ouvert le widget en lecture seule…` (même ligne dans « Voir en tant que » si Grist
+      y ouvre le widget en lecture seule ; sinon, la ligne `[IDENTITE] lecture impossible : …` donne le refus).
+- [ ] Les deux règles d'`Annuaire_Sonde` de `GRIST_SETUP.md` (étape 4) posées, avec un compte qui peut
+      modifier le document : la console dit toujours `[IDENTITE] personne identifiée…`, le bandeau et le
+      bouton « Modifier » sont là, la table reste vide. Depuis la console d'un compte ordinaire,
+      modifier une ligne d'`Annuaire_Sonde` (en créer une, puis changer son `Email`) est refusé, et lire
+      la ligne d'un autre compte ne renvoie rien.
 - [ ] Compte connecté dont l'adresse n'est pas dans `BDD` : un bandeau « Compte
       absent de l'annuaire » sans interrupteur ; la console l'explique sans citer
       d'adresse.
@@ -701,26 +708,32 @@ l'e-mail et de l'établissement sont à la section 16.
 
 ## 14. Logos et habillage (1.14.0)
 
-Réglages d'abord : `GRIST_SETUP.md`, étape 5 (colonnes `logo` et `ordre_bandeau` d'`Etablissements`, table
-facultative `Financeurs`). À jouer sur une **copie** du document, avec la console et l'onglet Réseau du
+Réglages d'abord : `GRIST_SETUP.md`, étape 5 (colonnes `logo` et `ordre_bandeau` d'`Etablissements`). Les
+financeurs n'en dépendent pas : deux images fixes du widget (1.21.0). À jouer sur une **copie** du document,
+avec la console et l'onglet Réseau du
 navigateur ouverts (F12). **Ce protocole est le seul contrôle du jeton d'accès et des adresses de pièces
 jointes : les tests automatiques simulent la réponse de Grist.** Si un point échoue, relever le message de
 la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
 
-- [ ] Document sans aucune colonne ni table de logos : aucune erreur, aucune ligne `[LOGOS]`, aucune demande de
-      jeton dans l'onglet Réseau, pas de financeurs en tête de page, les pastilles texte sur les cartes comme
-      avant la 1.14.0, et en bas de page le bandeau des fondateurs validés **en texte** (leurs acronymes).
+- [ ] Document sans aucune colonne de logos : aucune erreur, aucune ligne `[LOGOS]`, aucune demande de
+      jeton dans l'onglet Réseau, les pastilles texte sur les cartes comme avant la 1.14.0, et en bas de page
+      le bandeau des fondateurs validés **en texte** (leurs acronymes). Les financeurs sont là quand même, en
+      tête de page comme en bas (images fixes).
 - [ ] Un logo (PNG ou SVG) ajouté dans la colonne `logo` de deux établissements fondateurs validés, puis le
       widget rechargé : le logo remplace la pastille sur leurs cartes, **seul** (ni nom dessous) ; les autres
       établissements gardent leur pastille. Cliquer le logo filtre sur l'établissement, comme la pastille.
 - [ ] Onglet Réseau : **une seule** demande de jeton au chargement, puis une demande par logo à une adresse de
       la forme `…/attachments/<numéro>/download?auth=…`, réponse 200 de type image (pas 401, 403 ni 404).
       Aucune ligne `[LOGOS]` dans la console.
-- [ ] Table `Financeurs` remplie (`nom`, `logo`, `ordre`) : au centre de l'en-tête (cadre assez large), la phrase
-      « Projet financé par l'État dans le cadre de France 2030 » puis les logos, dans l'ordre d'`ordre`.
+- [ ] Financeurs, au centre de l'en-tête (cadre assez large) : le visuel de la maquette (République française,
+      ANR, Bpifrance, France 2030) avec, à sa gauche dès 1320 px, la phrase « Projet financé par l'État dans le
+      cadre de France 2030 ». Identiques dans tous les documents, sans table `Financeurs` (une table de ce nom,
+      si elle existe encore, est ignorée).
 - [ ] Bandeau tout en bas : seuls les fondateurs **validés**, dans l'ordre d'`ordre_bandeau` ; le rond
-      « France 2030 » à droite (le financeur de ce nom) ; la phrase de financement dont le lien ouvre la page
+      « France 2030 » à droite (image fixe) ; la phrase de financement dont le lien ouvre la page
       du projet dans un nouvel onglet ; une infobulle donne le nom complet de chaque établissement.
+- [ ] Cartes : tous les logos ont la **même hauteur** (32 px), quelle que soit leur forme ; un logo très large
+      est réduit à ses proportions au lieu de déborder sur le nom de la personne.
 - [ ] **Les droits** : avec un compte **Lecteur**, puis un compte **Éditeur**, les logos s'affichent dans les
       deux cas (le jeton demandé est en lecture seule). Les règles d'accès de l'étape 4 posées, un compte
       ordinaire voit toujours les logos ; sinon, noter lesquels sont refusés (les noms les remplacent, sans
@@ -730,16 +743,16 @@ la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
       dans l'onglet Réseau), sans cadre cassé ni nom à leur place.
 - [ ] Supprimer le fichier de la cellule `logo` d'un établissement, recharger : seul cet établissement retrouve
       sa pastille (et son nom dans le bandeau du bas) ; les autres logos sont intacts, sans bandeau rouge.
-- [ ] Renommer temporairement la table `Financeurs` : les financeurs disparaissent, sans erreur ni bandeau
-      rouge. Remettre son nom. Même chose avec la colonne `logo` : les noms remplacent les logos partout.
+- [ ] Renommer temporairement la colonne `logo` : les noms remplacent les logos des établissements partout,
+      sans erreur ni bandeau rouge, et les financeurs restent affichés. Remettre son nom.
 - [ ] Remplacer un logo dans Grist puis recharger le widget : le nouveau logo apparaît (sans recharger, rien ne
       change : Grist ne prévient pas le widget d'un changement d'`Etablissements`).
 - [ ] Un logo SVG qui n'a ni `width` ni `height` (seulement un `viewBox`) s'affiche à une taille raisonnable ;
-      un logo en hauteur et une bannière large ont un poids visuel voisin de leurs voisins.
+      dans le bandeau du bas, un logo en hauteur et une bannière large ont un poids visuel voisin de leurs voisins.
 - [ ] Mise en page, en réduisant la section du widget : à partir de 1180px, le titre à gauche, les financeurs
       au centre (leur phrase de financement ne s'ajoute qu'à partir de 1320px), le profil à droite ; de 860 à
       1179px, les financeurs au-dessus du profil, à droite ; sous 860px, tout est empilé ; les financeurs du haut
-      sont en niveaux de gris, le rond du bandeau du bas en couleurs ; quand la largeur utile du bandeau du bas
+      sont gris ardoise (c'est l'image de la maquette), le rond du bandeau du bas en couleurs ; quand la largeur utile du bandeau du bas
       passe sous 560px, ses logos se
       répartissent sur quatre colonnes au lieu de huit. Aucune barre de
       défilement horizontale, aucun logo déformé ni coupé.
