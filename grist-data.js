@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES } from './constants.js';
+import { CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -226,8 +226,37 @@ function listLabels(contact, referenceMaps) {
   }));
 }
 
-// Ajoute à un contact `labels` (pour chaque catégorie, la liste de ses libellés) et
-// les indicateurs de son établissement. `etabFlags` est optionnel : sans lui,
+// Libellé normalisé de la ligne `id`, calculé une fois par table de libellés : normalize() coûte cher
+// et les mêmes tâches reviennent d'un contact à l'autre.
+const normalizedLabels = new WeakMap();
+function normalizedLabel(labelMap, id) {
+  if (!normalizedLabels.has(labelMap)) normalizedLabels.set(labelMap, new Map());
+  const cache = normalizedLabels.get(labelMap);
+  if (!cache.has(id)) cache.set(id, normalize(labelMap[id]));
+  return cache.get(id);
+}
+
+// Le rôle de la personne dans chacune de ses tâches : { libellé normalisé de la tâche → [rôles] }. Il se lit
+// sur les lignes brutes de Taches que BDD.Taches désigne pour elle (par identifiant de ligne), pas sur le
+// libellé corrigé : plusieurs lignes brutes le partagent, et un rôle voisin n'est pas le sien. Une étiquette
+// qui regroupe plusieurs lignes de la personne les donne toutes, sans doublon. Une tâche sans rôle, ou dont la
+// ligne n'a pas de libellé corrigé (elle n'est pas affichée), n'a pas d'entrée.
+function taskRolesOf(contact, referenceMaps) {
+  const roles = referenceMaps[TASK_ROLES];
+  const labels = referenceMaps.taches;
+  if (!roles || !labels || Object.keys(roles).length === 0) return {};
+  const byLabel = new Map();
+  safeValues(contact.Taches).forEach(item => {
+    const role = Number.isSafeInteger(item) && roles[item];
+    if (!role || !labels[item]) return;
+    const label = normalizedLabel(labels, item);
+    byLabel.set(label, [...(byLabel.get(label) ?? []), role]);
+  });
+  return Object.fromEntries([...byLabel].map(([label, list]) => [label, list.length > 1 ? uniqueLabels(list) : list]));
+}
+
+// Ajoute à un contact `labels` (pour chaque catégorie, la liste de ses libellés), `taskRoles`
+// et les indicateurs de son établissement. `etabFlags` est optionnel : sans lui,
 // aucun indicateur n'est vrai et le contact n'est pas éligible.
 export function enrich(contact, referenceMaps, etabFlags) {
   // BDD.Etablissement est une Référence directe vers la ligne d'Etablissements
@@ -247,6 +276,7 @@ export function enrich(contact, referenceMaps, etabFlags) {
       etablissement: etablissement ? [etablissement] : [],
       role: role ? [role] : []
     },
+    taskRoles: taskRolesOf(contact, referenceMaps),
     etablissement_label: etablissement,
     etablissement_fondateur: flags?.fondateur === true,
     etablissement_partenaire: flags?.partenaire === true,
@@ -553,6 +583,14 @@ function readReferenceMap({ key, table, field, corrected }, result, log) {
   return { map, labelColumnsMissing: absent.length === labelFields.length };
 }
 
+// Le rôle de chaque ligne de la table des tâches (colonne facultative `Taches_role`, voir TASK_ROLES dans
+// constants.js) : identifiant de ligne → rôle, sans les lignes qui n'en ont pas. Sans la colonne, ou vide,
+// il n'y a simplement aucun rôle à montrer : rien n'est signalé. Une table illisible garde les rôles précédents.
+function readTaskRoles(result, previousMaps) {
+  if (result.status === 'rejected') return previousMaps[TASK_ROLES] ?? {};
+  return labelMapFromRows(tableToRows(result.value), [TASK_ROLE_COLUMN]);
+}
+
 // ===== TÂCHES RANGÉES PAR ACTION =====
 // Aucune colonne ne relie une tâche à son action : le numéro avant le point du libellé de la
 // tâche (« 1.3 Animer le réseau ») est celui de son action, que la table Actions porte dans
@@ -654,6 +692,7 @@ function readReferenceMaps(results, previousMaps, log) {
       withoutLabelColumn.add(source.key);
     }
   });
+  referenceMaps[TASK_ROLES] = readTaskRoles(results[CATEGORIES.taches.table], previousMaps);
   // Les regroupements se complètent une fois toutes les maps lues. Sans colonne
   // de regroupement, rien n'est classé : un filtre vide vaut mieux qu'un filtre
   // où tout le monde est « Autres ». Celui qui se déduit des numéros n'a rien à

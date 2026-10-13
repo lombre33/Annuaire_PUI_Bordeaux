@@ -24,6 +24,7 @@ Features
   *  Email
   *  Tel si renseigné
   *  Les Instances, Actions, GT, communautés Role dans le PUI auxquelles la personne fait partie (le cas échéant)
+  * Le rôle de la personne dans une tâche (colonne facultative Taches_role de la table Taches ; demande d'Antoine du 13/10/2026, 1.26.0) : dit au survol de l'étiquette de la tâche, à la souris et au clavier, et écrit sous le nom de la tâche sur un téléphone. Il se lit sur les lignes brutes de Taches que BDD.Taches désigne pour la personne, pas sur le libellé corrigé ; sans rôle, rien ne s'affiche.
 * En-tête et pied de page (décisions d'Antoine du 12/10/2026, 1.14.0) : le PUI est le consortium de tous ses établissements fondateurs et n'a pas d'identité graphique propre, ce sont leurs logos qui l'habillent.
   * Un seul bandeau d'en-tête, pour limiter la place prise : le titre en haut à gauche, les financeurs (ANR, France 2030…) discrets au centre, la zone du profil à droite.
   * Un bandeau tout en bas avec les logos des établissements fondateurs, dans l'ordre et à la position du bandeau fourni par le PUI, fermé par le rond « France 2030 » et la phrase de financement.

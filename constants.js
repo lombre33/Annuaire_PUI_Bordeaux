@@ -149,6 +149,14 @@ export const CATEGORIES = {
 // Bordeaux ». Ce n'est pas une catégorie : aucun filtre ni tag n'en vient.
 export const ETABLISSEMENT_NAMES = 'etablissementNom';
 
+// Le rôle de la personne dans une tâche : colonne facultative `Taches_role` de la table `Taches`. Une même
+// tâche corrigée recouvre plusieurs lignes brutes (une par rôle, par exemple) : le rôle d'une personne se lit
+// sur les lignes brutes que BDD.Taches lui désigne, jamais sur le libellé corrigé, qui les confond. Comme
+// ETABLISSEMENT_NAMES, TASK_ROLES est une clé de referenceMaps (identifiant de ligne → rôle, les lignes sans
+// rôle absentes) et non une catégorie : aucun filtre ni tag n'en vient. La carte le dit au survol de la tâche.
+export const TASK_ROLE_COLUMN = 'Taches_role';
+export const TASK_ROLES = 'tachesRole';
+
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
 // groupes du menu Compétences, les actions celles du menu Tâches. Rôle PUI en a un depuis la
 // 1.24.0 (demande d'Antoine du 13 octobre 2026).
