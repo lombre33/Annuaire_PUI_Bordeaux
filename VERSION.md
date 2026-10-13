@@ -1,4 +1,4 @@
-# Version 1.27.2 — Logos des cartes : l'égalité de taille revient, sans jamais cacher ni retarder un logo (voir CHANGELOG.md)
+# Version 1.27.3 — Le menu Établissement ne propose que les établissements qui peuvent s'afficher, les partenaires seulement quand Partenaires est allumé (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -79,4 +79,6 @@ fenêtres de profil ne propose que les fondateurs et les partenaires (et celui q
 autre personne en mode admin (non essayé dans le vrai Grist).
 Depuis la 1.27.1, le rôle PUI n'est plus une pastille mais du texte, comme la fonction, à droite de la ligne de l'e-mail : jamais sur une autre ligne, coupé par « … »
 quand il est trop long (le rôle entier au survol), masqué quand l'e-mail ne lui laisse presque rien.
-950 tests (dont 345 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.27.3, le menu Établissement ne propose que les établissements dont une fiche peut s'afficher (validés, fondateurs ou partenaires) et dont l'interrupteur est allumé : un
+partenaire n'y figure que si Partenaires est allumé, un fondateur que si Fondateurs l'est ; une coche dont l'option disparaît est retirée avec elle.
+953 tests (dont 346 dans un vrai navigateur, optionnels sans Playwright).

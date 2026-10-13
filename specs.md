@@ -47,6 +47,7 @@ Features
     * Un contact n'apparaît que si son établissement est fondateur OU partenaire — jamais si "autres" (ni l'un ni l'autre).
     * Dans tous les cas, l'établissement doit avoir validé (ok_pour_apparaitre = true), sans quoi ses contacts n'apparaissent jamais.
     * Interrupteurs "Fondateurs" / "Partenaires" dans l'UI pour affiner l'affichage parmi les contacts déjà éligibles ci-dessus : Fondateurs coché par défaut, Partenaires décoché (depuis la 1.7.0).
+    * Le menu du filtre Établissement ne propose que les établissements dont une fiche peut s'afficher (validés, fondateurs ou partenaires), et seulement ceux que les interrupteurs laissent voir : un partenaire n'y figure que si Partenaires est allumé, un fondateur que si Fondateurs l'est (demande d'Antoine du 13/10/2026, 1.27.3). Une coche dont l'option disparaît est retirée avec elle.
 
 
 

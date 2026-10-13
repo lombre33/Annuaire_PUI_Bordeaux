@@ -354,12 +354,18 @@ export function isEtablissementEligible(contact) {
     (contact.etablissement_fondateur === true || contact.etablissement_partenaire === true);
 }
 
-// Options du menu Établissement : seulement les lignes ok_pour_apparaitre. Les
-// libellés affichés sur les cartes viennent de referenceMaps, non restreint.
-export function filterVisibleEstablishments(labelMap, etabFlags) {
+// Options du menu Établissement : les établissements dont une fiche peut s'afficher, donc validés
+// (ok_pour_apparaitre) ET fondateurs ou partenaires, jamais « autres » (comme isEtablissementEligible).
+// `scope` : les interrupteurs Fondateurs/Partenaires, lus comme pour les cartes (matchesScope, filters.js) :
+// un partenaire n'a pas d'option tant que Partenaires est éteint, un fondateur tant que Fondateurs l'est ;
+// sans `scope`, aucun interrupteur ne retire rien. Les libellés affichés sur les cartes viennent de
+// referenceMaps, non restreint.
+export function filterVisibleEstablishments(labelMap, etabFlags, scope) {
+  const { fondateur, partenaire } = scope ?? { fondateur: true, partenaire: true };
   const result = {};
   Object.entries(labelMap || {}).forEach(([id, label]) => {
-    if (etabFlags?.byId?.[id]?.ok_pour_apparaitre === true) result[id] = label;
+    const flags = etabFlags?.byId?.[id];
+    if (flags?.ok_pour_apparaitre === true && ((fondateur && flags.fondateur) || (partenaire && flags.partenaire))) result[id] = label;
   });
   return result;
 }

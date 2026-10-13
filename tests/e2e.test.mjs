@@ -757,6 +757,32 @@ test('le menu Établissement ne propose pas un établissement non validé', { sk
     assert.ok(!labels.includes('INSERM'));
   }));
 
+test('le menu Établissement suit les interrupteurs : un partenaire n\'y figure que si Partenaires est allumé, et sa coche part avec lui', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    const filter = page.locator('.filter[data-filter-key="etablissement"]');
+    const labels = async () => (await filter.locator('.option-label').allTextContents()).sort();
+    assert.deepEqual(await labels(), ['CHU', 'Institut Bergonié'], 'au départ : les fondateurs validés, ni UBM (partenaire), ni Clinique (« autres »), ni INSERM (non validé)');
+
+    await page.click('[data-scope="partenaire"]');
+    await waitForCards(page, 5);
+    assert.deepEqual(await labels(), ['CHU', 'Institut Bergonié', 'UBM']);
+
+    await cardNamed(page, 'Bob Durand').locator('.etablissement-tag').click(); // coche UBM
+    await waitForCards(page, 1);
+    assert.equal(await filter.locator('.filter-count').textContent(), '1');
+
+    await page.click('[data-scope="partenaire"]');
+    await waitForCards(page, 4);
+    assert.deepEqual(await labels(), ['CHU', 'Institut Bergonié'], 'Partenaires éteint : UBM n\'est plus proposé');
+    assert.equal(await filter.locator('.filter-count').isHidden(), true, 'sa coche est partie avec lui : elle ne vide pas les cartes sans qu\'on la voie');
+
+    await page.click('[data-scope="partenaire"]');
+    await page.click('[data-scope="fondateur"]');
+    await waitForCards(page, 1);
+    assert.deepEqual(await labels(), ['UBM'], 'Partenaires seuls : les fondateurs ne sont plus proposés');
+  }));
+
 // ===== Pannes : jamais un faux « 0 contact » silencieux =====
 
 test('panne de lecture d\'Etablissements au démarrage : message explicite, pas de « 0 contact » trompeur', { skip }, () =>

@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.27.3 — Le menu Établissement ne propose que les établissements qui peuvent s'afficher, les partenaires seulement quand Partenaires est allumé
+
+Retour d'Antoine du 13 octobre 2026 (12 h 27) : « dans le filtre établissement ne doivent apparaître dans la liste que les établissements qui peuvent
+s'afficher ET si le bouton "partenaire" est toggle ».
+
+- **Avant**, le menu proposait tout établissement validé (`ok_pour_apparaitre`) : un partenaire alors que Partenaires était éteint (son option disait 0), et un
+  établissement « autres » (ni fondateur ni partenaire), dont aucune fiche ne s'affiche jamais.
+- **Maintenant**, une option n'existe que pour un établissement dont une fiche peut s'afficher, c'est-à-dire validé ET fondateur ou partenaire (la règle d'affichage
+  des fiches, `isEtablissementEligible`), et **dont l'interrupteur est allumé** : un partenaire n'est proposé que si Partenaires est allumé (au départ : les fondateurs
+  seulement). Les interrupteurs agissent de même dans l'autre sens, comme pour les cartes : Fondateurs éteint, plus de fondateur dans la liste. Le menu offre ainsi
+  exactement les établissements dont les cartes peuvent apparaître. La règle est celle de l'**établissement**, pas « au moins une fiche visible » : un établissement
+  validé qui n'a encore aucune personne affichée reste proposé (avec 0).
+- **Une option qui disparaît emporte sa coche.** UBM coché, puis Partenaires éteint : la coche est retirée avec l'option (`pruneStaleFilters`), au lieu de rester
+  invisible et de vider les cartes. Elle ne revient pas d'elle-même quand Partenaires se rallume.
+- Comment : `filterVisibleEstablishments(libellés, indicateurs, interrupteurs)` (`grist-data.js`) reçoit les interrupteurs ; `refreshFilterMenus()` (`main.js`)
+  recalcule les menus au chargement comme à chaque clic sur un interrupteur, purge les sélections périmées et ne reconstruit les menus que si la liste change.
+- Tests : le menu offre un établissement exactement quand ses contacts peuvent s'afficher, pour les huit statuts et les quatre positions des interrupteurs
+  (`tests/etablissements.test.mjs`) ; dans le navigateur, la liste suit les interrupteurs et la coche d'un partenaire part avec lui (`tests/e2e.test.mjs`).
+  **Non essayé dans le vrai Grist d'Antoine.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.27.2 — Logos des cartes : l'égalité de taille revient, sans jamais cacher ni retarder un logo
 
 Retour d'Antoine du 13 octobre 2026 (11 h 54), sur la 1.26.1 : « ça ne fonctionne pas. Mais là ce n'est pas une nouvelle feature mais une régression,

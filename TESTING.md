@@ -28,7 +28,8 @@ Sans dépendance, un fichier de tests par module :
   colonnes ignorées, indicateurs) et `labelsOf`.
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
-  libellé), `isEtablissementEligible`, `filterVisibleEstablishments`.
+  libellé), `isEtablissementEligible`, `filterVisibleEstablishments` (le menu Établissement offre ce que les cartes
+  peuvent montrer, selon les interrupteurs).
 - `tests/filters.test.mjs` — `filterContacts` (dont la recherche « prénom nom », mot par
   mot et dans n'importe quel ordre, et ses écritures tolérées), `pruneStaleFilters`,
   `computeFilterCounts` (dont les compteurs des domaines et des actions) et le menu
@@ -145,11 +146,11 @@ Sans dépendance, un fichier de tests par module :
   seule requête réseau et ses protections, aucun stockage). Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 73
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 75
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, cartes triées
 par nom (même quand Grist envoie les lignes dans le désordre), interrupteurs
-Fondateurs/Partenaires, recherche (« prénom nom » dans les deux sens, noms composés, tirets,
+Fondateurs/Partenaires (dont la liste du menu Établissement, qui les suit), recherche (« prénom nom » dans les deux sens, noms composés, tirets,
 apostrophe, œ), attente de la frappe (une seule mise à jour pour quatre lettres tapées d'un coup,
 champ vidé sans attendre, « Réinitialiser » qui annule l'attente), filtres et compteurs, menu Compétences rangé par
 domaine (case de domaine, détail replié, case partielle, recherche à deux niveaux,

@@ -151,7 +151,7 @@ Un clic sur un bouton de filtre ouvre son menu ; ouvrir un menu referme les autr
 - **Cochez** une ou plusieurs valeurs : les cartes se mettent à jour immédiatement.
 - Dans un **même** menu, les valeurs s'additionnent (**ou**) : cocher deux instances affiche les personnes qui sont dans l'une *ou* l'autre.
 - Entre **plusieurs** menus, les critères se cumulent (**et**) : cocher une instance et un établissement ne garde que les personnes qui ont les deux.
-- Le **nombre à droite** de chaque option est le nombre de cartes qui portent cette valeur, compte tenu de la recherche, des interrupteurs et des autres menus (pas du menu lui-même). Cocher une valeur de plus **ajoute** donc ses cartes à celles déjà affichées. Une option à **0** n'a aucune carte avec le reste des critères : par exemple, un établissement partenaire tant que Partenaires est désactivé.
+- Le **nombre à droite** de chaque option est le nombre de cartes qui portent cette valeur, compte tenu de la recherche, des interrupteurs et des autres menus (pas du menu lui-même). Cocher une valeur de plus **ajoute** donc ses cartes à celles déjà affichées. Une option à **0** n'a aucune carte avec le reste des critères : par exemple, une compétence que seuls des partenaires portent tant que Partenaires est désactivé.
 - Le **champ de recherche** en haut du menu réduit la liste d'options (sans tenir compte des accents ni des majuscules). Il ne coche rien.
 - Les valeurs cochées **remontent en tête** du menu, et un **chiffre** sur le bouton indique combien de valeurs sont cochées.
 
@@ -212,6 +212,7 @@ Deux interrupteurs choisissent les établissements dont les contacts sont affich
 - Au départ, **Fondateurs** est activé et **Partenaires** ne l'est pas : vous voyez les personnes des établissements fondateurs.
 - Activez **Partenaires** pour ajouter celles des établissements partenaires. Désactivez **Fondateurs** pour ne voir que les partenaires.
 - Si vous désactivez les deux, aucune carte ne s'affiche : réactivez-en au moins un.
+- Les interrupteurs règlent aussi la liste du menu **Établissement** : un établissement partenaire n'y figure que lorsque **Partenaires** est activé, un établissement fondateur que lorsque **Fondateurs** l'est. Un établissement coché qui disparaît de la liste est décoché avec elle.
 - **Réinitialiser** ne touche pas à ces interrupteurs : votre choix reste en place jusqu'à ce que vous le changiez ou que vous rechargiez la page, qui rétablit l'état de départ (Fondateurs activé, Partenaires désactivé).
 
 ## Réinitialiser
