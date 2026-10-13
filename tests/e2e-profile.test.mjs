@@ -1652,6 +1652,7 @@ test('la liste déroulante des établissements : recherche en direct, flèches e
     await page.keyboard.press('Escape');
     assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
     assert.equal(await isOpen(page), true, 'Échap ne referme que le panneau : la fenêtre reste ouverte');
+    assert.equal(await dialog(page).locator('.dlg-hint').isHidden(), true, 'la touche n\'a pas atteint la fenêtre : pas d\'avertissement « Des modifications ne sont pas enregistrées »');
     assert.equal(await chosenOf(page, 'Etablissement'), 'Institut Bergonié', 'Échap ne change pas le choix');
     assert.equal(await focusedId(page), 'profile-Etablissement');
 

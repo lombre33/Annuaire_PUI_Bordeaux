@@ -1,4 +1,4 @@
-# Version 1.27.3 — Le menu Établissement ne propose que les établissements qui peuvent s'afficher, les partenaires seulement quand Partenaires est allumé (voir CHANGELOG.md)
+# Version 1.28.0 — Établissement et rôle : une seule liste déroulante, avec la recherche dans le panneau (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -81,4 +81,7 @@ Depuis la 1.27.1, le rôle PUI n'est plus une pastille mais du texte, comme la f
 quand il est trop long (le rôle entier au survol), masqué quand l'e-mail ne lui laisse presque rien.
 Depuis la 1.27.3, le menu Établissement ne propose que les établissements dont une fiche peut s'afficher (validés, fondateurs ou partenaires) et dont l'interrupteur est allumé : un
 partenaire n'y figure que si Partenaires est allumé, un fondateur que si Fondateurs l'est ; une coche dont l'option disparaît est retirée avec elle.
-953 tests (dont 346 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.28.0, le choix de l'établissement et celui du rôle (fenêtres de profil) sont une seule liste déroulante : un bouton qui montre le choix et, ouverte, un panneau avec la recherche en haut dont les
+valeurs se réduisent en direct (au clavier : flèches, Entrée, Échap, qui ne ferme que le panneau ; sur un écran tactile le panneau ne prend pas le focus d'office) ; les champs reprennent leur demi-largeur
+(non essayé dans le vrai Grist ni sur un vrai téléphone).
+955 tests (dont 348 dans un vrai navigateur, optionnels sans Playwright).

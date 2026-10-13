@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.28.0 — Établissement et rôle : une seule liste déroulante, avec la recherche dans le panneau
+
+Retour d'Antoine du 13 octobre 2026 (12 h 26) : « le champ établissement c'est moche comme ça, j'aimerais simplement la dropdown classique et quand on recherche
+ça trie en temps réel comme pour les filtres ».
+
+- **Avant**, la liste des établissements des fenêtres de profil (et celle des rôles) était une liste native avec, à côté, un champ de recherche qui n'en gardait que les
+  valeurs qui répondaient (1.25.0), sur toute la largeur de la fenêtre.
+- **Maintenant**, c'est **une seule liste déroulante** (`dropdown()`, `dom.js`). Fermée, un bouton de la forme des autres champs montre le choix (« Choisir… » tant qu'un
+  établissement n'est pas choisi, « Non renseigné » pour un rôle vide). Ouverte, un panneau aux couleurs d'un menu de filtre : **la recherche en haut, les valeurs dessous,
+  réduites en direct** à mesure qu'on tape (casse et accents ignorés), « Aucun résultat » quand rien ne répond. Un clic ou un appui sur une valeur la choisit et referme le panneau.
+  Les champs retrouvent leur demi-largeur de la maquette v5 : **l'écart de la 1.25.0 (champ pleine largeur) disparaît**.
+- **Au clavier** : Entrée, Espace ou une flèche ouvre ; la recherche a le focus ; les flèches parcourent les valeurs ; Entrée choisit la valeur repérée (la première qui répond,
+  à mesure qu'on tape) ; Échap referme le panneau **sans fermer la fenêtre** ni changer le choix (le focus revient au bouton) ; un clic ailleurs ou la tabulation referme aussi.
+  **Sur un écran tactile**, le panneau s'ouvre sans prendre le focus (le clavier du téléphone cacherait les valeurs) ; les valeurs font 40 px de haut au moins et la recherche 16 px (iOS ne zoome pas).
+- **Pour les lecteurs d'écran** : le bouton est un `combobox` (`aria-expanded`, `aria-controls`, nommé par le libellé du champ et le choix), les valeurs une `listbox`, la recherche
+  est reliée à la valeur repérée (`aria-activedescendant`) et le nombre de résultats est annoncé (`status`).
+- **Ne change pas** : les valeurs proposées (fondateurs et partenaires, plus l'établissement de la fiche ; tous les rôles), l'absence de choix vide pour un établissement qu'une personne
+  a déjà, ce qui s'écrit dans Grist, ni la fiche de l'établissement (son choix de personnes à nommer garde sa recherche et sa liste). Rien à régler dans Grist.
+- Tests : la création et la fiche d'une autre personne passent par la liste (valeurs, recherche en direct, choix, « Choisir… ») ; au clavier et à la souris (Entrée, flèches, bout de
+  liste, Échap qui ne ferme que le panneau, clic ailleurs, tabulation) ; sur un écran tactile (pas de focus d'office, appui sur une valeur). Vu en capture dans Chromium, à 1280 px et à 390 px.
+  **Non essayé dans le vrai Grist d'Antoine ni sur un vrai Firefox mobile.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.27.3 — Le menu Établissement ne propose que les établissements qui peuvent s'afficher, les partenaires seulement quand Partenaires est allumé
 
 Retour d'Antoine du 13 octobre 2026 (12 h 27) : « dans le filtre établissement ne doivent apparaître dans la liste que les établissements qui peuvent
