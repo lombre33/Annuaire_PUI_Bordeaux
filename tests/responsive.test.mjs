@@ -183,7 +183,8 @@ test('le texte des cartes reste dans sa carte, même sans point de coupure (nom,
         const found = [];
         document.querySelectorAll('.contact-card').forEach(card => {
           const box = card.getBoundingClientRect();
-          // Un bloc dont le texte est plus large que lui : coupé par la carte, donc illisible.
+          // Un bloc dont le texte est plus large que lui : coupé par la carte, donc illisible. Seul texte coupé exprès : le
+          // rôle PUI (`.role-text`, dans son tag), par « … » avec le rôle entier en infobulle (tests/branding-layout.test.mjs).
           card.querySelectorAll('.name, .fonction, .detail-row, .tag, .tag-group-title').forEach(element => {
             if (element.scrollWidth > element.clientWidth + 1) found.push(`${element.className} : « ${element.textContent.slice(0, 30)} »`);
           });
@@ -497,14 +498,20 @@ test('le survol colore la ligne d\'un domaine à la souris, et ne reste pas coll
 test('écran tactile : cibles d\'au moins 28px, champs à 16px (iOS zoomerait en dessous)', { skip }, () =>
   withWidget({ width: 414, touch: true }, async ({ page }) => {
     await atEachWidth(page, [414, 820, 1180], async width => {
-      const { smallTargets, searchFont, emailHeight } = await page.evaluate(() => {
-        const heights = selector => [...document.querySelectorAll(selector)].map(element => element.getBoundingClientRect().height);
+      const { targets, smallTargets, searchFont, emailHeight } = await page.evaluate(() => {
+        // Les éléments affichés seulement : un rôle que l'e-mail ne laisse pas lire est masqué (display: none), ce n'est pas une cible.
+        const heights = selector => [...document.querySelectorAll(selector)]
+          .filter(element => element.getClientRects().length > 0)
+          .map(element => element.getBoundingClientRect().height);
+        const tags = [...heights('button.tag'), ...heights('.etablissement-tag.visible')];
         return {
-          smallTargets: [...heights('button.tag'), ...heights('.etablissement-tag.visible')].filter(height => height < 27.5).length,
+          targets: tags.length,
+          smallTargets: tags.filter(height => height < 27.5).length,
           searchFont: getComputedStyle(document.getElementById('searchInput')).fontSize,
           emailHeight: Math.min(...heights('a.email.visible'))
         };
       });
+      assert.ok(targets > 50, `à ${width}px, des tags et des badges sont mesurés (${targets})`);
       assert.equal(smallTargets, 0, `à ${width}px, des tags ou badges font moins de 28px de haut`);
       assert.equal(searchFont, '16px', `à ${width}px, le champ de recherche`);
       assert.ok(emailHeight >= 24, `à ${width}px, le lien e-mail fait ${emailHeight}px de haut`);

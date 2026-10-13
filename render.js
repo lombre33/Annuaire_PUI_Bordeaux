@@ -11,8 +11,8 @@ import { avatarIdOf } from './attachments.js';
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
 
-// Le rôle dans le PUI n'est pas une section du bas de la carte : c'est une petite pastille à côté de la fonction
-// et de l'e-mail (ou sous l'e-mail sur une carte étroite), hors de la colonne du logo.
+// Le rôle dans le PUI n'est pas une section du bas de la carte : c'est un texte à droite de la ligne de l'e-mail,
+// hors de la colonne du logo.
 const ROLE_GROUP = TAG_GROUPS.find(group => group.key === 'role');
 
 // ===== Menus de filtres =====
@@ -510,25 +510,33 @@ function buildTagGroup(group, labels, onToggle, change, roles) {
   return section;
 }
 
-// Le rôle dans le PUI : une petite pastille qui filtre comme les autres tags. Elle n'est pas dans la
-// colonne du logo (sa hauteur écarterait le nom de l'avatar) mais dans sa propre boîte, qui prend sa
-// place en CSS : à droite de la fonction et de l'e-mail sur une carte large, sous l'e-mail sur une carte
-// étroite. Sur la carte « Après » d'une relecture, un rôle ajouté porte son contour, un rôle retiré reste
-// barré (`change` : { added, removed }).
-function fillRole(body, contact, onToggle, change) {
+// Le rôle dans le PUI : du texte, comme la fonction (ni pastille ni fond), qui filtre comme les autres tags. Il est à droite
+// de la ligne de l'e-mail (style.css) et ne la fait jamais passer à la ligne : trop long pour la place que l'e-mail lui
+// laisse, il est coupé par une ellipse, et `title` donne le rôle entier au survol. Il n'est pas dans la colonne du logo
+// (sa hauteur écarterait le nom de l'avatar). Sur la carte « Après » d'une relecture, un rôle ajouté porte son contour,
+// un rôle retiré reste barré (`change` : { added, removed }).
+function fillRole(details, contact, onToggle, change) {
   const added = new Set((change?.added ?? []).map(normalize));
   const tags = [
-    ...labelsOf(contact, ROLE_GROUP.key).map(value => buildTag(ROLE_GROUP, value, onToggle, added.has(normalize(value)))),
-    ...(change?.removed ?? []).map(value => buildRemovedTag(ROLE_GROUP, value))
+    ...labelsOf(contact, ROLE_GROUP.key).map(value => roleTag(buildTag(ROLE_GROUP, value, onToggle, added.has(normalize(value))), value)),
+    ...(change?.removed ?? []).map(value => roleTag(buildRemovedTag(ROLE_GROUP, value), value))
   ];
   if (tags.length === 0) return;
-  const column = el('div', 'role-col');
-  tags.forEach(tag => {
-    tag.classList.add('role-tag');
-    column.append(tag);
-  });
-  body.insertBefore(column, body.querySelector('.card-tags'));
-  body.classList.add('has-role');
+  const line = el('div', 'role-col');
+  line.append(...tags);
+  // Juste après l'e-mail : l'ordre de lecture et de tabulation est celui de l'écran (l'e-mail, son rôle, puis le téléphone).
+  details.querySelector('.email').after(line);
+  details.classList.add('has-role');
+}
+
+// Un tag de rôle sans la couleur de sa catégorie, son texte dans un bloc à lui (c'est lui que style.css coupe par une
+// ellipse : un bouton n'en fait pas partout) et le rôle entier en infobulle.
+function roleTag(tag, value) {
+  tag.style.backgroundColor = '';
+  tag.classList.add('role-tag');
+  tag.title = value;
+  tag.firstChild.replaceWith(el('span', 'role-text', value));
+  return tag;
 }
 
 function fillTags(container, contact, onToggle, changes) {
@@ -638,7 +646,7 @@ function buildCard(template, contact, onToggle, view = {}) {
   if (marks?.texts.tel) showTextChange(tel, marks.texts.tel, value => `☎ ${value}`);
   else if (phone) reveal(tel, `☎ ${phone}`);
 
-  fillRole(card.querySelector('.card-body'), contact, onToggle, marks?.tags.role);
+  fillRole(card.querySelector('.details'), contact, onToggle, marks?.tags.role);
   fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags);
   if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);
   // Fermé par défaut : seul un établissement dont la personne est responsable (et dont la carte

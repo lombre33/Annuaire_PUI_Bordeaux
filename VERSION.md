@@ -1,4 +1,4 @@
-# Version 1.26.0 — Le rôle de la personne dans une tâche, au survol de son étiquette (voir CHANGELOG.md)
+# Version 1.26.2 — Le rôle PUI, plus discret : du texte à droite de la ligne de l'e-mail (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -64,10 +64,11 @@ pastille ; les menus de filtre réunissent deux libellés qui ne diffèrent que 
 Depuis la 1.25.0, la fenêtre « Créer ma fiche » a une case « Apparaître dans l'annuaire », cochée d'avance, qui renseigne `Accepte_apparaitre` et change le
 bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son périmètre rempli par un administrateur, et les messages le disent) ; les listes
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
-Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite : à droite de la fonction et de l'e-mail, sous le logo, sur une carte de 480 px ou
-plus ; sous l'e-mail sur une carte plus étroite.
+Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite.
 Depuis la 1.25.2, le logo qu'on voit sur une carte est une image ordinaire (sans CORS) : ses pixels sont lus à part, et si Grist ou le navigateur
 refuse ou tarde (3 s), le logo se montre quand même, sans recadrage (rejoué dans Chromium, pas essayé dans un vrai Grist ni sur Firefox).
 Depuis la 1.26.0, l'étiquette d'une tâche dit le rôle de la personne dans cette tâche (colonne facultative `Taches_role` de `Taches`, lue sur les lignes brutes
 que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bulle à la souris et au clavier, sous le nom de la tâche sur un téléphone.
-939 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.26.2, le rôle PUI n'est plus une pastille mais du texte, comme la fonction, à droite de la ligne de l'e-mail : jamais sur une autre ligne, coupé par « … »
+quand il est trop long (le rôle entier au survol), masqué quand l'e-mail ne lui laisse presque rien.
+941 tests (dont 341 dans un vrai navigateur, optionnels sans Playwright).

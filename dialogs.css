@@ -517,6 +517,24 @@ textarea {
 .rv-card .etablissement-tag {
   cursor: default;
 }
+/* Sur une carte de relecture, un rôle ajouté ou retiré se lit en entier : le rôle a sa ligne sous l'e-mail et passe
+   à la ligne s'il le faut, au lieu d'être coupé par « … » à côté de l'e-mail comme dans l'annuaire. */
+.rv-card .details.has-role {
+  display: block;
+}
+.rv-card .role-col {
+  container-type: normal;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  justify-content: flex-start;
+  min-height: 0;
+  padding-left: 0;
+}
+.rv-card .role-text {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .rv-card .tag-group-values {
   gap: 6px 4px;
 }

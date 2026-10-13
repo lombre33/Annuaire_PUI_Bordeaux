@@ -460,11 +460,14 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       case est bien cochée (pas seulement mise en évidence visuellement), et
       le badge de comptage sur le bouton du filtre est à jour — même
       résultat qu'en cochant la case directement dans le menu.
-- [ ] **Le rôle PUI d'une carte (petite pastille à droite, ou sous l'e-mail d'une carte étroite) est cliquable** (1.24.0, 1.25.1) :
-      curseur "main" au survol, un clic coche la valeur dans le filtre
-      « Rôle PUI » et la grille se filtre ; un second clic la décoche. Un
-      rôle long (« Référent innovation et valorisation ») passe à la ligne
-      dans la pastille, sans être coupé ni sortir de la carte, même à 320 px.
+- [ ] **Le rôle PUI d'une carte (du texte violet, comme la fonction, à droite de la ligne de l'e-mail) est cliquable** (1.24.0, 1.26.2) :
+      curseur "main" au survol, le rôle souligné ; un clic coche la valeur
+      dans le filtre « Rôle PUI » et la grille se filtre ; un second clic la
+      décoche. Il reste sur la ligne de l'e-mail à toute largeur, sans la
+      faire passer à la ligne ni agrandir la carte : un rôle long
+      (« Référent innovation et valorisation ») est coupé par « … » et le
+      rôle entier s'affiche au survol ; il disparaît quand l'e-mail prend
+      presque toute la ligne (téléphone étroit, e-mail très long).
 
 ## 6. Bouton Réinitialiser
 

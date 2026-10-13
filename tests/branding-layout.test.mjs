@@ -478,68 +478,147 @@ test('le nom et la fonction ne passent jamais sous le logo de l\'établissement,
     });
   }));
 
-// La pastille du rôle (1.25.1) : petite, hors de la colonne du logo. Une carte large (480px ou plus) la
-// pose à droite, sous le logo ou le sigle, sans écarter le nom de l'avatar ; une carte étroite lui
-// donne sa ligne sous l'e-mail. Rôle court, pour que le contrôle ne dépende pas de la police.
+// Le rôle dans le PUI (1.26.2) : du texte comme la fonction, sans pastille ni fond, à droite de la ligne de l'e-mail. Il ne
+// la fait jamais passer à la ligne ni grandir la carte : trop long, il est coupé par une ellipse (le rôle entier en
+// infobulle) ; quand l'e-mail ne lui laisse que quelques lettres, il disparaît. Rôle court dans la boucle, pour que
+// le contrôle ne dépende pas de la police.
 const withShortRole = tables => {
   tables.Role_Dans_le_PUI.Role = ['Référent qualité'];
   return tables;
 };
 
+const MIN_ROLE_PX = 44; // style.css : sous cette largeur utile (@container), le rôle disparaît
+
 const roleCards = page => page.evaluate(() => [...document.querySelectorAll('.contact-card')]
   .filter(card => card.querySelector('.role-tag'))
   .map(card => {
     const box = element => {
-      const { left, right, top, bottom } = element.getBoundingClientRect();
-      return { left, right, top, bottom };
+      const { left, right, top, bottom, width, height } = element.getBoundingClientRect();
+      return { left, right, top, bottom, width, height };
     };
-    const measure = () => ({ height: card.getBoundingClientRect().height, nameTop: card.querySelector('.name').getBoundingClientRect().top });
+    const measure = () => ({
+      height: card.getBoundingClientRect().height,
+      nameTop: card.querySelector('.name').getBoundingClientRect().top,
+      emailHeight: card.querySelector('.email.visible')?.getBoundingClientRect().height ?? 0
+    });
     const withRole = measure();
-    const roleBox = card.querySelector('.role-col');
-    roleBox.style.display = 'none';
+    const column = card.querySelector('.role-col');
+    column.style.display = 'none';
     const without = measure();
-    roleBox.style.display = '';
+    column.style.display = '';
+    const tag = card.querySelector('.role-tag');
+    const text = card.querySelector('.role-text');
     const email = card.querySelector('.email.visible');
+    const look = (element, ...properties) => Object.fromEntries(properties.map(name => [name, getComputedStyle(element)[name]]));
     return {
+      name: card.querySelector('.name').textContent,
       card: box(card),
-      pill: box(card.querySelector('.role-tag')),
-      name: box(card.querySelector('.name')),
-      badge: box(card.querySelector('.etablissement-tag.visible')),
+      details: box(card.querySelector('.details')),
+      column: { ...box(column), usable: parseFloat(getComputedStyle(column).width) - parseFloat(getComputedStyle(column).paddingLeft) },
+      tag: box(tag),
+      text: box(text),
       email: email && box(email),
-      inColumnOfLogo: Boolean(card.querySelector('.etab-col .role-tag')),
+      shown: getComputedStyle(tag).display !== 'none',
+      title: tag.title,
+      label: text.textContent,
+      truncated: text.scrollWidth > text.clientWidth + 1,
       grown: withRole.height - without.height,
-      nameMoved: withRole.nameTop - without.nameTop
+      nameMoved: withRole.nameTop - without.nameTop,
+      emailGrown: withRole.emailHeight - without.emailHeight,
+      inColumnOfLogo: Boolean(card.querySelector('.etab-col .role-tag')),
+      tagLook: look(tag, 'backgroundColor', 'color', 'fontSize', 'fontWeight', 'borderTopWidth'),
+      fonctionLook: look(card.querySelector('.fonction'), 'color', 'fontSize', 'fontWeight')
     };
   }));
 
 for (const [label, tables, waitLogos] of [['avec logos', withShortRole(crowdedBranding()), true], ['avec le sigle seul', withShortRole(crowdedTables()), false]]) {
-  test(`la pastille du rôle ne déstructure pas la carte (${label}) : à droite sous le logo sur une carte large, sous l'e-mail sur une carte étroite`, { skip }, () =>
+  test(`le rôle est du texte à droite de la ligne de l'e-mail, sans fond, et ne change ni l'e-mail ni la carte (${label})`, { skip }, () =>
     withWidget({ tables, waitLogos }, async ({ page }) => {
-      const seen = { wide: 0, narrow: 0 };
-      await atEachWidth(page, [320, 414, 600, 768, 840, 1280, 1640, 1920], async width => {
+      const seen = { shown: 0, hidden: 0 };
+      await atEachWidth(page, [320, 360, 414, 600, 768, 840, 1280, 1640, 1920], async width => {
         const cards = await roleCards(page);
         assert.ok(cards.length > 0, `à ${width}px, des cartes portent un rôle`);
         cards.forEach(card => {
-          const wide = card.card.right - card.card.left >= 480;
-          seen[wide ? 'wide' : 'narrow']++;
-          const message = `à ${width}px (carte de ${Math.round(card.card.right - card.card.left)}px)`;
-          assert.equal(card.inColumnOfLogo, false, `${message} : la pastille n'est pas dans la colonne du logo`);
-          assert.ok(card.pill.left >= card.card.left && card.pill.right <= card.card.right + 0.5, `${message} : la pastille reste dans la carte`);
-          assert.ok(card.pill.top >= card.badge.bottom - 0.5, `${message} : la pastille est sous le logo ou le sigle`);
-          if (wide) {
-            assert.ok(card.pill.left >= card.name.right - 0.5, `${message} : la pastille est à droite du nom`);
-            if (card.email) assert.ok(card.email.right <= card.pill.left + 0.5, `${message} : l'e-mail ne passe pas sous la pastille`);
-            assert.ok(card.grown <= 4, `${message} : la pastille agrandit la carte de ${Math.round(card.grown)}px`);
-            assert.ok(Math.abs(card.nameMoved) <= 1, `${message} : la pastille déplace le nom de ${Math.round(card.nameMoved)}px`);
-          } else if (card.email) {
-            assert.ok(card.pill.top >= card.email.bottom - 0.5, `${message} : la pastille est sous l'e-mail`);
-            assert.ok(Math.abs(card.pill.left - card.email.left) <= 1, `${message} : la pastille s'aligne sur l'e-mail`);
+          const message = `à ${width}px, ${card.name} (carte de ${Math.round(card.card.width)}px)`;
+          assert.equal(card.inColumnOfLogo, false, `${message} : le rôle n'est pas dans la colonne du logo`);
+          assert.ok(Math.abs(card.grown) <= 1, `${message} : le rôle agrandit la carte de ${Math.round(card.grown)}px`);
+          assert.ok(Math.abs(card.nameMoved) <= 1, `${message} : le rôle déplace le nom de ${Math.round(card.nameMoved)}px`);
+          assert.ok(Math.abs(card.emailGrown) <= 0.5, `${message} : le rôle fait passer l'e-mail à la ligne`);
+          if (!card.shown) {
+            // Disparu : l'e-mail ne lui laissait que quelques lettres, pas de quoi lire un mot.
+            seen.hidden++;
+            assert.ok(card.column.usable <= MIN_ROLE_PX + 0.5, `${message} : le rôle a disparu alors qu'il avait ${Math.round(card.column.usable)}px`);
+            return;
           }
+          seen.shown++;
+          assert.ok(card.column.usable > MIN_ROLE_PX - 0.5, `${message} : le rôle reste affiché dans ${Math.round(card.column.usable)}px`);
+          // Sur la ligne de l'e-mail : à sa droite, à sa hauteur, sans passer à la ligne.
+          assert.ok(card.text.height < 1.6 * parseFloat(card.tagLook.fontSize), `${message} : le rôle tient sur une seule ligne`);
+          if (card.email) {
+            assert.ok(card.text.left >= card.email.right - 0.5, `${message} : le rôle est à droite de l'e-mail`);
+            const gap = Math.abs((card.text.top + card.text.bottom) / 2 - (card.email.top + card.email.bottom) / 2);
+            assert.ok(gap <= 2, `${message} : le rôle est à ${Math.round(gap)}px de la ligne de l'e-mail`);
+          }
+          assert.ok(card.text.right <= card.details.right + 0.5 && card.text.left >= card.details.left - 0.5, `${message} : le rôle reste dans la carte`);
+          assert.ok(Math.abs(card.tag.right - card.details.right) <= 1, `${message} : le rôle est aligné à droite de la ligne`);
+          // Le style de la fonction : même couleur, même corps, même graisse ; ni fond, ni bordure.
+          assert.equal(card.tagLook.backgroundColor, 'rgba(0, 0, 0, 0)', `${message} : le rôle n'a pas de fond`);
+          assert.equal(card.tagLook.borderTopWidth, '0px', `${message} : le rôle n'a pas de bordure`);
+          assert.equal(card.tagLook.color, card.fonctionLook.color, `${message} : couleur de la fonction`);
+          assert.equal(card.tagLook.fontSize, card.fonctionLook.fontSize, `${message} : corps de la fonction`);
+          assert.equal(card.tagLook.fontWeight, card.fonctionLook.fontWeight, `${message} : graisse de la fonction`);
+          assert.equal(card.title, card.label, `${message} : le rôle entier est en infobulle`);
         });
       });
-      assert.ok(seen.wide > 0 && seen.narrow > 0, `les deux dispositions sont contrôlées (${JSON.stringify(seen)})`);
+      assert.ok(seen.shown > 0, `le rôle s'affiche (${JSON.stringify(seen)})`);
     }));
 }
+
+// Un e-mail qui prend presque toute la ligne (ou plus : il passe alors à la ligne, comme avant le rôle) ne laisse au rôle
+// que quelques lettres : il disparaît plutôt que de s'afficher en miette, et l'e-mail ne bouge pas.
+test('un e-mail très long ne laisse pas de place au rôle : il disparaît, sans faire passer l\'e-mail à la ligne', { skip }, () => {
+  const tables = withShortRole(crowdedTables());
+  tables.BDD.email = tables.BDD.email.map(() => 'prenom.nom-de-famille.tres-long@service-recherche-et-innovation.universite-de-bordeaux.fr');
+  return withWidget({ tables, waitLogos: false }, async ({ page }) => {
+    await atEachWidth(page, [320, 414, 600, 1280, 1920], async width => {
+      const cards = await roleCards(page);
+      assert.ok(cards.length > 0, `à ${width}px, des cartes portent un rôle`);
+      cards.forEach(card => {
+        const message = `à ${width}px, ${card.name}`;
+        assert.equal(card.shown, false, `${message} : le rôle devrait avoir disparu (${Math.round(card.column.usable)}px de place)`);
+        assert.ok(card.column.usable <= MIN_ROLE_PX + 0.5, `${message} : ${Math.round(card.column.usable)}px de place pour un rôle disparu`);
+        assert.ok(Math.abs(card.grown) <= 1 && Math.abs(card.emailGrown) <= 0.5, `${message} : le rôle disparu agrandit la carte`);
+      });
+    });
+  });
+});
+
+// Un rôle trop long pour la place que l'e-mail lui laisse est coupé par une ellipse : c'est le seul texte de carte coupé
+// exprès (les autres passent à la ligne), le rôle entier est en infobulle, et la ligne de l'e-mail reste une ligne.
+test('un rôle trop long est coupé par une ellipse, le rôle entier est en infobulle, la carte ne grandit pas', { skip }, () => {
+  const tables = crowdedTables();
+  const longRole = 'Référent innovation et valorisation de la recherche clinique et translationnelle';
+  tables.Role_Dans_le_PUI.Role = [longRole];
+  return withWidget({ tables, waitLogos: false }, async ({ page }) => {
+    let truncatedSeen = 0;
+    // Des largeurs où la carte a la place d'un rôle avec toutes les polices (les cartes de 600 px sont à deux colonnes, de 270 px).
+    await atEachWidth(page, [360, 414, 1280, 1640], async width => {
+      const cards = (await roleCards(page)).filter(card => card.shown);
+      assert.ok(cards.length > 0, `à ${width}px, des rôles sont affichés`);
+      cards.forEach(card => {
+        const message = `à ${width}px, ${card.name}`;
+        assert.equal(card.title, longRole, `${message} : le rôle entier est en infobulle`);
+        assert.ok(card.text.height < 1.6 * parseFloat(card.tagLook.fontSize), `${message} : le rôle tient sur une seule ligne`);
+        assert.ok(Math.abs(card.grown) <= 1 && Math.abs(card.emailGrown) <= 0.5, `${message} : le rôle grandit la carte ou la ligne de l'e-mail`);
+        assert.equal(card.truncated, true, `${message} : ce rôle, plus long que la ligne, n'est pas coupé`);
+        truncatedSeen++;
+      });
+    });
+    assert.ok(truncatedSeen > 0);
+    const ellipsis = await page.locator('.role-text').first().evaluate(text => getComputedStyle(text).textOverflow);
+    assert.equal(ellipsis, 'ellipsis', 'le rôle coupé se termine par « … »');
+  });
+});
 
 test('écran tactile : le logo de l\'établissement est une cible d\'au moins 28px', { skip }, () =>
   withWidget({ width: 414, touch: true }, async ({ page }) => {

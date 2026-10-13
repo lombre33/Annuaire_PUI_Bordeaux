@@ -559,53 +559,79 @@ button.avatar:hover {
 .etab-actions {
   margin: 2px 0 0 8px;
 }
-/* Le rôle dans le PUI : une petite pastille, jamais coupée (« Référent innovation et valorisation » doit
-   se lire en entier, sans survol sur un téléphone : elle passe à la ligne, sur deux lignes dans la place
-   qu'on lui laisse à droite). Elle n'est pas dans la colonne du logo : sa hauteur écarterait le nom de
-   l'avatar. Sur une carte étroite elle a sa ligne, sous l'e-mail, comme un tag. */
-.role-col {
-  display: flex;
-  flex-wrap: wrap;
+/* Le rôle dans le PUI : du texte comme la fonction (même couleur, même corps), ni pastille ni fond. Il est à droite de la
+   ligne de l'e-mail, qui garde sa place entière : le rôle prend le reste de la ligne et, trop long, est coupé par une
+   ellipse (`title` : le rôle entier au survol). Il ne fait donc jamais passer l'e-mail à la ligne, ni la carte grandir. */
+.details.has-role {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.details.has-role .email {
+  grid-column: 1;
+  grid-row: 1;
+}
+.details.has-role .tel {
   grid-column: 1 / -1;
-  gap: 4px;
-  margin-top: 6px;
+  grid-row: 2;
 }
-/* `.role-col .role-tag` : plus précis que `.tag`, défini plus bas, dont il reprend le reste. */
+/* La colonne du rôle est un conteneur de taille : ni sa largeur ni sa hauteur ne dépendent du rôle, elle prend ce que la
+   ligne de l'e-mail lui laisse (même hauteur, même marge haute que `.detail-row`) et se mesure plus bas. Le tag, haut
+   de 24px au moins (28px au doigt) comme tout tag, la déborde par le haut et le bas sans agrandir la ligne. */
+.role-col {
+  container: role / size;
+  display: flex;
+  grid-column: 2;
+  grid-row: 1;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 1.2em; /* sans e-mail, une ligne ; `lh` : la hauteur exacte de la ligne d'e-mail, quelle que soit la police */
+  min-height: 1lh;
+  margin-top: 3px;
+  padding-left: 8px;
+  font-size: 12px;
+}
+/* `.role-col .role-tag` : plus précis que `.tag`, défini plus bas, dont il garde la hauteur de cible. */
 .role-col .role-tag {
-  max-width: 100%;
-  padding: 2px 8px;
-  border-radius: 14px;
-  line-height: 1.2;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  color: var(--violet);
+  background: transparent;
+  border-radius: 6px;
+  font-weight: 600;
 }
-/* Une carte assez large (500 px sur un grand écran) pose la pastille à droite, sous le logo ou le
-   sigle : à la hauteur de la fonction (et de l'e-mail si elle tient sur deux lignes) ; quand le logo,
-   plus haut, couvre déjà la fonction, à la hauteur de l'e-mail. La fonction, l'e-mail et la ligne
-   « Votre fiche » lui laissent alors la colonne de droite. */
-@container (min-width: 480px) {
-  .card-body.has-role .fonction {
-    grid-column: 2;
+.role-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.role-col button.role-tag:hover .role-text,
+.role-col button.role-tag:focus-visible .role-text {
+  text-decoration: underline;
+}
+/* Un e-mail qui prend presque toute la ligne ne laisse au rôle que quelques lettres, pas même un mot : il disparaît
+   plutôt que de s'afficher en miette ou de passer à la ligne (la personne le retrouve dans le menu « Rôle PUI »). */
+@container role (max-width: 44px) {
+  .role-col .role-tag {
+    display: none;
   }
-  .card-body.has-role .details {
-    grid-column: 1 / 3;
-  }
-  .card-body.has-role .card-actions {
-    grid-column: 2;
-  }
-  .role-col {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: flex-end;
-    align-self: start;
-    grid-column: 3;
-    grid-row: 2 / span 2;
-    max-width: 164px;
-    margin: 2px -4px 0 0;
-  }
-  .card-body.with-logo .role-col {
-    grid-row: 3;
-    margin-right: 1px;
-  }
+}
+/* Sur la carte « Après » d'une relecture : le rôle ajouté a son contour (.tag-add), le rôle retiré reste barré en rouge. */
+.role-col .role-tag.tag-add,
+.role-col .role-tag.tag-del {
+  padding: 0 4px;
+}
+.role-col .role-tag.tag-add::before,
+.role-col .role-tag.tag-del::before {
+  flex: none;
+  margin-right: 0.3em;
+}
+.role-col .role-tag.tag-del {
+  color: #9b2226;
+  background: #fdecec;
 }
 .etab-actions:empty {
   display: none;
