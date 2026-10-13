@@ -5,15 +5,12 @@
 // DOM seulement : ce qui change (profile.js), ce qui s'écrit (profile-save.js) et les
 // cartes (render.js) viennent de la session que main.js donne à open().
 
-import { CATEGORIES, IMAGE_RULES } from './constants.js';
+import { CATEGORIES, CONSENT_COLUMN, CONSENT_LABEL, IMAGE_RULES } from './constants.js';
 import { formatPhone, normalize } from './grist-data.js';
-import { button, el, notice } from './dom.js';
+import { button, el, foundText, matchesTerm, notice, searchField } from './dom.js';
 import { megabytes, prepareImage } from './image-prep.js';
 import { frenchPhoneDigits, ETABLISSEMENT_REQUIRED, NAME_REQUIRED } from './profile.js';
 import { renderChangeList } from './changes-ui.js';
-
-// Au-delà de ce nombre de valeurs, un sélecteur propose une recherche.
-const SEARCH_FROM = 12;
 
 const PHOTO_HELP = 'Elle remplace les initiales sur la carte et s’agrandit au clic. '
   + `JPG, PNG ou WebP, ${megabytes(IMAGE_RULES.avatar.maxBytes)} au maximum, recadrée en carré.`;
@@ -21,9 +18,15 @@ const PHOTO_HELP = 'Elle remplace les initiales sur la carte et s’agrandit au 
 const fieldsChanged = count => `${count} champ${count > 1 ? 's' : ''} modifié${count > 1 ? 's' : ''}`;
 const fieldsFilled = count => `${count} champ${count > 1 ? 's' : ''} rempli${count > 1 ? 's' : ''}`;
 
-// Ce que la personne voit une fois sa fiche créée : la fenêtre se ferme, ce message le dit, et
-// l'interrupteur du bandeau est le seul moyen d'apparaître dans l'annuaire.
+// Ce que la personne voit une fois sa fiche créée : la fenêtre se ferme et ce message le dit. main.js le
+// compose d'après ce que Grist a gardé (`result.notice`) ; celui-ci sert à défaut.
 const CREATED_NOTICE = 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
+const createdNotice = result => result?.notice || CREATED_NOTICE;
+
+// La case de la fiche qu'on crée (CONSENT_LABEL) : elle décide de publier la fiche tout de suite (cochée d'avance) ou
+// de la créer masquée, et elle écrit Accepte_apparaitre avec la fiche. Le périmètre reste l'affaire d'un administrateur.
+const PUBLISH_HELP = 'Décochée, votre fiche est créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page. '
+  + 'Dans tous les cas, elle n’apparaît qu’une fois rattachée à un périmètre par un administrateur.';
 
 // `dialog` : le <dialog> de index.html.
 //
@@ -37,7 +40,9 @@ const CREATED_NOTICE = 'Votre fiche est créée. Pour apparaître dans l’annua
 //   renderEtablissement  (facultatif) libellé → l'élément qui montre l'établissement dans le bloc
 //                 d'identité (son logo quand Grist en a un) ; sans lui, une pastille avec le nom
 //   model         profileFormModel(row, referenceMaps)
-//   draft         le brouillon de départ (draftOf)
+//   draft         le brouillon de départ (draftOf). Pour une fiche qu'on crée, il porte aussi la case
+//                 Accepte_apparaitre (un booléen, cochée d'avance) : la fenêtre la propose alors, et le
+//                 bouton de la dernière étape devient « Publier ma fiche » quand elle est cochée
 //   evaluate      draft → { errors, fieldErrors, lines } : ce que le brouillon change et
 //                 pourquoi il serait refusé
 //   review        draft → promesse de { before, after, marks, lines, visibility, notice } :
@@ -49,7 +54,8 @@ const CREATED_NOTICE = 'Votre fiche est créée. Pour apparaître dans l’annua
 //                 ('' s'il n'y en a pas)
 //   save          (review, draft) → promesse de { status: 'saved', lines, leftovers,
 //                 reloaded } ou { status: 'changed', review, notice } (la fiche a changé
-//                 pendant la relecture : rien n'est écrit) ; un échec porte `message`
+//                 pendant la relecture : rien n'est écrit) ; un échec porte `message`.
+//                 Une fiche créée porte aussi `notice` : la phrase de fin, d'après ce que Grist a gardé
 //   renderCard    (contact, marks) → la carte à montrer (render.js)
 //   renderAvatar  { initials, photo } → l'avatar rond (identifiant de pièce jointe, 0 ou { url } : voir
 //                 avatar-ui.js ; les initiales sans photo)
@@ -78,7 +84,8 @@ export function createProfileDialog(dialog) {
   const isAdmin = () => session.mode === 'admin';
   const isCreating = () => session.mode === 'create';
   const reviewLabel = () => (isCreating() ? 'Relire ma fiche' : isAdmin() ? 'Relire les modifications' : 'Relire mes modifications');
-  const validateLabel = () => (isCreating() ? 'Créer ma fiche' : 'Valider');
+  const publishes = () => isCreating() && draft[CONSENT_COLUMN] === true;
+  const validateLabel = () => (isCreating() ? (publishes() ? 'Publier ma fiche' : 'Créer ma fiche') : 'Valider');
   const recapTitle = () => (isCreating() ? 'Ce qui sera enregistré' : 'Ce qui va changer');
 
   // ----- La photo du brouillon -----
@@ -271,9 +278,12 @@ export function createProfileDialog(dialog) {
     return wrap;
   }
 
+  // Un choix parmi une liste : la liste déroulante et, à côté, une recherche qui n'y garde que les valeurs qui lui
+  // répondent. L'option vide (« Choisir… », « Non renseigné ») et la valeur choisie y restent toujours : la liste
+  // montre ce que contient le brouillon, et chercher ne change rien au choix.
   function referenceField(field) {
     const id = `profile-${field.key}`;
-    const wrap = el('div', 'fld');
+    const wrap = el('div', 'fld fld-wide');
     const label = el('label', 'fld-label', field.label);
     label.htmlFor = id;
     const select = document.createElement('select');
@@ -283,13 +293,26 @@ export function createProfileDialog(dialog) {
     const empty = field.required
       ? (field.value === 0 ? [{ id: 0, label: 'Choisir…' }] : [])
       : [{ id: 0, label: 'Non renseigné' }];
-    [...empty, ...field.options].forEach(option => {
-      const node = document.createElement('option');
-      node.value = String(option.id);
-      node.textContent = option.label;
-      select.append(node);
-    });
-    select.value = String(draft[field.key]);
+    const choices = [...empty, ...field.options];
+    const found = el('p', 'fld-found');
+    found.setAttribute('role', 'status');
+    const paint = term => {
+      const chosen = draft[field.key];
+      const shown = choices.filter(choice => choice.id === 0 || choice.id === chosen || matchesTerm(choice.label, term));
+      select.replaceChildren(...shown.map(choice => {
+        const node = document.createElement('option');
+        node.value = String(choice.id);
+        node.textContent = choice.label;
+        return node;
+      }));
+      select.value = String(chosen);
+      found.textContent = foundText(term, choices.filter(choice => choice.id !== 0 && matchesTerm(choice.label, term)).length);
+    };
+    paint('');
+    const search = searchField({ label: `Rechercher dans ${field.label}`, placeholder: `Rechercher dans ${field.label}…`, onTerm: paint });
+    search.setAttribute('aria-controls', id);
+    const pair = el('div', 'fld-pair');
+    pair.append(search, select);
     const error = el('p', 'fld-err');
     error.id = `${id}-error`;
     error.hidden = true;
@@ -303,14 +326,14 @@ export function createProfileDialog(dialog) {
       draft[field.key] = Number(select.value);
       refresh();
     });
-    wrap.append(label, select, error);
+    wrap.append(label, pair, found, error);
     if (warning) wrap.append(warning);
     ui.fields[field.key] = { input: select, error, warning };
     return wrap;
   }
 
   // Toutes les valeurs proposées en pastilles à cocher, groupées par domaine quand
-  // les valeurs portent un `group`, avec une recherche quand la liste est longue.
+  // les valeurs portent un `group`, avec une recherche.
   function picker(field) {
     const section = el('section', 'grp');
     section.style.setProperty('--c', CATEGORIES[field.category].color);
@@ -372,27 +395,48 @@ export function createProfileDialog(dialog) {
       subgroups.push(picks);
     }
 
-    if (field.options.length > SEARCH_FROM) {
-      const search = document.createElement('input');
-      search.type = 'search';
-      search.className = 'pick-search';
-      search.placeholder = `Rechercher dans ${field.label.toLowerCase()}…`;
-      search.autocomplete = 'off';
-      search.setAttribute('aria-label', `Rechercher dans ${field.label}`);
-      search.addEventListener('input', () => {
-        const term = normalize(search.value);
+    const found = el('p', 'fld-found');
+    found.setAttribute('role', 'status');
+    section.append(searchField({
+      label: `Rechercher dans ${field.label}`,
+      placeholder: `Rechercher dans ${field.label}…`,
+      onTerm: term => {
         chips.forEach(({ chip, text }) => {
           chip.hidden = term !== '' && !text.includes(term);
         });
         subgroups.forEach(sub => {
           sub.hidden = !sub.querySelector('.pick:not([hidden])');
         });
-      });
-      section.append(search);
-    }
-    section.append(...subgroups);
+        found.textContent = foundText(term, chips.filter(({ chip }) => !chip.hidden).length);
+      }
+    }), found, ...subgroups);
     syncCount();
     return section;
+  }
+
+  // La case de la fiche qu'on crée, cochée d'avance (voir CONSENT_LABEL). Même présentation que la case de la fiche
+  // d'établissement : son nom en gras, ce qu'elle change en dessous.
+  function publishField() {
+    const id = `profile-${CONSENT_COLUMN}`;
+    const box = el('label', 'es-chk');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.checked = draft[CONSENT_COLUMN] === true;
+    const name = el('span', 'es-chk-label', CONSENT_LABEL);
+    name.id = `${id}-label`;
+    const help = el('span', 'es-chk-sub', PUBLISH_HELP);
+    help.id = `${id}-help`;
+    input.setAttribute('aria-labelledby', name.id);
+    input.setAttribute('aria-describedby', help.id);
+    input.addEventListener('change', () => {
+      draft[CONSENT_COLUMN] = input.checked;
+      refresh();
+    });
+    const text = el('span');
+    text.append(name, help);
+    box.append(input, text);
+    return box;
   }
 
   // ===== Pied de fenêtre =====
@@ -467,8 +511,7 @@ export function createProfileDialog(dialog) {
     dialog.classList.remove('dlg-review');
     const { person } = session;
     if (isCreating()) {
-      setHeading('Créer ma fiche', 'Vous relisez votre fiche avant de la créer : elle est ajoutée tout de suite, sans validation, '
-        + 'mais n’apparaît dans l’annuaire qu’une fois que vous avez accepté d’apparaître.');
+      setHeading('Créer ma fiche', 'Vous relisez votre fiche avant de la publier : elle est ajoutée tout de suite, sans validation.');
     } else {
       setHeading(
         isAdmin() ? `Modifier la fiche de ${person.name}` : 'Modifier mon profil',
@@ -492,7 +535,8 @@ export function createProfileDialog(dialog) {
       else if (field.kind === 'reference') grid.append(referenceField(field));
       else pickers.push(picker(field));
     });
-    body.replaceChildren(ui.alert, identityBlock(), ...(photo ? [photo] : []), grid, ...pickers, ui.recap);
+    const publish = isCreating() && typeof draft[CONSENT_COLUMN] === 'boolean' ? [publishField()] : [];
+    body.replaceChildren(ui.alert, identityBlock(), ...(photo ? [photo] : []), grid, ...pickers, ...publish, ui.recap);
 
     ui.review = button(reviewLabel(), 'btn btn-primary', startReview);
     renderFoot('', button('Annuler', 'btn', () => dialog.close()), ui.review);
@@ -568,7 +612,7 @@ export function createProfileDialog(dialog) {
     // fenêtre de largeur ordinaire.
     dialog.classList.toggle('dlg-review', !isCreating());
     setHeading(
-      isCreating() ? 'Relire avant de créer' : 'Relire avant de valider',
+      isCreating() ? (publishes() ? 'Relire avant de publier' : 'Relire avant de créer') : 'Relire avant de valider',
       isCreating()
         ? 'Voici votre carte telle qu’elle apparaîtra dans l’annuaire. La fiche est créée tout de suite, sans validation.'
         : `Voici ${isAdmin() ? `la carte de ${session.person.name}` : 'votre carte'} telle qu’elle est aujourd’hui et telle qu’elle apparaîtra. `
@@ -641,15 +685,15 @@ export function createProfileDialog(dialog) {
     closeButton.disabled = false;
     if (result.status === 'changed') renderReview(result.review, result.notice);
     else if (result.leftovers.length > 0 || !result.reloaded) renderSaved(result);
-    else finish();
+    else finish(result);
   }
 
   // Tout est enregistré : la fenêtre se ferme et un message le confirme. Rien ne reste à lire.
-  function finish() {
+  function finish(result) {
     const { person, notify } = session;
     phase = 'saved';
     dialog.close();
-    notify?.(isCreating() ? CREATED_NOTICE : isAdmin() ? `La fiche de ${person.name} est enregistrée.` : 'Vos modifications sont enregistrées.');
+    notify?.(isCreating() ? createdNotice(result) : isAdmin() ? `La fiche de ${person.name} est enregistrée.` : 'Vos modifications sont enregistrées.');
   }
 
   // Enregistré, mais avec une réserve à lire : Grist n'a pas tout gardé, ou l'annuaire n'a
@@ -665,7 +709,7 @@ export function createProfileDialog(dialog) {
       el('div', 'sent-mark', '✓'),
       el('h3', '', isCreating() ? 'Votre fiche est créée' : isAdmin() ? `La fiche de ${person.name} est enregistrée` : 'Vos modifications sont enregistrées'),
       el('p', '', isCreating()
-        ? 'Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire » en haut de page.'
+        ? (publishes() ? createdNotice(result) : 'Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire » en haut de page.')
         : 'Elles s\'appliquent tout de suite dans Grist, sans validation.')
     );
     const recap = el('div', 'recap');

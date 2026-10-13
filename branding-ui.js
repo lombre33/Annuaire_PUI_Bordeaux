@@ -18,7 +18,7 @@ import { logoSize, inkBounds, hasInk } from './branding.js';
 //           ou que son prochain chargement la montre
 // L'image qu'on voit se demande toujours comme une image ordinaire, sans CORS : un Grist qui ne la donnerait
 // pas en CORS, ou un navigateur qui bride la lecture des pixels, ne doit jamais faire disparaître un logo
-// (1.24.1). Lire ses pixels, c'est à fitCardLogo de le tenter, sur une copie à part.
+// (1.25.1). Lire ses pixels, c'est à fitCardLogo de le tenter, sur une copie à part.
 export function createLogoImage(attachments, attachmentId, alt, onFail, { eager = false, onLoad } = {}) {
   const image = document.createElement('img');
   image.className = 'logo-img';
