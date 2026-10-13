@@ -289,11 +289,11 @@ test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le t
 
 // Le bandeau « Ma présence » de 320 à 840 px (audit U46). Sous 860 px il se range en lignes qui se
 // replient : avec une base de 150 px le texte se retrouvait serré à 153-199 px à côté de l'interrupteur
-// (le message de trois raisons prenait neuf lignes), et le bloc des boutons, vide, comptait quand même
+// (alors, le message de trois raisons prenait neuf lignes), et le bloc des boutons, vide, comptait quand même
 // pour un écart de 14 px. La base est de 200 px : l'interrupteur passe sous le texte dès que celui-ci
 // n'aurait plus 200 px (pas 15rem, que l'audit proposait : à 320 px l'avatar resterait seul sur sa ligne).
 // Sept comptes : le plus chargé (administratrice et responsable : trois boutons),
-// un nom de 47 caractères, le message de trois raisons, un nom et une adresse sans aucune coupure
+// un nom de 47 caractères, le message de deux raisons, un nom et une adresse sans aucune coupure
 // possible, un compte sans fiche (aucun bouton : le bloc des boutons est vide), un administrateur sans
 // fiche et un responsable sans fiche (un seul bouton chacun).
 test('le bandeau « Ma présence » de 320 à 840 px : le texte garde 200 px au moins, rien ne le recouvre ni ne le coupe, et le bloc des boutons vide ne prend aucune place (audit U46)', { skip }, async () => {
@@ -308,13 +308,12 @@ test('le bandeau « Ma présence » de 320 à 840 px : le texte garde 200 px au 
       tables.BDD.prenom[0] = 'Wolfeschlegelsteinhausenbergerdorff';
       tables.BDD.nom[0] = 'Sanspaceniarretpossibleaecrire';
     } },
-    // Eve (ligne 5) devient Zoé, sans prénom, nom, établissement ni périmètre : fiche masquée pour trois raisons.
-    { label: 'fiche masquée pour trois raisons', user: 'zoe.eluard@example.test', ready: '.account-edit', buttons: 1, patch: tables => {
+    // Eve (ligne 5) devient Zoé, sans prénom, nom ni établissement : fiche masquée pour deux raisons.
+    { label: 'fiche masquée pour deux raisons', user: 'zoe.eluard@example.test', ready: '.account-edit', buttons: 1, patch: tables => {
       Object.assign(tables.BDD.email, { 4: 'zoe.eluard@example.test' });
       tables.BDD.prenom[4] = '';
       tables.BDD.nom[4] = '';
       tables.BDD.Etablissement[4] = 0;
-      tables.BDD.perimetre[4] = ['L'];
     } },
     // Un compte sans fiche a « Créer ma fiche », son seul bouton.
     { label: 'compte sans fiche, adresse sans coupure possible', user: unbreakableAddress, ready: '.account-create', buttons: 1, patch: () => {} },
@@ -985,8 +984,8 @@ test('un administrateur voit l\'e-mail et l\'établissement d\'une autre personn
     assert.equal(await field(page, 'email').inputValue(), 'hostile@chu-bordeaux.fr');
     assert.equal(await selectedLabel(page), 'CHU');
     assert.deepEqual(await field(page, 'Etablissement').locator('option').allTextContents(),
-      ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'],
-      'les acronymes (le nom complet de celui qui n\'en a pas), tous les établissements, sans option vide : celui d\'une personne ne se vide pas');
+      ['CHU', 'INSERM', 'Institut Bergonié', 'UBM'],
+      'les acronymes (le nom complet de celui qui n\'en a pas) des seuls établissements fondateurs ou partenaires (pas la Clinique, une structure « autres »), sans option vide : celui d\'une personne ne se vide pas');
     assert.equal(await dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement"]').count(), 1, 'la liste des établissements a sa recherche');
     assert.equal(await dialog(page).locator('.ident-lock').count(), 0, 'rien n\'est verrouillé pour un administrateur');
     assert.equal(await dialog(page).locator('#profile-email-hint').count(), 0, 'la mise en garde sur les droits est dite à la relecture, pas dans le formulaire');
@@ -1538,23 +1537,25 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     assert.equal(await summary(page), 'Choisissez votre établissement');
     assert.equal(await page.locator('#profile-Etablissement-error').textContent(), 'Choisissez votre établissement.');
 
-    // La liste n'offre que les acronymes (le nom complet de l'établissement qui n'en a pas), avec une recherche
+    // La liste n'offre que les acronymes (le nom complet de l'établissement qui n'en a pas) des établissements
+    // fondateurs ou partenaires, jamais une structure « autres » (la Clinique), avec une recherche à côté
     // qui ne garde que ce qui répond, sans toucher au choix.
     const etablissements = field(page, 'Etablissement');
     const search = dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement"]');
     const found = dialog(page).locator('.fld').filter({ has: etablissements }).locator('.fld-found');
-    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…', 'CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM']);
-    await search.fill('cl');
-    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…', 'Clinique']);
+    assert.equal(await search.isVisible(), true, 'le champ de recherche des établissements est affiché');
+    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…', 'CHU', 'INSERM', 'Institut Bergonié', 'UBM']);
+    await search.fill('ber');
+    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…', 'Institut Bergonié']);
     assert.equal(await found.textContent(), '1 résultat');
-    await search.fill('zzz');
-    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…']);
+    await search.fill('cl');
+    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…'], 'la Clinique, une structure « autres », n\'est pas proposée, même cherchée');
     assert.equal(await found.textContent(), 'Aucun résultat');
     await search.fill('chu');
     await etablissements.selectOption({ label: 'CHU' });
     await search.fill('');
     assert.equal(await selectedLabel(page), 'CHU', 'chercher, puis vider la recherche, laisse le choix');
-    assert.equal(await etablissements.locator('option').count(), 6, 'la recherche vidée rend toute la liste');
+    assert.equal(await etablissements.locator('option').count(), 5, 'la recherche vidée rend toute la liste');
     assert.equal(await summary(page), '4 champs remplis');
     await press(page, 'Relire ma fiche').click();
 
@@ -1562,20 +1563,19 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     assert.equal(await dialog(page).locator('.rv-col-before').count(), 0, 'pas de carte « avant » pour une fiche qui n\'existe pas');
     assert.equal(await column(page, 'after').locator('.name').textContent(), 'Zoé Nouvelle');
     assert.equal(await column(page, 'after').locator('.email').textContent(), NEW_EMAIL);
-    assert.equal(await dialog(page).locator('.notice').first().textContent(),
-      'Votre fiche sera publiée, mais elle restera masquée de l’annuaire : votre fiche n\'a pas de périmètre. Un administrateur doit d’abord régler ce point.');
+    assert.equal(await dialog(page).locator('.notice').count(), 0, 'rien ne retient la fiche : aucun avis de fiche masquée, ni de périmètre');
     assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
     await press(page, 'Publier ma fiche').click();
-    await savedWith(page, 'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre fiche n\'a pas de périmètre. Contactez un administrateur.');
+    await savedWith(page, 'Votre fiche est publiée : elle apparaît dans l’annuaire.');
 
-    // Une seule ligne ajoutée à BDD, avec l'adresse du compte et le choix d'apparaître ; pas de périmètre (l'affaire
-    // d'un administrateur), aucune autre table touchée.
+    // Une seule ligne ajoutée à BDD, avec l'adresse du compte et le choix d'apparaître ; le widget n'écrit pas de
+    // périmètre (il n'en a plus besoin), aucune autre table touchée.
     assert.deepEqual(await bddCalls(page), [{
       action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
       values: { email: NEW_EMAIL, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission' }
     }]);
     assert.deepEqual(await page.evaluate(() => window.__fake.calls.filter(call => !['BDD', 'Annuaire_Sonde'].includes(call.table))), []);
-    assert.equal(await page.locator('#cardsGrid .contact-card').count(), 4, 'sans périmètre, le nombre de contacts affichés ne change pas');
+    await waitForCards(page, 5); // la fiche, sans aucun périmètre, apparaît tout de suite, sans recharger la page
 
     // Le bandeau a changé : la fiche existe, l'interrupteur est déjà allumé, plus de bouton « Créer ».
     await page.locator('#accountBar .presence-switch').waitFor();
@@ -1585,12 +1585,12 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     assert.equal(await page.locator('#accountBar .account-name').textContent(), 'Zoé Nouvelle');
     await focusReturnsTo(page, '#accountBar .account-edit');
 
-    // Il manque encore le périmètre (l'affaire de Grist), que le bandeau dit.
-    await until(async () => (await page.locator('#accountBar .account-detail').textContent()).includes('n\'a pas de périmètre'), 'le bandeau ne dit pas pourquoi la fiche reste masquée');
-    await page.evaluate(() => { window.__tables.BDD.perimetre[12] = ['L', 1]; }); // un administrateur le renseigne dans Grist
-    await reload(page);
-    await waitForCards(page, 5);
+    // Le bandeau dit que la fiche apparaît (et non qu'elle reste masquée faute de périmètre), et la carte est là, sans pastille vide.
+    await until(async () => (await page.locator('#accountBar .account-detail').textContent()).includes('Vous apparaissez dans l\'annuaire'), 'le bandeau ne dit pas que la fiche apparaît');
     assert.equal(await gridCard(page, 'Zoé Nouvelle').locator('.fonction').textContent(), 'Chargée de mission');
+    assert.equal(await gridCard(page, 'Zoé Nouvelle').locator('.etablissement-tag').textContent(), 'CHU');
+    assert.equal(await gridCard(page, 'Zoé Nouvelle').locator('.card-tags .tag').count(), 0, 'sans périmètre ni liste, aucune étiquette');
+    assert.equal(await page.locator('#statusBanner').isHidden(), true, 'aucun bandeau d\'erreur');
     assert.deepEqual(await Promise.all(logs.errors), []);
     assert.ok(!JSON.stringify(await Promise.all([...logs.warnings, ...logs.infos])).includes('@'), 'aucune adresse dans la console');
   }));

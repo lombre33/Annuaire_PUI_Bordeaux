@@ -44,13 +44,15 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
     déjà résolu » restent tolérées : ne jamais supposer une seule forme pour
     une Référence. Voir refId() / refLabel() / etablissementFlags() dans
     grist-data.js.
-  perimetre         : ReferenceList(REMMAPING_PERIMETRES_COMPETENCES)   OBLIGATOIRE
-    Sert uniquement à savoir si le contact a au moins une valeur (cf. specs.md —
-    « Nous n'afficherons QUE les contacts ayant au moins une valeur dans
-    perimetre »). Le widget ne lit pas la table REMMAPING_PERIMETRES_COMPETENCES.
-    Encodage brut renvoyé par l'API Grist pour les colonnes liste :
+  perimetre         : ReferenceList(REMMAPING_PERIMETRES_COMPETENCES)   NON LUE
+    Le widget ne lit plus cette colonne (1.27.0) : elle n'est pas indispensable
+    et ne décide plus de qui apparaît (cf. specs.md ; jusqu'à la 1.26.0, un
+    contact devait avoir au moins une valeur dans perimetre). Elle peut rester
+    dans le document. Le widget ne lit pas la table REMMAPING_PERIMETRES_COMPETENCES
+    et n'écrit jamais perimetre.
+    Encodage brut renvoyé par l'API Grist pour toutes les colonnes liste :
     ['L', id1, id2, ...] — une liste vide est donc ['L'] (longueur 1) et non [].
-    Voir isInScope() / safeValues() dans grist-data.js.
+    Voir safeValues() dans grist-data.js.
   Accepte_apparaitre : Bool         OBLIGATOIRE (lue ET écrite par le widget)
     Accord de la personne pour figurer dans l'annuaire (cf. specs.md). Doit
     être une colonne de DONNÉES de type Bascule, pas une formule : Grist refuse

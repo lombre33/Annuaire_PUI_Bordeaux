@@ -311,9 +311,9 @@ test('pour chaque personne de démonstration, le bandeau « Ma présence » dit 
 
 test('le guide utilisateur cite les autres messages de « Ma présence » : raisons de masquage, fiches multiples, erreurs d\'écriture', () => {
   const guide = read('docs/utilisateurs.md');
-  const status = overrides => ({ accepted: true, visible: false, named: true, inScope: true, etablissement: 'ok', partnerOnly: false, ...overrides });
+  const status = overrides => ({ accepted: true, visible: false, named: true, etablissement: 'ok', partnerOnly: false, ...overrides });
   const alone = overrides => describePresence([{ status: status(overrides) }]).message;
-  const reasons = [{ named: false }, { inScope: false }, { etablissement: 'missing' }, { etablissement: 'unknown' },
+  const reasons = [{ named: false }, { etablissement: 'missing' }, { etablissement: 'unknown' },
     { etablissement: 'not_validated' }, { etablissement: 'not_eligible' }]
     .map(overrides => alone(overrides).match(/masquée : (.+)\. Contactez/)?.[1]);
   assert.ok(reasons.every(Boolean), 'presence.js ne donne plus la raison du masquage sous la forme attendue : adaptez ce test et le guide.');
@@ -579,7 +579,7 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
   const section = guide.slice(start, end);
 
   // Messages composés à l'exécution : on les demande à la fonction qui les compose.
-  const hidden = overrides => ({ accepted: true, visible: false, named: true, inScope: true, etablissement: 'not_validated', ...overrides });
+  const hidden = overrides => ({ accepted: true, visible: false, named: true, etablissement: 'not_validated', ...overrides });
   // Les refus de la photo : celui d'un format liste les formats acceptés, celui du poids dit le poids du
   // fichier choisi (2,4 Mo dans le guide) ; ils sont composés par checkImageFile.
   const photoRefusals = [
@@ -665,7 +665,6 @@ test('les personnes fictives citées dans le guide sont masquées, ou visibles, 
     'Sarah Colin': status => status.accepted && status.etablissement === 'not_validated',
     'Gabriel Noël': status => status.etablissement === 'not_eligible',
     'Alice Bertin': status => status.etablissement === 'missing',
-    'Victor Lambert': status => !status.inScope,
     'Lucas Mercier': status => !status.accepted
   };
   Object.entries(reasons).forEach(([name, because]) => {

@@ -194,10 +194,10 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
   .map(([key, { column, table, groups }]) => ({ key, column, table, ...(groups && { groups }) }));
 
 // Ce qu'on peut changer sur une fiche, dans l'ordre du formulaire. Une personne ne change
-// jamais : email (c'est lui qui désigne la personne), Etablissement et perimetre (ils
-// décident de ce qui s'affiche) ni Accepte_apparaitre (l'interrupteur « Ma présence »
-// l'écrit). Un administrateur qui modifie la fiche d'UNE AUTRE personne change aussi
-// l'e-mail et l'établissement (`admin: true`) ; le périmètre reste l'affaire de Grist.
+// jamais : email (c'est lui qui désigne la personne), Etablissement (il décide de ce qui
+// s'affiche) ni Accepte_apparaitre (l'interrupteur « Ma présence » l'écrit). Un administrateur
+// qui modifie la fiche d'UNE AUTRE personne change aussi l'e-mail et l'établissement
+// (`admin: true`) ; le périmètre reste l'affaire de Grist, et ne décide plus de rien.
 // Une personne qui crée sa fiche choisit en plus son établissement (`atCreation: true`) :
 // elle n'en a pas encore, et sans lui la fiche ne pourrait jamais s'afficher.
 //   key       colonne de BDD

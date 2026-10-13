@@ -44,17 +44,27 @@ test('describePresence: someone who accepted but stays hidden is told why, in th
   assert.match(why('carla@clinique.fr').message, /accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'est ni fondateur ni partenaire\. Contactez un administrateur\./);
   assert.match(why('dan@inserm.fr').message, /votre établissement n'a pas encore été validé/);
   assert.match(why('eve@example.fr').message, /votre fiche n'a pas d'établissement/);
-  assert.match(why('fred@chu-bordeaux.fr').message, /votre fiche n'a pas de périmètre/);
+  assert.match(why('fred@chu-bordeaux.fr').message, /votre établissement n'est pas reconnu/);
   assert.match(why('x@chu-bordeaux.fr').message, /ni prénom ni nom/);
   assert.equal(why('carla@clinique.fr').accepted, true, 'elle a bien accepté : l\'interrupteur est allumé');
 });
 
 test('describePresence lists every reason when several apply', async () => {
   const tables = sampleTables();
-  tables.BDD.perimetre[3] = ['L']; // Dan : établissement non validé ET aucun périmètre
+  tables.BDD.prenom[3] = ''; // Dan : établissement non validé ET ni prénom ni nom
+  tables.BDD.nom[3] = '';
   const { find } = await setup(tables);
   const { message } = describePresence(find('dan@inserm.fr'));
-  assert.match(message, /pas de périmètre ; votre établissement n'a pas encore été validé/);
+  assert.match(message, /ni prénom ni nom ; votre établissement n'a pas encore été validé/);
+});
+
+test('describePresence no longer talks about the perimetre: an accepted fiche appears even when nobody has one', async () => {
+  const tables = sampleTables();
+  tables.BDD.perimetre = tables.BDD.perimetre.map(() => ['L']); // personne n'a de périmètre
+  const { find } = await setup(tables);
+  const ana = describePresence(find(ANA_EMAIL));
+  assert.deepEqual([ana.visible, ana.tone, ana.message], [true, 'ok', 'Vous apparaissez dans l\'annuaire.']);
+  assert.ok(!JSON.stringify(describePresence(find('dan@inserm.fr'))).includes('périmètre'), 'aucun message ne parle plus du périmètre');
 });
 
 // ===== describeUnknownAccount : une adresse que BDD ne connaît pas =====
@@ -123,16 +133,16 @@ test('describeHiddenFiche gives the reason a fiche that was accepted stays hidde
     'Inserm Bordeaux n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.', 'l\'administrateur lit le nom de l\'établissement');
   assert.equal(say('carla@clinique.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'est ni fondateur ni partenaire.');
   assert.equal(say('eve@example.fr', false), 'Cette fiche reste masquée de l\'annuaire : la fiche n\'a pas d\'établissement.');
-  assert.equal(say('fred@chu-bordeaux.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre.');
+  assert.equal(say('fred@chu-bordeaux.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'est pas reconnu.');
 });
 
 test('describeHiddenFiche tells a person who ticks « Apparaître dans l’annuaire » while creating her fiche that it will be published but stay hidden until an administrator settles the point', async () => {
   const { find } = await setup();
   const status = email => find(email)[0].status;
   assert.equal(describeHiddenFiche(status('fred@chu-bordeaux.fr'), { own: true, creating: true }),
-    'Votre fiche sera publiée, mais elle restera masquée de l’annuaire : votre fiche n\'a pas de périmètre. Un administrateur doit d’abord régler ce point.');
+    'Votre fiche sera publiée, mais elle restera masquée de l’annuaire : votre établissement n\'est pas reconnu. Un administrateur doit d’abord régler ce point.');
   assert.equal(describeHiddenFiche(status('fred@chu-bordeaux.fr'), { own: true }),
-    'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre.', 'la phrase d\'une modification ne change pas');
+    'Votre fiche reste masquée de l\'annuaire : votre établissement n\'est pas reconnu.', 'la phrase d\'une modification ne change pas');
   assert.match(describeHiddenFiche(status(IRIS_EMAIL), { own: true, creating: true }), /vous n’avez pas accepté d’apparaître/, 'sans accord, c\'est la phrase de l\'interrupteur');
   assert.equal(describeHiddenFiche(status(ANA_EMAIL), { own: true, creating: true }), '', 'une fiche qui figure dans l\'annuaire n\'a rien à dire');
 });
@@ -142,7 +152,7 @@ test('describeCreated says whether a fiche that was just created appears in the 
   const status = email => find(email)[0].status;
   assert.equal(describeCreated(status(ANA_EMAIL), true), 'Votre fiche est publiée : elle apparaît dans l’annuaire.');
   assert.equal(describeCreated(status('fred@chu-bordeaux.fr'), true),
-    'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre fiche n\'a pas de périmètre. Contactez un administrateur.');
+    'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre établissement n\'est pas reconnu. Contactez un administrateur.');
   assert.equal(describeCreated(status('dan@inserm.fr'), true),
     'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre établissement n\'a pas encore été validé. Contactez un administrateur.');
   assert.equal(describeCreated(null, true), 'Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire.', 'la fiche relue manque : on ne dit pas qu\'elle apparaît');
@@ -154,11 +164,12 @@ test('describeCreated says whether a fiche that was just created appears in the 
 
 test('describeHiddenFiche lists every reason, and does not change what describePresence says', async () => {
   const tables = sampleTables();
-  tables.BDD.perimetre[3] = ['L']; // Dan : établissement non validé ET aucun périmètre
+  tables.BDD.prenom[3] = ''; // Dan : établissement non validé ET ni prénom ni nom
+  tables.BDD.nom[3] = '';
   const { find } = await setup(tables);
   assert.equal(describeHiddenFiche(find('dan@inserm.fr')[0].status, { own: true }),
-    'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre ; votre établissement n\'a pas encore été validé.');
-  assert.match(describePresence(find('dan@inserm.fr')).message, /pas de périmètre ; votre établissement n'a pas encore été validé\. Contactez un administrateur\./);
+    'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a ni prénom ni nom ; votre établissement n\'a pas encore été validé.');
+  assert.match(describePresence(find('dan@inserm.fr')).message, /ni prénom ni nom ; votre établissement n'a pas encore été validé\. Contactez un administrateur\./);
 });
 
 test('describePresence with several rows for one address: the switch is on only if all accepted, and the message says it applies to all', async () => {

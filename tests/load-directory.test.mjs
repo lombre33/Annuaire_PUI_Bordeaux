@@ -125,7 +125,7 @@ test('loadDirectory keeps going when a reference table is unreadable: previous l
 });
 
 test('loadDirectory refuses a BDD table that lacks a required column instead of silently showing nothing', async () => {
-  for (const column of ['nom', 'prenom', 'Etablissement', 'perimetre', 'Accepte_apparaitre']) {
+  for (const column of ['nom', 'prenom', 'Etablissement', 'Accepte_apparaitre']) {
     const tables = sampleTables();
     delete tables.BDD[column];
     await assert.rejects(
@@ -133,6 +133,18 @@ test('loadDirectory refuses a BDD table that lacks a required column instead of 
       error => error instanceof DirectoryLoadError && error.message.includes(`« ${column} »`) && error.message.includes('BDD')
     );
   }
+});
+
+test('loadDirectory does not need the perimetre column, and an empty perimetre hides nobody', async () => {
+  const withoutColumn = sampleTables();
+  delete withoutColumn.BDD.perimetre;
+  const { contacts, issues } = await load(withoutColumn);
+  assert.equal(contacts.length, 5, 'les mêmes contacts, sans colonne perimetre');
+  assert.deepEqual(issues, []);
+
+  const emptyEverywhere = sampleTables();
+  emptyEverywhere.BDD.perimetre = emptyEverywhere.BDD.perimetre.map(() => ['L']);
+  assert.equal((await load(emptyEverywhere)).contacts.length, 5, 'les mêmes contacts, avec un périmètre vide partout');
 });
 
 test('loadDirectory refuses an Etablissements table that lacks a visibility column instead of hiding every contact', async () => {
@@ -238,26 +250,23 @@ test('loadDirectory does not blame the consent column when it is another rule th
   assert.match(issues[0], /Aucun contact affichable/);
 });
 
-test('loadDirectory tells the console how many in-scope people are hidden for lack of consent, never who', async () => {
+test('loadDirectory tells the console how many people are hidden for lack of consent, never who', async () => {
   const log = recordingLog();
   await loadDirectory(fakeDocApi(sampleTables()), { log });
   const info = log.infos.find(args => String(args[0]).startsWith('[CONSENTEMENT]'));
   assert.ok(info, 'un message de console sur le consentement');
-  assert.match(info[0], /^\[CONSENTEMENT\] 2\/11 /, 'Iris et Jules, sur les 11 contacts du périmètre (Fred en est exclu)');
+  assert.match(info[0], /^\[CONSENTEMENT\] 2\/12 /, 'Iris et Jules, sur les 12 lignes de BDD');
   assert.ok(!/Iris|Jules|@/.test(JSON.stringify(log.infos)), 'ni nom ni adresse dans la console');
 });
 
 test('loadDirectory explains an empty directory instead of leaving an unexplained « 0 contact »', async () => {
   const noEtablissement = sampleTables();
   noEtablissement.BDD.Etablissement = noEtablissement.BDD.Etablissement.map(() => 0);
-  const noPerimetre = sampleTables();
-  noPerimetre.BDD.perimetre = noPerimetre.BDD.perimetre.map(() => ['L']);
   const nothingValidated = sampleTables();
   nothingValidated.Etablissements.ok_pour_apparaitre = nothingValidated.Etablissements.ok_pour_apparaitre.map(() => false);
 
   const explain = async tables => (await load(tables)).issues;
   assert.match((await explain(noEtablissement))[0], /Etablissement est vide/);
-  assert.match((await explain(noPerimetre))[0], /perimetre est vide/);
   assert.match((await explain(nothingValidated))[0], /Aucun contact affichable/);
 });
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  loadDirectory, buildContacts, isInScope, tableToRows, describeVisibility, createPeopleIndex, normalizeEmail
+  loadDirectory, buildContacts, tableToRows, describeVisibility, createPeopleIndex, normalizeEmail
 } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { sampleTables, withShownEmail, ANA_EMAIL, BOB_EMAIL, BOB_SHOWN_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
@@ -53,15 +53,15 @@ test('findByEmail returns every row that carries the address (a duplicate is rep
 test('describeVisibility says what keeps each person out of the directory', async () => {
   const { people } = await directory();
   const expected = {
-    [ANA_EMAIL]: { accepted: true, inScope: true, named: true, etablissement: 'ok', partnerOnly: false, visible: true },
-    [BOB_EMAIL]: { accepted: true, inScope: true, named: true, etablissement: 'ok', partnerOnly: true, visible: true },
-    'carla@clinique.fr': { accepted: true, inScope: true, named: true, etablissement: 'not_eligible', partnerOnly: false, visible: false },
-    'dan@inserm.fr': { accepted: true, inScope: true, named: true, etablissement: 'not_validated', partnerOnly: false, visible: false },
-    'eve@example.fr': { accepted: true, inScope: true, named: true, etablissement: 'missing', partnerOnly: false, visible: false },
-    'fred@chu-bordeaux.fr': { accepted: true, inScope: false, named: true, etablissement: 'ok', partnerOnly: false, visible: false },
-    [IRIS_EMAIL]: { accepted: false, inScope: true, named: true, etablissement: 'ok', partnerOnly: false, visible: false },
-    'jules@chu-bordeaux.fr': { accepted: false, inScope: true, named: true, etablissement: 'ok', partnerOnly: false, visible: false },
-    'x@chu-bordeaux.fr': { accepted: true, inScope: true, named: false, etablissement: 'ok', partnerOnly: false, visible: false }
+    [ANA_EMAIL]: { accepted: true, named: true, etablissement: 'ok', partnerOnly: false, visible: true },
+    [BOB_EMAIL]: { accepted: true, named: true, etablissement: 'ok', partnerOnly: true, visible: true },
+    'carla@clinique.fr': { accepted: true, named: true, etablissement: 'not_eligible', partnerOnly: false, visible: false },
+    'dan@inserm.fr': { accepted: true, named: true, etablissement: 'not_validated', partnerOnly: false, visible: false },
+    'eve@example.fr': { accepted: true, named: true, etablissement: 'missing', partnerOnly: false, visible: false },
+    'fred@chu-bordeaux.fr': { accepted: true, named: true, etablissement: 'unknown', partnerOnly: false, visible: false },
+    [IRIS_EMAIL]: { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, visible: false },
+    'jules@chu-bordeaux.fr': { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, visible: false },
+    'x@chu-bordeaux.fr': { accepted: true, named: false, etablissement: 'ok', partnerOnly: false, visible: false }
   };
   for (const [email, status] of Object.entries(expected)) {
     assert.deepEqual(await statusOf(people, email), status, email);
@@ -81,7 +81,7 @@ test('"visible" agrees with buildContacts for every row of BDD: the person is to
   tables.BDD.Etablissement[0] = 99; // un établissement inconnu
   const { people, referenceMaps, etabFlags } = await directory(tables);
   const rows = tableToRows(tables.BDD);
-  const shown = new Set(buildContacts(rows.filter(isInScope), referenceMaps, etabFlags).map(contact => contact.id));
+  const shown = new Set(buildContacts(rows, referenceMaps, etabFlags).map(contact => contact.id));
   assert.ok(shown.size >= 4);
   for (const row of rows) {
     assert.equal(describeVisibility(row, referenceMaps, etabFlags).visible, shown.has(row.id), `ligne ${row.id}`);

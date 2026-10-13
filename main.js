@@ -533,7 +533,7 @@ function openProfile(rowId, returnFocus) {
   const { row } = person;
   // L'e-mail et l'établissement ne se changent que depuis la fiche d'une autre personne.
   const admin = rights === 'admin';
-  const model = profileFormModel(row, state.referenceMaps, { admin });
+  const model = profileFormModel(row, state.referenceMaps, { admin, etabFlags: state.etabFlags });
   profileDialog.open({
     mode: rights,
     viewerAdmin: isAdmin(),
@@ -609,7 +609,7 @@ function openCreation() {
   if (state.identity?.status !== 'ready' || !state.people?.hasEmailColumn || myPersons().length > 0) return;
   const email = state.identity.email;
   const blank = blankFiche(state.people.columns, normalizeEmail(email));
-  const model = profileFormModel(blank, state.referenceMaps, { creating: true });
+  const model = profileFormModel(blank, state.referenceMaps, { creating: true, etabFlags: state.etabFlags });
   profileDialog.open({
     mode: 'create',
     viewerAdmin: isAdmin(),

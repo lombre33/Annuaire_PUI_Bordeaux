@@ -106,7 +106,6 @@ const COMPETENCES = [
 ];
 
 // Ordre de la table ; le widget affiche les cartes par nom de famille (compareContacts, grist-data.js).
-// `visible: false` : contact hors périmètre (perimetre vide).
 // `accepte: false` : la personne n'a pas donné son accord (Accepte_apparaitre).
 // `portrait: n` : la personne a une photo de profil (colonne Avatar de BDD, 1.19.0), le visage de rang n de
 // portraits-fictifs.mjs. Les photos ne sont servies qu'avec `tablesFictives({ photos: true })` (?photos dans
@@ -233,7 +232,6 @@ const CONTACTS = [
   { prenom: 'Sarah', nom: 'Colin', fonction: 'Chargée de mission', etab: 'FDX', competences: ['Gestion de projet'] },
   { prenom: 'Gabriel', nom: 'Noël', fonction: 'Ingénieur de recherche', etab: 'LABT', competences: ['Open science'] },
   { prenom: 'Alice', nom: 'Bertin', fonction: 'Chargée de mission', etab: '', competences: ['Gestion de projet'] },
-  { prenom: 'Victor', nom: 'Lambert', fonction: 'Chef de projet', etab: 'CHD', visible: false, competences: ['Gestion de projet'] },
   { prenom: 'Lucas', nom: 'Mercier', fonction: 'Chargé de mission innovation', etab: 'UDD', accepte: false, competences: ['Création d\'entreprise'] }
 ];
 
@@ -340,14 +338,15 @@ export function tablesFictives({ photos = false } = {}) {
     Fonction: CONTACTS.map(contact => contact.fonction ?? ''),
     // Référence vers Etablissements : identifiant de ligne, 0 quand elle est vide.
     Etablissement: CONTACTS.map(contact => (contact.etab ? idsEtablissements[contact.etab] : 0)),
-    perimetre: CONTACTS.map(contact => (contact.visible === false ? ['L'] : ['L', 1])),
+    // Le widget ne lit plus cette colonne (1.27.0) : elle reste, comme dans un document réel, sans décider de rien.
+    perimetre: CONTACTS.map(() => ['L', 1]),
     // Numeric : le 0 initial est perdu (0536490112 → 536490112), le widget le rétablit.
     numero_de_telephone: CONTACTS.map(contact => (contact.tel ? Number(contact.tel) : 0)),
     Role_dans_le_PUI: CONTACTS.map(contact => (contact.role ? idDe(contact.role, idsRoles) : 0)),
     Competences: CONTACTS.map(contact => liste(contact.competences, idsCompetences)),
     // Consentement (1.10.0) : une personne n'apparaît que si sa case est cochée.
     // Ici tout le monde a donné son accord sauf `accepte: false` : pour les autres,
-    // seuls les établissements et le périmètre décident.
+    // seuls les établissements décident.
     Accepte_apparaitre: CONTACTS.map(contact => contact.accepte !== false)
   };
   // Pièces jointes (1.19.0) : ['L', numéro du fichier], ['L'] quand la personne n'a pas de photo.

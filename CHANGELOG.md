@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.27.0 — La fiche créée apparaît tout de suite, et la liste des établissements ne propose que les fondateurs et les partenaires
+
+Retours d'Antoine du 13 octobre 2026 (09 h 24), ses points 3 et 4.
+
+- **Le périmètre ne décide plus de rien.** Jusqu'à la 1.26.0, une fiche devait avoir au moins une valeur dans `BDD.perimetre`, une colonne que
+  seul un administrateur remplit dans Grist : la fiche qu'une personne venait de créer ne pouvait donc pas apparaître, et le widget lui répondait
+  « Vous avez accepté d'apparaître, mais votre fiche reste masquée : votre fiche n'a pas de périmètre. Contactez un administrateur. »
+  (Antoine : « la fiche doit apparaître après sa création »). La règle est maintenant : **l'accord de la personne** (`Accepte_apparaitre`),
+  **un nom ou un prénom** et **un établissement validé** (`ok_pour_apparaitre`), fondateur ou partenaire. Le widget ne lit plus `perimetre`
+  (`isInScope` disparaît ; la colonne n'est plus indispensable, son absence n'est plus une erreur) et ne l'écrit toujours pas. Cela annule
+  le « Publier n'est pas afficher » de la 1.25.0.
+- **La fiche créée apparaît dès l'enregistrement**, sans recharger la page ni attendre un administrateur. La relecture n'a plus d'avis « restera
+  masquée », le message de fin dit « Votre fiche est publiée : elle apparaît dans l'annuaire. » et le bandeau « Ma présence » « Vous apparaissez
+  dans l'annuaire. ». Le message « … n'a pas de périmètre » n'existe plus nulle part (relecture, bandeau, bandeau d'état de l'annuaire, console).
+  Une fiche ne reste masquée que pour les raisons qui subsistent (établissement non validé, ni fondateur ni partenaire, ni nom ni prénom,
+  accord non donné), et les messages les disent comme avant.
+- **Ce que ça change pour les lignes déjà dans Grist.** Toute ligne de `BDD` dont la personne a accepté d'apparaître et dont l'établissement est
+  validé, fondateur ou partenaire, s'affiche maintenant, avec ou sans périmètre. Les lignes qui n'en avaient pas à dessein et dont la case
+  `Accepte_apparaitre` est cochée apparaissent donc : à vérifier dans Grist si l'on y tenait. Une fiche sans périmètre n'a aucune étiquette en trop
+  ni erreur (jeu d'essai : Hugo Bernard, `tests/fixtures.mjs`).
+- **La liste des établissements** des fenêtres de profil ne propose que les établissements dont la case `fondateur` ou `partenaire` est cochée
+  dans `Etablissements` (`choosableEtablissements`, `profile.js`) : plus de structure « autres ». L'établissement que la fiche porte déjà reste
+  dans la liste, même s'il est « autres », pour ne pas être remplacé en silence. La validation à l'enregistrement ne change pas.
+- **Le champ de recherche de cette liste** est dans toutes les fenêtres qui proposent un établissement : « Créer ma fiche » et la modification de
+  la fiche d'une autre personne par un administrateur en mode admin (à gauche de la liste, comme les autres : `input.pick-search`). Revérifié
+  dans Chromium de 420 à 900 px de large, avec un test. « Modifier mon profil » n'a pas de liste d'établissements : une personne ordinaire ne
+  change pas le sien (c'est l'affaire d'un administrateur), donc pas de champ non plus. Si Antoine ne le voit pas dans l'une de ces deux fenêtres
+  après un rechargement forcé (Ctrl+Maj+R), c'est un autre défaut à chercher : une ancienne copie de la page gardée par le navigateur est la
+  piste la plus simple, non démontrée.
+- **Écarts avec la maquette v5** : aucun de plus (ceux de la 1.25.0 demeurent).
+- Tests de non-régression : `tests/grist-data.test.mjs` (une ligne sans périmètre, ou sans colonne `perimetre`, s'affiche), `tests/people.test.mjs`,
+  `tests/load-directory.test.mjs`, `tests/presence.test.mjs` et `tests/profile-save.test.mjs` (la fiche créée est visible sans périmètre ; plus aucun
+  message de périmètre), `tests/profile.test.mjs` (la liste des établissements : fondateurs et partenaires, plus celui de la fiche) et, dans
+  Chromium, `tests/e2e-profile.test.mjs` (la fiche créée apparaît sans recharger la page, le bandeau le dit, la recherche est affichée et ne
+  propose pas la Clinique). Le jeu fictif de la documentation ne contient plus de personne « sans périmètre » (elle serait devenue visible).
+- Rien à changer dans le document Grist. **Non essayé dans le vrai Grist d'Antoine.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.26.1 — Logos des cartes : plus aucune lecture de pixels, chacun dans sa case
 
 Signalé par Antoine le 13 octobre 2026 (11 h 24) : « logo toujours cassés », sept minutes après la mise en ligne de la 1.25.2. Il pense que la

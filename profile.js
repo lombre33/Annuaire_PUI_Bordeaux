@@ -193,12 +193,25 @@ function knownIds(cell, options) {
   return [...new Set(safeValues(cell).filter(item => typeof item === 'number' && entryOf.has(item)).map(item => entryOf.get(item)))];
 }
 
+// Les établissements qu'une fiche peut choisir : ceux que la table Etablissements marque fondateur ou partenaire,
+// jamais une structure « autres » (ni l'un ni l'autre), et celui que la fiche porte déjà, pour que la liste le
+// montre même s'il n'en est pas. Sans les indicateurs des établissements (`etabFlags`), rien n'est écarté.
+function choosableEtablissements(options, row, etabFlags) {
+  if (!etabFlags?.byId) return options;
+  const current = refId(row.Etablissement);
+  return options.filter(option => {
+    const flags = etabFlags.byId[String(option.id)];
+    return option.id === current || flags?.fondateur === true || flags?.partenaire === true;
+  });
+}
+
 // Le formulaire de modification d'une fiche : un champ par PROFILE_FIELDS, avec la
 // valeur actuelle de la fiche (`value`) et, pour une référence ou une liste, sa
 // `category` et les valeurs proposées (`options`). `admin` : un administrateur modifie la
 // fiche d'une autre personne, et change aussi son e-mail et son établissement. `creating` : la
-// personne crée sa fiche (blankFiche) et choisit son établissement.
-export function profileFormModel(row, referenceMaps, { admin = false, creating = false } = {}) {
+// personne crée sa fiche (blankFiche) et choisit son établissement. `etabFlags` : les indicateurs des
+// établissements (etablissementFlagsFromRows), qui restreignent la liste des établissements.
+export function profileFormModel(row, referenceMaps, { admin = false, creating = false, etabFlags = null } = {}) {
   // Une colonne facultative absente de BDD n'est pas proposée (rien à modifier).
   return fieldsFor(admin, creating).filter(field => field.key in row).map(field => {
     const base = {
@@ -210,7 +223,10 @@ export function profileFormModel(row, referenceMaps, { admin = false, creating =
     if (field.kind === 'image') return { ...base, value: avatarIdOf(row[field.key]) };
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
     const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: field.kind === 'list' });
-    if (field.kind === 'reference') return { ...base, options, value: refId(row[field.key]) || 0 };
+    if (field.kind === 'reference') {
+      const choices = field.category === 'etablissement' ? choosableEtablissements(options, row, etabFlags) : options;
+      return { ...base, options: choices, value: refId(row[field.key]) || 0 };
+    }
     return { ...base, options, value: knownIds(row[field.key], options) };
   });
 }
