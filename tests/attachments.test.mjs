@@ -237,3 +237,20 @@ test('refresh reports false when Grist refuses the new token', async () => {
   clock.time += 2 * MINUTE;
   assert.equal(await attachments.refresh(failed), false);
 });
+
+// ===== stats : de quoi dire en une ligne de console ce que Grist a donné =====
+
+test('stats counts the requests made to Grist and how many failed, and never gives the token', async () => {
+  let refuse = false;
+  const { attachments, clock } = setup({ ttlMsecs: MINUTE, accessToken: () => (refuse ? null : { token: 'jeton-secret', baseUrl: FAKE_ATTACHMENTS_URL, ttlMsecs: MINUTE }) });
+  assert.deepEqual(attachments.stats(), { requested: 0, failed: 0 });
+  await Promise.all(Array.from({ length: 20 }, () => attachments.ready()));
+  assert.deepEqual(attachments.stats(), { requested: 1, failed: 0 }, 'vingt images, une demande');
+  refuse = true;
+  clock.time += 2 * MINUTE;
+  assert.equal(await attachments.ready(), false);
+  assert.deepEqual(attachments.stats(), { requested: 2, failed: 1 });
+  assert.doesNotMatch(JSON.stringify(attachments.stats()), /jeton-secret/);
+  attachments.stats().requested = 99;
+  assert.equal(attachments.stats().requested, 2, 'une copie : la modifier ne change pas le compte');
+});

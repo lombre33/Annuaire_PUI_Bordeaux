@@ -24,8 +24,13 @@ import { createEtablissementDialog } from './etablissement-ui.js';
 import { uploadAttachment } from './upload.js';
 import { brandingSummary, buildBranding, logoForContact } from './branding.js';
 import { avatarIdOf, createAttachments } from './attachments.js';
-import { createBrandingUI, createLogoImage } from './branding-ui.js';
+import { createBrandingUI, createLogoImage, logoStats } from './branding-ui.js';
 import { createAvatar, createPhotoViewer, createThumb } from './avatar-ui.js';
+
+// Le numéro de la version qui s'exécute, en bas de page (voir VERSION et index.html). Le cache de GitHub Pages garde chaque fichier dix
+// minutes : un index.html ancien sans cette ligne ne doit pas empêcher le code neuf de démarrer.
+const versionNote = document.getElementById('versionNote');
+if (versionNote) versionNote.textContent = `Version ${VERSION}`;
 
 const state = {
   allContacts: [],
@@ -104,6 +109,47 @@ const brandingUI = createBrandingUI({
 // l'annuaire comme la carte « avant / après » de la relecture.
 const cardLogos = () => ({ attachments, logoFor: contact => logoForContact(state.branding, contact) });
 
+// ===== Bilan des logos dans la console =====
+
+// Les logos sont un habillage dont l'échec se voit mal : sans logo, la carte montre le sigle, ou rien. Quelques secondes après
+// le dernier dessin des cartes (et encore un peu plus tard, pour un logo qui n'arrive jamais), la console dit en une ligne
+// combien de logos Grist a donnés et combien s'affichent, sans adresse ni jeton : de quoi comprendre un logo manquant sans
+// l'ouvrir. Une ligne par changement du bilan, pas une par rendu.
+let rendered = 0; // combien de fois les cartes ont été redessinées depuis le chargement
+let reportedBalance = '';
+let reportTimers = [];
+const LOGO_REPORT_DELAYS_MS = [6000, 15000];
+
+function browserLabel() {
+  const agent = globalThis.navigator?.userAgent ?? '';
+  const named = /(Firefox|Edg|Chrome)\/(\d+)/.exec(agent);
+  const safari = /Version\/(\d+)/.exec(agent);
+  const name = named ? (named[1] === 'Edg' ? 'Edge' : named[1]) : safari ? 'Safari' : '';
+  return name ? `${name} ${(named ?? safari).at(-1)}${/Mobi|Android/.test(agent) ? ' mobile' : ''}` : 'navigateur inconnu';
+}
+
+function reportLogos() {
+  const stats = logoStats(attachments);
+  if (stats.asked === 0) return;
+  const shown = selector => ({ loaded: document.querySelectorAll(`${selector}.loaded`).length, all: document.querySelectorAll(selector).length });
+  const cards = shown('#cardsGrid .etablissement-tag .logo-img');
+  const band = shown('#bandLogos .logo-img');
+  const problems = stats.refused + stats.late + stats.token + stats.pending;
+  const balance = `${stats.loaded} logo${stats.loaded > 1 ? 's' : ''} chargé${stats.loaded > 1 ? 's' : ''} sur ${stats.asked}`
+    + (problems ? ` (${stats.refused} refusé${stats.refused > 1 ? 's' : ''}, ${stats.late} sans réponse, ${stats.token} sans jeton, ${stats.pending} en attente)` : '')
+    + ` ; affichés : ${cards.loaded}/${cards.all} sur les cartes, ${band.loaded}/${band.all} dans le bandeau`;
+  if (balance === reportedBalance) return;
+  reportedBalance = balance;
+  const token = attachments.stats();
+  const line = `[LOGOS] Bilan : ${balance} ; cartes redessinées ${rendered} fois ; jetons demandés à Grist ${token.requested} (${token.failed} en échec) ; ${browserLabel()}.`;
+  (problems || cards.loaded < cards.all || band.loaded < band.all ? console.warn : console.info)(line);
+}
+
+function scheduleLogoReport() {
+  reportTimers.forEach(clearTimeout);
+  reportTimers = LOGO_REPORT_DELAYS_MS.map(delay => setTimeout(reportLogos, delay));
+}
+
 function toggleFilter(filterKey, value) {
   if (!state.activeFilters[filterKey]) state.activeFilters[filterKey] = new Set();
   const set = state.activeFilters[filterKey];
@@ -158,6 +204,8 @@ function refreshCards() {
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
   updateFilterCounts(elements.filtersContainer, currentCounts());
+  rendered += 1;
+  scheduleLogoReport();
 }
 
 // La bulle du rôle dans une tâche, un seul écouteur lui aussi (render.js).
@@ -528,7 +576,7 @@ function etablissementBadge(row, label) {
   const holder = document.createElement('span');
   holder.className = 'et-logo';
   holder.title = brand.name;
-  holder.append(createLogoImage(attachments, brand.logo, label, () => holder.replaceWith(pill()), { eager: true }));
+  holder.append(createLogoImage(attachments, brand.logo, label, () => holder.replaceWith(pill()), { eager: true, preload: true }));
   return holder;
 }
 
@@ -697,7 +745,7 @@ function etablissementLogo({ etablissement }) {
   const pill = document.createElement('span');
   pill.className = 'et-pill';
   pill.textContent = etablissement.acronym;
-  const image = createLogoImage(attachments, id, `Logo de ${etablissement.name || etablissement.acronym}`, () => image.replaceWith(pill), { eager: true });
+  const image = createLogoImage(attachments, id, `Logo de ${etablissement.name || etablissement.acronym}`, () => image.replaceWith(pill), { eager: true, preload: true });
   return image;
 }
 

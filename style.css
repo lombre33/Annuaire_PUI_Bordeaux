@@ -1371,6 +1371,14 @@ button.avatar:hover {
 .page-footer {
   margin-top: 40px;
 }
+/* Le numéro de la version qui s'exécute, discret : le cache de GitHub Pages garde les fichiers dix minutes, et sans lui on ne sait
+   pas laquelle une personne a sous les yeux. */
+.version-note {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
 .band {
   container: band / inline-size;
   max-width: 1200px;

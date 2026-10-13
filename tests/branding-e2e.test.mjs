@@ -95,12 +95,14 @@ test('une pièce jointe n\'est demandée à Grist qu\'avec un jeton en lecture s
     assert.ok(files.tokens.length >= 1 && files.tokens.every(token => token === 'fake-token'));
   }));
 
-test('les logos des cartes se chargent à l\'approche de l\'écran, ceux de l\'en-tête et du bandeau tout de suite, aucun ne dit d\'où il vient', { skip }, () =>
+test('les logos des cartes, du bandeau et de l\'en-tête s\'affichent sans attendre l\'écran (leur fichier est déjà chargé), aucun ne dit d\'où il vient', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     await waitForLogos(page, 4);
     const attribute = (selector, name) => page.locator(selector).evaluateAll((images, property) => images.map(image => image[property]), name);
-    assert.deepEqual(await attribute('.etablissement-tag img', 'loading'), ['lazy', 'lazy', 'lazy']);
+    // Un logo d'établissement est chargé à part, une fois (branding-ui.js, preloadLogo) : la carte qui le montre n'a plus rien à
+    // attendre, et un `lazy` ne ferait que retarder une image déjà en mémoire (les photos de profil, elles, restent `lazy`).
+    assert.deepEqual(await attribute('.etablissement-tag img', 'loading'), ['eager', 'eager', 'eager']);
     assert.deepEqual(await attribute('#bandLogos img', 'loading'), ['eager']);
     const policies = await attribute('.logo-img', 'referrerPolicy');
     assert.equal(policies.length, 4);

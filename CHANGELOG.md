@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.28.1 — Logos : chacun est chargé une seule fois, à l'abri des redessins de l'annuaire, et la page dit sa version
+
+Retour d'Antoine du 13 octobre 2026 (12 h 29), sur la 1.27.2 : « les logos ne s'affichent pas, la console est blindée d'erreurs […] c'est juste une régression, tout marchait
+bien avant ». Il a collé seize lignes `NS_BINDING_ABORTED`, une par logo (`…/attachments/N/download?auth=…`, N de 1 à 16), et une trentaine d'avertissements sur le cookie
+`grist_core` (Grist en pose un dans chaque réponse de fichier et Firefox le refuse quand la page vient d'un autre site : sans effet sur l'image).
+
+- **Ce que disent ces lignes.** `NS_BINDING_ABORTED` n'est ni un refus de Grist, ni un problème de CORS, ni un fichier introuvable : c'est le navigateur qui a **annulé** la demande,
+  ce que Firefox fait quand une image est retirée du document avant d'avoir fini de charger. Or l'annuaire refait toutes ses cartes (`render.js`) à chaque lecture de Grist, à chaque filtre,
+  à chaque recherche et à l'arrivée de l'identité, et plusieurs dessins se suivent au démarrage. Si Grist répond aux logos moins vite que ces dessins, chaque carte refait sa demande et le
+  dessin suivant l'annule : aucun logo n'arrive. Chromium, où les tests tournent, n'annule pas ainsi, ce qui explique qu'aucun test n'ait jamais rien montré. **Cause probable, pas démontrée** :
+  Firefox n'est pas installé ici et rien n'a été rejoué dans le Grist d'Antoine.
+- **Chaque logo est chargé une seule fois, à part** (`preloadLogo`, `branding-ui.js`), dans une image que le module garde pour la vie de la page : ni les cartes, ni un redessin, ni le
+  ramasse-miettes ne la retirent. Les images des cartes, du bandeau et des fenêtres de profil et d'établissement ne reçoivent l'adresse de leur logo qu'**une fois ce chargement fini** :
+  le fichier est alors en mémoire, elles s'affichent aussitôt quel que soit le nombre de dessins, et il n'y a plus qu'**une demande par logo** au lieu d'une par carte. Une tentative qui
+  échoue ou reste cinq secondes sans réponse est refaite, trois essais au plus : avec un jeton renouvelé si Grist en donne un, sinon à une adresse un peu différente (`annuaire_retry=1`,
+  que Grist ignore) pour ne pas retomber sur une réponse ratée gardée en cache. Un logo qui a échoué n'est pas redemandé avant trente secondes. Les photos de profil ne changent pas.
+- **Un logo ne reste jamais invisible pour de bon.** Si une image préchargée n'a ni chargé ni échoué huit secondes après avoir reçu son adresse, le sigle prend sa place et la console dit
+  « la demande n'a pas abouti à temps » (`[LOGOS]`, une fois par fichier).
+- **La console fait le bilan** (`[LOGOS] Bilan : …`, 6 puis 15 secondes après le dernier dessin des cartes, une ligne par bilan différent) : combien de logos Grist a donnés sur combien
+  demandés (et combien refusés, sans réponse, sans jeton, en attente), combien s'affichent sur les cartes et dans le bandeau, combien de fois les cartes ont été redessinées, combien de
+  jetons ont été demandés à Grist et le navigateur. Un avertissement s'il en manque un, une information sinon. Jamais d'adresse ni de jeton : Antoine peut copier ces lignes, pas les lignes
+  rouges du navigateur, qui portent le jeton.
+- **La version est écrite en bas de la page** (« Version x.y.z », discrète, `#versionNote`). GitHub Pages fait garder chaque fichier dix minutes : sans elle, on ne sait pas quelle version
+  une personne a sous les yeux, et trois signalements d'Antoine sont tombés dans ces dix minutes.
+- **Une copie de la 1.21.3 dans `archives/1.21.3/`**, la dernière version avant la lecture des pixels : ajoutée comme widget personnalisé dans le Grist d'Antoine
+  (`https://lombre33.github.io/Annuaire_PUI_Bordeaux/archives/1.21.3/index.html`, accès complet), elle dit si le défaut est dans le code (ses logos s'y affichent, pas dans la version
+  courante) ou dans le document (aucune ne les montre). **À supprimer dès que le diagnostic est fait.**
+- Tests : `tests/logos-preload-e2e.test.mjs`, qui reproduit la cause plutôt que le navigateur : un `MutationObserver` compte les images de logo retirées du document avant d'avoir fini de
+  charger, pendant que Grist est retenu (`downloadHold`) et que l'annuaire se redessine (seize fondateurs, 48 cartes, trois lectures de Grist et une recherche) : aucune, une seule demande par
+  logo ; première demande annulée ou sans réponse (`downloadFirst`), image de logo qui ne dit plus rien après avoir reçu son adresse (le sigle prend la place après huit secondes), fichier supprimé redemandé trois fois au plus,
+  ligne `Bilan` (information, avertissement), version en bas de page ; `attachments.stats()`. Sept des huit nouveaux tests échouent sur le code de la 1.28.0 (vérifié), le huitième, celui du fichier supprimé, borne un
+  comportement qui existait déjà ; l'assertion `loading` des logos de carte devient `eager` (le fichier est déjà là). **Non essayé dans le vrai Grist d'Antoine ni dans Firefox.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.28.0 — Établissement et rôle : une seule liste déroulante, avec la recherche dans le panneau
 
 Retour d'Antoine du 13 octobre 2026 (12 h 26) : « le champ établissement c'est moche comme ça, j'aimerais simplement la dropdown classique et quand on recherche
