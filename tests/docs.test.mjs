@@ -776,7 +776,9 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
   assert.deepEqual(cited.filter(name => !security.includes(`\`${name}\``)), [], 'docs/securite.md doit citer chacune de ces méthodes entre accents graves.');
 
   const banned = /XMLHttpRequest|sendBeacon|WebSocket|EventSource|localStorage|sessionStorage|indexedDB|document\.cookie|\beval\s*\(|new Function|insertAdjacentHTML|outerHTML|document\.write/;
-  assert.deepEqual(sources.filter(({ code }) => banned.test(code)).map(({ name }) => name), [],
+  // Seule exception : la valeur que l'envoi de upload.js donne à l'en-tête que Grist exige (1.21.5), un texte, pas l'API du même nom.
+  const withoutHeaderValue = code => code.replaceAll('\'X-Requested-With\': \'XMLHttpRequest\'', '');
+  assert.deepEqual(sources.filter(({ code }) => banned.test(withoutHeaderValue(code))).map(({ name }) => name), [],
     'Ces fichiers emploient une API réseau, de stockage ou d\'injection de HTML que docs/securite.md dit absente.');
   // `fetch` n'est admis que dans upload.js (voir le test suivant) : ni `fetch(`, ni `globalThis.fetch`, ni un
   // paramètre qui le porte (`fetchImpl`) ailleurs.

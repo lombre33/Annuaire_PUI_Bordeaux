@@ -9,7 +9,7 @@
 
 import { avatarIdOf } from './attachments.js';
 import { CATEGORIES, PROFILE_FIELDS, fieldsFor } from './constants.js';
-import { compareLabels, formatPhone, normalizeEmail, refId, safeValues, text } from './grist-data.js';
+import { compareLabels, formatPhone, normalize, normalizeEmail, refId, safeValues, text } from './grist-data.js';
 
 export const MAX_TEXT_LENGTH = 200;
 
@@ -144,18 +144,40 @@ const groupingOf = category => Object.entries(CATEGORIES).find(([, other]) => ot
 // regroupement est connu (les domaines des compétences), chaque valeur porte aussi son
 // `group` et les valeurs sont rangées groupe par groupe, le groupe de repli (« Autres »)
 // en dernier : le formulaire peut les présenter par domaine sans rien recalculer.
-export function optionsOf(category, referenceMaps) {
+// `merge` : une seule entrée par libellé (voir mergeSameLabels), pour les listes.
+export function optionsOf(category, referenceMaps, { merge = false } = {}) {
   const grouping = groupingOf(category);
   const groups = grouping ? referenceMaps[grouping[0]] || {} : {};
   const grouped = Object.keys(groups).length > 0;
   const fallback = grouping?.[1].fallback;
   const rank = group => (group === fallback ? 1 : 0);
-  return Object.entries(referenceMaps[category] || {})
-    .map(([id, label]) => ({ id: Number(id), label, ...(grouped && { group: groups[id] || fallback }) }))
+  const options = Object.entries(referenceMaps[category] || {})
+    .map(([id, label]) => ({ id: Number(id), label, ...(grouped && { group: groups[id] || fallback }) }));
+  return (merge ? mergeSameLabels(options) : options)
     .sort((a, b) => (grouped
       ? rank(a.group) - rank(b.group) || compareLabels(a.group, b.group) || compareLabels(a.label, b.label)
       : compareLabels(a.label, b.label)));
 }
+
+// Une seule entrée par libellé, à la casse et aux accents près et dans un même groupe : plusieurs
+// lignes de la table liée peuvent se lire pareil (des lignes brutes que la colonne « corrigé » ramène
+// au même libellé), et proposées telles quelles, la même tâche s'afficherait plusieurs fois. L'entrée
+// garde le plus petit identifiant ; `ids` les nomme tous quand il y en a plusieurs : cocher ou décocher
+// l'entrée vaut pour toutes ces lignes (voir knownIds, diffProfile et buildRowUpdate).
+function mergeSameLabels(options) {
+  const merged = new Map();
+  [...options].sort((a, b) => a.id - b.id).forEach(option => {
+    const key = `${normalize(option.group)}|${normalize(option.label)}`;
+    const entry = merged.get(key);
+    if (!entry) merged.set(key, { ...option });
+    else entry.ids = [...(entry.ids || [entry.id]), option.id];
+  });
+  return [...merged.values()];
+}
+
+// Identifiant d'une ligne de la table liée → identifiant de l'entrée qui la porte (le même, sauf
+// pour une ligne qui se lit comme une autre : voir mergeSameLabels).
+const entryOfRow = options => new Map(options.flatMap(option => (option.ids || [option.id]).map(id => [id, option.id])));
 
 // La table de libellés d'un champ de référence ou de liste : les noms complets quand le champ
 // en propose (`labelsFrom`) et que Grist en a donné, sinon ceux de sa catégorie.
@@ -164,11 +186,11 @@ function labelsKey(field, referenceMaps) {
   return names && Object.keys(referenceMaps[names] || {}).length > 0 ? names : field.category;
 }
 
-// Identifiants d'une cellule ReferenceList qui figurent parmi `options` (ceux que
-// le formulaire peut montrer).
+// Identifiants (ceux des entrées de `options`) des valeurs d'une cellule ReferenceList que le
+// formulaire peut montrer. Une ligne qui se lit comme une autre compte pour son entrée.
 function knownIds(cell, options) {
-  const known = new Set(options.map(option => option.id));
-  return safeValues(cell).filter(item => typeof item === 'number' && known.has(item));
+  const entryOf = entryOfRow(options);
+  return [...new Set(safeValues(cell).filter(item => typeof item === 'number' && entryOf.has(item)).map(item => entryOf.get(item)))];
 }
 
 // Le formulaire de modification d'une fiche : un champ par PROFILE_FIELDS, avec la
@@ -187,7 +209,7 @@ export function profileFormModel(row, referenceMaps, { admin = false, creating =
     if (field.kind === 'text' || field.kind === 'email') return { ...base, value: text(row[field.key]) };
     if (field.kind === 'image') return { ...base, value: avatarIdOf(row[field.key]) };
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
-    const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps);
+    const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: field.kind === 'list' });
     if (field.kind === 'reference') return { ...base, options, value: refId(row[field.key]) || 0 };
     return { ...base, options, value: knownIds(row[field.key], options) };
   });
@@ -203,6 +225,13 @@ export function draftOf(model) {
 // ===== Ce qui change =====
 
 const labelOf = (options, id) => options.find(option => option.id === id)?.label || '';
+
+// Une valeur d'une liste, telle que `champs` la garde : son identifiant, son libellé et, pour une entrée
+// qui en réunit plusieurs, les identifiants de toutes ses lignes.
+function listEntry(options, id) {
+  const option = options.find(candidate => candidate.id === id);
+  return { id, label: option?.label || '', ...(option?.ids && { ids: option.ids }) };
+}
 
 function sameSet(a, b) {
   return a.length === b.length && a.every(item => b.includes(item));
@@ -279,7 +308,7 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, creating
       return;
     }
 
-    const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps);
+    const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: field.kind === 'list' });
 
     // Un brouillon d'un autre type que prévu est une erreur, jamais « aucune valeur » :
     // une saisie illisible ne doit pas retirer un rôle ou vider une liste.
@@ -309,17 +338,17 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, creating
       fail(field, 'Valeur illisible.');
       return;
     }
-    const wanted = input;
-    if (wanted.some(id => !options.some(option => option.id === id))) {
+    const entryOf = entryOfRow(options);
+    if (input.some(id => !entryOf.has(id))) {
       fail(field, 'Valeur inconnue.');
       return;
     }
+    const wanted = [...new Set(input.map(id => entryOf.get(id)))];
     const current = knownIds(row[field.key], options);
     if (sameSet(current, wanted)) return;
-    const entry = id => ({ id, label: labelOf(options, id) });
     champs[field.key] = {
-      ajout: [...new Set(wanted)].filter(id => !current.includes(id)).map(entry),
-      retrait: current.filter(id => !wanted.includes(id)).map(entry)
+      ajout: wanted.filter(id => !current.includes(id)).map(id => listEntry(options, id)),
+      retrait: current.filter(id => !wanted.includes(id)).map(id => listEntry(options, id))
     };
   });
 
@@ -388,8 +417,9 @@ export function rebaseChanges(champs, row, referenceMaps, { admin = false, creat
     }
 
     const present = new Set(safeValues(row[field.key]).filter(Number.isSafeInteger));
-    const ajout = change.ajout.filter(entry => !present.has(entry.id));
-    const retrait = change.retrait.filter(entry => present.has(entry.id));
+    const there = entry => (entry.ids || [entry.id]).some(id => present.has(id));
+    const ajout = change.ajout.filter(entry => !there(entry));
+    const retrait = change.retrait.filter(there);
     if (ajout.length + retrait.length > 0) rebased[field.key] = { ajout, retrait };
   });
   return { champs: rebased, moved };
