@@ -307,7 +307,7 @@ const REPERES = [
   { numero: 6, selecteur: '.tel', texte: true },
   { numero: 7, selecteur: '.tag-group-title', texte: true },
   { numero: 8, selecteur: '.tag-instances', dernier: true },
-  { numero: 9, selecteur: '.tag-static' }
+  { numero: 9, selecteur: '.etab-col .role-tag', placement: 'gauche' }
 ];
 
 // Les pastilles sont ajoutées à la page le temps de la capture seulement :

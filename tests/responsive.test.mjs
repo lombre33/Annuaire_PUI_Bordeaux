@@ -341,7 +341,7 @@ test('barre d\'outils : sous 600px chaque rangée va d\'un bord à l\'autre, de 
 test('chaque menu de filtre s\'ouvre en entier dans le cadre, de 280px à 1920px', { skip }, () =>
   withWidget({}, async ({ page }) => {
     const filters = await page.locator('.filter').count();
-    assert.equal(filters, 7, 'les 7 filtres du widget');
+    assert.equal(filters, 8, 'les 8 filtres du widget');
     // 280px : un panneau Grist plus étroit que le plus petit téléphone, le menu se réduit alors à lui.
     await atEachWidth(page, [280, 320, 360, 414, 600, 768, 1024, 1280, 1480, 1920], async width => {
       for (let index = 0; index < filters; index++) {

@@ -1,7 +1,7 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
 import { CATEGORIES, TAG_GROUPS, FILTERS } from './constants.js';
-import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, shownEmail, sortWithCheckedFirst, normalize } from './grist-data.js';
+import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, shownEmail, sortWithCheckedFirst, normalize, uniqueLabels } from './grist-data.js';
 import { el } from './dom.js';
 import { groupState, menuGroups, selectionCount } from './filters.js';
 import { createLogoImage, fitCardLogo } from './branding-ui.js';
@@ -10,6 +10,9 @@ import { avatarIdOf } from './attachments.js';
 
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
+
+// Le rôle dans le PUI n'est pas une section du bas de la carte : c'est une pastille sous le logo.
+const ROLE_GROUP = TAG_GROUPS.find(group => group.key === 'role');
 
 // ===== Menus de filtres =====
 
@@ -33,9 +36,10 @@ function countFor(counts, countKey, value) {
   return counts?.[countKey]?.[normalize(value)] ?? 0;
 }
 
-// Cochées d'abord ; chaque groupe reste trié alphabétiquement.
+// Cochées d'abord ; chaque groupe reste trié alphabétiquement. Une valeur écrite deux fois (à la casse
+// ou aux accents près) n'a qu'une option : le filtre les couvre toutes les deux.
 function orderedValues(values, selected) {
-  return sortWithCheckedFirst([...new Set(values)].sort(compareLabels), selected);
+  return sortWithCheckedFirst(uniqueLabels(values).sort(compareLabels), selected);
 }
 
 // Un menu rangé par groupe dit ce qu'il offre (infobulle du bouton, champ de recherche) avec
@@ -334,7 +338,7 @@ function syncGroupedMenu(menu, selected) {
 // pour ne pas fermer un autre menu ni effacer une recherche en cours.
 export function updateFilterUI(container, filterKey, activeFilters) {
   const wrapper = container.querySelector(`[data-filter-key="${filterKey}"]`);
-  if (!wrapper) return; // « Rôle PUI » n'a pas de menu
+  if (!wrapper) return; // une catégorie sans menu : rien à resynchroniser
 
   const selected = activeFilters[filterKey];
   const menu = wrapper.querySelector('.filter-menu');
@@ -445,8 +449,8 @@ function fillEmail(link, email, linked) {
   if (href) link.href = href;
 }
 
-// Un groupe sans filtre (« Rôle PUI », specs.md) est fait de <span> non cliquables :
-// un bouton qui ne filtre rien induirait en erreur. Il en va de même sans `onToggle`.
+// Un tag d'une catégorie sans filtre serait fait de <span> non cliquables : un bouton qui ne
+// filtre rien induirait en erreur. Il en va de même sans `onToggle` (carte de relecture).
 function buildTag(group, value, onToggle, isNew) {
   const filterable = Boolean(onToggle) && FILTERABLE_KEYS.has(group.key);
   const tag = document.createElement(filterable ? 'button' : 'span');
@@ -493,8 +497,22 @@ function buildTagGroup(group, labels, onToggle, change) {
   return section;
 }
 
+// Le rôle dans le PUI, sous le logo (ou le nom) de l'établissement, dans la colonne de droite de la
+// carte : une pastille qui filtre comme les autres tags. Sur la carte « Après » d'une relecture,
+// un rôle ajouté porte son contour, un rôle retiré reste barré (`change` : { added, removed }).
+function fillRole(column, contact, onToggle, change) {
+  const before = column.querySelector('.etab-actions');
+  const added = new Set((change?.added ?? []).map(normalize));
+  const place = tag => {
+    tag.classList.add('role-tag');
+    column.insertBefore(tag, before);
+  };
+  labelsOf(contact, ROLE_GROUP.key).forEach(value => place(buildTag(ROLE_GROUP, value, onToggle, added.has(normalize(value)))));
+  (change?.removed ?? []).forEach(value => place(buildRemovedTag(ROLE_GROUP, value)));
+}
+
 function fillTags(container, contact, onToggle, changes) {
-  TAG_GROUPS.forEach(group => {
+  TAG_GROUPS.filter(group => group !== ROLE_GROUP).forEach(group => {
     const labels = labelsOf(contact, group.key);
     const change = changes?.[group.key];
     if (labels.length > 0 || change?.removed.length > 0) {
@@ -598,6 +616,7 @@ function buildCard(template, contact, onToggle, view = {}) {
   if (marks?.texts.tel) showTextChange(tel, marks.texts.tel, value => `☎ ${value}`);
   else if (phone) reveal(tel, `☎ ${phone}`);
 
+  fillRole(card.querySelector('.etab-col'), contact, onToggle, marks?.tags.role);
   fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags);
   if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);
   // Fermé par défaut : seul un établissement dont la personne est responsable (et dont la carte

@@ -182,7 +182,7 @@ export function resolveListItem(item, referenceMap) {
 
 // Un libellé par valeur distincte, à la casse et aux accents près : le compte
 // d'une option de menu compte les contacts, pas leurs lignes de table liées.
-function uniqueLabels(labels) {
+export function uniqueLabels(labels) {
   const seen = new Set();
   return labels.filter(label => {
     const key = normalize(label);

@@ -149,14 +149,15 @@ export const CATEGORIES = {
 // Bordeaux ». Ce n'est pas une catégorie : aucun filtre ni tag n'en vient.
 export const ETABLISSEMENT_NAMES = 'etablissementNom';
 
-// Ordre des boutons de filtre. Rôle PUI n'a pas de filtre (specs.md), ni les
-// regroupements : les domaines sont les groupes du menu Compétences, les actions
-// celles du menu Tâches.
-const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement'];
+// Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
+// groupes du menu Compétences, les actions celles du menu Tâches. Rôle PUI en a un depuis la
+// 1.24.0 (demande d'Antoine du 13 octobre 2026).
+const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role'];
 
-// Ordre des sections de tags d'une carte. Établissement a son badge dédié ; les
-// regroupements n'y figurent pas : la carte garde le détail des compétences et
-// des tâches.
+// Les sections de tags d'une carte, dans l'ordre. Établissement a son badge dédié ; les
+// regroupements n'y figurent pas : la carte garde le détail des compétences et des tâches.
+// Rôle PUI est dans la liste (c'est un tag, et la relecture compare ses libellés) mais la carte
+// le dessine sous le logo de l'établissement, pas dans le bas (render.js, fillRole).
 const TAG_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role'];
 
 const withKey = key => ({ key, ...CATEGORIES[key] });

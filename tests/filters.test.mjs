@@ -140,6 +140,22 @@ test('filterContacts applies a tag-list filter (e.g. instances)', () => {
   assert.equal(result[0].nom, 'A');
 });
 
+test('filterContacts applies the Rôle PUI filter, counts its options and drops a role that no longer exists', () => {
+  const contacts = [
+    { nom: 'A', labels: { role: ['Référent qualité'] } },
+    { nom: 'B', labels: { role: ['Chef de projet'] } },
+    { nom: 'C', labels: { role: [] } }
+  ];
+  const activeFilters = createEmptyFilterState();
+  activeFilters.role.add('referent QUALITE');
+  assert.deepEqual(filterContacts(contacts, activeFilters, '').map(contact => contact.nom), ['A']);
+  const counts = computeFilterCounts(contacts, createEmptyFilterState(), '', undefined);
+  assert.deepEqual(counts.role, { [normalize('Référent qualité')]: 1, [normalize('Chef de projet')]: 1 });
+  const ticked = createEmptyFilterState();
+  ticked.role.add('Référent qualité');
+  assert.equal(pruneStaleFilters(ticked, { role: { 7: 'Chef de projet' } }).role.size, 0, 'un rôle supprimé de Role_Dans_le_PUI ne filtre plus personne');
+});
+
 test('filterContacts matches a category filter regardless of case/accent differences between a card label and the reference-table option', () => {
   // Le libellé d'une carte et celui du menu peuvent venir de colonnes
   // différentes (libellé brut ou corrigé) et diverger par la casse ou les
@@ -244,7 +260,7 @@ const SKILLS = {
 
 test('createEmptyFilterState has no filter of its own for the domains: they are groups of the skills menu', () => {
   assert.deepEqual(Object.keys(createEmptyFilterState()),
-    ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement']);
+    ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role']);
 });
 
 test('ticking a domain keeps the contacts with at least one skill in it, exactly like the former « Domaines » filter', () => {
