@@ -328,27 +328,130 @@ textarea {
   color: #8f4519;
   font-weight: 700;
 }
-/* Un choix parmi une liste : la recherche à côté de la liste déroulante, qui passe dessous dans un cadre
-   étroit. Le nombre de résultats se lit dessous, sans rien décaler tant qu'on ne cherche pas. */
-.fld-pair {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.fld-pair input,
-.fld-pair select {
-  flex: 1 1 200px;
-  min-width: 0;
-}
-.fld-pair .pick-search {
-  margin-bottom: 0;
-}
+/* Le nombre de résultats de la recherche d'une liste à pastilles, lu dessous sans rien décaler tant qu'on ne cherche pas. */
 .fld-found {
   color: var(--muted);
   font-size: 12px;
 }
 .fld-found:not(:empty) {
   margin-top: 5px;
+}
+
+/* Un choix parmi une liste (dropdown() de dom.js) : le bouton a la forme d'un champ, le panneau celle d'un menu de
+   filtre (style.css) avec la recherche en haut. Le panneau couvre ce qui suit le champ ; la fenêtre défile pour le
+   montrer en entier. */
+.dd {
+  position: relative;
+}
+.dd-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+.dd-trigger:hover,
+.dd.open .dd-trigger {
+  border-color: var(--violet);
+}
+.dd.open .dd-trigger {
+  background: #fff;
+}
+.dd-trigger[aria-invalid="true"] {
+  border-color: #d85b5b;
+}
+.dd-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dd-trigger.empty .dd-value {
+  color: #566177; /* 5,9:1 sur le fond du champ, comme le texte d'invite de style.css */
+}
+.dd-caret {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg);
+}
+.dd.open .dd-caret {
+  transform: translateY(2px) rotate(225deg);
+}
+.dd-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--violet);
+  border-radius: 14px;
+  box-shadow: 0 16px 32px #1b203d29;
+}
+.dd-panel .dd-search {
+  margin-bottom: 6px;
+}
+.dd-list {
+  position: relative;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+.dd-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+/* Le repère de l'option désignée n'est montré que quand le focus est dans le panneau : sur un téléphone, où la recherche
+   ne prend pas le focus d'elle-même, la première valeur ne passerait pas pour un choix. */
+.dd-panel:focus-within .dd-option.active {
+  background: var(--violet-soft);
+}
+.dd-option[aria-selected="true"] {
+  color: var(--violet-ink);
+  font-weight: 750;
+}
+.dd-option[aria-selected="true"]::after {
+  content: "✓";
+  content: "✓" / ""; /* le coche ne s'ajoute pas au nom lu par les lecteurs d'écran : aria-selected le dit */
+  flex: none;
+}
+.dd-none {
+  padding: 10px 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+/* Écran tactile : des cibles pour un doigt et une recherche à 16 px (en dessous, iOS zoome sur la page à la saisie). */
+@media (pointer: coarse) {
+  .dd-panel .dd-search {
+    height: 42px;
+    font-size: 16px;
+  }
+  .dd-option {
+    padding: 13px 8px;
+    font-size: 15px;
+  }
 }
 
 /* Sélecteurs à pastilles : toutes les valeurs visibles, un clic pour cocher */

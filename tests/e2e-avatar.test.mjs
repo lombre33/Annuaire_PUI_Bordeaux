@@ -1128,7 +1128,8 @@ test('« Créer ma fiche » n\'offre pas la photo, qui s\'ajoute ensuite : la fi
     assert.equal(await dialog(page).locator('input[type="file"]').count(), 0);
 
     await dialog(page).locator('#profile-prenom').fill('Zoé');
-    await dialog(page).locator('#profile-Etablissement').selectOption({ label: 'CHU' });
+    await dialog(page).locator('#profile-Etablissement').click();
+    await dialog(page).locator('#profile-Etablissement-list .dd-option', { hasText: /^CHU$/ }).click();
     await press(page, 'Relire ma fiche').click();
     await headingIs(page, 'Relire avant de publier');
     assert.equal(await dialog(page).locator('.avatar-zoom, .mark-avatar, .thumb').count(), 0, 'rien de la photo dans la relecture d\'une création');
