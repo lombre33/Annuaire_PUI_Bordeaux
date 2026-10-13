@@ -537,17 +537,17 @@ export function groupLabelMap(groupMap, detailMap, fallback) {
 
 // Lit la colonne de libellé d'une catégorie : { map: id → libellé,
 // labelColumnsMissing } (aucune colonne de libellé n'existe : le menu et les tags
-// seraient vides en silence).
-function readReferenceMap({ key, table, field }, result, log) {
+// seraient vides en silence). Une catégorie `corrected` (voir constants.js) lit sa seule
+// colonne corrigée dès que la table en remplit au moins une : une ligne qui n'en a pas est
+// laissée de côté, la console dit combien, au lieu d'être montrée avec son libellé brut.
+function readReferenceMap({ key, table, field, corrected }, result, log) {
   const rows = tableToRows(result.value);
   const labelFields = [].concat(field);
-  const map = labelMapFromRows(rows, labelFields);
+  const correctedOnly = corrected === true && rows.some(row => text(row[labelFields[0]]));
+  const map = labelMapFromRows(rows, correctedOnly ? labelFields.slice(0, 1) : labelFields);
   const withoutLabel = rows.length - Object.keys(map).length;
-  // Le libellé corrigé est prioritaire : les lignes qui n'en ont pas gardent le libellé brut, et la console le dit.
-  const rawOnly = labelFields.length > 1 ? rows.filter(row => !text(row[labelFields[0]]) && pickLabel(row, labelFields)).length : 0;
   log.info(`[REFS] ${key} (${table}): ${Object.keys(map).length} entrées`
-    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${labelFields.join('/')})` : '')
-    + (rawOnly ? ` (${rawOnly} ligne(s) au libellé brut, faute de ${labelFields[0]})` : ''));
+    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${correctedOnly ? `${labelFields[0]}, ignorée(s)` : labelFields.join('/')})` : ''));
   const absent = missingColumns(rows, labelFields);
   if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
   return { map, labelColumnsMissing: absent.length === labelFields.length };

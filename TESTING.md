@@ -342,8 +342,9 @@ Spécifique **Compétences** (et toutes les catégories issues d'une table de
 référence) :
 
 - [ ] Le menu propose un seul libellé par compétence : le libellé corrigé
-      (`Competences_corrigees`) quand il est rempli, le libellé brut sinon.
-      Les compétences d'une carte portent les mêmes libellés que le menu.
+      (`Competences_corrigees`). Une compétence dont il est vide n'est pas proposée tant
+      que la table en remplit au moins un ; une table qui n'en remplit aucun garde les
+      libellés bruts. Les compétences d'une carte portent les mêmes libellés que le menu.
 - [ ] Cocher une compétence dans le menu garde exactement les contacts dont
       la carte affiche cette compétence.
 
@@ -450,7 +451,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       case est bien cochée (pas seulement mise en évidence visuellement), et
       le badge de comptage sur le bouton du filtre est à jour — même
       résultat qu'en cochant la case directement dans le menu.
-- [ ] **Le rôle PUI d'une carte (pastille sous le logo) est cliquable** (1.22.0) :
+- [ ] **Le rôle PUI d'une carte (pastille sous le logo) est cliquable** (1.23.0) :
       curseur "main" au survol, un clic coche la valeur dans le filtre
       « Rôle PUI » et la grille se filtre ; un second clic la décoche. Un
       rôle long (« Référent innovation et valorisation ») passe à la ligne

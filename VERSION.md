@@ -1,4 +1,4 @@
-# Version 1.22.0 — Filtre « Rôle PUI », et le rôle de la personne sous le logo de sa carte (voir CHANGELOG.md)
+# Version 1.23.0 — Filtre « Rôle PUI », et le rôle de la personne sous le logo de sa carte (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -57,6 +57,8 @@ Depuis la 1.21.6, la fenêtre « Modifier mon profil » ne propose qu'une entré
 qui ont le même libellé corrigé (une tâche proposée trois fois) ne forment plus qu'une case, qui les couvre toutes.
 Depuis la 1.21.7, le widget attend la réponse de Grist à la suppression de la ligne qu'il ajoute à `Annuaire_Sonde`, la retente une fois,
 dit dans la console pourquoi si Grist la refuse, et supprime les anciennes lignes laissées à l'adresse de la personne (jamais celles des autres).
-Depuis la 1.22.0, un huitième filtre, « Rôle PUI » (table `Role_Dans_le_PUI`), ferme la barre, et le rôle de la personne s'affiche en
+Depuis la 1.22.0, les filtres, les cartes et la fenêtre de modification ne lisent que la colonne « corrigé » des tables de référence dès qu'une
+table en remplit une : une ligne sans libellé corrigé n'apparaît plus (une table qui n'en remplit aucune garde ses libellés bruts).
+Depuis la 1.23.0, un huitième filtre, « Rôle PUI » (table `Role_Dans_le_PUI`), ferme la barre, et le rôle de la personne s'affiche en
 pastille sous le logo de son établissement ; les menus de filtre réunissent deux libellés qui ne diffèrent que par la casse ou les accents.
-916 tests (dont 328 dans un vrai navigateur, optionnels sans Playwright).
+919 tests (dont 328 dans un vrai navigateur, optionnels sans Playwright).

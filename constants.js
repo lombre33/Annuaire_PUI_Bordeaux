@@ -83,6 +83,13 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 //   table, field  table de référence et colonne de libellé (`field` peut lister
 //                 plusieurs colonnes, essayées dans l'ordre : le libellé
 //                 corrigé d'abord, le libellé brut de l'import en repli)
+//   corrected     la première colonne de `field` est le libellé corrigé et la seconde
+//                 le libellé brut de l'import. Dès que la table remplit au moins un
+//                 libellé corrigé, seul celui-là compte : une ligne qui n'en a pas est
+//                 laissée de côté (ni menu, ni tag, ni choix de la fenêtre de
+//                 modification) au lieu de montrer son libellé brut. Une table qui n'en
+//                 a encore aucun garde ses libellés bruts, pour que ses filtres ne
+//                 soient pas vides (voir readReferenceMap dans grist-data.js)
 //   column        colonne ReferenceList de BDD qui y renvoie ; absente pour les
 //                 Références simples Établissement et Rôle
 //   groups        catégorie dont celle-ci est un regroupement : elle lit une
@@ -108,15 +115,15 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 // Les libellés lus de Grist sont rangés par clé de catégorie (referenceMaps),
 // pas par table : deux catégories peuvent lire la même table.
 export const CATEGORIES = {
-  actions: { label: 'Actions', color: '#c84e0f', table: 'Actions', field: ['Actions_corrigees', 'Actions'], column: 'Actions' },
+  actions: { label: 'Actions', color: '#c84e0f', table: 'Actions', field: ['Actions_corrigees', 'Actions'], corrected: true, column: 'Actions' },
   taches: {
-    label: 'Tâches', color: '#a96500', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
+    label: 'Tâches', color: '#a96500', table: 'Taches', field: ['Taches_corrige', 'Taches'], corrected: true, column: 'Taches',
     grouping: 'macroTaches'
   },
-  communautes: { label: 'Communautés', color: '#cf3788', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], column: 'Communautes' },
-  gt: { label: 'GT', color: '#158378', table: 'GT', field: ['GT_corrige', 'GT'], column: 'GT' },
+  communautes: { label: 'Communautés', color: '#cf3788', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], corrected: true, column: 'Communautes' },
+  gt: { label: 'GT', color: '#158378', table: 'GT', field: ['GT_corrige', 'GT'], corrected: true, column: 'GT' },
   competences: {
-    label: 'Compétences', color: '#9c27b0', table: 'Competences', field: ['Competences_corrigees', 'Competences'], column: 'Competences',
+    label: 'Compétences', color: '#9c27b0', table: 'Competences', field: ['Competences_corrigees', 'Competences'], corrected: true, column: 'Competences',
     grouping: 'macro'
   },
   macro: {
@@ -131,7 +138,7 @@ export const CATEGORIES = {
     hint: 'Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi elles',
     placeholder: 'Action ou tâche…'
   },
-  instances: { label: 'Instances', color: '#2271e2', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], column: 'Instances' },
+  instances: { label: 'Instances', color: '#2271e2', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], corrected: true, column: 'Instances' },
   etablissement: { label: 'Établissement', color: '#147c72', table: 'Etablissements', field: ['acronyme', 'nom_complet'] },
   role: { label: 'Rôle PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
 };
@@ -144,7 +151,7 @@ export const ETABLISSEMENT_NAMES = 'etablissementNom';
 
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
 // groupes du menu Compétences, les actions celles du menu Tâches. Rôle PUI en a un depuis la
-// 1.22.0 (demande d'Antoine du 13 octobre 2026).
+// 1.23.0 (demande d'Antoine du 13 octobre 2026).
 const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role'];
 
 // Les sections de tags d'une carte, dans l'ordre. Établissement a son badge dédié ; les
@@ -162,11 +169,12 @@ export const TAG_GROUPS = TAG_KEYS.map(withKey);
 // catégories s'y appuient.
 export const REFERENCE_TABLES = [...new Set(Object.values(CATEGORIES).map(({ table }) => table))];
 
-// Un libellé à lire par catégorie : { key, table, field } et, pour un
-// regroupement, { groups, fallback } avec, s'il se déduit des numéros, numberedIn.
+// Un libellé à lire par catégorie : { key, table, field } avec `corrected` si sa première colonne est
+// le libellé corrigé et, pour un regroupement, { groups, fallback } avec, s'il se déduit des numéros,
+// numberedIn.
 export const REFERENCE_SOURCES = Object.entries(CATEGORIES)
-  .map(([key, { table, field, groups, fallback, numberedIn }]) => ({
-    key, table, field, ...(groups && { groups, fallback, ...(numberedIn && { numberedIn }) })
+  .map(([key, { table, field, corrected, groups, fallback, numberedIn }]) => ({
+    key, table, field, ...(corrected && { corrected }), ...(groups && { groups, fallback, ...(numberedIn && { numberedIn }) })
   }));
 
 // Catégories dont BDD porte une colonne ReferenceList ; `groups` pour un

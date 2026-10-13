@@ -58,12 +58,14 @@ export function sampleTables() {
       autres: [false, false, true, false, false],
       ok_pour_apparaitre: [true, true, true, false, true]
     },
-    // Chaque table de référence : libellé brut + libellé « corrigé » (prioritaire
-    // quand il est rempli).
+    // Chaque table de référence : libellé brut + libellé « corrigé ». Dès qu'une table remplit un
+    // libellé corrigé, seul celui-là compte (ses lignes sans libellé corrigé sont ignorées) ; une
+    // table qui n'en remplit aucun garde ses libellés bruts. Ici INSTANCES et Competences ont leur
+    // colonne corrigée remplie, les autres tables lisent leurs libellés bruts.
     INSTANCES: {
       id: [1, 2, 3],
       Instances: ['CME', '', 'Coviris (ancien nom)'],
-      Instances_Corrigees: ['', '', 'COVIRIS']
+      Instances_Corrigees: ['CME', '', 'COVIRIS']
     },
     Actions: { id: [1, 2], Actions: ['Vaccination', 'Audit'], Actions_corrigees: ['', ''] },
     Communautes: {
@@ -78,7 +80,7 @@ export function sampleTables() {
     Competences: {
       id: [1, 2, 3, 4],
       Competences: ['oncologie', 'hematologie', 'Pharmacovigilance', 'Divers'],
-      Competences_corrigees: ['Oncologie', 'Hématologie', '', ''],
+      Competences_corrigees: ['Oncologie', 'Hématologie', 'Pharmacovigilance', 'Divers'],
       Macro_competences: ['Cancérologie', 'cancérologie', 'Pharmacie', '']
     },
     Role_Dans_le_PUI: { id: [1], Role: ['Référent qualité'] }
@@ -98,7 +100,8 @@ export function withoutOptionalColumns(tables) {
 // de son action, que la table Actions porte dans son libellé. Les deux actions de la base de
 // départ sont numérotées, et quatre tâches sont portées par BDD.Taches. Avec ces données
 // (périmètre par défaut ; Bob est partenaire) :
-//   Action 1 : Vaccination  → 1.1 Relecture (Ana), 1.2 Rappel vaccinal (Gina ; libellé corrigé)
+//   Action 1 : Vaccination  → 1.1 Relecture (Ana), 1.2 Rappel vaccinal (Gina ; libellé corrigé : le brut
+//                             s'écrit « 1.2 rappel vaccinal »)
 //   Action 2 : Audit        → 2.1 Inspection (Ana, Bob)
 //   Sans action             → Veille (Hugo), une tâche sans numéro
 export function withTaskActions(tables = sampleTables()) {
@@ -108,7 +111,7 @@ export function withTaskActions(tables = sampleTables()) {
   copy.Taches = {
     id: [1, 2, 3, 4],
     Taches: ['1.1 Relecture', '1.2 rappel vaccinal', '2.1 Inspection', 'Veille'],
-    Taches_corrige: ['', '1.2 Rappel vaccinal', '', ''],
+    Taches_corrige: ['1.1 Relecture', '1.2 Rappel vaccinal', '2.1 Inspection', 'Veille'],
     Taches_role: ['', '', '', '']
   };
   const tasksOf = { 1: ['L', 1, 3], 2: ['L', 3], 9: ['L', 2], 10: ['L', 4] };
