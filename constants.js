@@ -5,6 +5,8 @@ export const MAIN_TABLE = 'BDD';
 // pour la lecture (grist-data.js) et l'écriture (presence.js) : les deux ne
 // peuvent pas diverger.
 export const CONSENT_COLUMN = 'Accepte_apparaitre';
+// Le nom de ce choix pour la personne : la case de la fenêtre de création et la ligne « pas gardé » d'une relecture.
+export const CONSENT_LABEL = 'Apparaître dans l’annuaire';
 
 // Table-sonde qui dit au widget qui est connecté (voir identity.js). Elle appartient
 // au document et se crée à la main : GRIST_SETUP.md donne ses colonnes.
@@ -144,9 +146,10 @@ export const CATEGORIES = {
 };
 
 // Clé, parmi les libellés lus de Grist (referenceMaps), des noms complets des établissements
-// (nom_complet, à défaut l'acronyme). Les cartes, les filtres et les tags parlent par acronyme ;
-// les fenêtres (la liste d'un administrateur, le détail des changements) disent « Université de
-// Bordeaux ». Ce n'est pas une catégorie : aucun filtre ni tag n'en vient.
+// (nom_complet, à défaut l'acronyme). Les cartes, les filtres, les tags et la liste d'établissements
+// des fenêtres de profil parlent par acronyme ; seules les phrases des fenêtres (« Université de
+// Bordeaux n'a pas validé sa présence ») et le choix de l'établissement à modifier disent le nom
+// complet. Ce n'est pas une catégorie : aucun filtre ni tag n'en vient.
 export const ETABLISSEMENT_NAMES = 'etablissementNom';
 
 // Le rôle de la personne dans une tâche : colonne facultative `Taches_role` de la table `Taches`. Une même
@@ -218,7 +221,7 @@ export const PROFILE_FIELDS = [
   { key: 'prenom', label: 'Prénom', kind: 'text' },
   { key: 'nom', label: 'Nom', kind: 'text' },
   { key: 'email', label: 'E-mail', kind: 'email', admin: true },
-  { key: 'Etablissement', label: CATEGORIES.etablissement.label, kind: 'reference', category: 'etablissement', labelsFrom: ETABLISSEMENT_NAMES, admin: true, atCreation: true, required: true },
+  { key: 'Etablissement', label: CATEGORIES.etablissement.label, kind: 'reference', category: 'etablissement', admin: true, atCreation: true, required: true },
   { key: 'Fonction', label: 'Fonction', kind: 'text' },
   // L'adresse que la carte montre à la place de `email` quand elle n'est pas vide (colonne facultative).
   { key: 'email_affiche', label: 'E-mail affiché', kind: 'email', optional: true },

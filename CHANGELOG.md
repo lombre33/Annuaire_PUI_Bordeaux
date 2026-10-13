@@ -3,7 +3,7 @@
 ## 1.26.0 — Le rôle de la personne dans une tâche, au survol de son étiquette
 
 Demande d'Antoine du 13 octobre 2026, après sa démo (point 9) : montrer le `Taches_role` de la table `Taches`, « en se basant bien sur la
-colonne Taches et pas Taches_corrige ». La 1.25.0 est celle de la PR « Publier ma fiche » (#48), encore ouverte.
+colonne Taches et pas Taches_corrige ». La 1.25.0 est celle de la PR « Publier ma fiche » (#48), fusionnée entre-temps.
 
 - **Le rôle se lit sur les lignes brutes de la personne.** Plusieurs lignes brutes de `Taches` ont le même libellé corrigé : c'est ce qui n'en fait
   qu'une étiquette sur la carte. Le widget prend le `Taches_role` des lignes que `BDD.Taches` désigne pour cette personne, jamais celui d'une ligne
@@ -18,6 +18,32 @@ colonne Taches et pas Taches_corrige ». La 1.25.0 est celle de la PR « Publier
 - Tests : `tests/task-roles.test.mjs` (4 tests des données : lignes de la personne et non du libellé corrigé, colonne absente, table illisible) et
   `tests/e2e-task-roles.test.mjs` (4 tests dans Chromium : souris, clavier, écran tactile). **Non essayé dans le vrai Grist d'Antoine ni sur un
   vrai téléphone.** Revenir en arrière : `git revert` de la fusion de cette version.
+
+## 1.25.0 — Créer sa fiche : « Publier ma fiche », et une recherche dans chaque liste à choix
+
+Demande d'Antoine du 13 octobre 2026 (08 h 07, ses points 7 et 8).
+
+- **Publier en créant.** La fenêtre « Créer ma fiche » a une case **« Apparaître dans l'annuaire », cochée d'avance** : son choix est écrit dans
+  `BDD.Accepte_apparaitre`, dans la même ligne ajoutée que le reste (toujours une seule action Grist). Cochée, la relecture s'intitule « Relire avant
+  de publier » et son bouton est « Publier ma fiche » ; décochée, rien ne change pour la personne (« Créer ma fiche »), et la ligne est écrite avec
+  `Accepte_apparaitre` à faux : elle a répondu non, ce qui n'est plus « pas répondu ». Elle l'allume ensuite avec l'interrupteur du bandeau.
+- **Publier n'est pas afficher.** Le widget n'écrit jamais le `perimetre` (réservé aux administrateurs) : une fiche créée, même publiée, n'apparaît
+  qu'une fois son périmètre rempli dans Grist. La relecture, le message de confirmation et le bandeau « Ma présence » le disent (« Votre fiche est
+  publiée, mais elle reste masquée de l'annuaire : votre fiche n'a pas de périmètre. Contactez un administrateur. ») au lieu de promettre qu'elle
+  apparaît ; le message est lu sur la fiche rechargée (`describeCreated`, `presence.js`). Si Grist n'a pas gardé le choix (règle d'accès), il le dit aussi.
+- **Les établissements, par leur acronyme.** Dans les fenêtres de création et de modification, la liste des établissements montrait un mélange de
+  noms complets et d'acronymes ; elle ne montre plus que l'`acronyme`, et le nom complet d'un établissement qui n'en a pas. Le nom complet reste
+  dans les phrases (« Votre établissement … ») et au survol des logos.
+- **Une recherche dans chaque liste à choix.** Même principe que les menus de filtre (casse et accents ignorés) : établissement et rôle (la liste
+  déroulante ne garde que les valeurs qui répondent, avec l'option vide et la valeur choisie, et dit « N résultats » ou « Aucun résultat » aux
+  lecteurs d'écran), les pastilles de la fenêtre de profil (jusqu'ici une recherche seulement au-delà de douze valeurs : désormais toujours) et les
+  personnes à nommer dans la fiche d'un établissement. Pas de recherche sur les deux ou trois boutons « radio » du choix d'établissement : on les lit d'un coup.
+- **Écarts avec la maquette v5** (comme demandé) : la case « Apparaître dans l'annuaire » et les champs de recherche n'y figurent pas ; les lignes
+  « Établissement » et « Rôle dans le PUI » du formulaire prennent toute la largeur (la recherche à gauche, la liste à droite) au lieu d'une demi-largeur.
+- Des tests de non-régression (`tests/profile-save.test.mjs`, `tests/presence.test.mjs`, `tests/e2e-profile.test.mjs`, `tests/e2e-etablissement.test.mjs`)
+  couvrent la case cochée et décochée, les messages, et la recherche de chaque sorte de liste ; ceux qui lisaient des noms complets lisent des acronymes.
+- Rien à changer dans le document Grist (la règle d'accès de 1.18.0 qui laisse ajouter sa ligne suffit ; `Accepte_apparaitre` doit rester une colonne de
+  données). **Non essayé dans le vrai Grist d'Antoine.** Revenir en arrière : `git revert` de la fusion de cette version.
 
 ## 1.24.0 — Filtre « Rôle PUI », et le rôle de la personne sous le logo de sa carte
 

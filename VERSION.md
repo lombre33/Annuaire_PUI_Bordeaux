@@ -61,6 +61,9 @@ Depuis la 1.22.0, les filtres, les cartes et la fenêtre de modification ne lise
 table en remplit une : une ligne sans libellé corrigé n'apparaît plus (une table qui n'en remplit aucune garde ses libellés bruts).
 Depuis la 1.24.0, un huitième filtre, « Rôle PUI » (table `Role_Dans_le_PUI`), ferme la barre, et le rôle de la personne s'affiche en
 pastille sous le logo de son établissement ; les menus de filtre réunissent deux libellés qui ne diffèrent que par la casse ou les accents.
+Depuis la 1.25.0, la fenêtre « Créer ma fiche » a une case « Apparaître dans l'annuaire », cochée d'avance, qui renseigne `Accepte_apparaitre` et change le
+bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son périmètre rempli par un administrateur, et les messages le disent) ; les listes
+d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
 Depuis la 1.26.0, l'étiquette d'une tâche dit le rôle de la personne dans cette tâche (colonne facultative `Taches_role` de `Taches`, lue sur les lignes brutes
 que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bulle à la souris et au clavier, sous le nom de la tâche sur un téléphone.
-927 tests (dont 332 dans un vrai navigateur, optionnels sans Playwright).
+933 tests (dont 334 dans un vrai navigateur, optionnels sans Playwright).

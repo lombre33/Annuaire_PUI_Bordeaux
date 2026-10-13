@@ -6,7 +6,7 @@
 // l'image (image-prep.js) viennent de ce que main.js donne à open().
 
 import { IMAGE_RULES } from './constants.js';
-import { button, el, notice } from './dom.js';
+import { button, el, matchesTerm, notice, searchField } from './dom.js';
 import {
   diffEtablissement, draftOfEtablissement, KEEP_ONE, nominate, NAME_REQUIRED, rebaseDraft, summaryOf,
   toggleResponsable, visibilityWarning
@@ -383,17 +383,29 @@ export function createEtablissementDialog(dialog) {
     return row;
   }
 
-  function paintResponsables() {
-    ui.list.replaceChildren(...draft.responsables.map(responsableRow));
+  // Les personnes qu'on peut encore nommer : celles de l'établissement qui ne sont pas déjà responsables, réduites
+  // par la recherche. La personne choisie dans la liste y reste, quoi qu'on cherche ensuite.
+  function paintCandidates() {
     const taken = new Set(draft.responsables.filter(item => item.state !== 'removed').map(item => item.email));
     const candidates = fiche.candidates.filter(candidate => !taken.has(candidate.email));
-    ui.pick.replaceChildren(...[{ email: '', name: candidates.length > 0 ? 'Choisir une personne' : 'Aucune autre personne' }, ...candidates].map(candidate => {
+    const term = ui.term;
+    const picked = ui.pick.value;
+    const shown = candidates.filter(candidate => candidate.email === picked || matchesTerm(candidate.name, term));
+    const none = candidates.length === 0 ? 'Aucune autre personne' : shown.length === 0 ? 'Aucun résultat' : 'Choisir une personne';
+    ui.pick.replaceChildren(...[{ email: '', name: none }, ...shown].map(candidate => {
       const option = document.createElement('option');
       option.value = candidate.email;
       option.textContent = candidate.name;
       return option;
     }));
+    ui.pick.value = shown.some(candidate => candidate.email === picked) ? picked : '';
     ui.pick.disabled = candidates.length === 0 || ui.mail.value.trim() !== '';
+    ui.search.disabled = ui.pick.disabled;
+  }
+
+  function paintResponsables() {
+    ui.list.replaceChildren(...draft.responsables.map(responsableRow));
+    paintCandidates();
   }
 
   function nominateTyped() {
@@ -404,6 +416,8 @@ export function createEtablissementDialog(dialog) {
     ui.pick.value = '';
     ui.mail.value = '';
     ui.mail.disabled = false;
+    ui.search.value = '';
+    ui.term = '';
     paintResponsables();
     refresh();
   }
@@ -424,6 +438,17 @@ export function createEtablissementDialog(dialog) {
     ui.selfNote.id = 'etabSelfNote';
     ui.minErr = el('p', 'fld-err es-err', KEEP_ONE);
     ui.minErr.setAttribute('role', 'alert');
+    const find = el('div', 'es-find');
+    ui.term = '';
+    ui.search = searchField({
+      label: 'Rechercher une personne de l’établissement',
+      placeholder: 'Rechercher une personne de l’établissement…',
+      onTerm: term => {
+        ui.term = term;
+        paintCandidates();
+      }
+    });
+    find.append(ui.search);
     const add = el('div', 'es-add');
     ui.pick = document.createElement('select');
     ui.pick.setAttribute('aria-label', 'Nommer une personne de l’établissement');
@@ -437,7 +462,7 @@ export function createEtablissementDialog(dialog) {
     ui.addErr.setAttribute('role', 'alert');
     ui.addErr.hidden = true;
     ui.pick.addEventListener('change', () => { ui.mail.disabled = ui.pick.value !== ''; });
-    ui.mail.addEventListener('input', () => { ui.pick.disabled = ui.mail.value.trim() !== ''; });
+    ui.mail.addEventListener('input', paintCandidates);
     ui.mail.addEventListener('keydown', event => {
       if (event.key === 'Enter') {
         event.preventDefault();
@@ -445,7 +470,7 @@ export function createEtablissementDialog(dialog) {
       }
     });
     add.append(ui.pick, ui.mail, button('Nommer', 'btn', nominateTyped));
-    box.append(ui.list, ui.selfNote, ui.minErr, add, ui.addErr);
+    box.append(ui.list, ui.selfNote, ui.minErr, find, add, ui.addErr);
     return box;
   }
 

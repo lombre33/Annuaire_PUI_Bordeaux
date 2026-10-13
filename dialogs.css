@@ -328,6 +328,28 @@ textarea {
   color: #8f4519;
   font-weight: 700;
 }
+/* Un choix parmi une liste : la recherche à côté de la liste déroulante, qui passe dessous dans un cadre
+   étroit. Le nombre de résultats se lit dessous, sans rien décaler tant qu'on ne cherche pas. */
+.fld-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fld-pair input,
+.fld-pair select {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.fld-pair .pick-search {
+  margin-bottom: 0;
+}
+.fld-found {
+  color: var(--muted);
+  font-size: 12px;
+}
+.fld-found:not(:empty) {
+  margin-top: 5px;
+}
 
 /* Sélecteurs à pastilles : toutes les valeurs visibles, un clic pour cocher */
 .grp {
@@ -955,6 +977,20 @@ textarea {
 }
 .es-add select:disabled,
 .es-add input:disabled {
+  opacity: 0.5;
+}
+/* La recherche des personnes à nommer, au-dessus de la liste qu'elle réduit : même hauteur que les champs
+   de la ligne qui suit. */
+.es-find {
+  margin-top: 10px;
+}
+.es-find .pick-search {
+  height: 40px;
+  margin-bottom: 0;
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+.es-find .pick-search:disabled {
   opacity: 0.5;
 }
 .es-err {

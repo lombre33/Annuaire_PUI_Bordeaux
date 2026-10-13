@@ -8,12 +8,12 @@
 // fenêtre), branding.js, attachments.js et branding-ui.js (les logos : cartes et
 // fondateurs) et avatar-ui.js (les photos de profil).
 
-import { ETABLISSEMENT_NAMES, SEARCH_DELAY_MS } from './constants.js';
+import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS } from './constants.js';
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { attachTagNotes, createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
-import { describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
+import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
 import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges, blankFiche } from './profile.js';
 import { PHOTO_UPLOAD_HINT, ProfileSaveError, createProfile, prepareCreation, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
@@ -581,7 +581,8 @@ async function reviewCreation(blank, draft) {
 }
 
 // Ajoute la fiche à BDD, puis relit l'annuaire : le bandeau montre alors l'interrupteur et « Modifier mon
-// profil », et on vérifie que Grist a gardé ce qu'on lui a demandé.
+// profil », on vérifie que Grist a gardé ce qu'on lui a demandé, et le message de fin dit si la fiche apparaît
+// (publier n'est pas afficher : voir describeCreated).
 async function saveCreation(review) {
   let result;
   try {
@@ -590,9 +591,15 @@ async function saveCreation(review) {
     throw userFacing(error);
   }
   const outcome = await reloadDirectory();
-  const saved = outcome === 'applied' && result.rowId !== null ? state.people?.findById(result.rowId)?.row : null;
-  const leftovers = saved ? unsavedLabels(review, saved, state.referenceMaps) : [];
-  return { status: 'saved', lines: review.lines, leftovers, reloaded: outcome !== 'failed' };
+  const saved = outcome === 'applied' && result.rowId !== null ? state.people?.findById(result.rowId) : null;
+  const leftovers = saved ? unsavedLabels(review, saved.row, state.referenceMaps) : [];
+  return {
+    status: 'saved',
+    lines: review.lines,
+    leftovers,
+    reloaded: outcome !== 'failed',
+    notice: describeCreated(saved?.status ?? null, review.accepted)
+  };
 }
 
 // Le bouton « Créer ma fiche » du bandeau : la personne connectée n'a aucune ligne dans BDD. Elle remplit la
@@ -609,10 +616,11 @@ function openCreation() {
     person: { name: 'Nouvelle fiche', email, initials: '+' },
     etablissement: '',
     model,
-    draft: draftOf(model),
+    // « Apparaître dans l'annuaire » est cochée d'avance : « Publier ma fiche ».
+    draft: { ...draftOf(model), [CONSENT_COLUMN]: true },
     evaluate: draft => evaluateDraft(blank, draft, false, true),
     review: draft => reviewCreation(blank, draft),
-    hiddenNotice: review => describeHiddenFiche(review.visibility, { own: true }),
+    hiddenNotice: review => describeHiddenFiche(review.visibility, { own: true, creating: true }),
     fieldWarning: (key, value) => (key === 'Etablissement' ? etablissementWarning(value) : ''),
     save: review => saveCreation(review),
     renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks, cardLogos()),

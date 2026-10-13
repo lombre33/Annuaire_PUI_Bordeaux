@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withIdentity, withSchema, withShownEmail, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
-import { assertFooterWraps, cardCount, skip, reload, waitForCards, withWidget } from './support/browser.mjs';
+import { assertFooterWraps, skip, reload, waitForCards, withWidget } from './support/browser.mjs';
 
 // ===== Outils =====
 
@@ -56,7 +56,12 @@ const heading = page => page.locator('#profileTitle');
 const headingIs = (page, expected) =>
   page.waitForFunction(value => document.getElementById('profileTitle').textContent === value, expected);
 const focusedId = page => page.evaluate(() => document.activeElement.id);
-const closed = page => page.waitForFunction(() => !document.getElementById('profileDialog').open);
+// « Fermée » veut dire aussi que l'événement « close » est passé : Chromium l'envoie à l'image suivante, pas dans la tâche qui ferme
+// la fenêtre, et c'est lui qui la vide. Un test rapide qui la rouvre ou la compte aussitôt la verrait vidée par cet événement en retard.
+const closed = page => page.waitForFunction(() => {
+  const dialog = document.getElementById('profileDialog');
+  return !dialog.open && dialog.querySelector('.dlg-body').childElementCount === 0;
+});
 // Le focus revient à l'élément voulu (sélecteur CSS) : l'événement « close » qui le rend est
 // envoyé après que la fenêtre a cessé d'être ouverte, d'où l'attente.
 const focusReturnsTo = (page, selector) => page.waitForFunction(
@@ -588,20 +593,34 @@ test('le numéro saisi sans espaces est remis en forme en quittant le champ', { 
     assert.equal(await summary(page), '1 champ modifié');
   }));
 
-test('la recherche d\'une liste longue ne retire rien de la sélection, et masque les domaines vides', { skip }, () =>
+test('la recherche d\'une liste ne retire rien de la sélection, et masque les domaines vides ; une liste courte a la sienne aussi', { skip }, () =>
   withWidget({ tables: manyCompetences(), user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
     const search = picker(page, 'Compétences').locator('input.pick-search');
-    assert.equal(await search.count(), 1, 'au-delà de douze valeurs, une recherche est proposée');
-    assert.equal(await picker(page, 'Instances').locator('input.pick-search').count(), 0);
+    assert.equal(await search.count(), 1, 'une recherche est proposée');
+    assert.equal(await search.getAttribute('aria-label'), 'Rechercher dans Compétences');
     await search.fill('technique 7');
     assert.deepEqual(await picker(page, 'Compétences').locator('.pick:not([hidden])').allTextContents(), ['Technique 7']);
     assert.deepEqual(await picker(page, 'Compétences').locator('.subgrp:not([hidden]) .subgrp-title').allTextContents(), ['Technique']);
+    assert.equal(await picker(page, 'Compétences').locator('.fld-found').textContent(), '1 résultat');
     await chip(page, 'Compétences', 'Technique 7').click();
     await search.fill('');
     assert.equal(await picker(page, 'Compétences').locator('.pick[hidden]').count(), 0);
     assert.equal(await isPressed(page, 'Compétences', 'Oncologie'), true, 'la sélection de départ est intacte');
     assert.equal(await picker(page, 'Compétences').locator('.grp-count').textContent(), '3 sélectionnés');
+
+    // Une liste de deux valeurs a la même recherche : sans accent ni casse, et rien n'est décoché.
+    const instances = picker(page, 'Instances').locator('input.pick-search');
+    assert.equal(await instances.count(), 1, 'même une liste courte a sa recherche');
+    await instances.fill('covi');
+    assert.deepEqual(await picker(page, 'Instances').locator('.pick:not([hidden])').allTextContents(), ['COVIRIS']);
+    await instances.fill('zzz');
+    assert.equal(await picker(page, 'Instances').locator('.pick:not([hidden])').count(), 0);
+    assert.equal(await picker(page, 'Instances').locator('.fld-found').textContent(), 'Aucun résultat');
+    await instances.fill('');
+    assert.equal(await picker(page, 'Instances').locator('.pick[hidden]').count(), 0);
+    assert.equal(await isPressed(page, 'Instances', 'CME'), true, 'la sélection de départ est intacte');
+    assert.equal(await summary(page), '1 champ modifié', 'chercher ne modifie pas la fiche : seule la compétence cliquée compte');
   }));
 
 test('Échap prévient avant d\'abandonner des modifications, puis ferme ; sans modification il ferme tout de suite', { skip }, () =>
@@ -964,10 +983,11 @@ test('un administrateur voit l\'e-mail et l\'établissement d\'une autre personn
     await openOther(page, 'Hostile');
     assert.equal(await field(page, 'email').getAttribute('type'), 'email');
     assert.equal(await field(page, 'email').inputValue(), 'hostile@chu-bordeaux.fr');
-    assert.equal(await selectedLabel(page), 'CHU de Bordeaux');
+    assert.equal(await selectedLabel(page), 'CHU');
     assert.deepEqual(await field(page, 'Etablissement').locator('option').allTextContents(),
-      ['CHU de Bordeaux', 'Clinique du Parc', 'INSERM', 'Institut Bergonié', 'Université Bordeaux Montaigne'],
-      'les noms complets, tous les établissements, sans option vide : celui d\'une personne ne se vide pas');
+      ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'],
+      'les acronymes (le nom complet de celui qui n\'en a pas), tous les établissements, sans option vide : celui d\'une personne ne se vide pas');
+    assert.equal(await dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement"]').count(), 1, 'la liste des établissements a sa recherche');
     assert.equal(await dialog(page).locator('.ident-lock').count(), 0, 'rien n\'est verrouillé pour un administrateur');
     assert.equal(await dialog(page).locator('#profile-email-hint').count(), 0, 'la mise en garde sur les droits est dite à la relecture, pas dans le formulaire');
     assert.equal(await field(page, 'email').getAttribute('aria-describedby'), 'profile-email-error');
@@ -1038,7 +1058,7 @@ test('le nouvel e-mail et le nouvel établissement se voient sur la carte après
     const rows = dialog(page).locator('.recap .diff-row');
     assert.equal(await rows.nth(0).locator('.none').first().textContent(), 'non renseigné');
     assert.equal(await rows.nth(0).locator('ins').textContent(), 'hugo.bernard@chu-bordeaux.fr');
-    assert.equal(await rows.nth(1).locator('del').textContent(), 'CHU de Bordeaux');
+    assert.equal(await rows.nth(1).locator('del').textContent(), 'CHU');
     assert.equal(await rows.nth(1).locator('ins').textContent(), 'Institut Bergonié');
     assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
 
@@ -1489,7 +1509,7 @@ for (const width of [280, 320, 360]) {
 
 // ===== Créer sa fiche =====
 
-test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit une seule carte, et une ligne est ajoutée à BDD', { skip }, () =>
+test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit une seule carte, et une ligne publiée est ajoutée à BDD', { skip }, () =>
   withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     const create = page.locator('#accountBar .account-create');
@@ -1503,9 +1523,12 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     assert.equal(await heading(page).textContent(), 'Créer ma fiche');
     assert.equal(await dialog(page).locator('.ident-mail').textContent(), NEW_EMAIL, 'l\'adresse du compte, qui ne se saisit pas');
     assert.equal(await dialog(page).locator('#profile-email').count(), 0);
-    assert.equal(await summary(page), 'Aucun champ rempli');
+    assert.equal(await summary(page), 'Aucun champ rempli', 'la case « Apparaître dans l’annuaire » n\'est pas un champ à remplir');
     assert.equal(await press(page, 'Relire ma fiche').isDisabled(), true);
     assert.equal(await field(page, 'Etablissement').evaluate(select => select.selectedOptions[0].textContent), 'Choisir…');
+    const publish = field(page, 'Accepte_apparaitre');
+    assert.equal(await publish.isChecked(), true, 'cochée d\'avance : la fiche se publie');
+    assert.equal(await dialog(page).getByRole('checkbox', { name: 'Apparaître dans l’annuaire' }).count(), 1, 'la case a son nom accessible');
 
     // Le formulaire réclame un nom puis un établissement, une fois commencé seulement.
     await field(page, 'Fonction').fill('Chargée de mission');
@@ -1514,36 +1537,55 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     await field(page, 'nom').fill('Nouvelle');
     assert.equal(await summary(page), 'Choisissez votre établissement');
     assert.equal(await page.locator('#profile-Etablissement-error').textContent(), 'Choisissez votre établissement.');
-    await field(page, 'Etablissement').selectOption({ label: 'CHU de Bordeaux' });
+
+    // La liste n'offre que les acronymes (le nom complet de l'établissement qui n'en a pas), avec une recherche
+    // qui ne garde que ce qui répond, sans toucher au choix.
+    const etablissements = field(page, 'Etablissement');
+    const search = dialog(page).locator('input.pick-search[aria-controls="profile-Etablissement"]');
+    const found = dialog(page).locator('.fld').filter({ has: etablissements }).locator('.fld-found');
+    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…', 'CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM']);
+    await search.fill('cl');
+    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…', 'Clinique']);
+    assert.equal(await found.textContent(), '1 résultat');
+    await search.fill('zzz');
+    assert.deepEqual(await etablissements.locator('option').allTextContents(), ['Choisir…']);
+    assert.equal(await found.textContent(), 'Aucun résultat');
+    await search.fill('chu');
+    await etablissements.selectOption({ label: 'CHU' });
+    await search.fill('');
+    assert.equal(await selectedLabel(page), 'CHU', 'chercher, puis vider la recherche, laisse le choix');
+    assert.equal(await etablissements.locator('option').count(), 6, 'la recherche vidée rend toute la liste');
     assert.equal(await summary(page), '4 champs remplis');
     await press(page, 'Relire ma fiche').click();
 
-    await headingIs(page, 'Relire avant de créer');
+    await headingIs(page, 'Relire avant de publier');
     assert.equal(await dialog(page).locator('.rv-col-before').count(), 0, 'pas de carte « avant » pour une fiche qui n\'existe pas');
     assert.equal(await column(page, 'after').locator('.name').textContent(), 'Zoé Nouvelle');
     assert.equal(await column(page, 'after').locator('.email').textContent(), NEW_EMAIL);
-    assert.match(await dialog(page).locator('.notice').first().textContent(), /Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître/);
+    assert.equal(await dialog(page).locator('.notice').first().textContent(),
+      'Votre fiche sera publiée, mais elle restera masquée de l’annuaire : votre fiche n\'a pas de périmètre. Un administrateur doit d’abord régler ce point.');
     assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
-    await press(page, 'Créer ma fiche').click();
-    await savedWith(page, 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».');
+    await press(page, 'Publier ma fiche').click();
+    await savedWith(page, 'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre fiche n\'a pas de périmètre. Contactez un administrateur.');
 
-    // Une seule ligne ajoutée à BDD, avec l'adresse du compte ; ni accord, ni périmètre, aucune autre table touchée.
+    // Une seule ligne ajoutée à BDD, avec l'adresse du compte et le choix d'apparaître ; pas de périmètre (l'affaire
+    // d'un administrateur), aucune autre table touchée.
     assert.deepEqual(await bddCalls(page), [{
       action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
-      values: { email: NEW_EMAIL, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission' }
+      values: { email: NEW_EMAIL, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission' }
     }]);
     assert.deepEqual(await page.evaluate(() => window.__fake.calls.filter(call => !['BDD', 'Annuaire_Sonde'].includes(call.table))), []);
-    assert.equal(await cardCount(page), 4, 'sans accord ni périmètre, le nombre de contacts affichés ne change pas');
+    assert.equal(await page.locator('#cardsGrid .contact-card').count(), 4, 'sans périmètre, le nombre de contacts affichés ne change pas');
 
-    // Le bandeau a changé : la fiche existe, le choix de présence aussi, plus de bouton « Créer ».
+    // Le bandeau a changé : la fiche existe, l'interrupteur est déjà allumé, plus de bouton « Créer ».
     await page.locator('#accountBar .presence-switch').waitFor();
+    assert.equal(await page.locator('#accountBar .presence-switch').getAttribute('aria-checked'), 'true');
     assert.equal(await create.isHidden(), true);
     assert.equal(await page.locator('#accountBar .account-edit').isVisible(), true);
     assert.equal(await page.locator('#accountBar .account-name').textContent(), 'Zoé Nouvelle');
     await focusReturnsTo(page, '#accountBar .account-edit');
 
-    // Elle accepte d'apparaître : il manque encore le périmètre (l'affaire de Grist), qui le dit.
-    await page.locator('#accountBar .presence-switch').click();
+    // Il manque encore le périmètre (l'affaire de Grist), que le bandeau dit.
     await until(async () => (await page.locator('#accountBar .account-detail').textContent()).includes('n\'a pas de périmètre'), 'le bandeau ne dit pas pourquoi la fiche reste masquée');
     await page.evaluate(() => { window.__tables.BDD.perimetre[12] = ['L', 1]; }); // un administrateur le renseigne dans Grist
     await reload(page);
@@ -1551,6 +1593,34 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     assert.equal(await gridCard(page, 'Zoé Nouvelle').locator('.fonction').textContent(), 'Chargée de mission');
     assert.deepEqual(await Promise.all(logs.errors), []);
     assert.ok(!JSON.stringify(await Promise.all([...logs.warnings, ...logs.infos])).includes('@'), 'aucune adresse dans la console');
+  }));
+
+test('« Créer ma fiche » avec la case « Apparaître dans l’annuaire » décochée : la fiche est créée sans accord, le bouton reste « Créer ma fiche »', { skip }, () =>
+  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.locator('#accountBar .account-create').click();
+    await dialog(page).waitFor();
+    await field(page, 'prenom').fill('Zoé');
+    await field(page, 'nom').fill('Nouvelle');
+    await field(page, 'Etablissement').selectOption({ label: 'CHU' });
+    await field(page, 'Accepte_apparaitre').uncheck();
+    assert.equal(await summary(page), '3 champs remplis', 'la case ne change pas ce qui est rempli');
+    await press(page, 'Relire ma fiche').click();
+
+    await headingIs(page, 'Relire avant de créer');
+    assert.match(await dialog(page).locator('.notice').first().textContent(), /Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître/);
+    await press(page, 'Retour').click();
+    assert.equal(await field(page, 'Accepte_apparaitre').isChecked(), false, 'le retour garde le choix');
+    await press(page, 'Relire ma fiche').click();
+    await press(page, 'Créer ma fiche').click();
+    await savedWith(page, 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».');
+
+    assert.deepEqual(await bddCalls(page), [{
+      action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
+      values: { email: NEW_EMAIL, Accepte_apparaitre: false, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 }
+    }]);
+    await page.locator('#accountBar .presence-switch').waitFor();
+    assert.equal(await page.locator('#accountBar .presence-switch').getAttribute('aria-checked'), 'false', 'l\'interrupteur reste éteint');
   }));
 
 // ===== E-mail affiché =====
