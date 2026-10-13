@@ -1,4 +1,4 @@
-# Version 1.28.0 — Établissement et rôle : une seule liste déroulante, avec la recherche dans le panneau (voir CHANGELOG.md)
+# Version 1.28.1 — Logos : chacun est chargé une seule fois, à l'abri des redessins de l'annuaire, et la page dit sa version (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -84,4 +84,5 @@ partenaire n'y figure que si Partenaires est allumé, un fondateur que si Fondat
 Depuis la 1.28.0, le choix de l'établissement et celui du rôle (fenêtres de profil) sont une seule liste déroulante : un bouton qui montre le choix et, ouverte, un panneau avec la recherche en haut dont les
 valeurs se réduisent en direct (au clavier : flèches, Entrée, Échap, qui ne ferme que le panneau ; sur un écran tactile le panneau ne prend pas le focus d'office) ; les champs reprennent leur demi-largeur
 (non essayé dans le vrai Grist ni sur un vrai téléphone).
-955 tests (dont 348 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.28.1, chaque logo d'établissement est chargé une seule fois, à part, avant d'être donné aux images des cartes, du bandeau et des fenêtres : Firefox annule la demande d'une image que la page retire pendant son chargement, et l'annuaire se redessine souvent (cause probable de la disparition des logos signalée le 13 octobre 2026, non rejouée dans Firefox ni dans le vrai Grist). La console (`[LOGOS] Bilan`) dit combien de logos Grist a donnés et combien s'affichent, et la version qui s'exécute est écrite en bas de la page.
+964 tests (dont 356 dans un vrai navigateur, optionnels sans Playwright).

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Annuaire PUI Bordeaux</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dialogs.css">
+</head>
+<body>
+  <main class="widget-shell">
+    <header class="page-header">
+      <div class="page-title">
+        <div class="title-line">
+          <h1>PUI Bordeaux</h1>
+          <div id="resultCount" class="result-count" aria-live="polite">0 contact</div>
+        </div>
+        <p class="subtitle">Annuaire des accompagnateurs de l'innovation</p>
+        <p class="tagline">Pas de mauvaise porte, toujours le bon interlocuteur</p>
+      </div>
+      <div id="funders" class="funders">
+        <p class="funders-label">Projet financé par l'État dans le cadre de France 2030</p>
+        <img class="funders-img" src="assets/financeurs.png" width="219" height="36" alt="République française, ANR, Bpifrance, France 2030">
+      </div>
+      <section id="accountBar" class="account-bar" aria-label="Ma présence dans l'annuaire" hidden>
+        <div class="avatar account-avatar" aria-hidden="true"></div>
+        <div class="account-identity">
+          <p class="account-name"></p>
+          <p class="account-detail"></p>
+        </div>
+        <button type="button" class="presence-switch" role="switch" aria-checked="false">
+          <span class="presence-track" aria-hidden="true"><span class="presence-thumb"></span></span>
+          <span class="presence-label">Apparaître dans l'annuaire</span>
+        </button>
+        <div class="account-actions">
+          <button type="button" class="account-create" aria-haspopup="dialog" hidden>Créer ma fiche</button>
+          <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
+          <button type="button" class="account-etab" aria-haspopup="dialog" hidden>Mon établissement</button>
+          <button type="button" class="account-admin" aria-pressed="false" hidden>Mode admin</button>
+        </div>
+        <p class="account-status" role="status" data-tone="info"></p>
+      </section>
+    </header>
+
+    <section class="toolbar" aria-label="Recherche et filtres">
+      <label class="search-box" for="searchInput">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="searchInput" type="search" placeholder="Rechercher par nom ou prénom…" aria-label="Rechercher par nom ou prénom" autocomplete="off">
+      </label>
+      <div id="filtersContainer" class="filters-container" aria-label="Filtres"></div>
+      <div id="scopeToggle" class="scope-toggle" role="group" aria-label="Établissements affichés">
+        <button type="button" class="scope-btn active" data-scope="fondateur" aria-pressed="true">Fondateurs</button>
+        <button type="button" class="scope-btn" data-scope="partenaire" aria-pressed="false">Partenaires</button>
+      </div>
+      <button id="resetFilters" class="reset-button" type="button">Réinitialiser</button>
+    </section>
+
+    <p id="adminStrip" class="admin-strip" role="status" hidden>Mode admin : un bouton « Modifier la fiche » apparaît sur chaque carte. Vos changements sont relus avant d’être validés.</p>
+
+    <p id="statusBanner" class="status-banner" role="alert" hidden></p>
+    <section id="cardsGrid" class="cards-grid" aria-live="polite"></section>
+    <section id="emptyState" class="empty-state" hidden>
+      <div class="empty-mark">✦</div>
+      <h2>Aucun contact trouvé</h2>
+      <p>Modifiez votre recherche ou réinitialisez les filtres.</p>
+    </section>
+
+    <footer class="page-footer">
+      <section id="foundersBand" class="band" aria-label="Établissements fondateurs du PUI" hidden>
+        <div class="band-grid">
+          <div class="band-main">
+            <ul id="bandLogos" class="band-logos"></ul>
+          </div>
+          <div id="bandRoundel" class="band-roundel"><img src="assets/france-2030.png" width="136" height="134" alt="France 2030"></div>
+        </div>
+        <p class="band-sentence">Le <a id="bandLink" target="_blank" rel="noopener noreferrer">Pôle universitaire d'innovation Bordeaux</a> est un projet financé par l'État dans le cadre de France 2030.</p>
+      </section>
+    </footer>
+  </main>
+
+  <dialog id="profileDialog" class="dlg" aria-labelledby="profileTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="profileTitle" tabindex="-1">Modifier mon profil</h2>
+          <p class="dlg-sub"></p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>
+      </header>
+      <div class="dlg-body"></div>
+      <footer class="dlg-foot"></footer>
+    </div>
+  </dialog>
+
+  <dialog id="etabDialog" class="dlg dlg-etab" aria-labelledby="etabTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="etabTitle" tabindex="-1">Fiche de l’établissement</h2>
+          <p class="dlg-sub"></p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>
+      </header>
+      <div class="dlg-body"></div>
+      <footer class="dlg-foot"></footer>
+    </div>
+  </dialog>
+
+  <dialog id="photoDialog" class="dlg photo-dlg" aria-labelledby="photoCaption">
+    <button type="button" class="dlg-x" data-close aria-label="Fermer la photo">✕</button>
+    <div class="photo-stage"></div>
+    <p id="photoCaption" class="photo-cap"></p>
+  </dialog>
+
+  <div id="toast" class="toast" aria-hidden="true" hidden></div>
+  <p id="toastLive" class="sr-only" role="status" aria-live="polite"></p>
+
+  <template id="cardTemplate">
+    <article class="contact-card">
+      <div class="card-topline"></div>
+      <div class="card-body">
+        <div class="avatar" aria-hidden="true"></div>
+        <div class="identity">
+          <h2 class="name"></h2>
+          <p class="fonction"></p>
+        </div>
+        <div class="card-actions" hidden>
+          <span class="own-flag" hidden>Votre fiche</span>
+          <button class="card-edit" type="button">✎ Modifier</button>
+        </div>
+        <div class="etab-col">
+          <button class="etablissement-tag" type="button"></button>
+          <div class="etab-actions"></div>
+        </div>
+        <div class="details">
+          <a class="email detail-row" rel="noopener"></a>
+          <p class="tel detail-row"></p>
+        </div>
+        <div class="card-tags"></div>
+      </div>
+    </article>
+  </template>
+
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

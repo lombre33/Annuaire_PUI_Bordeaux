@@ -7,6 +7,104 @@ import { BAND_LOGO, CARD_LOGO, PUI_URL } from './constants.js';
 import { logoSize, inkBounds, hasInk } from './branding.js';
 
 export const HOLD_LIMIT_MS = 5000; // un logo que retient onLoad se montre au plus tard après ce délai (plus que ANALYSIS_TIMEOUT_MS)
+export const PRELOAD_LIMIT_MS = 5000; // une tentative de chargement à part qui n'a rien rendu après ce délai est comptée perdue
+export const STALL_LIMIT_MS = 8000; // un logo préchargé qui n'a ni chargé ni échoué après ce délai laisse la place au nom
+const PRELOAD_TRIES = 3; // tentatives de chargement à part d'un logo (la 1re, puis sous une autre adresse, voir preload)
+const RETRY_FAILED_MS = 30 * 1000; // un logo qui a échoué n'est pas redemandé à Grist plus souvent que ça
+
+// Chaque logo d'établissement est chargé UNE fois, à part, dans une image que ce module garde : le chargement ne dépend
+// ni des cartes (elles sont toutes redessinées à chaque filtre, à chaque édition dans Grist, à l'arrivée de l'identité),
+// ni du ramasse-miettes. Firefox annule (NS_BINDING_ABORTED) la demande d'une image qu'on retire du document avant sa fin
+// et en recommence une autre : si le document se redessine plus vite que Grist ne répond, aucun logo n'arrive jamais
+// (retour d'Antoine du 13 octobre 2026). Les cartes ne reçoivent l'adresse de leur logo qu'une fois ce chargement fini :
+// il est alors en mémoire et leur image s'affiche aussitôt, quel que soit le nombre de rendus.
+//   attachments -> Map(identifiant de la pièce jointe -> { image, result, settledAt, settled })
+//   result      { ok: true, url } ou { ok: false, cause } où cause vaut 'token', 'file' ou 'late'
+const preloads = new WeakMap();
+const RETRY_PARAM = 'annuaire_retry'; // une autre adresse pour la même pièce jointe : Grist ignore le paramètre (comme PROBE_PARAM)
+
+function entriesOf(attachments) {
+  if (!preloads.has(attachments)) preloads.set(attachments, new Map());
+  return preloads.get(attachments);
+}
+
+// La même adresse, avec un paramètre de plus que Grist ignore : le navigateur la traite comme un autre fichier. Une adresse
+// qui n'est pas celle d'un serveur (une image en data:) est gardée telle quelle.
+function withParam(source, name) {
+  try {
+    const url = new URL(source);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return source;
+    url.searchParams.set(name, '1');
+    return url.href;
+  } catch {
+    return source;
+  }
+}
+
+// Une tentative : 'load', 'error' ou 'late' (ni l'un ni l'autre dans PRELOAD_LIMIT_MS). Son image reste celle de l'entrée,
+// donc en vie tant que la page vit : une tentative perdue peut encore aboutir, sans conséquence.
+function attempt(entry, url) {
+  return new Promise(resolve => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    entry.images.push(image);
+    const timer = setTimeout(() => resolve('late'), PRELOAD_LIMIT_MS);
+    image.addEventListener('load', () => { clearTimeout(timer); resolve('load'); });
+    image.addEventListener('error', () => { clearTimeout(timer); resolve('error'); });
+    image.src = url;
+  });
+}
+
+// Jusqu'à PRELOAD_TRIES tentatives. Une image en erreur ou sans réponse a pu être victime du navigateur ou d'un jeton
+// expiré : si Grist donne un autre jeton (refresh), la suivante l'emploie ; sinon elle demande le même fichier sous une
+// autre adresse (withParam), pour ne pas retomber sur une réponse ratée gardée en cache.
+async function preload(attachments, id, entry) {
+  if (!attachments.url(id) && !await attachments.ready()) return { ok: false, cause: 'token' };
+  let otherAddress = false;
+  let cause = 'file';
+  for (let tries = 0; tries < PRELOAD_TRIES; tries += 1) {
+    const base = attachments.url(id);
+    if (!base) return { ok: false, cause: 'token' };
+    const url = otherAddress ? withParam(base, RETRY_PARAM) : base;
+    const outcome = await attempt(entry, url);
+    if (outcome === 'load') return { ok: true, url };
+    cause = outcome === 'late' ? 'late' : 'file';
+    if (!await attachments.refresh(base)) otherAddress = true;
+  }
+  return { ok: false, cause };
+}
+
+// Le chargement à part du logo `id` : une promesse qui rend { ok: true, url } (l'adresse à donner aux images) ou
+// { ok: false, cause }. Une seule par logo, partagée par toutes les images qui l'attendent ; un échec est gardé
+// RETRY_FAILED_MS, pour ne pas solliciter à chaque rendu un Grist qui vient de refuser.
+function preloadLogo(attachments, id) {
+  const entries = entriesOf(attachments);
+  const known = entries.get(id);
+  if (known && (!known.result || known.result.ok || Date.now() - known.settledAt < RETRY_FAILED_MS)) return known.settled;
+  const entry = { images: [], result: null, settledAt: 0, settled: null };
+  entry.settled = preload(attachments, id, entry).then(result => {
+    entry.result = result;
+    entry.settledAt = Date.now();
+    return result;
+  });
+  entries.set(id, entry);
+  return entry.settled;
+}
+
+// Ce que la console dit des logos chargés à part : combien, et ce qu'il en est advenu. Aucune adresse, aucun jeton.
+export function logoStats(attachments) {
+  const stats = { asked: 0, loaded: 0, refused: 0, late: 0, token: 0, pending: 0 };
+  entriesOf(attachments).forEach(({ result }) => {
+    stats.asked += 1;
+    if (!result) stats.pending += 1;
+    else if (result.ok) stats.loaded += 1;
+    else if (result.cause === 'file') stats.refused += 1;
+    else if (result.cause === 'late') stats.late += 1;
+    else stats.token += 1;
+  });
+  return stats;
+}
 
 // Un logo : une <img> invisible tant qu'elle n'est pas chargée (ni cadre cassé ni texte
 // alternatif qui clignote). Quand Grist ne donne pas le fichier (pas de jeton, fichier
@@ -15,19 +113,25 @@ export const HOLD_LIMIT_MS = 5000; // un logo que retient onLoad se montre au pl
 // pendant que la page restait ouverte. Les photos de profil (avatar-ui.js) passent par ici aussi.
 //   eager   charger tout de suite (les logos de l'en-tête et du pied de page) ; sinon
 //           l'image attend d'approcher de l'écran, comme celles des cartes
+//   preload charger le fichier d'abord à part, une fois pour toutes les images qui le montrent (preloadLogo) : pour les
+//           logos d'établissement, jamais pour les photos de profil, qui sont des centaines et n'arrivent qu'à l'approche de
+//           l'écran. L'image est alors chargée sans attendre l'écran (le fichier est déjà là), et si rien n'est arrivé
+//           STALL_LIMIT_MS après sa demande, `onFail('late')` : un logo ne reste jamais invisible pour de bon
 //   onLoad  appelé avec l'image et `show` (qui la rend visible) dès qu'elle est chargée, avant qu'elle ne
 //           devienne visible ; s'il renvoie false, l'image reste cachée jusqu'à ce que l'appelant appelle `show`,
 //           que son prochain chargement la montre, ou que `holdLimit` ms soient passées : un onLoad qui plante ou
 //           qui oublie `show` ne cache jamais un logo pour de bon
+// `onFail` reçoit la cause : 'token' (pas de jeton, aucune demande n'a eu lieu), 'file' (Grist n'a pas donné le fichier) ou
+// 'late' (la demande n'a jamais abouti).
 // L'image qu'on voit se demande toujours comme une image ordinaire, sans CORS, et son affichage ne dépend jamais de
 // la lecture de ses pixels : un Grist qui ne la donnerait pas en CORS, ou un navigateur qui bride cette lecture, ne doit
 // jamais faire disparaître un logo (1.25.2, 1.26.1). Lire ses pixels, c'est à fitCardLogo de le tenter, sur une copie à part.
-export function createLogoImage(attachments, attachmentId, alt, onFail, { eager = false, onLoad, holdLimit = HOLD_LIMIT_MS } = {}) {
+export function createLogoImage(attachments, attachmentId, alt, onFail, { eager = false, preload: shared = false, onLoad, holdLimit = HOLD_LIMIT_MS } = {}) {
   const image = document.createElement('img');
   image.className = 'logo-img';
   image.alt = alt;
   image.decoding = 'async';
-  image.loading = eager ? 'eager' : 'lazy';
+  image.loading = eager || shared ? 'eager' : 'lazy';
   image.draggable = false;
   // L'adresse de la page du widget n'a pas à être envoyée au serveur de Grist.
   image.referrerPolicy = 'no-referrer';
@@ -35,20 +139,29 @@ export function createLogoImage(attachments, attachmentId, alt, onFail, { eager 
   let failed = false;
   let retried = false;
   let requested = '';
-  // `onFail` reçoit la cause : 'token' (pas de jeton, aucune demande n'a eu lieu) ou 'file' (Grist n'a pas donné le fichier).
+  let stall = 0;
   const fail = reason => {
+    clearTimeout(stall);
     if (failed) return;
     failed = true;
     onFail(reason);
   };
-  const assign = () => {
-    requested = attachments.url(attachmentId) ?? '';
-    if (requested) image.src = requested;
+  // `url` : l'adresse que le chargement à part a déjà fait aboutir ; sans elle, celle que Grist donne maintenant.
+  const assign = url => {
+    requested = url || attachments.url(attachmentId) || '';
+    if (requested) {
+      if (shared) {
+        clearTimeout(stall);
+        stall = setTimeout(() => fail('late'), STALL_LIMIT_MS);
+      }
+      image.src = requested;
+    }
     return requested !== '';
   };
 
   const show = () => image.classList.add('loaded');
   image.addEventListener('load', () => {
+    clearTimeout(stall);
     let held = false;
     try {
       held = onLoad?.(image, show) === false;
@@ -59,6 +172,7 @@ export function createLogoImage(attachments, attachmentId, alt, onFail, { eager 
     else show();
   });
   image.addEventListener('error', async () => {
+    clearTimeout(stall);
     if (failed) return;
     if (retried) {
       fail('file');
@@ -70,9 +184,20 @@ export function createLogoImage(attachments, attachmentId, alt, onFail, { eager 
     else if (!assign()) fail('token');
   });
 
-  if (!assign()) {
-    attachments.ready().then(ready => {
-      if (!ready || !assign()) fail('token');
+  const begin = url => {
+    if (!assign(url)) {
+      attachments.ready().then(ready => {
+        if (!ready || !assign()) fail('token');
+      });
+    }
+  };
+  if (!shared) {
+    begin();
+  } else {
+    preloadLogo(attachments, attachmentId).then(result => {
+      if (failed) return;
+      if (result.ok) begin(result.url);
+      else fail(result.cause);
     });
   }
   return image;
@@ -165,14 +290,7 @@ function readInk(image) {
 // pas les en-têtes CORS ; la même adresse redemandée en CORS y serait prise puis refusée. Une adresse qui n'est pas
 // celle d'un serveur (une image en data:) est gardée telle quelle.
 function probeUrl(source) {
-  try {
-    const url = new URL(source);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return source;
-    url.searchParams.set(PROBE_PARAM, '1');
-    return url.href;
-  } catch {
-    return source;
-  }
+  return withParam(source, PROBE_PARAM);
 }
 
 // La lecture d'un logo, une seule fois par pièce jointe : toutes les cartes d'un même établissement attendent la même.
@@ -253,7 +371,7 @@ function logoOrName(attachments, logo, name) {
   const holder = document.createElement('span');
   holder.className = 'logo-holder';
   const onLoad = image => sizeLogo(image, BAND_LOGO);
-  holder.append(createLogoImage(attachments, logo, name, () => holder.replaceChildren(asName()), { eager: true, onLoad }));
+  holder.append(createLogoImage(attachments, logo, name, () => holder.replaceChildren(asName()), { eager: true, preload: true, onLoad }));
   return holder;
 }
 

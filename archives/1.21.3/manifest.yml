@@ -1,0 +1,5 @@
+widgets:
+  - widgetId: annuaire-cartes
+    name: "Annuaire — Contacts (cartes filtrables)"
+    url: https://lombre33.github.io/Annuaire_PUI_Bordeaux/index.html
+    accessLevel: full

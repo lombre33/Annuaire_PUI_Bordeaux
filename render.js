@@ -420,11 +420,14 @@ function markEtablissement(badge, mark) {
 // Dit dans la console, une seule fois par fichier, qu'un logo ne s'est pas chargé : la ligne d'Etablissements et le numéro de la
 // pièce jointe, jamais son adresse (elle porte le jeton) ni un nom.
 const logosWarned = new Set();
-function warnLogoFailed(logo) {
+function warnLogoFailed(logo, cause) {
   if (logosWarned.has(logo.attachment)) return;
   logosWarned.add(logo.attachment);
-  console.warn(`[LOGOS] Le logo de la ligne ${logo.row} d'${ETABLISSEMENT_TABLE} (pièce jointe ${logo.attachment}) ne se charge pas : `
-    + 'Grist ne l\'a pas donné (règle d\'accès sur la colonne logo, fichier supprimé, jeton refusé). Le sigle est affiché à la place.');
+  const why = cause === 'late'
+    ? 'la demande n\'a pas abouti à temps (Grist trop lent, ou le navigateur l\'a annulée)'
+    : 'Grist ne l\'a pas donné (règle d\'accès sur la colonne logo, fichier supprimé, jeton refusé)';
+  console.warn(`[LOGOS] Le logo de la ligne ${logo.row} d'${ETABLISSEMENT_TABLE} (pièce jointe ${logo.attachment}) ne se charge pas : ${why}. `
+    + 'Le sigle est affiché à la place.');
 }
 
 function fillEtablissement(badge, label, onToggle, logo) {
@@ -439,7 +442,7 @@ function fillEtablissement(badge, label, onToggle, logo) {
   // et de la fonction (style.css) : sa hauteur ne décentre pas le nom par rapport à l'avatar.
   const body = badge.closest('.card-body');
   const showName = cause => {
-    if (cause === 'file') warnLogoFailed(logo);
+    if (cause === 'file' || cause === 'late') warnLogoFailed(logo, cause);
     badge.classList.remove('has-logo');
     body?.classList.remove('with-logo');
     badge.replaceChildren();
@@ -449,7 +452,7 @@ function fillEtablissement(badge, label, onToggle, logo) {
   body?.classList.add('with-logo');
   badge.title = logo.name;
   const onLoad = (image, show) => fitCardLogo(image, logo.attachment, show);
-  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { onLoad }));
+  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { preload: true, onLoad }));
 }
 
 // Sans `onToggle` (carte de relecture), l'adresse est du texte : un clic ne doit pas

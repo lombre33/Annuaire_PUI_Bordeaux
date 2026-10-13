@@ -733,7 +733,8 @@ navigateur ouverts (F12). **Ce protocole est le seul contrôle du jeton d'accès
 jointes : les tests automatiques simulent la réponse de Grist.** Si un point échoue, relever le message de
 la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
 
-- [ ] Document sans aucune colonne de logos : aucune erreur, aucune ligne `[LOGOS]`, aucune demande de
+- [ ] Document sans aucune colonne de logos : aucune erreur, aucun avertissement `[LOGOS]` (la ligne d'information
+      `Version …` dit « aucun logo »), aucune demande de
       jeton dans l'onglet Réseau, les pastilles texte sur les cartes comme avant la 1.14.0, et en bas de page
       le bandeau des fondateurs validés **en texte** (leurs acronymes). Les financeurs sont là quand même, en
       tête de page comme en bas (images fixes).
@@ -742,7 +743,13 @@ la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
       établissements gardent leur pastille. Cliquer le logo filtre sur l'établissement, comme la pastille.
 - [ ] Onglet Réseau : **une seule** demande de jeton au chargement, puis une demande par logo à une adresse de
       la forme `…/attachments/<numéro>/download?auth=…`, réponse 200 de type image (pas 401, 403 ni 404).
-      Aucune ligne `[LOGOS]` dans la console.
+      Aucun avertissement `[LOGOS]` dans la console (les lignes d'information `Version …` et `Bilan : …` y sont normales).
+- [ ] **Chaque logo n'est demandé qu'une fois, et un redessin ne le fait pas disparaître (1.28.1)** : dans **Firefox** de préférence (c'est lui qui annule
+      la demande d'une image retirée en cours de chargement, `NS_BINDING_ABORTED`), onglet Réseau et console (filtre « LOGOS ») ouverts, recharger le widget et taper vite dans la recherche pendant que les
+      logos arrivent : tous les logos des cartes et du bandeau s'affichent, l'onglet Réseau montre **une seule** demande par logo (pas une par carte) et aucune ligne
+      `NS_BINDING_ABORTED`, la ligne `[LOGOS] Bilan : N logos chargés sur N ; affichés : x/x sur les cartes, y/y dans le bandeau` arrive dans les
+      15 secondes (avertissement s'il en manque : elle dit combien sont refusés, sans réponse ou sans jeton), et le bas de la page dit « Version … » comme le titre du CHANGELOG (sinon le
+      cache de GitHub Pages sert encore l'ancien code : Ctrl+Maj+R ou une fenêtre privée).
 - [ ] Financeurs, au centre de l'en-tête (cadre assez large) : le visuel de la maquette (République française,
       ANR, Bpifrance, France 2030) avec, à sa gauche dès 1320 px, la phrase « Projet financé par l'État dans le
       cadre de France 2030 ». Identiques dans tous les documents, sans table `Financeurs` (une table de ce nom,

@@ -68,16 +68,20 @@ function withTimeout(promise, milliseconds) {
 //   refresh(failedUrl) une image est en erreur : true si un autre jeton peut être essayé
 //                      (le jeton a changé depuis, ou il a pu être redemandé), false si
 //                      l'erreur ne vient pas du jeton
+//   stats()            ce que la console dit des jetons : { requested, failed }, le nombre de demandes à Grist et
+//                      combien ont échoué (jamais le jeton lui-même)
 export function createAttachments(docApi, { now = Date.now, timeout = TOKEN_TIMEOUT_MS, log = console } = {}) {
   let info = null; // { token, baseUrl, expiresAt }
   let pending = null;
   let lastFailure = -Infinity;
   let lastFetch = -Infinity;
   let warned = false;
+  const counts = { requested: 0, failed: 0 };
 
   // Une seule demande à la fois : cent images en erreur le même instant n'en font qu'une.
   function request() {
     if (pending) return pending;
+    counts.requested += 1;
     pending = (async () => {
       try {
         const raw = await withTimeout(Promise.resolve().then(() => docApi.getAccessToken({ readOnly: true })), timeout);
@@ -89,6 +93,7 @@ export function createAttachments(docApi, { now = Date.now, timeout = TOKEN_TIME
         return true;
       } catch (error) {
         lastFailure = now();
+        counts.failed += 1;
         if (!warned) {
           warned = true;
           log.warn('[LOGOS] Jeton d\'accès aux pièces jointes indisponible : les logos sont remplacés par le texte.', error);
@@ -106,6 +111,10 @@ export function createAttachments(docApi, { now = Date.now, timeout = TOKEN_TIME
   return {
     url(id) {
       return stillValid() ? attachmentUrl(info, id) : null;
+    },
+
+    stats() {
+      return { ...counts };
     },
 
     async ready() {
