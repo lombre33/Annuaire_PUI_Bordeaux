@@ -182,7 +182,7 @@ export function resolveListItem(item, referenceMap) {
 
 // Un libellé par valeur distincte, à la casse et aux accents près : le compte
 // d'une option de menu compte les contacts, pas leurs lignes de table liées.
-function uniqueLabels(labels) {
+export function uniqueLabels(labels) {
   const seen = new Set();
   return labels.filter(label => {
     const key = normalize(label);
@@ -543,8 +543,11 @@ function readReferenceMap({ key, table, field }, result, log) {
   const labelFields = [].concat(field);
   const map = labelMapFromRows(rows, labelFields);
   const withoutLabel = rows.length - Object.keys(map).length;
+  // Le libellé corrigé est prioritaire : les lignes qui n'en ont pas gardent le libellé brut, et la console le dit.
+  const rawOnly = labelFields.length > 1 ? rows.filter(row => !text(row[labelFields[0]]) && pickLabel(row, labelFields)).length : 0;
   log.info(`[REFS] ${key} (${table}): ${Object.keys(map).length} entrées`
-    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${labelFields.join('/')})` : ''));
+    + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${labelFields.join('/')})` : '')
+    + (rawOnly ? ` (${rawOnly} ligne(s) au libellé brut, faute de ${labelFields[0]})` : ''));
   const absent = missingColumns(rows, labelFields);
   if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
   return { map, labelColumnsMissing: absent.length === labelFields.length };

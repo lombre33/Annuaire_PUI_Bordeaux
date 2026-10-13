@@ -130,14 +130,15 @@ export function menuGroups(filter, referenceMaps) {
   Object.entries(referenceMaps[filter.key] || {}).forEach(([id, value]) => {
     const label = groupOf[id] || grouping.fallback;
     const key = normalize(label);
-    if (!byGroup.has(key)) byGroup.set(key, { label, values: new Set() });
-    byGroup.get(key).values.add(value);
+    if (!byGroup.has(key)) byGroup.set(key, { label, values: new Map() });
+    const values = byGroup.get(key).values;
+    if (!values.has(normalize(value))) values.set(normalize(value), value); // une écriture par valeur, à la casse près
   });
   const fallbackKey = normalize(grouping.fallback);
   const rank = key => (key === fallbackKey ? 1 : 0);
   return [...byGroup]
     .sort(([keyA, a], [keyB, b]) => rank(keyA) - rank(keyB) || compareLabels(a.label, b.label))
-    .map(([, { label, values }]) => ({ label, values: [...values].sort(compareLabels) }));
+    .map(([, { label, values }]) => ({ label, values: [...values.values()].sort(compareLabels) }));
 }
 
 // Où en est un groupe : 'none', 'some' ou 'all' de ses valeurs sont cochées.

@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CATEGORIES, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE, PROFILE_FIELDS, fieldsFor } from '../constants.js';
 
-test('FILTERS lists the 7 filter buttons in display order: a grouping has no button of its own, it is the groups of the menu it arranges', () => {
-  assert.deepEqual(FILTERS.map(f => f.key), ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement']);
+test('FILTERS lists the 8 filter buttons in display order, Rôle PUI last: a grouping has no button of its own, it is the groups of the menu it arranges', () => {
+  assert.deepEqual(FILTERS.map(f => f.key), ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role']);
   assert.ok(!FILTERS.some(f => f.key === 'macro'), 'plus de filtre « Domaines » séparé');
   assert.ok(!FILTERS.some(f => f.key === 'macroTaches'), 'pas de filtre « Actions des tâches » : les actions rangent le menu Tâches');
 });

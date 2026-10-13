@@ -99,7 +99,7 @@ test('colonne Accepte_apparaitre absente de BDD : erreur explicite, jamais l\'an
   });
 });
 
-test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI', { skip }, () =>
+test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI sous le logo', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const ana = cardNamed(page, 'Ana Martin');
@@ -113,11 +113,14 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
       ['Instances', ['CME']],
       ['Actions', ['Vaccination']],
       ['Compétences', ['Oncologie', 'Hématologie']],
-      ['Communautés', ['Réseau douleur']],
-      ['Rôle PUI', ['Référent qualité']]
+      ['Communautés', ['Réseau douleur']]
     ]);
     assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
-    assert.equal(await ana.locator('.tag-static').count(), 1, 'le tag Rôle PUI n\'est pas cliquable');
+    const role = ana.locator('.etab-col .role-tag');
+    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est sous l\'établissement, plus dans le bas de la carte');
+    assert.equal(await role.evaluate(tag => tag.tagName), 'BUTTON', 'il filtre comme les autres tags');
+    assert.equal(await ana.locator('.tag-static').count(), 0);
+    assert.equal(await cardNamed(page, 'Hugo Bernard').locator('.role-tag').count(), 0, 'pas de rôle : pas de pastille');
 
     const hugo = cardNamed(page, 'Hugo Bernard');
     assert.equal(await hugo.locator('.email.visible').count(), 0, 'pas de ligne email vide');
@@ -330,6 +333,24 @@ test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ;
     assert.equal(await page.locator('.filter-count:not([hidden])').count(), 0);
   }));
 
+test('le filtre Rôle PUI propose les rôles de la table Role_Dans_le_PUI ; le rôle sous le logo d\'une carte le coche, et il filtre', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    const filter = page.locator('.filter[data-filter-key="role"]');
+    await filter.locator('.filter-button').click();
+    assert.deepEqual(await filter.locator('.filter-option .option-label').allTextContents(), ['Référent qualité']);
+    assert.equal(await filter.locator('.filter-option .option-count').textContent(), '1', 'une seule personne a ce rôle');
+
+    await cardNamed(page, 'Ana Martin').locator('.etab-col .role-tag').click();
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), ['Ana Martin']);
+    assert.equal(await filter.locator('.filter-count').textContent(), '1');
+    assert.equal(await filter.locator('.filter-option input').isChecked(), true);
+
+    await page.click('#resetFilters');
+    await waitForCards(page, 4);
+  }));
+
 // ===== Compétences et domaines : un seul menu =====
 // Les domaines (compétences macro) sont les groupes du menu Compétences : une case par
 // domaine, qui coche toutes ses compétences, un bouton qui déplie le détail, et une
@@ -361,11 +382,11 @@ test('le filtre Compétences propose le libellé corrigé de la table Competence
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
   }));
 
-test('la barre de filtres compte sept boutons : « Domaines » n\'a plus le sien, ses domaines rangent le menu Compétences', { skip }, () =>
+test('la barre de filtres compte huit boutons : « Domaines » n\'a plus le sien, ses domaines rangent le menu Compétences', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await page.locator('.filter-button > span:nth-child(2)').allTextContents(),
-      ['Actions', 'Tâches', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement']);
+      ['Actions', 'Tâches', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement', 'Rôle PUI']);
     assert.equal(await page.locator('.filter[data-filter-key="macro"]').count(), 0);
     assert.match(await skillsFilter(page).locator('.filter-button').getAttribute('title'), /domaine/);
     assert.equal(await skillsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Domaine ou compétence…');
