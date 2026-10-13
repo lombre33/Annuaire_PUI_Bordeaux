@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildBranding, logoForContact, logoSize, inkBounds, hasInk } from '../branding.js';
 import { BAND_LOGO } from '../constants.js';
+import { fitCardLogo } from '../branding-ui.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { sampleTables, withBranding } from './fixtures.mjs';
 
@@ -241,6 +242,20 @@ test('logoSize: never beyond the bounds, whatever the ratio', () => {
   }
 });
 
+// Un navigateur peut garder dix minutes l'ancien render.js (cache de GitHub Pages), qui appelle encore fitCardLogo au
+// chargement d'un logo de carte et attend qu'elle le montre : depuis la 1.26.1 elle le montre aussitôt, sans rien lire.
+test('fitCardLogo (gardée pour l\'ancien render.js en cache) montre le logo aussitôt, sans le lire ni le remplacer', () => {
+  const source = 'https://grist.example/attachments/7/download?auth=x';
+  const image = { src: source, dataset: {}, parentElement: null };
+  let shown = 0;
+  assert.equal(fitCardLogo(image, 7, () => { shown += 1; }), false);
+  assert.equal(shown, 1);
+  assert.equal(image.src, source, 'l\'image n\'est pas remplacée par une copie');
+  assert.deepEqual(image.dataset, {});
+  assert.doesNotThrow(() => fitCardLogo(image, 7), 'sans `show`, rien ne casse');
+});
+
+// hasInk et inkBounds ne servent plus depuis la 1.26.1 : gardées pour le même cache (branding.js), donc toujours essayées.
 // Les pixels d'une image de `width` x `height` : transparente (ou blanche), avec des rectangles de couleur.
 function pixelsOf(width, height, { background = [0, 0, 0, 0], rects = [] }) {
   const pixels = new Uint8ClampedArray(width * height * 4);
