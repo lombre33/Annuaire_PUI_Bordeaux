@@ -1,9 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildBranding, logoForContact, logoSize, inkBounds, hasInk } from '../branding.js';
+import { brandingSummary, buildBranding, logoForContact, logoSize, inkBounds, hasInk } from '../branding.js';
 import { BAND_LOGO } from '../constants.js';
-import { fitCardLogo } from '../branding-ui.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { sampleTables, withBranding } from './fixtures.mjs';
 
@@ -79,16 +78,23 @@ test('an establishment without any name never reaches the band', () => {
 
 // ===== le logo de la carte d'un contact =====
 
+// Le logo et le nom d'un établissement (sans son numéro de ligne, que le journal des logos cite : voir la dernière assertion).
+const brandOf = (branding, contact) => {
+  const { logo, name } = logoForContact(branding, contact);
+  return { logo, name };
+};
+
 test('logoForContact finds the logo through the establishment row id that BDD carries', () => {
   const branding = brandingOf(withBranding());
-  assert.deepEqual(logoForContact(branding, { Etablissement: 1 }), { logo: 11, name: 'CHU de Bordeaux' });
-  assert.deepEqual(logoForContact(branding, { Etablissement: ['R', 'Etablissements', 2] }), { logo: 12, name: 'Université Bordeaux Montaigne' });
+  assert.deepEqual(brandOf(branding, { Etablissement: 1 }), { logo: 11, name: 'CHU de Bordeaux' });
+  assert.equal(logoForContact(branding, { Etablissement: 1 }).id, 1, 'le numéro de ligne d\'Etablissements, cité par la console quand le logo ne se charge pas');
+  assert.deepEqual(brandOf(branding, { Etablissement: ['R', 'Etablissements', 2] }), { logo: 12, name: 'Université Bordeaux Montaigne' });
 });
 
 test('logoForContact finds the logo through the label when Grist already resolved the reference to text', () => {
   const branding = brandingOf(withBranding());
-  assert.deepEqual(logoForContact(branding, { Etablissement: 'CHU' }), { logo: 11, name: 'CHU de Bordeaux' });
-  assert.deepEqual(logoForContact(branding, { Etablissement: 'Institut Bergonié' }), { logo: null, name: 'Institut Bergonié' });
+  assert.deepEqual(brandOf(branding, { Etablissement: 'CHU' }), { logo: 11, name: 'CHU de Bordeaux' });
+  assert.deepEqual(brandOf(branding, { Etablissement: 'Institut Bergonié' }), { logo: null, name: 'Institut Bergonié' });
 });
 
 test('logoForContact answers the establishment without a logo, and nothing for an unknown one', () => {
@@ -242,20 +248,15 @@ test('logoSize: never beyond the bounds, whatever the ratio', () => {
   }
 });
 
-// Un navigateur peut garder dix minutes l'ancien render.js (cache de GitHub Pages), qui appelle encore fitCardLogo au
-// chargement d'un logo de carte et attend qu'elle le montre : depuis la 1.26.1 elle le montre aussitôt, sans rien lire.
-test('fitCardLogo (gardée pour l\'ancien render.js en cache) montre le logo aussitôt, sans le lire ni le remplacer', () => {
-  const source = 'https://grist.example/attachments/7/download?auth=x';
-  const image = { src: source, dataset: {}, parentElement: null };
-  let shown = 0;
-  assert.equal(fitCardLogo(image, 7, () => { shown += 1; }), false);
-  assert.equal(shown, 1);
-  assert.equal(image.src, source, 'l\'image n\'est pas remplacée par une copie');
-  assert.deepEqual(image.dataset, {});
-  assert.doesNotThrow(() => fitCardLogo(image, 7), 'sans `show`, rien ne casse');
+test('brandingSummary : ce que la console dit des logos lus dans Etablissements', () => {
+  const rows = (...logos) => logos.map((logo, index) => ({ id: index + 1, acronyme: `E${index + 1}`, logo }));
+  const summary = list => brandingSummary(buildBranding({ etablissementRows: list }));
+  assert.equal(summary(rows(['L', 11], null, ['L', 12])), '3 établissements lus dans Etablissements, 2 avec un logo dans la colonne logo');
+  assert.equal(summary(rows(['L', 11])), '1 établissement lu dans Etablissements, 1 avec un logo dans la colonne logo');
+  assert.equal(summary(rows(null, ['L'])), '2 établissements lus dans Etablissements, 0 avec un logo dans la colonne logo (aucun : les cartes montrent le sigle)');
+  assert.equal(summary([]), '0 établissement lu dans Etablissements, 0 avec un logo dans la colonne logo');
 });
 
-// hasInk et inkBounds ne servent plus depuis la 1.26.1 : gardées pour le même cache (branding.js), donc toujours essayées.
 // Les pixels d'une image de `width` x `height` : transparente (ou blanche), avec des rectangles de couleur.
 function pixelsOf(width, height, { background = [0, 0, 0, 0], rects = [] }) {
   const pixels = new Uint8ClampedArray(width * height * 4);

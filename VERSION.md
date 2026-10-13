@@ -1,4 +1,4 @@
-# Version 1.27.1 — Le rôle PUI, plus discret : du texte à droite de la ligne de l'e-mail (voir CHANGELOG.md)
+# Version 1.27.2 — Logos des cartes : l'égalité de taille revient, sans jamais cacher ni retarder un logo (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -48,7 +48,7 @@ son thème clair : plus de carré noir sur Firefox Android.
 Depuis la 1.21.3, les boutons et les champs prennent la couleur du texte de la page et le texte d'invite est gris foncé : ce qu'on tape
 dans la recherche reste lisible sur Firefox mobile en thème sombre (rejoué dans Chromium en schéma sombre imposé, pas essayé dans Firefox).
 Depuis la 1.21.4, les logos des cartes avaient tous la même surface visuelle : le widget lisait leurs pixels pour en retirer les marges
-(retiré en 1.26.1, voir plus bas).
+(retiré en 1.26.1, rétabli en 1.27.2 sans jamais cacher un logo).
 Depuis la 1.21.5, l'envoi d'un fichier à Grist (photo de profil, logo d'établissement) porte l'en-tête `X-Requested-With: XMLHttpRequest` que Grist
 exige d'une requête qui écrit avec un jeton d'accès : sans lui le navigateur ne montrait qu'une panne de réseau (rejoué dans Chromium contre un vrai
 serveur HTTP d'une autre origine ; pas encore essayé dans le vrai Grist d'Antoine).
@@ -70,10 +70,13 @@ que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bu
 Depuis la 1.26.1, le widget ne lit plus les pixels des logos des cartes : chaque logo est une image ordinaire dans une case de 104 x 42 px (85 % dès 330 px
 de large de carte, 70 % en dessous), qui se montre dès qu'elle est chargée, quoi que Grist réponde à une demande CORS (rejoué dans Chromium, pas essayé dans
 un vrai Grist ni sur Firefox). Les logos ne sont plus recadrés : un logo posé dans un grand carré transparent paraît plus petit qu'un logo coupé au ras.
+Depuis la 1.27.2, l'égalité de taille des logos des cartes revient : le logo se montre dès qu'il est chargé (au plus 400 ms d'attente), et sa lecture, à part, lui retire ses marges et lui
+donne la surface des autres quand Grist laisse lire ses pixels ; sinon il reste dans sa case de 104 x 42 px. La console (`[LOGOS]`) dit la version qui s'exécute, combien de logos Grist
+donne, et pourquoi un logo ne se charge pas ou ne se lit pas (rejoué dans Chromium, pas essayé dans un vrai Grist ni sur Firefox).
 Depuis la 1.27.0, le périmètre (`BDD.perimetre`) ne décide plus de rien : une fiche s'affiche dès que la personne a accepté d'apparaître et que son établissement est
 validé, fondateur ou partenaire, donc celle qu'elle vient de créer apparaît tout de suite ; la colonne n'est plus lue ni indispensable. La liste des établissements des
 fenêtres de profil ne propose que les fondateurs et les partenaires (et celui que la fiche porte déjà), et sa recherche est dans « Créer ma fiche » et dans la fiche d'une
 autre personne en mode admin (non essayé dans le vrai Grist).
 Depuis la 1.27.1, le rôle PUI n'est plus une pastille mais du texte, comme la fonction, à droite de la ligne de l'e-mail : jamais sur une autre ligne, coupé par « … »
 quand il est trop long (le rôle entier au survol), masqué quand l'e-mail ne lui laisse presque rien.
-943 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).
+950 tests (dont 345 dans un vrai navigateur, optionnels sans Playwright).

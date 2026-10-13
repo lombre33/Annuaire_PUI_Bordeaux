@@ -21,7 +21,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crowdedTables, crowdedBranding, crowdedIdentity } from './fixtures-responsive.mjs';
 import { routeAttachments, TALL_FILE, WIDE_FILE, UNSIZED_FILE } from './support/fake-attachments.mjs';
-import { BAND_LOGO } from '../constants.js';
+import { BAND_LOGO, CARD_LOGO } from '../constants.js';
+import { logoSize } from '../branding.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
@@ -85,9 +86,11 @@ after(async () => {
 // approchant de l'écran, on les demande tous pour que la mise en page soit complète.
 async function settle(page) {
   await page.evaluate(() => document.querySelectorAll('img[loading="lazy"]').forEach(image => { image.loading = 'eager'; }));
+  // Un logo de carte se montre dès qu'il est chargé, mais sa lecture (`data-logo`) peut le recadrer et le redimensionner juste après.
   await page.waitForFunction(() => {
     const images = [...document.querySelectorAll('.logo-img')];
-    return images.length > 0 && images.every(image => image.classList.contains('loaded'));
+    return images.length > 0 && images.every(image => image.classList.contains('loaded')
+      && (image.dataset.fit === 'trimmed' ? image.dataset.logo === 'sized' : !image.closest('.etablissement-tag') || image.dataset.logo !== undefined));
   });
 }
 
@@ -318,13 +321,12 @@ test('à 1480px avec logos : trois colonnes, logo dans le coin haut droit comme 
   }));
 
 // Les logos ont des formes différentes (de 1,2 à 6 fois plus larges que hauts dans ces fichiers) : sur une carte,
-// tous tiennent dans la même case de 104 x 42 px (style.css, 1.26.1), à l'échelle que donne la place de la carte
-// (requêtes de conteneur : 70 % sur une carte étroite, 85 % dès 330px de large, 100 % dès 380px). Le widget ne lit plus
-// leurs pixels : la case est la même pour tous, et un logo plus large ou plus haut s'y réduit (object-fit: contain).
+// tous ont la même surface visuelle (CARD_LOGO, logoSize), répartie selon leurs proportions, à l'échelle que
+// donne la place de la carte (style.css, requêtes de conteneur : 70 % sur une carte étroite, 85 % dès 330px de
+// large, 100 % dès 380px). Seul un logo que la largeur ou la hauteur maximale borne est plus petit.
 const LOGO_SCALES = [{ from: 380, scale: 1 }, { from: 330, scale: 0.85 }, { from: 0, scale: 0.7 }];
-const CARD_LOGO_BOX = { width: 104, height: 42 };
 
-test('cartes : chaque logo tient dans la même case de 104 x 42 px, à l\'échelle de la carte, quelles que soient ses proportions', { skip }, () =>
+test('cartes : tous les logos ont la même surface visuelle, à leurs proportions, dans les bornes de CARD_LOGO', { skip }, () =>
   withWidget({ tables: crowdedBranding() }, async ({ page }) => {
     const scales = new Set();
     await atEachWidth(page, [320, 600, 840, 1024, 1150, 1280, 1480], async width => {
@@ -333,23 +335,104 @@ test('cartes : chaque logo tient dans la même case de 104 x 42 px, à l\'échel
         const box = image.getBoundingClientRect();
         // La largeur de la carte hors bordures : celle que mesurent les requêtes de conteneur.
         const { scale } = steps.find(candidate => card.clientWidth >= candidate.from);
-        return { alt: image.alt, shown: image.classList.contains('loaded'), sized: image.classList.contains('sized'),
+        return { alt: image.alt, sized: image.classList.contains('sized'), fitted: image.parentElement.classList.contains('fitted'),
           width: box.width / scale, height: box.height / scale, ratio: image.naturalWidth / image.naturalHeight, scale };
       }), LOGO_SCALES);
       assert.ok(logos.length >= 12, `à ${width}px : assez de cartes pour comparer (${logos.length})`);
-      logos.forEach(({ alt, shown, sized, width: w, height: h, scale }) => {
+      let equal = 0;
+      logos.forEach(({ alt, sized, fitted, width: w, height: h, ratio, scale }) => {
         const message = `à ${width}px, ${alt}`;
         scales.add(scale);
-        assert.ok(shown, `${message} : le logo ne se voit pas`);
-        assert.ok(!sized, `${message} : la taille du logo ne se calcule plus`);
-        assert.ok(Math.abs(w - CARD_LOGO_BOX.width) <= 0.6 && Math.abs(h - CARD_LOGO_BOX.height) <= 0.6,
-          `${message} : ${w.toFixed(1)}x${h.toFixed(1)}px au lieu de ${CARD_LOGO_BOX.width}x${CARD_LOGO_BOX.height}`);
+        assert.ok(sized && fitted, `${message} : le logo n'a pas reçu sa taille`);
+        const expected = logoSize(ratio, CARD_LOGO);
+        assert.ok(Math.abs(w - expected.width) <= 0.6 && Math.abs(h - expected.height) <= 0.6,
+          `${message} : ${w.toFixed(1)}x${h.toFixed(1)}px au lieu de ${expected.width.toFixed(1)}x${expected.height.toFixed(1)}`);
+        assert.ok(w <= CARD_LOGO.maxWidth + 0.6 && h <= CARD_LOGO.maxHeight + 0.6, `${message} : plus grand que les bornes (${w.toFixed(1)}x${h.toFixed(1)}px)`);
+        if (Math.abs(w * h - CARD_LOGO.area) <= 0.04 * CARD_LOGO.area) equal++;
       });
-      // Le test n'est pas vide : les logos n'ont pas tous la même forme.
-      const ratios = logos.map(logo => logo.ratio);
-      assert.ok(Math.max(...ratios) / Math.min(...ratios) >= 2, `à ${width}px : des logos de formes différentes (${ratios.map(r => r.toFixed(1))})`);
+      // Le test n'est pas vide : la plupart des formes ont bien la surface visée.
+      assert.ok(equal >= logos.length / 2, `à ${width}px : ${equal}/${logos.length} logos seulement ont la surface visée`);
     });
     assert.deepEqual([...scales].sort(), [0.7, 0.85, 1], 'les trois échelles de carte sont toutes essayées');
+  }));
+
+// Un logo placé au milieu d'un grand carré transparent paraissait minuscule à côté d'un logo coupé au ras : le widget
+// recadre l'encre du logo (fitCardLogo) avant d'en tirer la taille. Ici des logos dessinés à la demande : deux ont des
+// marges (de formes différentes), un autre n'en a pas, un dernier a un fond coloré qui fait partie du logo.
+test('logos des cartes : les marges transparentes sont retirées, et les logos ont la même surface malgré leurs marges', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    const logos = await page.evaluate(async () => {
+      const { fitCardLogo } = await import('/branding-ui.js');
+      const draw = (width, height, rects) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        rects.forEach(([color, ...rect]) => {
+          context.fillStyle = color;
+          context.fillRect(...rect);
+        });
+        return canvas.toDataURL('image/png');
+      };
+      const cases = {
+        wideInSquare: draw(800, 800, [['#123b6b', 200, 330, 400, 140]]),
+        wideInBanner: draw(1200, 300, [['#7a1f3d', 400, 100, 360, 100]]),
+        square: draw(300, 300, [['#1d6b3a', 100, 100, 100, 100]]),
+        tight: draw(200, 100, [['#444', 0, 0, 200, 100]]),
+        badge: draw(200, 100, [['#147c72', 0, 0, 200, 100], ['#ffffff', 60, 30, 80, 40]])
+      };
+      const results = {};
+      let id = 5000;
+      for (const [name, url] of Object.entries(cases)) {
+        const holder = document.createElement('button');
+        holder.className = 'etablissement-tag';
+        const image = new Image();
+        image.className = 'logo-img';
+        image.src = url;
+        await image.decode();
+        holder.append(image);
+        document.body.append(holder);
+        const key = ++id;
+        // Comme createLogoImage : chaque chargement de l'image rappelle fitCardLogo, qui la montre (`show`) quand elle
+        // est à sa taille ; un logo recadré est remplacé par sa copie, dont le chargement rappelle fitCardLogo.
+        await new Promise(show => {
+          image.addEventListener('load', () => fitCardLogo(image, key, show));
+          fitCardLogo(image, key, show);
+        });
+        const copied = image.dataset.fit === 'trimmed';
+        results[name] = {
+          copied,
+          natural: [image.naturalWidth, image.naturalHeight],
+          w: Number(image.style.getPropertyValue('--w')),
+          h: Number(image.style.getPropertyValue('--h')),
+          sized: image.classList.contains('sized'),
+          fitted: holder.classList.contains('fitted')
+        };
+      }
+      return results;
+    });
+    const near = (value, expected, tolerance) => Math.abs(value - expected) <= tolerance;
+    // 400x140 dans un carré de 800 : 2,86 ; 360x100 dans une bannière : 3,6 ; 100x100 dans un carré de 300 : 1.
+    assert.equal(logos.wideInSquare.copied, true);
+    assert.ok(near(logos.wideInSquare.natural[0] / logos.wideInSquare.natural[1], 400 / 140, 0.25), `proportions du logo large : ${logos.wideInSquare.natural}`);
+    assert.ok(logos.wideInSquare.natural[0] < 450 && logos.wideInSquare.natural[1] < 180, `marges retirées : ${logos.wideInSquare.natural}`);
+    assert.equal(logos.wideInBanner.copied, true);
+    assert.ok(near(logos.wideInBanner.natural[0] / logos.wideInBanner.natural[1], 3.6, 0.35), `proportions de la bannière : ${logos.wideInBanner.natural}`);
+    assert.equal(logos.square.copied, true);
+    assert.ok(near(logos.square.natural[0] / logos.square.natural[1], 1, 0.1), `proportions du carré : ${logos.square.natural}`);
+    // Rien à retirer : l'image reste celle du fichier, ainsi que quand le fond est une couleur (il fait partie du logo).
+    assert.equal(logos.tight.copied, false);
+    assert.deepEqual(logos.tight.natural, [200, 100]);
+    assert.equal(logos.badge.copied, false);
+    assert.deepEqual(logos.badge.natural, [200, 100]);
+    // Tous ont reçu leur taille, de même surface (le carré tient dans la hauteur maximale, les autres dans la largeur).
+    Object.entries(logos).forEach(([name, logo]) => {
+      assert.ok(logo.sized && logo.fitted, `${name} : taille donnée`);
+      assert.ok(near(logo.w * logo.h, CARD_LOGO.area, 0.02 * CARD_LOGO.area) || logo.w >= CARD_LOGO.maxWidth - 0.1 || logo.h >= CARD_LOGO.maxHeight - 0.1,
+        `${name} : ${logo.w}x${logo.h}`);
+    });
+    assert.ok(near(logos.wideInSquare.w * logos.wideInSquare.h, CARD_LOGO.area, 0.02 * CARD_LOGO.area), 'logo large : surface visée');
+    assert.ok(near(logos.square.w * logos.square.h, CARD_LOGO.area, 0.02 * CARD_LOGO.area) || logos.square.h >= CARD_LOGO.maxHeight - 0.1, 'carré : surface visée ou hauteur maximale');
   }));
 
 test('sur téléphone avec logos, le nom reste centré sur l\'avatar et le logo dans le coin de la carte', { skip }, () =>

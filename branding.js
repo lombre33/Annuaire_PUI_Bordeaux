@@ -7,7 +7,7 @@
 // Tout est facultatif. Une colonne absente donne simplement un établissement sans logo,
 // jamais une erreur : le widget s'affiche comme avant, avec les noms à la place des logos.
 
-import { BRANDING, CATEGORIES } from './constants.js';
+import { BRANDING, CATEGORIES, ETABLISSEMENT_TABLE } from './constants.js';
 import { attachmentIds } from './attachments.js';
 import { pickLabel, refId, text } from './grist-data.js';
 
@@ -61,7 +61,7 @@ function logosOf(rows) {
   rows.forEach(row => {
     if (row.id === null || row.id === undefined) return;
     const label = pickLabel(row, LABEL_FIELDS);
-    const entry = { logo: firstAttachment(row[BRANDING.logoColumn]), name: text(row.nom_complet) || label };
+    const entry = { id: row.id, logo: firstAttachment(row[BRANDING.logoColumn]), name: text(row.nom_complet) || label };
     byId.set(String(row.id), entry);
     const known = byLabel.get(label);
     if (label && (!known || (!known.logo && entry.logo))) byLabel.set(label, entry);
@@ -92,6 +92,15 @@ export function logoForContact(branding, contact) {
   return (id && branding.logos.byId.get(String(id))) || (label && branding.logos.byLabel.get(label)) || null;
 }
 
+// Ce que la console dit des logos lus dans Etablissements : combien d'établissements, combien portent un logo dans la colonne
+// `logo`. Aucun logo lu : ce n'est pas le widget qui les perd, Grist ne les donne pas (colonne vidée, règle d'accès).
+export function brandingSummary(branding) {
+  const entries = [...branding.logos.byId.values()];
+  const withLogo = entries.filter(entry => entry.logo !== null).length;
+  return `${entries.length} établissement${entries.length > 1 ? 's' : ''} lu${entries.length > 1 ? 's' : ''} dans ${ETABLISSEMENT_TABLE}, `
+    + `${withLogo} avec un logo dans la colonne ${BRANDING.logoColumn}${withLogo === 0 && entries.length > 0 ? ' (aucun : les cartes montrent le sigle)' : ''}`;
+}
+
 // Taille d'un logo de même poids visuel que ses voisins : on vise une surface, répartie
 // selon les proportions du logo (un logo large est plus large et moins haut qu'un logo
 // carré, de même surface), puis bornée en hauteur et en largeur. C'est ce qui donne à une
@@ -113,9 +122,7 @@ export function logoSize(ratio, { area, maxWidth, maxHeight }) {
   return { width, height };
 }
 
-// hasInk et inkBounds ne servent plus à rien depuis la 1.26.1 (les logos des cartes ne sont plus lus, ni recadrés). Gardés
-// avec CARD_LOGO et fitCardLogo tant qu'un navigateur peut garder dix minutes l'ancien branding-ui.js, qui les importe :
-// retirer un nom exporté ferait échouer le chargement de tout le widget.
+// hasInk et inkBounds servent à fitCardLogo (branding-ui.js), qui retire les marges d'un logo de carte quand ses pixels se lisent.
 // Un pixel qui ne fait pas partie du logo : transparent, ou à peu près blanc (le fond d'un JPEG, d'un PNG sans transparence).
 const MIN_ALPHA = 24;
 const NEAR_WHITE = 235;

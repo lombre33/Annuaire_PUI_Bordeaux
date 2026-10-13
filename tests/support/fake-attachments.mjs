@@ -96,8 +96,9 @@ function readUpload(request) {
 //             sur un vrai serveur sans en-têtes CORS, une demande ordinaire passe ; 'hang', une demande CORS ne reçoit
 //             jamais de réponse. (Une réponse fabriquée ici sans en-têtes CORS passerait quand même le contrôle de
 //             Chromium : c'est la demande elle-même qu'on fait échouer.)
-//   requests  les demandes de téléchargement reçues : { id, crossOrigin }, selon que le navigateur a joint
-//             l'en-tête Origin (une demande CORS) ou non, dans l'ordre
+//   requests  les demandes de téléchargement reçues : { id, crossOrigin, probe }, selon que le navigateur a joint
+//             l'en-tête Origin (une demande CORS) ou non, et que l'adresse porte le paramètre de la lecture des pixels d'un
+//             logo (`annuaire_pixels`, branding-ui.js) ou non, dans l'ordre
 export async function routeAttachments(context) {
   const record = { hits: {}, tokens: [], uploads: [], stored: {}, upload: { mode: 'ok', cors: true, delay: 0 }, download: { cors: true }, requests: [] };
   const cors = { 'access-control-allow-origin': '*' };
@@ -108,7 +109,7 @@ export async function routeAttachments(context) {
     record.hits[id] = (record.hits[id] ?? 0) + 1;
     record.tokens.push(url.searchParams.get('auth'));
     const crossOrigin = 'origin' in route.request().headers();
-    record.requests.push({ id, crossOrigin });
+    record.requests.push({ id, crossOrigin, probe: url.searchParams.has('annuaire_pixels') });
     // Comme Grist, qui laisse le widget lire les fichiers avec un jeton d'accès (CORS), donc leurs pixels ;
     // `download.cors` faux ou 'hang' simule un Grist qui ne le fait pas.
     if (crossOrigin && record.download.cors === 'hang') return undefined;

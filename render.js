@@ -1,10 +1,10 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
-import { CATEGORIES, TAG_GROUPS, FILTERS } from './constants.js';
+import { CATEGORIES, ETABLISSEMENT_TABLE, TAG_GROUPS, FILTERS } from './constants.js';
 import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, shownEmail, sortWithCheckedFirst, normalize, uniqueLabels } from './grist-data.js';
 import { el } from './dom.js';
 import { groupState, menuGroups, selectionCount } from './filters.js';
-import { createLogoImage } from './branding-ui.js';
+import { createLogoImage, fitCardLogo } from './branding-ui.js';
 import { createAvatar } from './avatar-ui.js';
 import { avatarIdOf } from './attachments.js';
 
@@ -417,6 +417,16 @@ function markEtablissement(badge, mark) {
 // L'établissement d'une carte : son logo seul quand Grist en a un, sinon son nom dans
 // une pastille. `logo` : { attachment, name, attachments } (voir buildCard), ou null.
 // Si le logo ne se charge pas, le nom reprend sa place.
+// Dit dans la console, une seule fois par fichier, qu'un logo ne s'est pas chargé : la ligne d'Etablissements et le numéro de la
+// pièce jointe, jamais son adresse (elle porte le jeton) ni un nom.
+const logosWarned = new Set();
+function warnLogoFailed(logo) {
+  if (logosWarned.has(logo.attachment)) return;
+  logosWarned.add(logo.attachment);
+  console.warn(`[LOGOS] Le logo de la ligne ${logo.row} d'${ETABLISSEMENT_TABLE} (pièce jointe ${logo.attachment}) ne se charge pas : `
+    + 'Grist ne l\'a pas donné (règle d\'accès sur la colonne logo, fichier supprimé, jeton refusé). Le sigle est affiché à la place.');
+}
+
 function fillEtablissement(badge, label, onToggle, logo) {
   if (!label) return;
   if (onToggle) badge.addEventListener('click', () => onToggle('etablissement', label));
@@ -428,7 +438,8 @@ function fillEtablissement(badge, label, onToggle, logo) {
   // `with-logo` donne au logo, plus haut que la pastille, la place des deux rangées du nom
   // et de la fonction (style.css) : sa hauteur ne décentre pas le nom par rapport à l'avatar.
   const body = badge.closest('.card-body');
-  const showName = () => {
+  const showName = cause => {
+    if (cause === 'file') warnLogoFailed(logo);
     badge.classList.remove('has-logo');
     body?.classList.remove('with-logo');
     badge.replaceChildren();
@@ -437,7 +448,8 @@ function fillEtablissement(badge, label, onToggle, logo) {
   badge.classList.add('visible', 'has-logo');
   body?.classList.add('with-logo');
   badge.title = logo.name;
-  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName));
+  const onLoad = (image, show) => fitCardLogo(image, logo.attachment, show);
+  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { onLoad }));
 }
 
 // Sans `onToggle` (carte de relecture), l'adresse est du texte : un clic ne doit pas
@@ -634,7 +646,7 @@ function buildCard(template, contact, onToggle, view = {}) {
 
   const badge = card.querySelector('.etablissement-tag');
   fillEtablissement(badge, contact.etablissement_label, onToggle,
-    etablissement?.logo ? { attachment: etablissement.logo, name: etablissement.name, attachments: logos.attachments } : null);
+    etablissement?.logo ? { attachment: etablissement.logo, name: etablissement.name, row: etablissement.id, attachments: logos.attachments } : null);
   if (marks?.texts.etab?.after) markEtablissement(badge, marks.texts.etab);
   const email = card.querySelector('.email');
   if (marks?.texts.email) showTextChange(email, marks.texts.email);
