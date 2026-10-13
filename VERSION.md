@@ -1,4 +1,4 @@
-# Version 1.20.0 — Le widget crée la table Annuaire_Sonde quand elle manque (voir CHANGELOG.md)
+# Version 1.20.1 — Menu Tâches : actions préfixées « [ PUI ] » (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -36,4 +36,6 @@ et le widget l'envoie lui-même à Grist, redessinée en carré de 256 px (JPEG,
 essayés dans un vrai Grist).
 Depuis la 1.20.0, le widget crée lui-même la table `Annuaire_Sonde` (qui est connecté ?, étape 2 de `GRIST_SETUP.md`)
 quand elle manque, avec ses trois colonnes à formule de déclenchement ; c'est la seule table qu'il crée.
-902 tests (dont 323 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.20.1, le menu « Tâches » range de nouveau les tâches par action quand le libellé des actions commence par un
+préfixe entre crochets (« [ PUI ] Action 1: … ») : le préfixe est ignoré pour lire le numéro, et reste dans le libellé affiché.
+904 tests (dont 323 dans un vrai navigateur, optionnels sans Playwright).
