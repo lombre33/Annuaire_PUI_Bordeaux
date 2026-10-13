@@ -1,4 +1,4 @@
-# Version 1.21.4 — Logos des cartes à la même taille visuelle, marges retirées (voir CHANGELOG.md)
+# Version 1.21.5 — Modifier mon profil : une seule entrée par libellé (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -50,4 +50,6 @@ dans la recherche reste lisible sur Firefox mobile en thème sombre (rejoué dan
 Depuis la 1.21.4, les logos des cartes ont tous la même surface visuelle : le widget retire les marges transparentes ou blanches de
 chaque logo, puis lui donne 3 200 px² répartis selon ses proportions, dans une case de 104 x 42 px au plus (non essayé dans un vrai Grist :
 il lit les pixels des logos, ce que Grist doit autoriser).
-902 tests (dont 325 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.21.5, la fenêtre « Modifier mon profil » ne propose qu'une entrée par libellé dans ses listes : plusieurs lignes brutes
+qui ont le même libellé corrigé (une tâche proposée trois fois) ne forment plus qu'une case, qui les couvre toutes.
+904 tests (dont 325 dans un vrai navigateur, optionnels sans Playwright).

@@ -67,9 +67,12 @@ export function buildRowUpdate(champs, row, columnTypes = {}) {
       if (current.some(item => !Number.isSafeInteger(item))) {
         return { error: `${field.label} : la fiche contient des valeurs que le widget ne sait pas modifier, à corriger dans Grist` };
       }
-      const removed = new Set(change.retrait.map(entry => entry.id));
+      // Une entrée qui réunit plusieurs lignes de la table liée (`ids`) se retire de toutes, et ne
+      // s'ajoute pas si la fiche en porte déjà une.
+      const rowsOf = entry => entry.ids || [entry.id];
+      const removed = new Set(change.retrait.flatMap(rowsOf));
       const kept = current.filter(id => !removed.has(id));
-      const added = change.ajout.map(entry => entry.id).filter(id => !kept.includes(id));
+      const added = change.ajout.filter(entry => !rowsOf(entry).some(id => kept.includes(id))).map(entry => entry.id);
       values[field.key] = ['L', ...kept, ...added];
     }
   }

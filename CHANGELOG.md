@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.21.5 — Modifier mon profil : une seule entrée par libellé
+
+Signalé par Antoine le 13 octobre 2026 (capture à l'appui) : dans la fenêtre « Modifier mon profil », une même tâche apparaissait
+plusieurs fois (« Tâche 1.1 : Pilotage/Suivi » trois fois). La cause : plusieurs lignes brutes de la table `Taches` ont le même libellé
+dans la colonne `Taches_corrige`, et la fenêtre proposait une case par ligne. Les menus de filtre réunissaient déjà ces lignes par libellé ;
+la fenêtre, non.
+
+- Les listes de la fenêtre (tâches, actions, GT, communautés, compétences, instances) proposent **une seule entrée par libellé**, à la casse et
+  aux accents près, et dans un même domaine ou une même action (`mergeSameLabels` dans `profile.js`).
+- L'entrée est cochée si la fiche porte l'une quelconque de ces lignes. La décocher les retire toutes (sinon la tâche réapparaîtrait cochée à la
+  réouverture) ; la cocher n'ajoute qu'une ligne, la plus petite. Une ligne ajoutée entre-temps par quelqu'un d'autre sous le même libellé n'est
+  ni dupliquée ni retirée à tort (`rebaseChanges`, `buildRowUpdate`).
+- Seules les listes changent : les références simples (rôle, établissement) gardent une ligne par option. Deux tests de non-régression
+  (`tests/profile.test.mjs`) échouent sur la 1.21.4 (trois cases pour la même tâche) et passent maintenant.
+- Rien ne change dans l'annuaire lui-même. À savoir : la colonne `BDD.Taches` est une colonne à formule dans le Grist d'Antoine, que Grist refuse
+  d'écrire ; cocher ou décocher une tâche dans la fenêtre est donc refusé à l'enregistrement (message « colonne à formule ») tant qu'elle ne
+  devient pas une colonne de données. Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.21.4 — Logos des cartes : même taille visuelle, quelles que soient leurs marges
 
 Demande d'Antoine du 13 octobre 2026 (capture à l'appui) : malgré la hauteur commune de 1.21.0, les logos paraissaient de

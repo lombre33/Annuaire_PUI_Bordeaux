@@ -4,6 +4,7 @@ import {
   profileFormModel, diffProfile, cleanText, frenchPhoneDigits, textFault, MAX_TEXT_LENGTH,
   draftOf, rightsFor, rebaseChanges, describeChanges, blankFiche, NAME_REQUIRED, ETABLISSEMENT_REQUIRED
 } from '../profile.js';
+import { buildRowUpdate } from '../profile-save.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { sampleTables, withAvatars, withoutOptionalColumns, withTaskActions, withShownEmail, BOB_SHOWN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
@@ -111,6 +112,53 @@ test('a group never leaks into the changes: champs keep only id and label', asyn
   const { referenceMaps, row } = await setup();
   const result = diffProfile(row(1), { Competences: [1, 2, 3] }, referenceMaps);
   assert.deepEqual(result.champs.Competences, { ajout: [{ id: 3, label: 'Pharmacovigilance' }], retrait: [] });
+});
+
+// Trois lignes brutes de Taches que la colonne « corrigé » ramène au même libellé (l'une à la casse
+// près), et une tâche à part. Ana porte la ligne 2, Bob les lignes 1 et 3, Gina aucune.
+function withSameCorrectedLabel() {
+  const tables = sampleTables();
+  tables.Taches = {
+    id: [1, 2, 3, 4],
+    Taches: ['Pilotage', 'pilotage/suivi', 'Pilotage / Suivi', 'Veille'],
+    Taches_corrige: ['Tâche 1.1 : Pilotage/Suivi', 'Tâche 1.1 : Pilotage/Suivi', 'tâche 1.1 : pilotage/suivi', ''],
+    Taches_role: ['', '', '', '']
+  };
+  tables.BDD.Taches[0] = ['L', 2];
+  tables.BDD.Taches[1] = ['L', 1, 3];
+  return tables;
+}
+
+test('profileFormModel offers one entry per label when several rows read the same, checked whichever row the fiche holds', async () => {
+  const { referenceMaps, row } = await setup(withSameCorrectedLabel());
+  const taches = field(profileFormModel(row(1), referenceMaps), 'Taches');
+  assert.deepEqual(taches.options, [
+    { id: 1, label: 'Tâche 1.1 : Pilotage/Suivi', ids: [1, 2, 3] },
+    { id: 4, label: 'Veille' }
+  ]);
+  assert.deepEqual(taches.value, [1], 'Ana porte la ligne 2 : l\'entrée est cochée');
+  assert.deepEqual(field(profileFormModel(row(2), referenceMaps), 'Taches').value, [1], 'Bob porte deux lignes : une seule entrée cochée');
+  assert.deepEqual(diffProfile(row(1), { Taches: [1] }, referenceMaps).champs, {}, 'rien n\'a changé');
+});
+
+test('unchecking an entry that merges several rows removes all of them, and checking it adds one', async () => {
+  const { referenceMaps, row } = await setup(withSameCorrectedLabel());
+  const merged = { id: 1, label: 'Tâche 1.1 : Pilotage/Suivi', ids: [1, 2, 3] };
+
+  const bob = diffProfile(row(2), { Taches: [4] }, referenceMaps).champs;
+  assert.deepEqual(bob.Taches, { ajout: [{ id: 4, label: 'Veille' }], retrait: [merged] });
+  assert.deepEqual(buildRowUpdate(bob, row(2)).values, { Taches: ['L', 4] }, 'les lignes 1 et 3 partent ensemble');
+
+  const gina = diffProfile(row(9), { Taches: [1] }, referenceMaps).champs; // aucune ligne portée
+  assert.deepEqual(buildRowUpdate(gina, row(9)).values, { Taches: ['L', 1] }, 'une seule ligne ajoutée');
+
+  // Pendant ce temps, la fiche de Gina a pris une autre ligne du même libellé : rien à ajouter, rien à retirer à tort.
+  const added = diffProfile(row(9), { Taches: [1] }, referenceMaps).champs;
+  const taken = { ...row(9), Taches: ['L', 3] };
+  assert.deepEqual(rebaseChanges(added, taken, referenceMaps).champs, {}, 'déjà portée par la ligne 3');
+  const removed = diffProfile(row(2), { Taches: [] }, referenceMaps).champs;
+  assert.deepEqual(rebaseChanges(removed, { ...row(2), Taches: ['L', 3] }, referenceMaps).champs.Taches.retrait, [merged]);
+  assert.deepEqual(rebaseChanges(removed, { ...row(2), Taches: ['L'] }, referenceMaps).champs, {}, 'déjà retirée');
 });
 
 test('profileFormModel shows only the values it can name: a row without label stays out of the form', async () => {
