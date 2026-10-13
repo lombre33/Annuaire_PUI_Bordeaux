@@ -9,6 +9,7 @@
 //   TALL_FILE      un logo en hauteur (40 x 120)
 //   WIDE_FILE      une bannière très large (300 x 30)
 //   UNSIZED_FILE   un SVG qui n'a qu'un viewBox, sans width ni height (100 x 50)
+//   PADDED_FILE    un logo de 400 x 140 posé au milieu d'un carré transparent de 800 x 800
 //   MISSING_FILE   le serveur répond 404 (fichier supprimé)
 //   BROKEN_FILE    le serveur répond 200 mais le contenu n'est pas une image
 //
@@ -30,6 +31,7 @@ export const BROKEN_FILE = 998;
 export const TALL_FILE = 997;
 export const WIDE_FILE = 996;
 export const UNSIZED_FILE = 995;
+export const PADDED_FILE = 994;
 // Les photos de profil des tests : les fichiers 500 à 599 sont des portraits carrés.
 export const PORTRAIT_FIRST = 500;
 const isPortrait = id => id >= PORTRAIT_FIRST && id < PORTRAIT_FIRST + 100;
@@ -46,6 +48,10 @@ export function fakeLogoSize(id) {
 }
 
 function logoSvg(id) {
+  if (id === PADDED_FILE) {
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">'
+      + '<rect x="200" y="330" width="400" height="140" rx="12" fill="#123b6b"/></svg>';
+  }
   const { width, height } = fakeLogoSize(id);
   const size = id === UNSIZED_FILE ? '' : ` width="${width}" height="${height}"`;
   return `<svg xmlns="http://www.w3.org/2000/svg"${size} viewBox="0 0 ${width} ${height}">`

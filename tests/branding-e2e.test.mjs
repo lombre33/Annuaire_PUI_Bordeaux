@@ -11,9 +11,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withBranding, withIdentity, withSchema, HOSTILE_FIRST_NAME, ANA_EMAIL } from './fixtures.mjs';
 import { FAKE_ATTACHMENTS_URL } from './support/fake-grist.js';
-import { MISSING_FILE, BROKEN_FILE } from './support/fake-attachments.mjs';
+import { MISSING_FILE, BROKEN_FILE, PADDED_FILE } from './support/fake-attachments.mjs';
 import { skip, reload, waitForCards, withWidget as withWidgetOn } from './support/browser.mjs';
-import { PUI_URL } from '../constants.js';
+import { PUI_URL, CARD_LOGO } from '../constants.js';
 
 // Sans autre précision, un document complété de logos (GRIST_SETUP.md).
 const withWidget = (options, run) => withWidgetOn({ tables: withBranding(), ...options }, run);
@@ -223,6 +223,30 @@ test('si Grist refuse le jeton, les logos laissent la place aux noms, une seule 
     await badgeOf(page, 'Ana Martin').click();
     await waitForCards(page, 3);
   }));
+
+// Un logo posé au milieu d'un grand carré transparent paraissait minuscule : la carte en montre l'encre seule, recadrée
+// (une copie, lue grâce au CORS), à la surface visée. Le parcours est celui d'une vraie carte : chargement, copie, rechargement.
+test('une carte recadre le logo posé dans un grand carré transparent et lui donne la surface des autres', { skip }, () => {
+  const tables = withBranding();
+  tables.Etablissements.logo[0] = ['L', PADDED_FILE];
+  return withWidget({ tables }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => document.querySelector('.contact-card .etablissement-tag.has-logo img.loaded.sized'));
+    const logo = await page.locator('.contact-card .etablissement-tag.has-logo img.loaded.sized').first().evaluate(image => ({
+      copy: image.src.startsWith('data:image/png;base64,'),
+      natural: [image.naturalWidth, image.naturalHeight],
+      w: Number(image.style.getPropertyValue('--w')),
+      h: Number(image.style.getPropertyValue('--h')),
+      fitted: image.parentElement.classList.contains('fitted')
+    }));
+    assert.equal(logo.copy, true, 'l\'image montrée est la copie recadrée');
+    assert.ok(logo.natural[0] < 450 && logo.natural[1] < 180, `marges retirées : ${logo.natural}`);
+    assert.ok(Math.abs(logo.natural[0] / logo.natural[1] - 400 / 140) < 0.25, `proportions du logo : ${logo.natural}`);
+    assert.ok(Math.abs(logo.w * logo.h - CARD_LOGO.area) <= 0.02 * CARD_LOGO.area, `surface : ${logo.w}x${logo.h}`);
+    assert.equal(logo.fitted, true);
+    assert.deepEqual(await errorsOf(logs), []);
+  });
+});
 
 test('un fichier supprimé dans Grist : la pastille texte reprend sa place, sans redemander de jeton', { skip }, () => {
   const tables = withBranding();
