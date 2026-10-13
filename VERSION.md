@@ -60,4 +60,4 @@ dit dans la console pourquoi si Grist la refuse, et supprime les anciennes ligne
 Depuis la 1.22.0, la fenêtre « Créer ma fiche » a une case « Apparaître dans l'annuaire », cochée d'avance, qui renseigne `Accepte_apparaitre` et change le
 bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son périmètre rempli par un administrateur, et les messages le disent) ; les listes
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
-912 tests (dont 327 dans un vrai navigateur, optionnels sans Playwright).
+918 tests (dont 329 dans un vrai navigateur, optionnels sans Playwright).
