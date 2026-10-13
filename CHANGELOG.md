@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.21.2 — Cases à cocher des filtres : plus de carré noir sur Firefox Android
+
+Signalé par Antoine le 13 octobre 2026 : sur Firefox pour Android, les cases à cocher vides des menus de filtre
+s'affichaient comme un carré noir. Les cases étaient celles du navigateur, qui reprenait les couleurs du thème du
+téléphone. Elles sont désormais dessinées par la feuille de style (`style.css`) : fond blanc, bordure à 3:1 au moins sur
+blanc, coche blanche sur le violet (le vert foncé dans la fiche d'un établissement), et le widget impose son thème clair
+(`color-scheme: light`) ; en contraste forcé, le navigateur reprend la main. Non essayé sur un vrai Firefox Android : les
+tests vérifient les couleurs rendues dans Chromium, thème sombre émulé compris. Revenir en arrière : `git revert`.
+
 ## 1.21.1 — Logos des cartes deux fois plus grands
 
 Demande d'Antoine du 13 octobre 2026 (« faire un ×2 sur la taille »), la veille d'une démo : sur une carte assez large, le
