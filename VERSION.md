@@ -1,4 +1,4 @@
-# Version 1.21.5 — Modifier mon profil : une seule entrée par libellé (voir CHANGELOG.md)
+# Version 1.21.6 — Modifier mon profil : une seule entrée par libellé (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -50,6 +50,9 @@ dans la recherche reste lisible sur Firefox mobile en thème sombre (rejoué dan
 Depuis la 1.21.4, les logos des cartes ont tous la même surface visuelle : le widget retire les marges transparentes ou blanches de
 chaque logo, puis lui donne 3 200 px² répartis selon ses proportions, dans une case de 104 x 42 px au plus (non essayé dans un vrai Grist :
 il lit les pixels des logos, ce que Grist doit autoriser).
-Depuis la 1.21.5, la fenêtre « Modifier mon profil » ne propose qu'une entrée par libellé dans ses listes : plusieurs lignes brutes
+Depuis la 1.21.5, l'envoi d'un fichier à Grist (photo de profil, logo d'établissement) porte l'en-tête `X-Requested-With: XMLHttpRequest` que Grist
+exige d'une requête qui écrit avec un jeton d'accès : sans lui le navigateur ne montrait qu'une panne de réseau (rejoué dans Chromium contre un vrai
+serveur HTTP d'une autre origine ; pas encore essayé dans le vrai Grist d'Antoine).
+Depuis la 1.21.6, la fenêtre « Modifier mon profil » ne propose qu'une entrée par libellé dans ses listes : plusieurs lignes brutes
 qui ont le même libellé corrigé (une tâche proposée trois fois) ne forment plus qu'une case, qui les couvre toutes.
-904 tests (dont 325 dans un vrai navigateur, optionnels sans Playwright).
+907 tests (dont 327 dans un vrai navigateur, optionnels sans Playwright).
