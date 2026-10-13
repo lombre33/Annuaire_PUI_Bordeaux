@@ -1120,11 +1120,11 @@ test('« Créer ma fiche » n\'offre pas la photo, qui s\'ajoute ensuite : la fi
     assert.equal(await dialog(page).locator('input[type="file"]').count(), 0);
 
     await dialog(page).locator('#profile-prenom').fill('Zoé');
-    await dialog(page).locator('#profile-Etablissement').selectOption({ label: 'CHU de Bordeaux' });
+    await dialog(page).locator('#profile-Etablissement').selectOption({ label: 'CHU' });
     await press(page, 'Relire ma fiche').click();
-    await headingIs(page, 'Relire avant de créer');
+    await headingIs(page, 'Relire avant de publier');
     assert.equal(await dialog(page).locator('.avatar-zoom, .mark-avatar, .thumb').count(), 0, 'rien de la photo dans la relecture d\'une création');
-    await press(page, 'Créer ma fiche').click();
+    await press(page, 'Publier ma fiche').click();
     await closed(page);
 
     const calls = await bddCalls(page);

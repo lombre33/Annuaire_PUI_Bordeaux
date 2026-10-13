@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, explainWriteError, PresenceError } from '../presence.js';
+import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, explainWriteError, PresenceError } from '../presence.js';
 import { loadDirectory } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { sampleTables, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
@@ -124,6 +124,32 @@ test('describeHiddenFiche gives the reason a fiche that was accepted stays hidde
   assert.equal(say('carla@clinique.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre établissement n\'est ni fondateur ni partenaire.');
   assert.equal(say('eve@example.fr', false), 'Cette fiche reste masquée de l\'annuaire : la fiche n\'a pas d\'établissement.');
   assert.equal(say('fred@chu-bordeaux.fr', true), 'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre.');
+});
+
+test('describeHiddenFiche tells a person who ticks « Apparaître dans l’annuaire » while creating her fiche that it will be published but stay hidden until an administrator settles the point', async () => {
+  const { find } = await setup();
+  const status = email => find(email)[0].status;
+  assert.equal(describeHiddenFiche(status('fred@chu-bordeaux.fr'), { own: true, creating: true }),
+    'Votre fiche sera publiée, mais elle restera masquée de l’annuaire : votre fiche n\'a pas de périmètre. Un administrateur doit d’abord régler ce point.');
+  assert.equal(describeHiddenFiche(status('fred@chu-bordeaux.fr'), { own: true }),
+    'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a pas de périmètre.', 'la phrase d\'une modification ne change pas');
+  assert.match(describeHiddenFiche(status(IRIS_EMAIL), { own: true, creating: true }), /vous n’avez pas accepté d’apparaître/, 'sans accord, c\'est la phrase de l\'interrupteur');
+  assert.equal(describeHiddenFiche(status(ANA_EMAIL), { own: true, creating: true }), '', 'une fiche qui figure dans l\'annuaire n\'a rien à dire');
+});
+
+test('describeCreated says whether a fiche that was just created appears in the directory, and why not, instead of promising it', async () => {
+  const { find } = await setup();
+  const status = email => find(email)[0].status;
+  assert.equal(describeCreated(status(ANA_EMAIL), true), 'Votre fiche est publiée : elle apparaît dans l’annuaire.');
+  assert.equal(describeCreated(status('fred@chu-bordeaux.fr'), true),
+    'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre fiche n\'a pas de périmètre. Contactez un administrateur.');
+  assert.equal(describeCreated(status('dan@inserm.fr'), true),
+    'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre établissement n\'a pas encore été validé. Contactez un administrateur.');
+  assert.equal(describeCreated(null, true), 'Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire.', 'la fiche relue manque : on ne dit pas qu\'elle apparaît');
+  const private_ = 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
+  assert.equal(describeCreated(status(IRIS_EMAIL), false), private_);
+  assert.equal(describeCreated(null, false), private_);
+  assert.equal(describeCreated(status(ANA_EMAIL), false), private_, 'sans accord, la phrase ne dépend pas de ce que dit la fiche');
 });
 
 test('describeHiddenFiche lists every reason, and does not change what describePresence says', async () => {

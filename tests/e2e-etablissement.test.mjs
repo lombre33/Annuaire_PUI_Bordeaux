@@ -472,6 +472,39 @@ test('on nomme une personne de l’établissement depuis la liste, son nom s’a
     assert.equal(await dlg(page).locator('.es-add input').isDisabled(), false);
   }));
 
+test('la liste des personnes à nommer a sa recherche : elle ne garde que les noms qui répondent, et la personne choisie y reste', { skip }, () =>
+  withWidget({ tables: world(tables => { tables.BDD.email[9] = 'hugo.bernard@chu-bordeaux.fr'; }), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await openFromBar(page);
+    const pick = dlg(page).locator('.es-add select');
+    const options = () => pick.locator('option').allTextContents();
+    const search = dlg(page).locator('.es-find input.pick-search');
+    assert.equal(await search.getAttribute('aria-label'), 'Rechercher une personne de l’établissement');
+    assert.deepEqual(await options(), ['Choisir une personne', `${HOSTILE_FIRST_NAME} Hostile`, 'Hugo Bernard']);
+
+    await search.fill('BERN'); // sans casse ni accent, comme partout
+    assert.deepEqual(await options(), ['Choisir une personne', 'Hugo Bernard']);
+    await pick.selectOption({ label: 'Hugo Bernard' });
+    await search.fill('zzz');
+    assert.deepEqual(await options(), ['Choisir une personne', 'Hugo Bernard'], 'la personne choisie reste, quoi qu’on cherche ensuite');
+    await search.fill('');
+    assert.equal(await pick.inputValue(), 'hugo.bernard@chu-bordeaux.fr');
+    assert.equal(await pick.locator('option').count(), 3);
+
+    await press(page, 'Nommer').click();
+    assert.equal(await rowFor(page, 'hugo.bernard@chu-bordeaux.fr').locator('.es-resp-name').textContent(), 'Hugo Bernardajouté');
+    assert.equal(await search.inputValue(), '', 'la recherche est vidée avec la liste');
+    await search.fill('zzz');
+    assert.deepEqual(await options(), ['Aucun résultat']);
+
+    // Une adresse saisie remplace la liste : la recherche s’éteint avec elle.
+    await dlg(page).locator('.es-add input').fill('autre@exemple.fr');
+    assert.equal(await search.isDisabled(), true);
+    assert.equal(await pick.isDisabled(), true);
+    await dlg(page).locator('.es-add input').fill('');
+    assert.equal(await search.isDisabled(), false);
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
 test('nommer sans rien choisir, avec une adresse invalide ou une personne déjà responsable dit pourquoi', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await openFromBar(page);

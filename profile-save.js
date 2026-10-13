@@ -12,8 +12,8 @@
 //   - l'écriture est une seule action Grist, donc atomique.
 
 import { avatarIdOf } from './attachments.js';
-import { MAIN_TABLE, PROFILE_FIELDS } from './constants.js';
-import { describeVisibility, formatPhone, normalizeEmail, safeValues, tableToRows, text } from './grist-data.js';
+import { CONSENT_COLUMN, CONSENT_LABEL, MAIN_TABLE, PROFILE_FIELDS } from './constants.js';
+import { describeVisibility, formatPhone, hasAccepted, normalizeEmail, safeValues, tableToRows, text } from './grist-data.js';
 import { classifyWriteError } from './presence.js';
 import { describeChanges, diffProfile, rebaseChanges } from './profile.js';
 import { previewOf, withAvatarChange } from './preview.js';
@@ -176,11 +176,13 @@ export async function prepareReview(docApi, row, draft, { referenceMaps, etabFla
 
 // Après l'écriture : les champs de la relecture que la fiche `saved` (relue dans Grist)
 // n'a pas gardés, par leur libellé. Vide quand Grist a tout retenu. `attachmentId` : la photo
-// que saveProfile() vient d'envoyer, si elle était remplacée.
+// que saveProfile() vient d'envoyer, si elle était remplacée. Une fiche créée « pour apparaître »
+// (`review.accepted`) doit aussi avoir gardé ce choix.
 export function unsavedLabels(review, saved, referenceMaps, { attachmentId = null } = {}) {
   const { Avatar: photo, ...others } = review.champs;
   const who = { admin: review.admin === true, creating: review.creating === true };
   const labels = describeChanges(rebaseChanges(others, saved, referenceMaps, who).champs).map(line => line.label);
+  if (review.creating === true && review.accepted === true && !hasAccepted(saved)) labels.push(CONSENT_LABEL);
   if (photo) {
     const now = avatarIdOf(saved.Avatar);
     const kept = photo.action === 'replace' ? attachmentId !== null && now === attachmentId : now === 0;
@@ -282,7 +284,10 @@ async function checkCanCreate(docApi, email, log) {
 // Prépare la relecture de la fiche qu'une personne veut créer : vérifie qu'elle n'existe pas déjà, ramène
 // le brouillon à ce qui sera écrit et en tire la carte « après ». Rien n'est écrit. `blank` : la fiche
 // vide (blankFiche, avec l'adresse du compte), `email` : l'adresse du compte, jamais celle du brouillon.
-// Renvoie la relecture : { creating, email, champs, values, lines, after, visibility, notice }.
+// Le brouillon dit aussi si la personne veut apparaître (sa case Accepte_apparaitre, un booléen) : la fiche est
+// créée avec ce choix, écrit tel quel, vrai ou faux. Ce n'est pas un champ de la fiche (il ne compte pas dans
+// `champs` ni dans `lines`) ; sans lui, rien n'est écrit et la colonne garde la valeur de Grist.
+// Renvoie la relecture : { creating, email, accepted, champs, values, lines, after, visibility, notice }.
 // Lève une ProfileSaveError.
 export async function prepareCreation(docApi, blank, draft, { email, referenceMaps, etabFlags, log = console }) {
   await checkCanCreate(docApi, email, log);
@@ -293,12 +298,14 @@ export async function prepareCreation(docApi, blank, draft, { email, referenceMa
   const columnTypes = await readColumnTypes(docApi, MAIN_TABLE, { log });
   const built = buildRowUpdate(champs, blank, columnTypes);
   if (built.error) throw new ProfileSaveError(`Cette fiche ne peut pas être créée : ${built.error}.`);
-  const row = { ...blank, email: normalizeEmail(email) };
+  const choice = typeof draft?.[CONSENT_COLUMN] === 'boolean' ? { [CONSENT_COLUMN]: draft[CONSENT_COLUMN] } : {};
+  const row = { ...blank, email: normalizeEmail(email), ...choice };
   return {
     creating: true,
     email: row.email,
+    accepted: choice[CONSENT_COLUMN] === true,
     champs,
-    values: { email: row.email, ...built.values },
+    values: { email: row.email, ...choice, ...built.values },
     lines: describeChanges(champs),
     after: previewOf(row, built.values, referenceMaps, etabFlags).after,
     visibility: describeVisibility({ ...row, ...built.values }, referenceMaps, etabFlags),
@@ -307,9 +314,9 @@ export async function prepareCreation(docApi, blank, draft, { email, referenceMa
 }
 
 // Ajoute la ligne de la relecture (prepareCreation) à BDD, en une seule action Grist. Elle porte l'adresse
-// du compte et ce que la personne a rempli ; ni le choix de présence (l'interrupteur « Ma présence » en
-// décide) ni le périmètre (l'affaire de Grist). Renvoie { status: 'created', rowId } ; lève une
-// ProfileSaveError, sans rien écrire, si une fiche porte déjà l'adresse.
+// du compte, ce que la personne a rempli et son choix d'apparaître (la case Accepte_apparaitre) ; jamais le
+// périmètre, qui décide de qui apparaît et reste l'affaire des administrateurs. Renvoie { status: 'created',
+// rowId } ; lève une ProfileSaveError, sans rien écrire, si une fiche porte déjà l'adresse.
 export async function createProfile(docApi, review, { log = console } = {}) {
   if (review?.creating !== true || !review.email || Object.keys(review.champs).length === 0) {
     throw new ProfileSaveError('Aucune fiche à créer.');
