@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildBranding, logoForContact, logoSize, inkBounds } from '../branding.js';
+import { buildBranding, logoForContact, logoSize, inkBounds, hasInk } from '../branding.js';
 import { BAND_LOGO } from '../constants.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { sampleTables, withBranding } from './fixtures.mjs';
@@ -250,6 +250,16 @@ function pixelsOf(width, height, { background = [0, 0, 0, 0], rects = [] }) {
   }
   return pixels;
 }
+
+test('hasInk : une copie recadrée qui ne contient plus rien (canvas vidé par le navigateur) n\'est pas utilisée', () => {
+  const ink = { x: 2, y: 2, w: 3, h: 3, color: [20, 60, 110, 255] };
+  assert.equal(hasInk(pixelsOf(10, 10, { rects: [ink] })), true, 'un pixel coloré suffit');
+  assert.equal(hasInk(pixelsOf(10, 10, { background: [255, 255, 255, 255], rects: [ink] })), true, 'sur fond blanc');
+  assert.equal(hasInk(pixelsOf(10, 10, {})), false, 'transparente');
+  assert.equal(hasInk(pixelsOf(10, 10, { background: [255, 255, 255, 255] })), false, 'blanche');
+  assert.equal(hasInk(pixelsOf(10, 10, { background: [250, 250, 248, 255] })), false, 'presque blanche');
+  assert.equal(hasInk(new Uint8ClampedArray(0)), false, 'sans pixels');
+});
 
 test('inkBounds : le cadre de l\'encre d\'un logo, sans ses marges transparentes ou blanches', () => {
   const ink = { x: 30, y: 40, w: 50, h: 20, color: [20, 60, 110, 255] };

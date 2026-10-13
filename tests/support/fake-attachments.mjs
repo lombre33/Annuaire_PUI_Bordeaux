@@ -91,8 +91,15 @@ function readUpload(request) {
 //   uploads   les envois reçus : { token, method, referrer, cookie, field, fileName, contentType, bytes, id }
 //             (`id` : l'identifiant donné au fichier, null quand le serveur refuse)
 //   upload    la réponse du serveur aux envois, modifiable par le test (voir plus haut)
+//   download  les téléchargements : `cors` vrai (défaut), toute demande reçoit les en-têtes CORS ; faux, un Grist qui
+//             ne donne pas les fichiers en CORS : une demande CORS (le navigateur joint l'en-tête Origin) échoue comme
+//             sur un vrai serveur sans en-têtes CORS, une demande ordinaire passe ; 'hang', une demande CORS ne reçoit
+//             jamais de réponse. (Une réponse fabriquée ici sans en-têtes CORS passerait quand même le contrôle de
+//             Chromium : c'est la demande elle-même qu'on fait échouer.)
+//   requests  les demandes de téléchargement reçues : { id, crossOrigin }, selon que le navigateur a joint
+//             l'en-tête Origin (une demande CORS) ou non, dans l'ordre
 export async function routeAttachments(context) {
-  const record = { hits: {}, tokens: [], uploads: [], stored: {}, upload: { mode: 'ok', cors: true, delay: 0 } };
+  const record = { hits: {}, tokens: [], uploads: [], stored: {}, upload: { mode: 'ok', cors: true, delay: 0 }, download: { cors: true }, requests: [] };
   const cors = { 'access-control-allow-origin': '*' };
 
   await context.route(url => url.origin === ORIGIN && url.pathname.startsWith(`${PATH}/attachments/`), route => {
@@ -100,7 +107,12 @@ export async function routeAttachments(context) {
     const id = Number(url.pathname.split('/').at(-2));
     record.hits[id] = (record.hits[id] ?? 0) + 1;
     record.tokens.push(url.searchParams.get('auth'));
-    // Comme Grist, qui laisse le widget lire les fichiers avec un jeton d'accès (CORS), donc leurs pixels.
+    const crossOrigin = 'origin' in route.request().headers();
+    record.requests.push({ id, crossOrigin });
+    // Comme Grist, qui laisse le widget lire les fichiers avec un jeton d'accès (CORS), donc leurs pixels ;
+    // `download.cors` faux ou 'hang' simule un Grist qui ne le fait pas.
+    if (crossOrigin && record.download.cors === 'hang') return undefined;
+    if (crossOrigin && record.download.cors === false) return route.abort('failed');
     const headers = cors;
     if (id === MISSING_FILE) return route.fulfill({ status: 404, headers, contentType: 'text/plain', body: 'Not found' });
     if (id === BROKEN_FILE) return route.fulfill({ status: 200, headers, contentType: 'image/svg+xml', body: 'ceci n\'est pas une image' });

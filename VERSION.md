@@ -66,6 +66,8 @@ bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
 Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite : à droite de la fonction et de l'e-mail, sous le logo, sur une carte de 480 px ou
 plus ; sous l'e-mail sur une carte plus étroite.
+Depuis la 1.25.2, le logo qu'on voit sur une carte est une image ordinaire (sans CORS) : ses pixels sont lus à part, et si Grist ou le navigateur
+refuse ou tarde (3 s), le logo se montre quand même, sans recadrage (rejoué dans Chromium, pas essayé dans un vrai Grist ni sur Firefox).
 Depuis la 1.26.0, l'étiquette d'une tâche dit le rôle de la personne dans cette tâche (colonne facultative `Taches_role` de `Taches`, lue sur les lignes brutes
 que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bulle à la souris et au clavier, sous le nom de la tâche sur un téléphone.
-935 tests (dont 336 dans un vrai navigateur, optionnels sans Playwright).
+939 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).

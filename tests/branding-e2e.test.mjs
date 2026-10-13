@@ -14,6 +14,7 @@ import { FAKE_ATTACHMENTS_URL } from './support/fake-grist.js';
 import { MISSING_FILE, BROKEN_FILE, PADDED_FILE } from './support/fake-attachments.mjs';
 import { skip, reload, waitForCards, withWidget as withWidgetOn } from './support/browser.mjs';
 import { PUI_URL, CARD_LOGO } from '../constants.js';
+import { ANALYSIS_TIMEOUT_MS } from '../branding-ui.js';
 
 // Sans autre précision, un document complété de logos (GRIST_SETUP.md).
 const withWidget = (options, run) => withWidgetOn({ tables: withBranding(), ...options }, run);
@@ -244,6 +245,64 @@ test('une carte recadre le logo posé dans un grand carré transparent et lui do
     assert.ok(Math.abs(logo.natural[0] / logo.natural[1] - 400 / 140) < 0.25, `proportions du logo : ${logo.natural}`);
     assert.ok(Math.abs(logo.w * logo.h - CARD_LOGO.area) <= 0.02 * CARD_LOGO.area, `surface : ${logo.w}x${logo.h}`);
     assert.equal(logo.fitted, true);
+    assert.deepEqual(await errorsOf(logs), []);
+  });
+});
+
+// Régression du 13/10/2026 : après la 1.21.4 (le logo demandé en CORS pour lire ses pixels), les logos ont disparu des
+// cartes chez Antoine. Le logo qu'on voit est désormais une image ordinaire, sans CORS ; ses pixels se lisent sur une
+// copie à part, et si la lecture échoue ou tarde, le logo se montre quand même, à la taille de repli de style.css.
+const visibleLogos = page => page.locator('.contact-card .etablissement-tag.has-logo img').evaluateAll(images => images.map(image => ({
+  shown: Number(getComputedStyle(image).opacity) === 1 && image.getBoundingClientRect().width > 0,
+  width: image.getBoundingClientRect().width,
+  height: image.getBoundingClientRect().height,
+  copy: image.src.startsWith('data:'),
+  cors: image.hasAttribute('crossorigin'),
+  sized: image.classList.contains('sized')
+})));
+
+test('le logo qu\'on voit sur une carte est une image ordinaire : jamais d\'attribut crossorigin, même quand ses pixels se lisent', { skip }, () => {
+  const tables = withBranding();
+  tables.Etablissements.logo[0] = ['L', PADDED_FILE];
+  return withWidget({ tables }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => document.querySelectorAll('.contact-card .etablissement-tag.has-logo img.loaded.sized').length === 3);
+    await page.waitForTimeout(250); // la fin du fondu d'apparition
+    const logos = await visibleLogos(page);
+    assert.deepEqual(logos.map(logo => logo.cors), [false, false, false]);
+    assert.deepEqual(logos.map(logo => logo.shown), [true, true, true]);
+    assert.deepEqual(logos.map(logo => logo.copy), [true, true, true], 'la copie recadrée a pris la place du fichier');
+    assert.deepEqual(await errorsOf(logs), []);
+  });
+});
+
+test('un Grist qui ne donne pas les logos en CORS : ils s\'affichent quand même, tels quels, à la taille de repli', { skip }, () => {
+  const tables = withBranding();
+  tables.Etablissements.logo[0] = ['L', PADDED_FILE];
+  return withWidget({ tables, downloadCors: false }, async ({ page, logs, files }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => document.querySelectorAll('.contact-card .etablissement-tag.has-logo img.loaded').length === 3);
+    await page.waitForTimeout(250);
+    const logos = await visibleLogos(page);
+    assert.deepEqual(logos.map(logo => logo.shown), [true, true, true], 'les trois logos du CHU se voient');
+    assert.deepEqual(logos.map(logo => logo.copy), [false, false, false], 'ni lus ni recadrés : le fichier lui-même');
+    assert.deepEqual(logos.map(logo => logo.sized), [false, false, false]);
+    assert.ok(logos.every(logo => logo.width <= CARD_LOGO.maxWidth + 0.5 && logo.height <= 42.5 && logo.height > 0), `dans la case de repli : ${JSON.stringify(logos[0])}`);
+    assert.ok(files.requests.some(request => request.crossOrigin), 'la lecture a bien été tentée en CORS');
+    assert.equal(await page.locator('.contact-card .etablissement-tag.has-logo.fitted').count(), 0);
+    assert.deepEqual(await errorsOf(logs), []);
+  });
+});
+
+test('un Grist qui laisse la lecture d\'un logo sans réponse : le logo se montre après un court délai', { skip }, () => {
+  const tables = withBranding();
+  tables.Etablissements.logo[0] = ['L', PADDED_FILE];
+  return withWidget({ tables, downloadCors: 'hang' }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => document.querySelectorAll('.contact-card .etablissement-tag.has-logo img.loaded').length === 3,
+      undefined, { timeout: ANALYSIS_TIMEOUT_MS + 4000 });
+    await page.waitForTimeout(250);
+    assert.deepEqual((await visibleLogos(page)).map(logo => logo.shown), [true, true, true]);
     assert.deepEqual(await errorsOf(logs), []);
   });
 });
