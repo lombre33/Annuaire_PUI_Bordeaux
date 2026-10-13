@@ -88,7 +88,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 6. **Téléphone**, s'il est renseigné, présenté par paires de chiffres.
 7. **Titres de section** : Instances, Actions, GT, Compétences, Communautés, Tâches. Une section n'apparaît que si la personne y a au moins une valeur.
 8. **Étiquettes colorées** : un clic filtre sur cette valeur (voir [Gagner du temps](#gagner-du-temps--cliquer-sur-une-étiquette)).
-9. **Rôle PUI** : une pastille violette sous le logo (ou la pastille) de l'établissement, seulement si la personne a un rôle dans le PUI. Un clic filtre sur ce rôle.
+9. **Rôle PUI** : une petite pastille violette, seulement si la personne a un rôle dans le PUI. Sur une carte large (480 px ou plus), elle se lit à droite, sous le logo (ou la pastille) de l'établissement, à la hauteur de la fonction et de l'e-mail ; sur une carte plus étroite, elle a sa propre ligne sous l'e-mail. Un clic filtre sur ce rôle.
 
 Sur une carte que vous pouvez modifier, une ligne s'ajoute sous la fonction : la mention **Votre fiche** (sur la vôtre) et le bouton **✎ Modifier** ([Modifier ma fiche](#modifier-ma-fiche)) ; sur la carte d'une autre personne, un administrateur en mode admin lit **✎ Modifier la fiche**. Si vous êtes responsable de l'établissement, un second bouton **✎ Modifier** se lit sous le logo de l'établissement : il ouvre la fiche de l'**établissement**, pas celle de la personne ([La fiche de mon établissement](#la-fiche-de-mon-établissement)).
 
@@ -201,7 +201,7 @@ Le menu **Tâches** range lui aussi ses valeurs par groupe, ici par **action**. 
 
 Cliquer sur une étiquette de carte, sur le logo ou la pastille d'établissement **coche le filtre correspondant** ; cliquer à nouveau le décoche. C'est le même résultat que cocher la case dans le menu, sans l'ouvrir.
 
-Le **rôle PUI**, sous le logo de l'établissement, se clique de la même façon : il coche le filtre **Rôle PUI**.
+Le **rôle PUI**, la petite pastille violette de la carte, se clique de la même façon : il coche le filtre **Rôle PUI**.
 
 ## Fondateurs et Partenaires
 

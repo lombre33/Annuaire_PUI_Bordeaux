@@ -157,7 +157,7 @@ const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'i
 // Les sections de tags d'une carte, dans l'ordre. Établissement a son badge dédié ; les
 // regroupements n'y figurent pas : la carte garde le détail des compétences et des tâches.
 // Rôle PUI est dans la liste (c'est un tag, et la relecture compare ses libellés) mais la carte
-// le dessine sous le logo de l'établissement, pas dans le bas (render.js, fillRole).
+// le dessine en petite pastille à côté de la fonction, pas dans le bas (render.js, fillRole).
 const TAG_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role'];
 
 const withKey = key => ({ key, ...CATEGORIES[key] });

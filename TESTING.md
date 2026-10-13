@@ -451,7 +451,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       case est bien cochée (pas seulement mise en évidence visuellement), et
       le badge de comptage sur le bouton du filtre est à jour — même
       résultat qu'en cochant la case directement dans le menu.
-- [ ] **Le rôle PUI d'une carte (pastille sous le logo) est cliquable** (1.24.0) :
+- [ ] **Le rôle PUI d'une carte (petite pastille à droite, ou sous l'e-mail d'une carte étroite) est cliquable** (1.24.0, 1.24.1) :
       curseur "main" au survol, un clic coche la valeur dans le filtre
       « Rôle PUI » et la grille se filtre ; un second clic la décoche. Un
       rôle long (« Référent innovation et valorisation ») passe à la ligne
@@ -475,7 +475,8 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       dans Grist (la quasi-totalité) → la carte affiche bien le 0 initial,
       formaté par paires (`05 56 78 90 12`), pas un nombre à 9 chiffres.
 - [ ] **Rôle PUI** : un contact avec `Role_dans_le_PUI` renseigné affiche
-      bien son rôle en pastille sous le logo de l'établissement, et le menu
+      bien son rôle en petite pastille (à droite de la fonction et de l'e-mail sur
+      une carte de 480 px ou plus, sous l'e-mail sur une carte plus étroite), et le menu
       du filtre « Rôle PUI » liste les valeurs de la table `Role_Dans_le_PUI`.
 - [ ] **Renommage de libellé** : dans Grist, cocher un filtre (ex.
       Établissement sur une valeur), puis renommer cette valeur dans la
