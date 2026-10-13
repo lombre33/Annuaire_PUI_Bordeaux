@@ -13,8 +13,7 @@ import { sampleTables, withBranding, withIdentity, withSchema, HOSTILE_FIRST_NAM
 import { FAKE_ATTACHMENTS_URL } from './support/fake-grist.js';
 import { MISSING_FILE, BROKEN_FILE, PADDED_FILE } from './support/fake-attachments.mjs';
 import { skip, reload, waitForCards, withWidget as withWidgetOn } from './support/browser.mjs';
-import { PUI_URL, CARD_LOGO } from '../constants.js';
-import { ANALYSIS_TIMEOUT_MS } from '../branding-ui.js';
+import { PUI_URL } from '../constants.js';
 
 // Sans autre précision, un document complété de logos (GRIST_SETUP.md).
 const withWidget = (options, run) => withWidgetOn({ tables: withBranding(), ...options }, run);
@@ -225,87 +224,58 @@ test('si Grist refuse le jeton, les logos laissent la place aux noms, une seule 
     await waitForCards(page, 3);
   }));
 
-// Un logo posé au milieu d'un grand carré transparent paraissait minuscule : la carte en montre l'encre seule, recadrée
-// (une copie, lue grâce au CORS), à la surface visée. Le parcours est celui d'une vraie carte : chargement, copie, rechargement.
-test('une carte recadre le logo posé dans un grand carré transparent et lui donne la surface des autres', { skip }, () => {
-  const tables = withBranding();
-  tables.Etablissements.logo[0] = ['L', PADDED_FILE];
-  return withWidget({ tables }, async ({ page, logs }) => {
-    await waitForCards(page, 4);
-    await page.waitForFunction(() => document.querySelector('.contact-card .etablissement-tag.has-logo img.loaded.sized'));
-    const logo = await page.locator('.contact-card .etablissement-tag.has-logo img.loaded.sized').first().evaluate(image => ({
-      copy: image.src.startsWith('data:image/png;base64,'),
-      natural: [image.naturalWidth, image.naturalHeight],
-      w: Number(image.style.getPropertyValue('--w')),
-      h: Number(image.style.getPropertyValue('--h')),
-      fitted: image.parentElement.classList.contains('fitted')
-    }));
-    assert.equal(logo.copy, true, 'l\'image montrée est la copie recadrée');
-    assert.ok(logo.natural[0] < 450 && logo.natural[1] < 180, `marges retirées : ${logo.natural}`);
-    assert.ok(Math.abs(logo.natural[0] / logo.natural[1] - 400 / 140) < 0.25, `proportions du logo : ${logo.natural}`);
-    assert.ok(Math.abs(logo.w * logo.h - CARD_LOGO.area) <= 0.02 * CARD_LOGO.area, `surface : ${logo.w}x${logo.h}`);
-    assert.equal(logo.fitted, true);
-    assert.deepEqual(await errorsOf(logs), []);
-  });
-});
-
-// Régression du 13/10/2026 : après la 1.21.4 (le logo demandé en CORS pour lire ses pixels), les logos ont disparu des
-// cartes chez Antoine. Le logo qu'on voit est désormais une image ordinaire, sans CORS ; ses pixels se lisent sur une
-// copie à part, et si la lecture échoue ou tarde, le logo se montre quand même, à la taille de repli de style.css.
+// Régression du 13/10/2026 : la 1.21.4 demandait le logo en CORS pour lire ses pixels, et les logos ont disparu des cartes
+// chez Antoine ; la 1.25.2 (image ordinaire, pixels lus à part) n'a pas suffi. Depuis la 1.26.1 le widget ne lit plus les
+// pixels d'un logo et ne fait aucune demande CORS : chaque logo est une image ordinaire dans une case fixe de 104 x 42 px
+// (style.css), quoi que Grist réponde à une demande CORS (accepte, refuse, ne répond pas).
+const BOX = { width: 104, height: 42 };
 const visibleLogos = page => page.locator('.contact-card .etablissement-tag.has-logo img').evaluateAll(images => images.map(image => ({
   shown: Number(getComputedStyle(image).opacity) === 1 && image.getBoundingClientRect().width > 0,
   width: image.getBoundingClientRect().width,
   height: image.getBoundingClientRect().height,
-  copy: image.src.startsWith('data:'),
+  src: image.getAttribute('src'),
   cors: image.hasAttribute('crossorigin'),
-  sized: image.classList.contains('sized')
+  classes: image.className
 })));
 
-test('le logo qu\'on voit sur une carte est une image ordinaire : jamais d\'attribut crossorigin, même quand ses pixels se lisent', { skip }, () => {
+test('le logo d\'une carte est une image ordinaire dans une case fixe : ni crossorigin, ni copie, ni demande CORS, même posé dans un grand carré transparent', { skip }, () => {
   const tables = withBranding();
   tables.Etablissements.logo[0] = ['L', PADDED_FILE];
-  return withWidget({ tables }, async ({ page, logs }) => {
-    await waitForCards(page, 4);
-    await page.waitForFunction(() => document.querySelectorAll('.contact-card .etablissement-tag.has-logo img.loaded.sized').length === 3);
-    await page.waitForTimeout(250); // la fin du fondu d'apparition
-    const logos = await visibleLogos(page);
-    assert.deepEqual(logos.map(logo => logo.cors), [false, false, false]);
-    assert.deepEqual(logos.map(logo => logo.shown), [true, true, true]);
-    assert.deepEqual(logos.map(logo => logo.copy), [true, true, true], 'la copie recadrée a pris la place du fichier');
-    assert.deepEqual(await errorsOf(logs), []);
-  });
-});
-
-test('un Grist qui ne donne pas les logos en CORS : ils s\'affichent quand même, tels quels, à la taille de repli', { skip }, () => {
-  const tables = withBranding();
-  tables.Etablissements.logo[0] = ['L', PADDED_FILE];
-  return withWidget({ tables, downloadCors: false }, async ({ page, logs, files }) => {
+  return withWidget({ tables }, async ({ page, logs, files }) => {
     await waitForCards(page, 4);
     await page.waitForFunction(() => document.querySelectorAll('.contact-card .etablissement-tag.has-logo img.loaded').length === 3);
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(250); // la fin du fondu d'apparition
     const logos = await visibleLogos(page);
-    assert.deepEqual(logos.map(logo => logo.shown), [true, true, true], 'les trois logos du CHU se voient');
-    assert.deepEqual(logos.map(logo => logo.copy), [false, false, false], 'ni lus ni recadrés : le fichier lui-même');
-    assert.deepEqual(logos.map(logo => logo.sized), [false, false, false]);
-    assert.ok(logos.every(logo => logo.width <= CARD_LOGO.maxWidth + 0.5 && logo.height <= 42.5 && logo.height > 0), `dans la case de repli : ${JSON.stringify(logos[0])}`);
-    assert.ok(files.requests.some(request => request.crossOrigin), 'la lecture a bien été tentée en CORS');
+    assert.deepEqual(logos.map(logo => logo.shown), [true, true, true]);
+    assert.deepEqual(logos.map(logo => logo.cors), [false, false, false]);
+    assert.deepEqual(logos.map(logo => logo.src), [logoUrl(PADDED_FILE), logoUrl(PADDED_FILE), logoUrl(PADDED_FILE)], 'le fichier lui-même, pas une copie');
+    assert.ok(logos.every(logo => !/\bsized\b/.test(logo.classes)), 'rien n\'est lu ni mesuré');
+    assert.ok(logos.every(logo => logo.width <= BOX.width + 0.5 && logo.height <= BOX.height + 0.5 && logo.height > 0
+      && Math.abs(logo.width / logo.height - BOX.width / BOX.height) < 0.05), `dans la case : ${JSON.stringify(logos[0])}`);
+    assert.ok(files.requests.length > 0 && files.requests.every(request => !request.crossOrigin), 'aucune demande CORS');
     assert.equal(await page.locator('.contact-card .etablissement-tag.has-logo.fitted').count(), 0);
     assert.deepEqual(await errorsOf(logs), []);
   });
 });
 
-test('un Grist qui laisse la lecture d\'un logo sans réponse : le logo se montre après un court délai', { skip }, () => {
-  const tables = withBranding();
-  tables.Etablissements.logo[0] = ['L', PADDED_FILE];
-  return withWidget({ tables, downloadCors: 'hang' }, async ({ page, logs }) => {
-    await waitForCards(page, 4);
-    await page.waitForFunction(() => document.querySelectorAll('.contact-card .etablissement-tag.has-logo img.loaded').length === 3,
-      undefined, { timeout: ANALYSIS_TIMEOUT_MS + 4000 });
-    await page.waitForTimeout(250);
-    assert.deepEqual((await visibleLogos(page)).map(logo => logo.shown), [true, true, true]);
-    assert.deepEqual(await errorsOf(logs), []);
-  });
-});
+// Le test qu'il fallait : un Grist qui ne donne pas les pixels d'un logo (CORS refusé, ou sans réponse) ne retarde ni ne cache
+// jamais un logo. La limite est celle des 3 secondes de la 1.25.2 : un logo qui attendrait encore une lecture la dépasserait.
+[[false, 'refuse'], ['hang', 'laisse sans réponse']].forEach(([downloadCors, what]) =>
+  test(`un Grist qui ${what} les demandes CORS : les logos s'affichent quand même, aussitôt`, { skip }, () => {
+    const tables = withBranding();
+    tables.Etablissements.logo[0] = ['L', PADDED_FILE];
+    return withWidget({ tables, downloadCors }, async ({ page, logs, files }) => {
+      await waitForCards(page, 4);
+      await page.waitForFunction(() => document.querySelectorAll('.contact-card .etablissement-tag.has-logo img.loaded').length === 3,
+        undefined, { timeout: 2500 });
+      await page.waitForTimeout(250);
+      const logos = await visibleLogos(page);
+      assert.deepEqual(logos.map(logo => logo.shown), [true, true, true], 'les trois logos du CHU se voient');
+      assert.ok(logos.every(logo => logo.width <= BOX.width + 0.5 && logo.height <= BOX.height + 0.5 && logo.height > 0), `dans la case : ${JSON.stringify(logos[0])}`);
+      assert.ok(files.requests.length > 0 && files.requests.every(request => !request.crossOrigin), 'le widget n\'a même pas essayé le CORS');
+      assert.deepEqual(await errorsOf(logs), []);
+    });
+  }));
 
 test('un fichier supprimé dans Grist : la pastille texte reprend sa place, sans redemander de jeton', { skip }, () => {
   const tables = withBranding();
