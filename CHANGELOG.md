@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.28.2 — Logos : la console dit pourquoi Grist les refuse (règles d'accès) et comment y remédier, la documentation aussi
+
+Retour d'Antoine du 13 octobre 2026 (entre 13 h 27 et 14 h 18, heure de Paris), sur la 1.28.1 : sa console disait « 17 avec un logo dans la colonne logo », puis `[LOGOS] Bilan : 0 logo chargé sur 16 (16 refusés)`, et aucun logo
+n'apparaissait, dans Firefox comme ailleurs.
+
+- **La cause n'était pas dans le code.** Les règles d'accès d'`Etablissements`, dans le document d'Antoine, ne laissaient lire la table qu'aux Éditeurs (lecture) et aux propriétaires. Or le jeton qui sert à afficher les pièces jointes,
+  `getAccessToken({ readOnly: true })` (le même depuis le premier logo, commit `9d4460e`), est plafonné au rôle de **Lecteur** du document, et Grist n'ouvre un fichier qu'à un rôle qui peut lire une cellule qui le contient (d'après son code) :
+  il refusait les seize fichiers, même au propriétaire. L'essai de la copie de la 1.21.3 (celle d'avant la lecture des pixels) ne les montrait pas non plus. Antoine a posé une règle de colonne sur `logo` (`user.Access in [OWNER, EDITOR, VIEWER]`,
+  lecture autorisée) : les logos sont revenus, pour un propriétaire comme pour un Éditeur (« Voir en tant que »), à la bonne taille. Les Éditeurs devaient figurer dans la règle : le widget lit la colonne avec le rôle réel de la personne,
+  et sans eux elle arrive vide (« 0 avec un logo dans la colonne logo »).
+- **Les pistes des 1.27.2 à 1.28.1 sur la disparition des logos étaient fausses.** Les seize `NS_BINDING_ABORTED` de la console de la 1.27.2 étaient vraisemblablement les seize refus de Grist (une réponse qui n'est pas une image), pas des demandes
+  annulées par un redessin ; le mécanisme de la 1.28.1 (Firefox annule une image retirée du document pendant son chargement) n'a jamais été observé dans un vrai Grist. Le préchargement reste, il ne gêne rien (une demande par logo) ;
+  `docs/developpeurs.md` et `VERSION.md` le disent.
+- **La console dit le remède.** Le premier avertissement d'un logo que Grist ne donne pas ajoute la cause la plus probable (une règle d'accès : le jeton compte comme un Lecteur) et ce qu'il faut faire (la colonne `logo` lisible par les Lecteurs,
+  les Éditeurs et les propriétaires, `GRIST_SETUP.md` étape 5) ; les suivants renvoient au premier (« même cause probable que plus haut ») au lieu de le répéter seize fois. Toujours ni adresse ni jeton.
+- **La documentation** : `GRIST_SETUP.md` (étape 4 : la ligne « lire la colonne `logo` » ; étape 5 : le jeton plafonné au Lecteur, la règle, deux lignes dans « Vérifier » ; étape 6 : les photos `Avatar` ont le même plafond, avec une règle limitée aux fiches
+  qui acceptent d'apparaître, car une photo est une donnée personnelle), `docs/securite.md`, `docs/developpeurs.md`, `TESTING.md` (section 14). **La règle sur `Avatar` n'a pas été essayée** (aucune photo manquante n'a été signalée).
+- **Correction de la documentation des conditions d'accès.** `GRIST_SETUP.md` donnait, pour des conditions, `ACL.lookupRecords(email=user.Email)` et `user.Email.strip().lower() == rec.email.strip().lower()`. Or une condition d'accès ne contient ni
+  appel de fonction ni autre table : seulement `user`, `rec` et `newRec` (plus `OWNER`, `EDITOR`, `VIEWER`), des nombres, des textes, des listes, des comparaisons, `and`, `or`, `not`, `in` et `+ - * / %` (documentation de Grist, « Access rules », et son code :
+  `PredicateFormula.ts` n'a aucun nœud « appel »). Pour « un responsable de cette ligne », la page décrit maintenant un attribut d'utilisateur (nom `Acl`, table `ACL`, colonne `email`, valeur `user.Email`), les conditions qui en découlent pour `ACL` et
+  `Etablissements` et leur limite (une seule ligne d'`ACL` par adresse). **Ces conditions n'ont pas été essayées dans un vrai Grist** : celle de la lecture d'`ACL` est entre les mains d'Antoine (fenêtre « Fiche de l'établissement » : « la liste des
+  responsables n'a pas pu être lue »).
+- **`archives/1.21.3/` est supprimé** (la copie de test, devenue inutile) ; la version elle-même reste dans l'historique de git (`a0b1472`).
+- Tests : celui de l'avertissement d'un logo refusé vérifie le remède et l'absence d'adresse ; un test avec deux fichiers refusés vérifie que le remède n'est dit qu'une fois. Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.28.1 — Logos : chacun est chargé une seule fois, à l'abri des redessins de l'annuaire, et la page dit sa version
 
 Retour d'Antoine du 13 octobre 2026 (12 h 29), sur la 1.27.2 : « les logos ne s'affichent pas, la console est blindée d'erreurs […] c'est juste une régression, tout marchait

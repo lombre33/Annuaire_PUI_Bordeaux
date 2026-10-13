@@ -239,6 +239,7 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 | `ACL` : lire les lignes de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce qui affiche la liste des responsables dans la fiche. Si la règle la leur refuse, la fiche s'ouvre sans cette liste et le dit |
 | `ACL` : ajouter, supprimer, modifier `email` et `Responsable_de_l_Etablissement` d'une ligne de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce que le widget écrit quand un responsable nomme ou retire un responsable. **`admin` : les administrateurs seulement** (le widget ne l'écrit jamais ; sans cette règle, un responsable pourrait se donner le droit d'administrateur depuis la console) |
 | `Etablissements` : modifier `nom_complet`, `ok_pour_apparaitre` et `logo` d'**une ligne** | les responsables de cette ligne, et les administrateurs | c'est ce que le widget écrit pour la fiche d'un établissement. `ok_pour_apparaitre` décide de qui apparaît ; `acronyme`, `fondateur`, `partenaire` et `autres` : l'équipe du PUI seulement, le widget ne les écrit pas |
+| `Etablissements` : **lire** la colonne `logo` (une règle sur cette seule colonne) | toute personne qui a accès au document, Lecteurs, Éditeurs et propriétaires : `user.Access in [OWNER, EDITOR, VIEWER]`, lecture autorisée | le jeton en lecture seule qui sert à afficher les logos compte comme un **Lecteur** : si la table n'est lisible que par les Éditeurs et les propriétaires, Grist refuse tous les logos (étape 5, 1.28.2). Les Éditeurs et les propriétaires doivent y être aussi : le widget lit la colonne avec le rôle réel de la personne |
 | Ajouter une pièce jointe au document | les responsables et les administrateurs (le logo) ; toute personne qui modifie sa fiche (sa photo de profil, étape 6) | c'est ce que fait l'envoi d'un logo ou d'une photo. Un compte au rôle **Lecteur** du document ne peut rien écrire, pas même cela |
 | `ACL` : lire et modifier les lignes des autres | les administrateurs | la formule d'`Annuaire_Sonde` la lit pour son propre compte, sans passer par les droits de la personne |
 
@@ -269,23 +270,47 @@ une règle d'accès qui n'autorise pas « Supprimer » à `rec.Email == user.Ema
 jamais celles des autres. Les lignes déjà présentes peuvent être supprimées à la main sans risque :
 le widget ne les relit pas.
 
-Pour « un responsable de cette ligne d'`Etablissements` » (ou de cette ligne d'`ACL`), un
-attribut d'utilisateur qui cherche `user.Email` dans la colonne `email` d'`ACL` ne rend que
-la **première** ligne : pour une personne responsable de plusieurs établissements, une
-condition qui consulte toutes les lignes d'`ACL` de son adresse (par exemple en
-parcourant `ACL.lookupRecords(email=user.Email)`) est plus sûre. La table-sonde n'est pas une
-source utilisable ici : elle est vide au repos, la valeur de sa colonne `Responsable_de` n'existe
-que le temps de l'identification. À essayer sur une copie.
+**Ce qu'une condition peut contenir.** D'après la documentation de Grist (« Access rules ») et
+son code, une condition est une expression Python restreinte : les seules variables sont `user`,
+`rec` et `newRec` (avec leurs colonnes : `rec.email`, `user.Access`), plus `OWNER`, `EDITOR` et
+`VIEWER` ; des nombres, des textes et des listes ; `and`, `or`, `not`, `+ - * / %`,
+`== != < <= > >=`, `is`, `is not`, `in` et `not in`. **Aucun appel de fonction ni de méthode, aucune
+autre table** : ni `ACL.lookupRecords(...)`, ni `any(...)`, ni `.lower()` ou `.strip()`. Grist
+refuse une condition qui en contient (variable inconnue, syntaxe non prise en charge). Ce qu'il faut
+chercher dans une autre table passe par un attribut d'utilisateur (ci-dessous) ; ce qu'il faut
+calculer, par une colonne formule de la table.
 
-Pour « la personne dont `email` est la sienne », une condition comme
-`user.Email and rec.email and user.Email.strip().lower() == rec.email.strip().lower()`.
-Pour « les administrateurs », le plus simple est un attribut d'utilisateur de Grist
-(« Ajouter des attributs d'utilisateur ») qui cherche `user.Email` dans la colonne
-`email` de `ACL` : la condition devient `user.Acl.admin`, si vous avez nommé l'attribut
-`Acl`. Comme cet attribut ne lit qu'une ligne (voir ci-dessus), cochez `admin` sur **chaque**
+Pour « un responsable de cette ligne d'`Etablissements` » (ou de cette ligne d'`ACL`), le moyen
+prévu est un **attribut d'utilisateur** (« Ajouter des attributs d'utilisateur », en bas des règles
+d'accès) : nom `Acl`, table `ACL`, colonne `email`, valeur de la personne `user.Email`. Les
+conditions s'écrivent ensuite avec `user.Acl` :
+
+| Où | Condition |
+|---|---|
+| `ACL` : lire, modifier, supprimer une ligne de son établissement | `rec.Responsable_de_l_Etablissement and user.Acl.Responsable_de_l_Etablissement == rec.Responsable_de_l_Etablissement` |
+| `ACL` : ajouter une ligne pour son établissement | `newRec.Responsable_de_l_Etablissement and user.Acl.Responsable_de_l_Etablissement == newRec.Responsable_de_l_Etablissement` |
+| `Etablissements` : modifier une ligne | `rec.id == user.Acl.Responsable_de_l_Etablissement` |
+| les administrateurs | `user.Acl.admin` |
+
+Un attribut d'utilisateur ne donne **qu'une ligne** de la table (la première qui correspond,
+d'après le code de Grist) : une personne responsable de plusieurs établissements n'est reconnue que
+pour celui de sa première ligne d'`ACL`, et les autres s'ouvrent pour elle sans la liste des
+responsables, avec le message qui le dit ; un administrateur règle ce cas. La table-sonde n'est pas une
+source utilisable ici : elle est vide au repos, la valeur de sa colonne `Responsable_de` n'existe
+que le temps de l'identification. **Ces conditions n'ont pas encore été essayées dans un vrai Grist** :
+à tester sur une copie, avec « Voir en tant que » sur le compte d'un responsable.
+
+Pour « la personne dont `email` est la sienne », la condition `user.Email and rec.email == user.Email`.
+Elle tient compte des majuscules et des espaces (une condition ne peut pas les ignorer) : l'adresse
+de `BDD` doit être écrite comme celle du compte Grist, en général en minuscules et sans espace. Pour
+une comparaison qui les ignore, un second attribut d'utilisateur (nom `Fiche`, table `BDD`, colonne
+`email`, valeur `user.Email`) donne la condition `user.Fiche.id == rec.id`, qui profite de la recherche de
+Grist (insensible à la casse dans ses versions récentes : à vérifier sur votre instance).
+Pour « les administrateurs », la condition `user.Acl.admin` du tableau ci-dessus. Comme cet
+attribut ne lit qu'une ligne (voir ci-dessus), cochez `admin` sur **chaque**
 ligne d'`ACL` d'un administrateur qui en a plusieurs (le bouton « Mode admin » du widget, lui,
-regarde toutes les lignes). La recherche de Grist tient compte de la casse : écrivez les
-adresses d'`ACL` en minuscules.
+regarde toutes les lignes). La recherche d'un attribut tient compte de la casse dans les anciennes
+versions de Grist : écrivez les adresses d'`ACL` en minuscules, par prudence.
 
 Si vous préférez que le rôle dans le PUI (`Role_dans_le_PUI`) soit attribué par les
 administrateurs, retirez-le de la deuxième ligne : le champ reste affiché dans la
@@ -361,9 +386,23 @@ indique : c'est la méthode que la documentation de Grist donne pour afficher un
 jointe. Le jeton figure donc dans l'adresse de l'image ; il ne permet que de **lire** le
 document (pas d'y écrire), pour quelques minutes, puis le widget en demande un autre. Voir
 [`docs/securite.md`](docs/securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes).
-Cet affichage **n'a pas pu être essayé dans un vrai document Grist** (les tests simulent
-la réponse de Grist) : vérifiez-le sur votre document avant de compter dessus
-([`TESTING.md`](TESTING.md), section 14).
+Cet affichage a été constaté dans le document d'Antoine le 13 octobre 2026, une fois la règle
+d'accès ci-dessous posée (les tests, eux, simulent la réponse de Grist) : vérifiez-le sur votre
+document avant de compter dessus ([`TESTING.md`](TESTING.md), section 14).
+
+**Les règles d'accès doivent laisser lire la colonne `logo` aux Lecteurs (1.28.2).** Le jeton en
+lecture seule est plafonné au rôle de **Lecteur** du document, quelle que soit la personne qui
+ouvre l'annuaire, et Grist n'ouvre un fichier qu'à une personne de ce rôle qui peut lire au moins
+une cellule qui le contient (d'après son code). Si vos règles ne laissent lire `Etablissements`
+qu'aux Éditeurs et aux propriétaires, la table se lit bien (le widget la lit avec le rôle réel de la
+personne) mais **Grist refuse tous les logos**, même à un propriétaire : c'est ce qui s'est passé
+dans le document d'Antoine (« 0 logo chargé sur 16 (16 refusés) »), sans rapport avec le code. Dans
+les règles d'accès, bloc `Etablissements`, ajoutez une **règle de colonne** pour `logo` : condition
+`user.Access in [OWNER, EDITOR, VIEWER]`, lecture autorisée. Les Éditeurs et les propriétaires
+doivent y figurer eux aussi : sans eux, la colonne arrive vide chez un Éditeur (« 0 avec un logo
+dans la colonne logo »). Ce n'est pas une brèche : un logo n'est pas un secret (plus haut), et
+seule cette colonne est ouverte, pas le reste de la table. Contrôlez avec « Voir en tant que » sur
+un propriétaire et sur un Éditeur (et sur un Lecteur, si les Lecteurs lisent l'annuaire).
 
 **Remplacer un logo depuis le widget (1.17.0).** Le widget redessine l'image choisie (PNG,
 JPG, WebP ou SVG, 1 Mo au plus) en un PNG de 480 px au plus, puis l'envoie à Grist : il
@@ -392,6 +431,8 @@ qu'il y ait dans Grist. Si les logos ne s'affichent pas, la console dit pourquoi
 |---|---|---|
 | `[LOGOS] Jeton d'accès aux pièces jointes indisponible : les logos sont remplacés par le texte.` et des noms à la place de tous les logos | Grist ne donne pas de jeton (version de Grist sans `getAccessToken`, ou règle d'accès qui interdit la lecture des pièces jointes) | Vérifier l'accès du widget (`full`) et la version de Grist ; essayer avec un compte qui peut modifier le document |
 | Le nom d'**un seul** établissement à la place de son logo, ou un message « Failed to load resource » du navigateur | Le fichier est absent de la cellule `logo`, a été supprimé, ou n'est pas une image lisible (PNG, SVG, JPEG…) | Remplacer le fichier dans Grist |
+| Un avertissement par fichier, `[LOGOS] Le logo de la ligne N d'Etablissements … ne se charge pas : Grist ne l'a pas donné. Cause probable : une règle d'accès…`, puis `[LOGOS] Bilan : 0 logo chargé sur N (N refusés, …)` | Grist refuse tous les fichiers : le jeton en lecture seule compte comme un Lecteur, et la colonne `logo` ne lui est pas lisible | Règle de colonne sur `logo` : `user.Access in [OWNER, EDITOR, VIEWER]`, lecture autorisée (plus haut) |
+| `[LOGOS] Version … : N établissements lus dans Etablissements, 0 avec un logo dans la colonne logo (aucun : les cartes montrent le sigle)` alors que la colonne contient des fichiers | La colonne arrive vide : une règle d'accès ne la laisse pas lire au rôle de la personne (un Éditeur, par exemple) | La même règle, avec les Éditeurs et les propriétaires dans la condition |
 | `[LOGOS] Impossible d'afficher les logos : …` | Une erreur inattendue en construisant l'habillage ; les cartes restent affichées | Transmettre la ligne au mainteneur du code |
 | Pas de bandeau en bas de page | Aucun établissement n'est à la fois `fondateur` et `ok_pour_apparaitre` | Cocher les deux cases pour les fondateurs |
 | Un logo paraît trop petit, ou entouré de blanc | Marge ou fond blanc dans le fichier | Rogner l'image, fond transparent |
@@ -422,6 +463,15 @@ profil ».
    fichier : vos droits ne permettent pas d'ajouter une pièce jointe au document »).
 4. Rechargez le widget : ouvrez « Modifier mon profil », la carte « Photo de profil »
    apparaît.
+
+**Si les photos ne s'affichent pas (1.28.2).** Une photo s'affiche avec le même jeton en lecture
+seule qu'un logo, donc avec les droits d'un **Lecteur** (étape 5) : si `BDD` n'est lisible que par les
+Éditeurs et les propriétaires, les photos sont refusées et les initiales les remplacent, alors que la table
+se lit bien. Il faut qu'une règle de colonne laisse lire `Avatar` au rôle Lecteur. Contrairement à un
+logo, une photo est une **donnée personnelle** : n'ouvrez pas toutes les photos de `BDD` à tous les
+Lecteurs, limitez-les aux fiches dont la personne a accepté d'apparaître, par exemple avec la condition
+`user.Access in [OWNER, EDITOR] or rec.Accepte_apparaitre` (lecture autorisée). Cette règle ne peut pas
+regarder l'établissement (une condition ne suit pas les références). Non essayée dans un vrai Grist.
 
 **Ce que le widget fait d'une photo.** La personne choisit un fichier (JPG, PNG ou WebP,
 2 Mo au plus) ; le navigateur le redessine : recadré en carré au centre, 256 pixels de côté

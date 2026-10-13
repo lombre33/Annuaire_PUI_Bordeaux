@@ -418,14 +418,26 @@ function markEtablissement(badge, mark) {
 // une pastille. `logo` : { attachment, name, attachments } (voir buildCard), ou null.
 // Si le logo ne se charge pas, le nom reprend sa place.
 // Dit dans la console, une seule fois par fichier, qu'un logo ne s'est pas chargé : la ligne d'Etablissements et le numéro de la
-// pièce jointe, jamais son adresse (elle porte le jeton) ni un nom.
+// pièce jointe, jamais son adresse (elle porte le jeton) ni un nom. Quand c'est Grist qui ne le donne pas, le premier message dit
+// aussi la cause la plus probable et son remède : le jeton qui affiche les fichiers est en lecture seule, donc compté comme un
+// Lecteur du document, et une colonne `logo` qu'une règle d'accès ne laisse lire qu'aux Éditeurs lui est fermée (13 octobre 2026,
+// chez Antoine : seize logos refusés, rien à voir avec le code). Les suivants le renvoient au premier, pour ne pas le répéter seize fois.
 const logosWarned = new Set();
+let accessRemedyGiven = false;
 function warnLogoFailed(logo, cause) {
   if (logosWarned.has(logo.attachment)) return;
   logosWarned.add(logo.attachment);
-  const why = cause === 'late'
-    ? 'la demande n\'a pas abouti à temps (Grist trop lent, ou le navigateur l\'a annulée)'
-    : 'Grist ne l\'a pas donné (règle d\'accès sur la colonne logo, fichier supprimé, jeton refusé)';
+  let why;
+  if (cause === 'late') {
+    why = 'la demande n\'a pas abouti à temps (Grist trop lent, ou le navigateur l\'a annulée)';
+  } else if (accessRemedyGiven) {
+    why = 'Grist ne l\'a pas donné (même cause probable que plus haut)';
+  } else {
+    accessRemedyGiven = true;
+    why = 'Grist ne l\'a pas donné. Cause probable : une règle d\'accès. Le jeton qui sert à afficher les pièces jointes est en lecture seule, '
+      + `donc compté comme un Lecteur du document : la colonne logo de la table ${ETABLISSEMENT_TABLE} doit être lisible par les Lecteurs, les Éditeurs et les propriétaires `
+      + '(GRIST_SETUP.md, étape 5). Autres causes : fichier supprimé, jeton refusé';
+  }
   console.warn(`[LOGOS] Le logo de la ligne ${logo.row} d'${ETABLISSEMENT_TABLE} (pièce jointe ${logo.attachment}) ne se charge pas : ${why}. `
     + 'Le sigle est affiché à la place.');
 }

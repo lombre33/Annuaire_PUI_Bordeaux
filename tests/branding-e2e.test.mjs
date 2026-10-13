@@ -357,6 +357,26 @@ test('un logo que Grist ne donne pas : la console le dit une fois par fichier, s
     assert.match(warnings[0], new RegExp(`^\\[LOGOS\\] Le logo de la ligne \\d+ d'Etablissements \\(pièce jointe ${MISSING_FILE}\\) ne se charge pas`));
     assert.doesNotMatch(warnings[0], /CHU/, 'un numéro de ligne, pas un nom');
     assert.doesNotMatch(warnings[0], /fake-token|auth=|\/attachments\//);
+    // La cause la plus probable et son remède sont dans le message : de quoi se passer du mainteneur (13 octobre 2026, seize logos
+    // refusés par les règles d'accès d'Antoine).
+    assert.match(warnings[0], /Cause probable : une règle d'accès\. Le jeton .* en lecture seule, donc compté comme un Lecteur du document : la colonne logo de la table Etablissements doit être lisible par les Lecteurs, les Éditeurs et les propriétaires \(GRIST_SETUP\.md, étape 5\)/);
+  });
+});
+
+test('plusieurs logos que Grist ne donne pas : le premier message dit le remède, les suivants y renvoient sans le répéter', { skip }, () => {
+  const tables = withBranding();
+  tables.Etablissements.logo[0] = ['L', MISSING_FILE]; // le CHU
+  tables.Etablissements.logo[4] = ['L', BROKEN_FILE]; // l'Institut Bergonié
+  return withWidget({ tables }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => [...document.querySelectorAll('.contact-card .etablissement-tag')]
+      .filter(badge => badge.textContent.trim() !== '').length === 4);
+    assert.deepEqual(await page.locator('.contact-card .etablissement-tag').allTextContents(), ['Institut Bergonié', 'CHU', 'CHU', 'CHU']);
+    const warnings = await warningsOf(logs, /\[LOGOS\] Le logo de/);
+    assert.equal(warnings.length, 2, 'un message par fichier');
+    assert.equal(warnings.filter(text => /GRIST_SETUP\.md/.test(text)).length, 1, 'le remède n\'est dit qu\'une fois');
+    assert.equal(warnings.filter(text => /même cause probable que plus haut/.test(text)).length, 1, 'l\'autre renvoie au premier');
+    warnings.forEach(text => assert.doesNotMatch(text, /fake-token|auth=|\/attachments\/|CHU|Bergonié/));
   });
 });
 
