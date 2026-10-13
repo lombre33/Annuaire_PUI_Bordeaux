@@ -35,7 +35,7 @@ Le widget écrit dans `BDD` dans trois cas :
 - quand un administrateur, mode admin allumé, enregistre la fiche d'une autre
   personne : les mêmes colonnes, plus `email` et `Etablissement`.
 
-Jamais `perimetre`, ni `Accepte_apparaitre` depuis la fenêtre de modification.
+Jamais `perimetre` (le widget ne le lit ni ne l'écrit plus depuis la 1.27.0), ni `Accepte_apparaitre` depuis la fenêtre de modification.
 
 Grist refuse d'écrire dans une colonne **à formule** : chacune doit être une colonne
 de **données**. `Accepte_apparaitre` est de type **Case à cocher** (Bascule) ;
@@ -234,7 +234,7 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 | `Annuaire_Sonde` : ajouter une ligne, lire et supprimer **la sienne**, ne rien modifier | toute personne qui peut modifier le document (les deux règles exactes sont plus bas) | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
 | `BDD` : modifier `prenom`, `nom`, `Fonction`, `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Avatar` (si vous l'avez ajoutée, étape 6), `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
 | `BDD` : modifier `email`, `Etablissement` | les administrateurs | c'est ce que le widget écrit quand un administrateur, mode admin allumé, change l'adresse ou l'établissement d'une autre personne. `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` décide de qui apparaît |
-| `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais ; il décide de qui apparaît |
+| `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais, et ne le lit plus depuis la 1.27.0 : il ne décide plus de qui apparaît |
 | `BDD` : ajouter ou supprimer une ligne | les administrateurs | le widget ne crée ni ne supprime jamais de fiche |
 | `ACL` : lire les lignes de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce qui affiche la liste des responsables dans la fiche. Si la règle la leur refuse, la fiche s'ouvre sans cette liste et le dit |
 | `ACL` : ajouter, supprimer, modifier `email` et `Responsable_de_l_Etablissement` d'une ligne de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce que le widget écrit quand un responsable nomme ou retire un responsable. **`admin` : les administrateurs seulement** (le widget ne l'écrit jamais ; sans cette règle, un responsable pourrait se donner le droit d'administrateur depuis la console) |

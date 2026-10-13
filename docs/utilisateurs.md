@@ -56,7 +56,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Communautés** | *À compléter* |
 | **Tâches** | *À compléter* |
 | **Rôle PUI** | *À compléter* |
-| **Périmètre** | *À compléter.* Pour qu'une personne apparaisse, au moins un périmètre doit être renseigné (colonne `perimetre`) |
+| **Périmètre** | *À compléter.* Colonne `perimetre` de la table des contacts : depuis la 1.27.0, elle ne décide plus de qui apparaît |
 
 ## Découvrir l'écran
 
@@ -252,7 +252,6 @@ Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'a
 Quand votre fiche reste masquée alors que vous avez accepté d'apparaître, le message donne la ou les raisons, séparées par des points-virgules :
 
 - « votre fiche n'a ni prénom ni nom » ;
-- « votre fiche n'a pas de périmètre » ;
 - « votre fiche n'a pas d'établissement » ;
 - « votre établissement n'est pas reconnu » ;
 - « votre établissement n'a pas encore été validé » ;
@@ -583,7 +582,6 @@ Dans tous ces cas, le logo se change aussi directement dans Grist (colonne `logo
 **Ensuite, côté données** (informations à transmettre à l'administrateur des données). Une personne n'est affichée que si **toutes** ces conditions sont réunies :
 
 - elle a un **nom ou un prénom** ;
-- elle a au moins une valeur de **périmètre** (colonne `perimetre`) ;
 - elle a **accepté d'apparaître** (case `Accepte_apparaitre` cochée : par elle-même avec « Ma présence », ou dans Grist avec son accord) ;
 - elle est rattachée à un établissement (colonne `Etablissement`, qui renvoie à une ligne de la table `Etablissements`) ;
 - cet établissement a **validé** son apparition (`ok_pour_apparaitre` coché) ;
@@ -597,7 +595,6 @@ Quelques cas, avec des personnes fictives du jeu de démonstration :
 | Lucas Mercier | N'a pas accepté d'apparaître | Jamais affiché, tant qu'il n'active pas l'interrupteur de « Ma présence » |
 | Gabriel Noël | Établissement de statut « autres » | Jamais affiché |
 | Alice Bertin | Aucun établissement renseigné | Jamais affichée |
-| Victor Lambert | Aucun périmètre renseigné | Jamais affiché |
 | Clara Dubois | Établissement partenaire validé | Affichée seulement avec l'interrupteur Partenaires |
 
 Les deux accords sont indépendants : celui de l'établissement ne remplace pas celui de la personne, et celui de la personne ne contourne pas l'établissement. La page [maintenance](maintenance.md#pourquoi-un-contact-est-visible-ou-non) détaille ces règles pour l'administrateur des données.
@@ -616,7 +613,7 @@ Un bandeau rouge apparaît sous la barre d'outils quand l'annuaire n'a pas pu ê
 | « Tables illisibles (…) : des libellés ou des tags peuvent manquer » | Les cartes s'affichent, mais certains libellés ou « tags » (les étiquettes colorées des cartes) et certaines valeurs de filtre peuvent manquer | Rechargez la page, puis prévenez l'administrateur des données si le message revient |
 | « Colonne de libellé introuvable : … Les tags et le filtre correspondants restent vides » | Une table de référence se lit, mais la colonne qui porte les libellés n'existe plus (renommée ou supprimée) | À corriger dans Grist par l'administrateur des données |
 | « Acronymes en double dans Etablissements (…) avec des statuts différents » | Cas rare : deux établissements portent le même acronyme avec des statuts contradictoires et Grist a transmis l'établissement sous forme de texte. Le statut le plus strict est retenu : leurs contacts sont masqués s'il ne les rend plus éligibles | À corriger dans Grist par l'administrateur des données |
-| « perimetre est vide… », « Etablissement est vide… », « Aucun contact affichable… » | Les données sont présentes mais aucune ne remplit les conditions d'affichage | À vérifier dans Grist par l'administrateur des données |
+| « Etablissement est vide… », « Aucun contact affichable… » | Les données sont présentes mais aucune ne remplit les conditions d'affichage | À vérifier dans Grist par l'administrateur des données |
 | « Personne n'a accepté d'apparaître : Accepte_apparaitre n'est coché pour aucun contact… » | Personne n'a donné son accord d'apparaître (ou la case n'est plus renseignée) : l'annuaire est vide faute d'accord, pas faute de données | À vérifier dans Grist par l'administrateur des données. Que quelques personnes seulement aient refusé n'est pas une anomalie : aucun bandeau ne le signale |
 
 Le bandeau ne signale pas « aucun résultat pour ma recherche » : c'est le rôle de l'écran « Aucun contact trouvé ».

@@ -397,7 +397,7 @@ test('le nom et la fonction ne passent jamais sous le logo de l\'établissement,
     });
   }));
 
-// Le rôle dans le PUI (1.26.2) : du texte comme la fonction, sans pastille ni fond, à droite de la ligne de l'e-mail. Il ne
+// Le rôle dans le PUI (1.27.1) : du texte comme la fonction, sans pastille ni fond, à droite de la ligne de l'e-mail. Il ne
 // la fait jamais passer à la ligne ni grandir la carte : trop long, il est coupé par une ellipse (le rôle entier en
 // infobulle) ; quand l'e-mail ne lui laisse que quelques lettres, il disparaît. Rôle court dans la boucle, pour que
 // le contrôle ne dépende pas de la police.

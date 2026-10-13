@@ -1,4 +1,4 @@
-# Version 1.26.2 — Le rôle PUI, plus discret : du texte à droite de la ligne de l'e-mail (voir CHANGELOG.md)
+# Version 1.27.1 — Le rôle PUI, plus discret : du texte à droite de la ligne de l'e-mail (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -61,7 +61,7 @@ table en remplit une : une ligne sans libellé corrigé n'apparaît plus (une ta
 Depuis la 1.24.0, un huitième filtre, « Rôle PUI » (table `Role_Dans_le_PUI`), ferme la barre, et le rôle de la personne s'affiche en
 pastille ; les menus de filtre réunissent deux libellés qui ne diffèrent que par la casse ou les accents.
 Depuis la 1.25.0, la fenêtre « Créer ma fiche » a une case « Apparaître dans l'annuaire », cochée d'avance, qui renseigne `Accepte_apparaitre` et change le
-bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son périmètre rempli par un administrateur, et les messages le disent) ; les listes
+bouton en « Publier ma fiche » (la 1.27.0 a levé la condition du périmètre : une fiche publiée apparaît tout de suite) ; les listes
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
 Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite.
 Depuis la 1.25.2, le logo qu'on voit sur une carte était une image ordinaire (sans CORS), ses pixels étant lus à part (retiré en 1.26.1).
@@ -70,6 +70,10 @@ que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bu
 Depuis la 1.26.1, le widget ne lit plus les pixels des logos des cartes : chaque logo est une image ordinaire dans une case de 104 x 42 px (85 % dès 330 px
 de large de carte, 70 % en dessous), qui se montre dès qu'elle est chargée, quoi que Grist réponde à une demande CORS (rejoué dans Chromium, pas essayé dans
 un vrai Grist ni sur Firefox). Les logos ne sont plus recadrés : un logo posé dans un grand carré transparent paraît plus petit qu'un logo coupé au ras.
-Depuis la 1.26.2, le rôle PUI n'est plus une pastille mais du texte, comme la fonction, à droite de la ligne de l'e-mail : jamais sur une autre ligne, coupé par « … »
+Depuis la 1.27.0, le périmètre (`BDD.perimetre`) ne décide plus de rien : une fiche s'affiche dès que la personne a accepté d'apparaître et que son établissement est
+validé, fondateur ou partenaire, donc celle qu'elle vient de créer apparaît tout de suite ; la colonne n'est plus lue ni indispensable. La liste des établissements des
+fenêtres de profil ne propose que les fondateurs et les partenaires (et celui que la fiche porte déjà), et sa recherche est dans « Créer ma fiche » et dans la fiche d'une
+autre personne en mode admin (non essayé dans le vrai Grist).
+Depuis la 1.27.1, le rôle PUI n'est plus une pastille mais du texte, comme la fonction, à droite de la ligne de l'e-mail : jamais sur une autre ligne, coupé par « … »
 quand il est trop long (le rôle entier au survol), masqué quand l'e-mail ne lui laisse presque rien.
-940 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).
+943 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).

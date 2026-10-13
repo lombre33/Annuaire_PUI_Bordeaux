@@ -11,7 +11,7 @@
 //   actions des tâches → aucune : ses tâches et ses actions n'ont pas de numéro (voir
 //                        withTaskActions pour les tâches rangées par action)
 //   jamais affichés    → Carla (établissement « autres »), Dan (non validé),
-//                        Eve (sans établissement), Fred (hors périmètre),
+//                        Eve (sans établissement), Fred (établissement absent d'Etablissements),
 //                        le contact sans nom, Iris (a refusé d'apparaître) et
 //                        Jules (n'a pas répondu : Accepte_apparaitre vide).
 //   Tous les autres ont accepté d'apparaître : chaque règle de visibilité se
@@ -24,13 +24,13 @@ export function sampleTables() {
     BDD: {
       id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       prenom: ['Ana', 'Bob', 'Carla', 'Dan', 'Eve', HOSTILE_FIRST_NAME, 'Fred', '', 'Gina', 'Hugo', 'Iris', 'Jules'],
-      nom: ['Martin', 'Durand', 'Lopez', 'Petit', 'Sans', 'Hostile', 'Horsperimetre', '', 'Bergonié', 'Bernard', 'Refus', 'Sansreponse'],
+      nom: ['Martin', 'Durand', 'Lopez', 'Petit', 'Sans', 'Hostile', 'Inconnu', '', 'Bergonié', 'Bernard', 'Refus', 'Sansreponse'],
       email: ['ana.martin@chu-bordeaux.fr', 'bob@u-bordeaux-montaigne.fr', 'carla@clinique.fr', 'dan@inserm.fr',
         'eve@example.fr', 'hostile@chu-bordeaux.fr', 'fred@chu-bordeaux.fr', 'x@chu-bordeaux.fr',
         'gina@bergonie.fr?cc=intrus@example.fr', '', 'iris@chu-bordeaux.fr', 'jules@chu-bordeaux.fr'],
       Fonction: ['Pharmacienne', 'Chargé de mission', '', '', '', '', '', '', 'Directrice', '', '', ''],
       // Référence vers Etablissements : identifiant de ligne, 0 quand elle est vide.
-      Etablissement: [1, 2, 3, 4, 0, 1, 1, 1, 5, 1, 1, 1],
+      Etablissement: [1, 2, 3, 4, 0, 1, 99, 1, 5, 1, 1, 1],
       Instances: [['L', 1], ['L', 1, 3], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L', 999], ['L'], ['L']],
       // Une liste arrive en identifiants, parfois déjà résolue en texte.
       Actions: [['L', 'Vaccination'], ['L', 2], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L']],
@@ -40,7 +40,8 @@ export function sampleTables() {
       // Ana : deux compétences du même domaine ; Bob : un autre domaine ; Gina :
       // une compétence que Macro_competences ne classe pas.
       Competences: [['L', 1, 2], ['L', 3], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L', 4], ['L'], ['L'], ['L']],
-      perimetre: [['L', 1], ['L', 2], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L'], ['L', 1], ['L', 3], ['L', 1], ['L', 1], ['L', 1]],
+      // Hugo n'a aucun périmètre (['L'] : une liste vide) et apparaît quand même : le périmètre ne décide de rien.
+      perimetre: [['L', 1], ['L', 2], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 3], ['L'], ['L', 1], ['L', 1]],
       // Colonnes facultatives, rajoutées dans BDD sous ces noms : Numeric (le 0
       // initial est perdu) et Référence vers Role_Dans_le_PUI (0 = vide).
       numero_de_telephone: [556789012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

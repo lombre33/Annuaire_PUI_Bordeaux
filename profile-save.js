@@ -318,8 +318,8 @@ export async function prepareCreation(docApi, blank, draft, { email, referenceMa
 
 // Ajoute la ligne de la relecture (prepareCreation) à BDD, en une seule action Grist. Elle porte l'adresse
 // du compte, ce que la personne a rempli et son choix d'apparaître (la case Accepte_apparaitre) ; jamais le
-// périmètre, qui décide de qui apparaît et reste l'affaire des administrateurs. Renvoie { status: 'created',
-// rowId } ; lève une ProfileSaveError, sans rien écrire, si une fiche porte déjà l'adresse.
+// périmètre, qui reste l'affaire des administrateurs. Renvoie { status: 'created', rowId } ; lève une
+// ProfileSaveError, sans rien écrire, si une fiche porte déjà l'adresse.
 export async function createProfile(docApi, review, { log = console } = {}) {
   if (review?.creating !== true || !review.email || Object.keys(review.champs).length === 0) {
     throw new ProfileSaveError('Aucune fiche à créer.');
