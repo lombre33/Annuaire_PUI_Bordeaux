@@ -130,6 +130,84 @@ test('readIdentity does not even try for a read-only (viewer) account', async ()
   assert.deepEqual(s.log.warnings, []);
 });
 
+// Un docApi dont la suppression d'une ligne de la sonde passe par `removal(actions, apply)`.
+const withRemoval = (s, removal) => ({
+  ...s.docApi,
+  applyUserActions: actions => (actions[0][0] === 'RemoveRecord' ? removal(actions, s.docApi.applyUserActions) : s.docApi.applyUserActions(actions))
+});
+
+test('readIdentity answers only once Grist has deleted its row: the table is already empty, nothing is left running', async () => {
+  const s = session(ANA_EMAIL);
+  const slow = withRemoval(s, async (actions, apply) => {
+    await new Promise(resolve => setTimeout(resolve, 30));
+    return apply(actions);
+  });
+  assert.equal((await readIdentity(slow, { log: s.log })).status, 'ready');
+  assert.deepEqual(s.tables.Annuaire_Sonde.id, [], 'la ligne est supprimée avant la réponse (sans attendre ensuite)');
+});
+
+test('readIdentity retries a refused deletion once, says why in the console (row number, Grist\'s reason, no address) and still identifies the person', async () => {
+  const s = session(BOB_EMAIL);
+  const tried = [];
+  const refusing = withRemoval(s, async actions => {
+    tried.push(actions[0][2]);
+    throw new Error('Blocked by table delete access rules');
+  });
+  const identity = await readIdentity(refusing, { log: s.log });
+  assert.equal(identity.status, 'ready');
+  assert.equal(identity.email, BOB_EMAIL);
+  assert.equal(tried.length, 2, 'une seconde tentative');
+  assert.equal(tried[0], tried[1], 'sur la même ligne');
+  assert.equal(s.log.warnings.length, 1);
+  assert.match(s.log.warnings[0][0], /^\[IDENTITE\] la ligne \d+ de Annuaire_Sonde n'a pas pu être supprimée : Blocked by table delete access rules .*GRIST_SETUP\.md/);
+  assert.ok(!JSON.stringify(s.log.warnings).includes('@'), 'aucune adresse dans la console');
+});
+
+test('readIdentity does not wait for ever for a deletion Grist never answers: the person is identified, the console says so', async () => {
+  const s = session(ANA_EMAIL);
+  const silent = withRemoval(s, () => new Promise(() => {}));
+  const identity = await readIdentity(silent, { log: s.log, cleanupWaitMs: 20 });
+  assert.equal(identity.status, 'ready');
+  assert.match(s.log.warnings[0][0], /^\[IDENTITE\] Grist n'a pas répondu à la suppression de la ligne de Annuaire_Sonde/);
+});
+
+test('readIdentity also deletes the older rows left at the same address by earlier loads, never the rows of other people', async () => {
+  const tables = withIdentity();
+  tables.Annuaire_Sonde = {
+    id: [3, 4, 5, 6],
+    Email: [BOB_EMAIL, ANA_EMAIL, ` ${BOB_EMAIL.toUpperCase()} `, ''],
+    Admin: [false, true, false, false],
+    Responsable_de: ['2', '1', '2', '']
+  };
+  const s = session(BOB_EMAIL, tables);
+  const identity = await identify(s);
+  assert.equal(identity.status, 'ready');
+  assert.deepEqual(s.tables.Annuaire_Sonde.id, [4, 6], 'les deux lignes de Bob sont parties (casse et espaces ignorés), celles des autres restent');
+  assert.deepEqual(s.calls.map(call => call.action), ['AddRecord', 'RemoveRecord', 'BulkRemoveRecord']);
+  assert.match(s.log.infos.at(-1)[0], /\[IDENTITE\] 2 ancienne\(s\) ligne\(s\) de Annuaire_Sonde/);
+  assert.ok(!JSON.stringify(s.log.infos).includes('@'));
+});
+
+test('readIdentity leaves the older rows alone when it could not delete its own, and when it could not even find its own', async () => {
+  const tables = withIdentity();
+  tables.Annuaire_Sonde = { id: [3], Email: [BOB_EMAIL], Admin: [false], Responsable_de: ['2'] };
+  const refused = session(BOB_EMAIL, tables);
+  await readIdentity(withRemoval(refused, async () => { throw new Error('refusé'); }), { log: refused.log });
+  assert.deepEqual(refused.tables.Annuaire_Sonde.id, [3, 4], 'la ligne ajoutée reste, la plus ancienne aussi : rien n\'a été supprimé');
+  assert.equal(refused.log.warnings.length, 1, 'une seule phrase, pas une par ligne');
+
+  // Une autre fenêtre de la même personne a déjà supprimé la ligne qu'on vient d'ajouter.
+  const vanished = session(BOB_EMAIL);
+  const gone = { ...vanished.docApi, fetchTable: async name => {
+    const table = await vanished.docApi.fetchTable(name);
+    return Object.fromEntries(Object.keys(table).map(column => [column, []]));
+  } };
+  const identity = await readIdentity(gone, { log: vanished.log });
+  assert.equal(identity.status, 'unavailable');
+  assert.match(identity.reason, /Annuaire_Sonde.*n'a pas été retrouvée/);
+  assert.deepEqual(vanished.tables.Annuaire_Sonde.id, [], 'la ligne ajoutée est quand même supprimée');
+});
+
 // La règle d'accès que GRIST_SETUP.md (étape 4) donne à la sonde : toute personne peut ajouter et supprimer
 // une ligne, personne ne peut en modifier une, et chacune ne lit que les lignes à son adresse.
 test('readIdentity works with the strictest rule on the probe: add and delete only, a person reads only the rows at their own address', async () => {

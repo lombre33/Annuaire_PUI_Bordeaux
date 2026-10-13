@@ -4,7 +4,7 @@
 //
 // Il reproduit ce dont le widget dépend, pas Grist en entier :
 //   - fetchTable / listTables, avec des tables en colonnes ({ id: [...], nom: [...] }) ;
-//   - applyUserActions pour AddRecord, UpdateRecord, RemoveRecord, AddTable (l'identifiant
+//   - applyUserActions pour AddRecord, UpdateRecord, RemoveRecord, BulkRemoveRecord, AddTable (l'identifiant
 //     est numéroté s'il est pris, comme Grist) et RemoveTable, atomique (un lot refusé ne
 //     change rien) et qui renvoie retValues comme Grist ;
 //   - les formules déclenchées de la table-sonde (GRIST_SETUP.md) : Email prend
@@ -112,6 +112,14 @@ export function createFakeGrist(options = {}) {
       Object.keys(table).forEach(column => table[column].splice(index, 1));
       return null;
     },
+    BulkRemoveRecord(all, tableName, rowIds) {
+      const table = requireTable(all, tableName);
+      rowIds.forEach(rowId => {
+        const index = rowIndex(table, rowId);
+        Object.keys(table).forEach(column => table[column].splice(index, 1));
+      });
+      return null;
+    },
     // Comme Grist : un identifiant déjà pris est numéroté (« Annuaire_Sonde2 »), la table existante reste
     // intacte ; la valeur renvoyée porte l'identifiant obtenu. Les formules de déclenchement de la sonde
     // sont celles de `builtInTriggers`, quel que soit ce que les colonnes déclarent.
@@ -128,7 +136,7 @@ export function createFakeGrist(options = {}) {
     }
   };
 
-  const verbs = { AddRecord: 'add', UpdateRecord: 'update', RemoveRecord: 'remove', AddTable: 'create', RemoveTable: 'remove' };
+  const verbs = { AddRecord: 'add', UpdateRecord: 'update', RemoveRecord: 'remove', BulkRemoveRecord: 'remove', AddTable: 'create', RemoveTable: 'remove' };
 
   const docApi = {
     async fetchTable(name) {

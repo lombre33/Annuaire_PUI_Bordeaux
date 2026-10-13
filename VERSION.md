@@ -1,4 +1,4 @@
-# Version 1.21.6 — Modifier mon profil : une seule entrée par libellé (voir CHANGELOG.md)
+# Version 1.21.7 — La sonde supprime sa ligne en attendant Grist, et dit pourquoi si Grist refuse (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -55,4 +55,6 @@ exige d'une requête qui écrit avec un jeton d'accès : sans lui le navigateur 
 serveur HTTP d'une autre origine ; pas encore essayé dans le vrai Grist d'Antoine).
 Depuis la 1.21.6, la fenêtre « Modifier mon profil » ne propose qu'une entrée par libellé dans ses listes : plusieurs lignes brutes
 qui ont le même libellé corrigé (une tâche proposée trois fois) ne forment plus qu'une case, qui les couvre toutes.
-907 tests (dont 327 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.21.7, le widget attend la réponse de Grist à la suppression de la ligne qu'il ajoute à `Annuaire_Sonde`, la retente une fois,
+dit dans la console pourquoi si Grist la refuse, et supprime les anciennes lignes laissées à l'adresse de la personne (jamais celles des autres).
+912 tests (dont 327 dans un vrai navigateur, optionnels sans Playwright).
