@@ -27,6 +27,33 @@ l'e-mail finalement, et ça ne devrait jamais générer de saut de ligne ».
   fait disparaître le rôle et qu'un rôle long est coupé par « … » avec son infobulle. Les captures du guide `apercu.png` et `carte-anatomie.png`
   sont refaites. **Non essayé dans le vrai Grist d'Antoine ni sur Firefox mobile.** Revenir en arrière : `git revert` de la fusion de cette version.
 
+## 1.26.1 — Logos des cartes : plus aucune lecture de pixels, chacun dans sa case
+
+Signalé par Antoine le 13 octobre 2026 (11 h 24) : « logo toujours cassés », sept minutes après la mise en ligne de la 1.25.2. Il pense que la
+cause est plutôt dans le changement fait avec la photo de profil que dans la taille des logos. Décision : la fiabilité passe avant l'égalité de taille.
+
+- **Le widget ne lit plus les pixels d'un logo de carte, et ne fait plus aucune demande CORS pour eux.** Chaque logo est une `<img>` ordinaire,
+  sans `crossorigin`, qui se montre dès qu'elle est chargée, dans la même case de 104 x 42 px (`object-fit: contain` : un logo large est borné
+  par la largeur, un logo haut par la hauteur ; 85 % de cette case dès 330 px de large de carte, 70 % en dessous). `analyseInk`, `readInk`,
+  `probeUrl` et le délai de 3 secondes disparaissent de `branding-ui.js`, `createLogoImage` ne change pas, et la feuille de style perd les règles
+  `.sized` et `.fitted` des cartes (le bandeau du bas garde les siennes). `render.js` n'a plus d'`onLoad` pour les logos de carte.
+- **Ce qu'on perd** : l'égalité de taille visuelle de la 1.21.4. Un logo posé au milieu d'un grand carré transparent paraît de nouveau plus petit
+  qu'un logo coupé au ras. Elle pourra revenir plus tard, à condition de ne plus jamais retarder ni cacher un logo.
+- **La cause réelle n'est toujours pas démontrée.** La panne n'a pu être rejouée ni dans le Grist d'Antoine ni sur Firefox. Relu : la photo de profil
+  (1.19.0) n'a touché au chemin des logos que par un commentaire et le déplacement d'une ligne (`attachments.js` y gagne seulement `avatarIdOf`) ; aucune
+  version de la 1.21.5 à la 1.26.0 ne modifie `branding-ui.js`, `branding.js` ni `attachments.js` en dehors de la 1.25.2. Autre piste, plausible : GitHub
+  Pages garde chaque fichier du widget **dix minutes**, et le navigateur peut mélanger pendant ce temps d'anciens et de nouveaux fichiers ; sept minutes après la
+  mise en ligne de la 1.25.2, il pouvait encore exécuter l'ancien code. Si des logos manquent encore dix minutes après la mise en ligne de cette version, la
+  cause est ailleurs (jeton ou règle d'accès du document, colonne `logo` de `Etablissements`) : ce que la carte montre à leur place (le sigle de
+  l'établissement, un espace vide, une image cassée) et la console du navigateur le diront.
+- **Un ancien fichier en cache ne casse pas le nouveau.** Un fichier resté en cache qui importe un nom disparu ferait échouer le chargement de tout le
+  widget : `fitCardLogo` (qui montre simplement le logo), `CARD_LOGO`, `inkBounds` et `hasInk` restent donc exportés, sans plus aucun usage. À retirer dans quelques jours.
+- Tests : trois tests navigateur remplacent ceux de la 1.25.2 (le logo d'une carte est une image ordinaire dans sa case, sans `crossorigin`, sans copie ni demande CORS ;
+  un Grist qui refuse, ou qui laisse sans réponse, les demandes CORS : les trois logos se voient en moins de 2,5 s, sans que le widget ait même essayé),
+  le test de mise en page des logos vérifie la case de 104 x 42 px à sept largeurs et aux trois échelles, et un test de `fitCardLogo`. Les trois tests
+  navigateur échouent avec le code de la 1.25.2 (rejoué). Retirés : le recadrage des marges et l'égalité des surfaces. **Non essayé dans le vrai Grist d'Antoine
+  ni sur Firefox mobile.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.26.0 — Le rôle de la personne dans une tâche, au survol de son étiquette
 
 Demande d'Antoine du 13 octobre 2026, après sa démo (point 9) : montrer le `Taches_role` de la table `Taches`, « en se basant bien sur la

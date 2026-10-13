@@ -686,12 +686,9 @@ button.avatar:hover {
 .etablissement-tag.has-logo:focus-visible {
   border-color: var(--line);
 }
-/* Tous les logos ont le même poids visuel. Un logo dont les marges ont été retirées (branding-ui.js,
-   fitCardLogo, classe `sized`) reçoit de la feuille de style sa taille --w x --h, de même surface que
-   les autres (CARD_LOGO) : --k la réduit à 85 % dès 330 px de large de carte et à 70 % en dessous, pour que
-   le nom garde sa place. Tant que le logo n'est pas lu, ou quand Grist refuse de donner ses pixels, il
-   tient dans une case de la taille maximale (object-fit) : un logo large est borné par la largeur, un
-   logo haut par la hauteur. */
+/* Le logo d'une carte est une image ordinaire, que le widget ne lit ni ne recadre (1.26.1) : chacun tient dans la
+   même case, 104 x 42 px (object-fit : un logo large est borné par la largeur, un logo haut par la hauteur).
+   --k la réduit à 85 % dès 330 px de large de carte et à 70 % en dessous, pour que le nom garde sa place. */
 .etablissement-tag .logo-img {
   --k: 0.7;
   display: block;
@@ -699,14 +696,6 @@ button.avatar:hover {
   height: calc(42px * var(--k));
   object-fit: contain;
   object-position: right center;
-}
-.etablissement-tag .logo-img.sized {
-  width: calc(var(--w) * var(--k) * 1px);
-  height: calc(var(--h) * var(--k) * 1px);
-}
-.etablissement-tag.visible.has-logo.fitted {
-  height: auto;
-  max-width: none;
 }
 @container (min-width: 330px) {
   .etablissement-tag .logo-img {

@@ -47,9 +47,8 @@ Depuis la 1.21.2, les cases à cocher sont dessinées par la feuille de style (f
 son thème clair : plus de carré noir sur Firefox Android.
 Depuis la 1.21.3, les boutons et les champs prennent la couleur du texte de la page et le texte d'invite est gris foncé : ce qu'on tape
 dans la recherche reste lisible sur Firefox mobile en thème sombre (rejoué dans Chromium en schéma sombre imposé, pas essayé dans Firefox).
-Depuis la 1.21.4, les logos des cartes ont tous la même surface visuelle : le widget retire les marges transparentes ou blanches de
-chaque logo, puis lui donne 3 200 px² répartis selon ses proportions, dans une case de 104 x 42 px au plus (non essayé dans un vrai Grist :
-il lit les pixels des logos, ce que Grist doit autoriser).
+Depuis la 1.21.4, les logos des cartes avaient tous la même surface visuelle : le widget lisait leurs pixels pour en retirer les marges
+(retiré en 1.26.1, voir plus bas).
 Depuis la 1.21.5, l'envoi d'un fichier à Grist (photo de profil, logo d'établissement) porte l'en-tête `X-Requested-With: XMLHttpRequest` que Grist
 exige d'une requête qui écrit avec un jeton d'accès : sans lui le navigateur ne montrait qu'une panne de réseau (rejoué dans Chromium contre un vrai
 serveur HTTP d'une autre origine ; pas encore essayé dans le vrai Grist d'Antoine).
@@ -65,10 +64,12 @@ Depuis la 1.25.0, la fenêtre « Créer ma fiche » a une case « Apparaître da
 bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son périmètre rempli par un administrateur, et les messages le disent) ; les listes
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
 Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite.
-Depuis la 1.25.2, le logo qu'on voit sur une carte est une image ordinaire (sans CORS) : ses pixels sont lus à part, et si Grist ou le navigateur
-refuse ou tarde (3 s), le logo se montre quand même, sans recadrage (rejoué dans Chromium, pas essayé dans un vrai Grist ni sur Firefox).
+Depuis la 1.25.2, le logo qu'on voit sur une carte était une image ordinaire (sans CORS), ses pixels étant lus à part (retiré en 1.26.1).
 Depuis la 1.26.0, l'étiquette d'une tâche dit le rôle de la personne dans cette tâche (colonne facultative `Taches_role` de `Taches`, lue sur les lignes brutes
 que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bulle à la souris et au clavier, sous le nom de la tâche sur un téléphone.
+Depuis la 1.26.1, le widget ne lit plus les pixels des logos des cartes : chaque logo est une image ordinaire dans une case de 104 x 42 px (85 % dès 330 px
+de large de carte, 70 % en dessous), qui se montre dès qu'elle est chargée, quoi que Grist réponde à une demande CORS (rejoué dans Chromium, pas essayé dans
+un vrai Grist ni sur Firefox). Les logos ne sont plus recadrés : un logo posé dans un grand carré transparent paraît plus petit qu'un logo coupé au ras.
 Depuis la 1.26.2, le rôle PUI n'est plus une pastille mais du texte, comme la fonction, à droite de la ligne de l'e-mail : jamais sur une autre ligne, coupé par « … »
 quand il est trop long (le rôle entier au survol), masqué quand l'e-mail ne lui laisse presque rien.
-941 tests (dont 341 dans un vrai navigateur, optionnels sans Playwright).
+940 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).
