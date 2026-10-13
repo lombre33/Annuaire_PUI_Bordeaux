@@ -50,4 +50,4 @@ dans la recherche reste lisible sur Firefox mobile en thème sombre (rejoué dan
 Depuis la 1.21.4, les logos des cartes ont tous la même surface visuelle : le widget retire les marges transparentes ou blanches de
 chaque logo, puis lui donne 3 200 px² répartis selon ses proportions, dans une case de 104 x 42 px au plus (non essayé dans un vrai Grist :
 il lit les pixels des logos, ce que Grist doit autoriser).
-901 tests (dont 324 dans un vrai navigateur, optionnels sans Playwright).
+902 tests (dont 325 dans un vrai navigateur, optionnels sans Playwright).
