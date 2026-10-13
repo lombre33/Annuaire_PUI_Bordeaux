@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadDirectory, DirectoryLoadError } from '../grist-data.js';
+import { FILTERS } from '../constants.js';
+import { computeFilterCounts, createEmptyFilterState, filterContacts, menuGroups } from '../filters.js';
 import { sampleTables, withoutOptionalColumns, withTaskActions, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME } from './fixtures.mjs';
 
 // ===== loadDirectory : lecture de Grist → contacts affichables =====
@@ -371,18 +373,17 @@ test('loadDirectory gives each contact the actions of its tasks: the number of a
 
 test('loadDirectory names the group of a task by the label of its action, as the Actions filter shows it: the corrected one first', async () => {
   const tables = withTaskActions();
-  tables.Actions.Actions_corrigees = ['Action 1 : Vaccinations (corrigé)', ''];
+  tables.Actions.Actions_corrigees = ['Action 1 : Vaccinations (corrigé)', 'Action 2 : Audit'];
   const { referenceMaps } = await load(tables);
   assert.equal(referenceMaps.actions[1], 'Action 1 : Vaccinations (corrigé)', 'le filtre Actions propose le libellé corrigé');
   assert.deepEqual(referenceMaps.macroTaches, { 1: 'Action 1 : Vaccinations (corrigé)', 2: 'Action 1 : Vaccinations (corrigé)', 3: AUDIT, 4: 'Sans action' },
     'le groupe porte le même nom que l\'option du filtre Actions');
 });
 
-test('loadDirectory reads the number in the label the menu shows: the corrected label of a task first, then its raw label', async () => {
+test('loadDirectory reads the number in the label the menu shows: the corrected label of a task, not its raw label', async () => {
   const tables = withTaskActions();
-  tables.Taches.Taches_corrige = ['', '', '', '2.4 Veille réglementaire']; // « Veille » reçoit un numéro, corrigé
-  tables.Taches.Taches[0] = 'Relecture sans numéro'; // le libellé brut perd le sien
-  tables.Taches.Taches_corrige[0] = '1.1 Relecture';
+  tables.Taches.Taches_corrige = ['1.1 Relecture', '1.2 rappel vaccinal', '2.1 Inspection', '2.4 Veille réglementaire']; // « Veille » reçoit un numéro, corrigé
+  tables.Taches.Taches[0] = 'Relecture sans numéro'; // le libellé brut perd le sien : seul le corrigé compte
   const { referenceMaps } = await load(tables);
   assert.deepEqual(referenceMaps.macroTaches, { 1: VACCINATION, 2: VACCINATION, 3: AUDIT, 4: AUDIT });
   assert.equal(referenceMaps.taches[1], '1.1 Relecture');
@@ -526,7 +527,7 @@ test('loadDirectory keeps the tasks flat when the Actions table cannot be read a
 test('loadDirectory follows a change made in Grist: an action renumbered or a task renumbered moves the tasks', async () => {
   const tables = withTaskActions();
   const first = await load(tables);
-  tables.Taches.Taches[0] = '2.1 Relecture'; // « Relecture » passe à l'audit
+  tables.Taches.Taches_corrige[0] = '2.1 Relecture'; // « Relecture » passe à l'audit
   tables.Actions.Actions[1] = 'Action 2 : Contrôle'; // l'audit est renommé
   const second = await load(tables);
   assert.deepEqual(first.referenceMaps.macroTaches, NUMBERED_GROUPS);
@@ -539,4 +540,44 @@ test('loadDirectory ranges the tasks of a contact whose cell holds the text of t
   tables.BDD.Taches[0] = ['L', '1.1 relecture', 'Tâche inconnue'];
   const { contacts } = await load(tables);
   assert.deepEqual(actionsOf(contacts).Martin, [VACCINATION], 'le texte retrouve sa ligne ; « Tâche inconnue » est ignorée');
+});
+
+// ===== Libellés corrigés : la colonne corrigée seule, une entrée par libellé =====
+
+test('loadDirectory reads the corrected label alone once a table fills one: a row without it is left out, and the console counts them', async () => {
+  const tables = withTaskActions();
+  tables.Taches.Taches_corrige = ['1.1 Relecture', '', '2.1 Inspection', ''];
+  const log = recordingLog();
+  const { referenceMaps, contacts } = await loadDirectory(fakeDocApi(tables), { log });
+  assert.deepEqual(referenceMaps.taches, { 1: '1.1 Relecture', 3: '2.1 Inspection' }, 'les lignes 2 et 4 n\'ont pas de libellé corrigé : ni leur libellé brut, ni rien');
+  assert.deepEqual(contacts.find(contact => contact.nom === 'Bergonié').labels.taches, [], 'sa seule tâche (ligne 2) n\'a pas de libellé corrigé : pas de tag');
+  const info = log.infos.find(args => String(args[0]).startsWith('[REFS] taches (Taches)'));
+  assert.match(info[0], /2 ligne\(s\) sans Taches_corrige, ignorée\(s\)/);
+});
+
+test('loadDirectory keeps the raw labels of a table that has no corrected label yet, so its filter is not empty', async () => {
+  const tables = withTaskActions();
+  tables.Taches.Taches_corrige = ['', '', '', ''];
+  const { referenceMaps } = await load(tables);
+  assert.deepEqual(referenceMaps.taches, { 1: '1.1 Relecture', 2: '1.2 rappel vaccinal', 3: '2.1 Inspection', 4: 'Veille' });
+});
+
+test('several raw rows with the same corrected label make one entry of the filter, which finds the contacts of every one of those rows', async () => {
+  const tables = withTaskActions();
+  tables.Taches = {
+    id: [1, 2, 3, 4],
+    Taches: ['1.1 Relecture', 'T1.1  relecture', '1.1 relecture (ancien)', 'Veille'],
+    Taches_corrige: ['1.1 Relecture', '1.1 Relecture', '1.1 Relecture', 'Veille'],
+    Taches_role: ['', '', '', '']
+  };
+  // Ana, Gina et Hugo portent chacun une ligne brute différente ; Bob aucune.
+  const rowOf = { 1: ['L', 1], 9: ['L', 2], 10: ['L', 3] };
+  tables.BDD.Taches = tables.BDD.id.map(id => rowOf[id] || ['L']);
+  const { contacts, referenceMaps } = await load(tables);
+  const group = menuGroups(FILTERS.find(filter => filter.key === 'taches'), referenceMaps).find(({ label }) => label === VACCINATION);
+  assert.deepEqual(group.values, ['1.1 Relecture'], 'une seule entrée dans le menu, pas trois');
+  const active = createEmptyFilterState();
+  active.taches.add('1.1 Relecture');
+  assert.deepEqual(filterContacts(contacts, active).map(contact => contact.nom).sort(), ['Bergonié', 'Bernard', 'Martin']);
+  assert.equal(computeFilterCounts(contacts, createEmptyFilterState()).taches['1.1 relecture'], 3, 'le nombre de l\'entrée compte les trois contacts');
 });

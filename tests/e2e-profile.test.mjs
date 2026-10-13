@@ -43,7 +43,7 @@ function manyCompetences() {
   for (let n = 5; n <= 16; n += 1) {
     tables.Competences.id.push(n);
     tables.Competences.Competences.push(`Technique ${n}`);
-    tables.Competences.Competences_corrigees.push('');
+    tables.Competences.Competences_corrigees.push(`Technique ${n}`);
     tables.Competences.Macro_competences.push(n <= 10 ? 'Technique' : 'Gestion');
   }
   return tables;

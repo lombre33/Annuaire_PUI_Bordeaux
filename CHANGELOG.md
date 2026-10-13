@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.22.0 — Créer sa fiche : « Publier ma fiche », et une recherche dans chaque liste à choix
+## 1.23.0 — Créer sa fiche : « Publier ma fiche », et une recherche dans chaque liste à choix
 
 Demande d'Antoine du 13 octobre 2026 (08 h 07, ses points 7 et 8).
 
@@ -25,6 +25,27 @@ Demande d'Antoine du 13 octobre 2026 (08 h 07, ses points 7 et 8).
   couvrent la case cochée et décochée, les messages, et la recherche de chaque sorte de liste ; ceux qui lisaient des noms complets lisent des acronymes.
 - Rien à changer dans le document Grist (la règle d'accès de 1.18.0 qui laisse ajouter sa ligne suffit ; `Accepte_apparaitre` doit rester une colonne de
   données). **Non essayé dans le vrai Grist d'Antoine.** Revenir en arrière : `git revert` de la fusion de cette version.
+
+## 1.22.0 — Filtres, cartes et fenêtre de modification : la colonne « corrigé », à chaque fois
+
+Demande d'Antoine du 13 octobre 2026, après sa démo (points 2 et 3) : « pour les informations à prendre dans les filtres, à chaque fois la
+colonne "corrigé" pour tâches, actions, GT, etc. », et la même chose pour la fenêtre de modification du profil. Jusqu'ici le widget affichait
+le libellé corrigé quand il était rempli et, sinon, le libellé brut de l'import (un choix fait par défaut le 12 octobre, que personne n'avait
+confirmé) : un libellé brut jamais corrigé se mêlait aux libellés corrigés.
+
+- Les six tables à libellé corrigé (`Actions`, `Taches`, `Communautes`, `GT`, `Competences`, `INSTANCES` ; drapeau `corrected` de `CATEGORIES`)
+  ne se lisent plus que par leur colonne corrigée dès que la table en remplit au moins une. **Une ligne dont le libellé corrigé est vide est
+  ignorée** : ni valeur de filtre, ni tag de carte, ni case de la fenêtre de modification. La console dit combien (`[REFS] taches (Taches) : 2
+  ligne(s) sans Taches_corrige, ignorée(s)`). Le rangement des tâches par action, qui lit les numéros dans ces libellés, suit.
+- Une table dont aucune ligne n'a de libellé corrigé garde ses libellés bruts, pour que son filtre ne soit pas vide ; une colonne corrigée
+  absente aussi, comme avant (la console prévient).
+- Plusieurs lignes brutes qui ont le même libellé corrigé ne forment qu'une seule entrée de filtre, qui trouve les personnes de toutes ces
+  lignes (c'était déjà le cas, un test le fixe ; la fenêtre de modification fait de même depuis la 1.21.6).
+- Les fiches ne sont pas touchées : une ligne ignorée reste dans la cellule de la personne, la fenêtre ne la montre pas et ne la retire pas.
+- À savoir : une valeur qui disparaît des filtres après cette version est une ligne dont la colonne corrigée est vide ; la remplir dans Grist
+  la fait revenir (recharger la page). Trois tests de non-régression (`tests/load-directory.test.mjs`) et un pour la fenêtre
+  (`tests/profile.test.mjs`) ; le jeu de données de test remplit désormais la colonne corrigée de toute table qui en a une. Revenir en arrière :
+  `git revert` de la fusion de cette version.
 
 ## 1.21.7 — La sonde supprime sa ligne en attendant la réponse de Grist, et dit pourquoi quand Grist refuse
 

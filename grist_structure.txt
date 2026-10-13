@@ -83,7 +83,11 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
 
 Tables de référence (id -> libellé, chargées via fetchTable)
   Chaque table porte un libellé brut (issu de l'import) et un libellé corrigé :
-  le widget affiche le libellé corrigé quand il est rempli, le brut sinon.
+  dès que la table remplit au moins un libellé corrigé, le widget ne lit plus que
+  celui-là (une ligne dont il est vide est ignorée : ni filtre, ni tag, ni choix
+  dans la fenêtre de modification) ; une table qui n'en remplit aucun garde les
+  libellés bruts. Plusieurs lignes brutes de même libellé corrigé ne font qu'une
+  valeur de filtre.
   Actions            : Actions_corrigees (Choice)     puis Actions (Text)
                        Le libellé commence par « Action n : » (ou « Action n: ») :
                        ce numéro n rattache les tâches du même numéro à l'action
