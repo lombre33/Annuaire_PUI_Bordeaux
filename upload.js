@@ -8,6 +8,15 @@
 // répond par l'identifiant de la pièce jointe. L'écriture dans la cellule (`['L', identifiant]`)
 // est ensuite une action Grist ordinaire (etablissement-save.js, profile-save.js).
 //
+// L'en-tête `X-Requested-With: XMLHttpRequest` est INDISPENSABLE (1.21.5). Pour toute requête qui écrit
+// dans le document et que seul le jeton authentifie, Grist exige cet en-tête (ou un corps JSON, impossible
+// pour un fichier), sinon il répond 401 AVANT d'ajouter ses en-têtes CORS (Authorizer.ts, `addRequestUser`,
+// puis FlexServer.ts, `trustOriginHandler`) : le navigateur cache alors ce 401 au widget, dont `fetch`
+// échoue comme sur une panne de réseau (« le navigateur n'a pas pu joindre le serveur »). Avec l'en-tête, le
+// navigateur envoie d'abord une requête de vérification (OPTIONS), que Grist accepte de toute origine tant
+// qu'aucun cookie ne l'accompagne. Pas de Content-Type écrit ici : le navigateur pose le sien, avec la
+// limite du multipart. Rejoué dans Chromium contre un vrai serveur : tests/e2e-upload-cors.test.mjs.
+//
 // Ce qui limite l'exposition du jeton d'écriture :
 //   - il n'est demandé qu'au moment d'un envoi voulu par la personne (« Enregistrer » ou « Valider »
 //     avec une image choisie), jamais au chargement ; contrairement au jeton de lecture des logos
@@ -83,6 +92,7 @@ export async function uploadAttachment(docApi, file, { hint = BY_HAND, fetchImpl
     response = await fetchImpl(`${info.baseUrl}/attachments?auth=${encodeURIComponent(info.token)}`, {
       method: 'POST',
       body: form,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
       signal: controller.signal
