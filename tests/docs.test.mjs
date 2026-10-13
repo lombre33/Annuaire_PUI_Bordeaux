@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { CATEGORIES, FILTERS, IMAGE_RULES } from '../constants.js';
+import { CATEGORIES, FILTERS, IMAGE_RULES, VERSION } from '../constants.js';
 import { displayName, loadDirectory } from '../grist-data.js';
 import { avatarIdOf } from '../attachments.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
@@ -831,6 +831,14 @@ test('l\'envoi d\'un logo garde ses protections, et la page de sécurité les d�
 // Une adresse web écrite en dur dans le code est une porte vers l'extérieur : le test précédent
 // ne voit que celles d'index.html, or le lien du bandeau du bas est posé par le code
 // (branding-ui.js). docs/securite.md doit nommer son serveur et dire comment il s'ouvre.
+// Le numéro que la console dit (constants.js, VERSION) est celui du dernier titre du CHANGELOG et de VERSION.md : sinon la
+// console ferait croire qu'un navigateur exécute une autre version que la sienne. À chaque version : ces trois endroits.
+test('la version dite par la console est celle du CHANGELOG et de VERSION.md', () => {
+  const latest = read('CHANGELOG.md').match(/^## (\d+\.\d+\.\d+)\b/m)?.[1];
+  assert.equal(VERSION, latest, `constants.js doit dire VERSION = '${latest}' (le dernier titre de CHANGELOG.md)`);
+  assert.ok(read('VERSION.md').startsWith(`# Version ${VERSION} `), `VERSION.md doit commencer par « # Version ${VERSION} »`);
+});
+
 // Les préfixes de la console ([GRIST], [LOGOS]…) : docs/developpeurs.md les liste avec leur nombre,
 // docs/securite.md les nomme parmi les diagnostics. Un préfixe de plus dans le code, et ces deux
 // pages doivent le dire.

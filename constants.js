@@ -50,16 +50,20 @@ export const IMAGE_RULES = {
   avatar: { types: ['image/jpeg', 'image/png', 'image/webp'], maxBytes: 2 * 1024 * 1024, maxSide: 256, square: true, output: 'image/jpeg', quality: 0.85, name: 'photo-de-profil.jpg' }
 };
 
+// Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
+// minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
+// CHANGELOG (tests/docs.test.mjs le contrôle).
+export const VERSION = '1.27.2';
+
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
 // largeur et en hauteur, voir logoSize() dans branding.js. Ces valeurs reproduisent, à une
 // dizaine de pour cent près, les tailles du bandeau fourni.
 export const BAND_LOGO = { area: 4150, maxWidth: 118, maxHeight: 58 };
 
-// Logos des cartes (1.21.4 à 1.25.2) : la surface visée et les bornes d'un logo dont les marges étaient retirées par
-// lecture de ses pixels. Plus utilisée depuis la 1.26.1, où un logo de carte tient dans une case fixe de 104 x 42 px
-// (style.css) : gardée, avec fitCardLogo, inkBounds et hasInk, tant qu'un navigateur peut encore garder dix minutes
-// l'ancien branding-ui.js, qui l'importe (GitHub Pages) ; l'enlever ferait échouer le chargement de tout le widget.
+// Logos des cartes : la surface visée et les bornes d'un logo dont les marges ont été retirées par lecture de ses pixels
+// (branding-ui.js, fitCardLogo). Cette lecture ne conditionne jamais l'affichage du logo (1.27.2) : un logo dont les pixels ne
+// se lisent pas tient dans une case fixe de 104 x 42 px (style.css).
 export const CARD_LOGO = { area: 3200, maxWidth: 104, maxHeight: 42 };
 
 // Recherche principale : les cartes ne se redessinent qu'une fois la frappe arrêtée depuis ce

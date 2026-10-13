@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.27.2 — Logos des cartes : l'égalité de taille revient, sans jamais cacher ni retarder un logo
+
+Retour d'Antoine du 13 octobre 2026 (11 h 54), sur la 1.26.1 : « ça ne fonctionne pas. Mais là ce n'est pas une nouvelle feature mais une régression,
+il faut voir ce qui a pu bouger, moi je veux les logos qui s'affichent et à la bonne taille harmonisée comme avant. »
+
+- **Ce qui a bougé, relu.** Depuis 06 h 34 UTC, quand Antoine voyait encore les logos, seule la 1.21.4 (l'égalité de taille) change le chemin
+  qui amène un logo à l'écran ; aucune version de la 1.21.5 à la 1.26.0 n'y touche. Ses trois signalements (08 h 40, 09 h 24, 09 h 54) ont aussi eu lieu
+  moins de dix minutes après une mise en ligne, or GitHub Pages fait garder chaque fichier dix minutes : le navigateur a pu exécuter l'ancien code. **La cause
+  réelle n'est toujours pas démontrée** (pas rejouée dans son Grist ni sur Firefox) ; cette version ajoute ce qu'il faut pour la lire dans la console.
+- **L'égalité de taille de la 1.21.4 revient, mais comme une amélioration** (`fitCardLogo`, `branding-ui.js`). Le logo qu'on voit reste une image ordinaire, sans
+  `crossorigin`. Ses pixels sont lus à part, sur une copie demandée en CORS à une adresse distincte (`annuaire_pixels=1`, que Grist ignore : la réponse en cache de
+  l'image affichée n'a pas d'en-têtes CORS et serait refusée à la même adresse). Quand la lecture réussit, les marges sont retirées et le logo prend la surface des
+  autres (`CARD_LOGO`, classe `sized`, comme en 1.21.4). **Il n'attend la lecture que 400 ms** (`FIT_GATE_MS`) : passé ce délai, ou si Grist refuse le CORS, ne répond
+  pas (la lecture est abandonnée après 3 s) ou si le navigateur brouille le canvas, le logo se montre dans sa case de 104 x 42 px, comme en 1.26.1, et la copie recadrée
+  le remplace si la lecture finit. `style.css` retrouve ses règles `.sized` et `.fitted` ; `render.js` son `onLoad`.
+- **La console dit ce qui se passe, sans adresse ni jeton** (`[LOGOS]`) : une ligne `Version 1.27.2 : N établissements lus dans Etablissements, M avec un logo dans la
+  colonne logo` (une seule fois, tant qu'elle ne change pas ; `VERSION` dans `constants.js`, contrôlée par `tests/docs.test.mjs`) ; une ligne par fichier de logo que
+  Grist ne donne pas ; une ligne par cause quand les pixels ne se lisent pas. Chaque logo de carte porte `data-logo` : `sized` (il a sa taille) ou `box` (il reste dans sa case).
+- **À chaque version, trois endroits** disent maintenant le numéro : le titre du CHANGELOG, `VERSION.md` et `VERSION` de `constants.js`.
+- Tests : le recadrage et l'égalité des surfaces de la 1.25.2 (cartes à sept largeurs, logos dessinés à la demande) ; la lecture des pixels se fait sur une adresse à part et
+  l'image affichée n'est jamais demandée en CORS ; un Grist qui refuse le CORS, ou le laisse sans réponse, ne cache ni ne retarde un logo (montrés en moins de 2,5 s, `box`) ;
+  les trois messages de la console. **Non essayé dans le vrai Grist d'Antoine ni sur Firefox mobile.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.27.1 — Le rôle PUI, plus discret : du texte à droite de la ligne de l'e-mail
 
 Retour d'Antoine du 13 octobre 2026 (11 h 24) sur la pastille de la 1.25.1 : « un peu plus discrète, peut-être pas de fond en mode bulle mais juste

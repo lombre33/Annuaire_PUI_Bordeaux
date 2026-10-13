@@ -8,7 +8,7 @@
 // fenêtre), branding.js, attachments.js et branding-ui.js (les logos : cartes et
 // fondateurs) et avatar-ui.js (les photos de profil).
 
-import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS } from './constants.js';
+import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { attachTagNotes, createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
@@ -22,7 +22,7 @@ import { diffEtablissement, etablissementOf, etablissementRightsFor, peopleOfEta
 import { EtablissementSaveError, readEtablissement, saveEtablissement, savePlanOf } from './etablissement-save.js';
 import { createEtablissementDialog } from './etablissement-ui.js';
 import { uploadAttachment } from './upload.js';
-import { buildBranding, logoForContact } from './branding.js';
+import { brandingSummary, buildBranding, logoForContact } from './branding.js';
 import { avatarIdOf, createAttachments } from './attachments.js';
 import { createBrandingUI, createLogoImage } from './branding-ui.js';
 import { createAvatar, createPhotoViewer, createThumb } from './avatar-ui.js';
@@ -240,10 +240,15 @@ window.grist.ready({ requiredAccess: 'full' });
 
 // Les logos sont un habillage : une erreur ici ne doit jamais empêcher les cartes
 // de s'afficher.
+let brandingNote = '';
 function applyBranding({ etablissementRows }) {
   try {
     state.branding = buildBranding({ etablissementRows });
     brandingUI.render(state.branding);
+    // Une ligne dans la console, relue seulement quand elle change : la version qui s'exécute (le cache de GitHub Pages
+    // peut en garder une ancienne dix minutes) et ce que Grist donne des logos.
+    const note = `[LOGOS] Version ${VERSION} : ${brandingSummary(state.branding)}.`;
+    if (note !== brandingNote) console.info(brandingNote = note);
   } catch (error) {
     console.error('[LOGOS] Impossible d\'afficher les logos :', error);
   }
