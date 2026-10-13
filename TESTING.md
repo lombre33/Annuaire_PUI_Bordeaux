@@ -21,7 +21,7 @@ Sans dépendance, un fichier de tests par module :
   `safeValues`, `tableToRows`,
   `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `taskActionNumber`, `actionNumber`,
   `refId`, `refLabel`, `isEmptyReference`,
-  `resolveListItem`, `isInScope`, `createRequestSequencer`,
+  `resolveListItem`, `createRequestSequencer`,
   `referenceMapsEqual`, `mailtoHref`.
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
   catégories liste dont compétences, domaines, tâches et actions, libellés sans doublon, anciennes
@@ -281,8 +281,9 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 - [ ] Aucune erreur dans la console au chargement.
 - [ ] `[GRIST] Enregistrements reçus: N` correspond au nombre de lignes de
       `BDD`, et le nombre de cartes affichées (`#resultCount`) est
-      inférieur ou égal à N (seuls les contacts avec `perimetre` non
-      vide s'affichent — voir `isInScope()`).
+      inférieur ou égal à N (les personnes qui n'ont pas accepté d'apparaître, ou dont
+      l'établissement n'est pas validé, fondateur ou partenaire, ne s'affichent pas ;
+      `perimetre` ne compte plus depuis la 1.27.0).
 - [ ] Les 8 boutons de filtre (Actions, Tâches, Communautés, GT, Compétences,
       Instances, Établissement, Rôle PUI) sont présents dans la barre d'outils. Il n'y a
       pas de bouton « Domaines » : les domaines sont dans le menu Compétences.
@@ -318,7 +319,7 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
       nom contenant `École`, si un tel contact existe — sinon vérifier sur
       n'importe quel nom accentué du jeu de données réel) — comportement
       nouveau en 1.4.0, strictement plus permissif qu'avant.
-- [ ] Recherche vide → tous les contacts (dans le périmètre) réapparaissent.
+- [ ] Recherche vide → tous les contacts affichés réapparaissent.
 - [ ] Recherche sans aucun résultat → état vide (`#emptyState`) affiché,
       grille de cartes vide.
 
@@ -472,7 +473,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       dans un champ de recherche interne à un menu) → cliquer
       "Réinitialiser" vide la recherche, décoche tous les filtres, **vide
       aussi les champs de recherche internes aux menus** (pas seulement les
-      cases), et réaffiche tous les contacts du périmètre.
+      cases), et réaffiche tous les contacts affichés.
 
 ## 7. Scénarios de non-régression spécifiques à la 1.4.0
 
@@ -516,8 +517,9 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 
 - [ ] Contact sans aucune valeur dans les 7 catégories de tags → carte
       affichée sans section `card-tags` visible (pas de section vide).
-- [ ] Contact avec `perimetre` vide → absent de la grille (et absent du
-      compte `#resultCount`).
+- [ ] Contact avec `perimetre` vide, mais qui a accepté d'apparaître et dont l'établissement
+      est validé (fondateur ou partenaire) → présent dans la grille et dans le compte
+      `#resultCount`, sans erreur ni étiquette vide (1.27.0 : le périmètre ne décide plus de rien).
 - [ ] Contact dont `Accepte_apparaitre` est décoché ou vide → absent de la
       grille, sans bandeau. Le cocher dans Grist puis recharger le widget : la
       carte apparaît. La console indique `[CONSENTEMENT] n/m …` (nombre

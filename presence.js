@@ -28,7 +28,6 @@ function hiddenReasons(statuses, voice = VOICES.own) {
   const etablissements = etablissementReasons(voice);
   const reasons = statuses.flatMap(status => [
     !status.named && `${voice.fiche} n'a ni prénom ni nom`,
-    !status.inScope && `${voice.fiche} n'a pas de périmètre`,
     etablissements[status.etablissement]
   ]).filter(Boolean);
   return [...new Set(reasons)];
@@ -100,11 +99,11 @@ export function describeUnknownAccount({ email, admin, emailColumn = true }) {
 // établissement qui n'a pas validé sa présence (quand c'est la seule raison), puis une
 // personne qui n'a pas accepté d'apparaître. `creating` : la personne crée sa fiche et a coché
 // « Apparaître dans l'annuaire » ; si la fiche reste masquée, c'est que quelqu'un d'autre doit régler
-// un point (le plus souvent le périmètre, que le widget n'écrit jamais). Renvoie '' quand la fiche
+// un point (l'établissement choisi, par exemple, qui n'a pas validé sa présence). Renvoie '' quand la fiche
 // figure dans l'annuaire.
 export function describeHiddenFiche(status, { own, etablissement = '', creating = false }) {
   if (status.visible) return '';
-  if (status.etablissement === 'not_validated' && status.named && status.inScope) {
+  if (status.etablissement === 'not_validated' && status.named) {
     return own
       ? 'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.'
       : `${etablissement || 'Son établissement'} n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.`;
@@ -121,9 +120,9 @@ export function describeHiddenFiche(status, { own, etablissement = '', creating 
 }
 
 // Ce que la personne lit une fois sa fiche créée. `accepted` : elle a coché « Apparaître dans l'annuaire » ;
-// `status` : describeVisibility() de sa fiche relue dans Grist, null quand elle n'a pas pu l'être. Publier
-// n'est pas afficher : tant que le périmètre (ou autre chose) manque, la fiche existe mais reste masquée, et
-// le message le dit au lieu de promettre qu'elle apparaît.
+// `status` : describeVisibility() de sa fiche relue dans Grist, null quand elle n'a pas pu l'être. Une fiche
+// publiée apparaît tout de suite ; si quelque chose la retient (son établissement n'a pas validé sa présence),
+// elle existe mais reste masquée, et le message le dit au lieu de promettre qu'elle apparaît.
 export function describeCreated(status, accepted) {
   if (!accepted) return 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
   if (!status) return 'Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire.';

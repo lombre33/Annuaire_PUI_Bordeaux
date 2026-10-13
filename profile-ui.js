@@ -24,9 +24,8 @@ const CREATED_NOTICE = 'Votre fiche est créée. Pour apparaître dans l’annua
 const createdNotice = result => result?.notice || CREATED_NOTICE;
 
 // La case de la fiche qu'on crée (CONSENT_LABEL) : elle décide de publier la fiche tout de suite (cochée d'avance) ou
-// de la créer masquée, et elle écrit Accepte_apparaitre avec la fiche. Le périmètre reste l'affaire d'un administrateur.
-const PUBLISH_HELP = 'Décochée, votre fiche est créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page. '
-  + 'Dans tous les cas, elle n’apparaît qu’une fois rattachée à un périmètre par un administrateur.';
+// de la créer masquée, et elle écrit Accepte_apparaitre avec la fiche.
+const PUBLISH_HELP = 'Décochée, votre fiche est créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page.';
 
 // `dialog` : le <dialog> de index.html.
 //

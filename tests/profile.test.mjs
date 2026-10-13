@@ -14,9 +14,9 @@ import { sampleTables, withAvatars, withoutOptionalColumns, withTaskActions, wit
 const quiet = { info() {}, warn() {} };
 
 async function setup(tables = sampleTables()) {
-  const { referenceMaps } = await loadDirectory(createFakeGrist({ tables }).docApi, { log: quiet });
+  const { referenceMaps, etabFlags } = await loadDirectory(createFakeGrist({ tables }).docApi, { log: quiet });
   const rows = tableToRows(tables.BDD);
-  return { referenceMaps, row: id => rows.find(candidate => candidate.id === id) };
+  return { referenceMaps, etabFlags, row: id => rows.find(candidate => candidate.id === id) };
 }
 
 const field = (model, key) => model.find(entry => entry.key === key);
@@ -579,6 +579,20 @@ test('the list of établissements offers the acronym of each one, never a mix wi
   assert.deepEqual(labels({ ...referenceMaps, etablissementNom: { 1: 'Nom complet de tout autre établissement' } }), acronyms);
   const next = diffProfile(row(2), { Etablissement: 1 }, referenceMaps, { admin: true }).champs.Etablissement;
   assert.deepEqual(next, { avant: { id: 2, label: 'UBM' }, apres: { id: 1, label: 'CHU' } });
+});
+
+test('the list of établissements offers only the founders and partners, never a structure « autres », and always the one the fiche already has', async () => {
+  const { referenceMaps, etabFlags, row } = await setup();
+  const labels = (target, options) => field(profileFormModel(target, referenceMaps, { etabFlags, ...options }), 'Etablissement').options.map(option => option.label).sort();
+  // Clinique est « autres » (ni fondateur ni partenaire) ; INSERM est fondateur sans avoir validé sa présence : on le propose.
+  const chosen = ['CHU', 'INSERM', 'Institut Bergonié', 'UBM'].sort();
+  assert.deepEqual(labels(row(2), { admin: true }), chosen, 'un administrateur qui modifie la fiche de Bob (UBM)');
+  assert.deepEqual(labels(blankFiche(Object.keys(sampleTables().BDD), NEW_EMAIL), { creating: true }), chosen, 'une personne qui crée sa fiche');
+  assert.deepEqual(labels(row(3), { admin: true }), ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'].sort(),
+    'la fiche de Carla est dans Clinique : la liste le montre encore, pour ne pas la laisser sans valeur');
+  assert.deepEqual(labels(row(2), { admin: true, etabFlags: null }), ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'].sort(),
+    'sans les indicateurs des établissements, rien n\'est écarté');
+  assert.deepEqual(field(profileFormModel(row(1), referenceMaps, { etabFlags }), 'Role_dans_le_PUI').options, [{ id: 1, label: 'Référent qualité' }], 'les autres listes ne changent pas');
 });
 
 test('diffProfile refuses an e-mail that is not an address, that is too long, or that a spreadsheet would read as a formula', async () => {

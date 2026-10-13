@@ -852,7 +852,7 @@ test('a fiche created with « Apparaître dans l\'annuaire » ticked is written 
   const published = await creation(w, { ...fill, Accepte_apparaitre: true });
   assert.equal(published.accepted, true);
   assert.equal(published.visibility.accepted, true, 'la relecture compte la fiche comme acceptée');
-  assert.equal(published.visibility.visible, false, 'mais sans périmètre, elle reste masquée : le widget n\'écrit jamais le périmètre');
+  assert.equal(published.visibility.visible, true, 'sans périmètre (le widget n\'en écrit jamais), la fiche apparaît quand même : le périmètre ne décide plus de rien');
   assert.deepEqual(Object.keys(published.champs), ['prenom', 'nom', 'Etablissement'], 'le choix n\'est pas un champ de la fiche');
   assert.deepEqual(published.lines.map(line => line.key), ['prenom', 'nom', 'Etablissement']);
   assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien');
@@ -862,7 +862,7 @@ test('a fiche created with « Apparaître dans l\'annuaire » ticked is written 
     values: { email: NEW_EMAIL, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 }
   }]);
   assert.equal(w.tables.BDD.Accepte_apparaitre[12], true);
-  assert.equal('perimetre' in writes(w)[0].values, false, 'aucun périmètre écrit : il décide de qui apparaît');
+  assert.equal('perimetre' in writes(w)[0].values, false, 'aucun périmètre écrit : il reste l\'affaire des administrateurs');
 
   const quietly = await newcomer();
   const unticked = await creation(quietly, { ...fill, Accepte_apparaitre: false });

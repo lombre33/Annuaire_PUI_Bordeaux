@@ -1,4 +1,4 @@
-# Version 1.26.0 — Le rôle de la personne dans une tâche, au survol de son étiquette (voir CHANGELOG.md)
+# Version 1.27.0 — La fiche créée apparaît tout de suite, et la liste des établissements ne propose que les fondateurs et les partenaires (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -62,7 +62,7 @@ table en remplit une : une ligne sans libellé corrigé n'apparaît plus (une ta
 Depuis la 1.24.0, un huitième filtre, « Rôle PUI » (table `Role_Dans_le_PUI`), ferme la barre, et le rôle de la personne s'affiche en
 pastille ; les menus de filtre réunissent deux libellés qui ne diffèrent que par la casse ou les accents.
 Depuis la 1.25.0, la fenêtre « Créer ma fiche » a une case « Apparaître dans l'annuaire », cochée d'avance, qui renseigne `Accepte_apparaitre` et change le
-bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son périmètre rempli par un administrateur, et les messages le disent) ; les listes
+bouton en « Publier ma fiche » (la 1.27.0 a levé la condition du périmètre : une fiche publiée apparaît tout de suite) ; les listes
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
 Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite : à droite de la fonction et de l'e-mail, sous le logo, sur une carte de 480 px ou
 plus ; sous l'e-mail sur une carte plus étroite.
@@ -70,4 +70,8 @@ Depuis la 1.25.2, le logo qu'on voit sur une carte est une image ordinaire (sans
 refuse ou tarde (3 s), le logo se montre quand même, sans recadrage (rejoué dans Chromium, pas essayé dans un vrai Grist ni sur Firefox).
 Depuis la 1.26.0, l'étiquette d'une tâche dit le rôle de la personne dans cette tâche (colonne facultative `Taches_role` de `Taches`, lue sur les lignes brutes
 que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bulle à la souris et au clavier, sous le nom de la tâche sur un téléphone.
-939 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.27.0, le périmètre (`BDD.perimetre`) ne décide plus de rien : une fiche s'affiche dès que la personne a accepté d'apparaître et que son établissement est
+validé, fondateur ou partenaire, donc celle qu'elle vient de créer apparaît tout de suite ; la colonne n'est plus lue ni indispensable. La liste des établissements des
+fenêtres de profil ne propose que les fondateurs et les partenaires (et celui que la fiche porte déjà), et sa recherche est dans « Créer ma fiche » et dans la fiche d'une
+autre personne en mode admin (non essayé dans le vrai Grist).
+942 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).

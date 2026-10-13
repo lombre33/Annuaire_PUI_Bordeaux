@@ -294,12 +294,6 @@ export function displayName(contact) {
   return `${text(contact.prenom)} ${text(contact.nom)}`.trim() || 'Sans nom';
 }
 
-// Un contact n'est affiché que s'il a au moins une valeur dans perimetre
-// (specs.md). Ne pas tester la longueur brute : une liste vide vaut ['L'].
-export function isInScope(record) {
-  return safeValues(record.perimetre).length > 0;
-}
-
 // ===== INDICATEURS D'UN ÉTABLISSEMENT =====
 // Colonnes booléennes de la table Etablissements (specs.md) : fondateur,
 // partenaire, autres (jamais affiché) et ok_pour_apparaitre (validation, verrou
@@ -397,8 +391,9 @@ export function mailtoHref(email) {
 // elle on ne sait pas qui a accepté d'apparaître, et afficher tout le monde dans
 // le doute serait pire qu'afficher personne. Les autres colonnes de BDD
 // (Fonction, email, numero_de_telephone, Role_dans_le_PUI…) sont facultatives :
-// absentes, elles ne s'affichent simplement pas.
-const REQUIRED_COLUMNS = ['nom', 'prenom', 'Etablissement', 'perimetre', CONSENT_COLUMN];
+// absentes, elles ne s'affichent simplement pas. `perimetre` n'en fait plus partie : depuis la
+// 1.27.0 il ne décide plus de qui apparaît, le widget ne le lit plus.
+const REQUIRED_COLUMNS = ['nom', 'prenom', 'Etablissement', CONSENT_COLUMN];
 
 // Colonnes d'Etablissements dont dépend l'éligibilité des contacts (specs.md) :
 // l'une d'elles renommée, et plus aucun contact ne s'affiche.
@@ -419,9 +414,10 @@ export function hasAccepted(record) {
   return record[CONSENT_COLUMN] === true;
 }
 
-// `scopedRows` : lignes de BDD déjà filtrées par isInScope().
-export function buildContacts(scopedRows, referenceMaps, etabFlags) {
-  return scopedRows
+// `rows` : les lignes de BDD. Une personne apparaît si elle a accepté (Accepte_apparaitre), si elle a un nom
+// ou un prénom et si son établissement est éligible : rien d'autre ne compte, pas même `perimetre`.
+export function buildContacts(rows, referenceMaps, etabFlags) {
+  return rows
     .filter(hasAccepted)
     .map(row => enrich(row, referenceMaps, etabFlags))
     .filter(contact => contact.nom || contact.prenom)
@@ -431,7 +427,7 @@ export function buildContacts(scopedRows, referenceMaps, etabFlags) {
 
 // Pourquoi une ligne de BDD apparaît dans l'annuaire, ou non : reprend, critère
 // par critère, ceux de buildContacts() (un test vérifie que les deux concordent).
-//   accepted, inScope, named   accord de la personne, périmètre, nom ou prénom
+//   accepted, named            accord de la personne, nom ou prénom
 //   etablissement              'ok', ou ce qui l'empêche : 'missing' (aucun),
 //                              'unknown' (absent d'Etablissements), 'not_validated'
 //                              (ok_pour_apparaitre) ou 'not_eligible' (ni fondateur
@@ -450,15 +446,13 @@ export function describeVisibility(row, referenceMaps, etabFlags) {
     else etablissement = 'not_eligible';
   }
   const accepted = hasAccepted(row);
-  const inScope = isInScope(row);
   const named = Boolean(contact.nom || contact.prenom);
   return {
     accepted,
-    inScope,
     named,
     etablissement,
     partnerOnly: eligible && !contact.etablissement_fondateur,
-    visible: accepted && inScope && named && eligible
+    visible: accepted && named && eligible
   };
 }
 
@@ -501,20 +495,17 @@ export function createPeopleIndex(rows, referenceMaps, etabFlags, columns = rows
 // Quand la table contient des lignes mais qu'aucun contact n'est affichable,
 // dit pourquoi (colonne vide, établissements non validés...) au lieu de laisser
 // un « 0 contact » inexpliqué.
-function describeEmptyDirectory(rowCount, scopedRows, contacts) {
-  if (contacts.length > 0 || rowCount === 0) return null;
-  if (scopedRows.length === 0) {
-    return 'perimetre est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
-  }
-  if (scopedRows.every(row => isEmptyReference(row.Etablissement))) {
+function describeEmptyDirectory(rows, contacts) {
+  if (contacts.length > 0 || rows.length === 0) return null;
+  if (rows.every(row => isEmptyReference(row.Etablissement))) {
     return 'Etablissement est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
   }
-  if (!scopedRows.some(hasAccepted)) {
+  if (!rows.some(hasAccepted)) {
     return 'Personne n\'a accepté d\'apparaître : Accepte_apparaitre n\'est coché pour aucun contact. '
       + 'Cochez cette colonne dans Grist pour les personnes qui doivent figurer dans l\'annuaire.';
   }
-  return `Aucun contact affichable alors que la table ${MAIN_TABLE} contient des lignes : vérifiez les noms, Etablissement `
-    + '(établissement validé, fondateur ou partenaire) et perimetre.';
+  return `Aucun contact affichable alors que la table ${MAIN_TABLE} contient des lignes : vérifiez les noms et Etablissement `
+    + '(établissement validé, fondateur ou partenaire).';
 }
 
 // Lit toutes les tables en parallèle : { nom de table → résultat de Promise.allSettled }.
@@ -705,29 +696,29 @@ function readReferenceMaps(results, previousMaps, log) {
 
 // Les contacts sans Etablissement ne s'affichent pas. Seuls leurs identifiants
 // de ligne sont journalisés : la console peut être partagée pendant une démo.
-function warnAboutMissingEtablissement(scopedRows, log) {
-  const ids = scopedRows.filter(row => isEmptyReference(row.Etablissement)).map(row => row.id);
+function warnAboutMissingEtablissement(rows, log) {
+  const ids = rows.filter(row => isEmptyReference(row.Etablissement)).map(row => row.id);
   if (!ids.length) return;
-  log.warn(`[ETABLISSEMENT] ${ids.length}/${scopedRows.length} contact(s) sans Etablissement `
+  log.warn(`[ETABLISSEMENT] ${ids.length}/${rows.length} contact(s) sans Etablissement `
     + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
 }
 
-// Les personnes du périmètre qui n'ont pas accepté d'apparaître sont normales,
-// pas une anomalie : la console en donne seulement le nombre (jamais leurs noms).
-function logWithoutConsent(scopedRows, log) {
-  const count = scopedRows.filter(row => !hasAccepted(row)).length;
-  if (count) log.info(`[CONSENTEMENT] ${count}/${scopedRows.length} contact(s) du périmètre masqué(s) : Accepte_apparaitre n'est pas coché.`);
+// Les personnes qui n'ont pas accepté d'apparaître sont normales, pas une anomalie : la console en
+// donne seulement le nombre (jamais leurs noms).
+function logWithoutConsent(rows, log) {
+  const count = rows.filter(row => !hasAccepted(row)).length;
+  if (count) log.info(`[CONSENTEMENT] ${count}/${rows.length} contact(s) masqué(s) : Accepte_apparaitre n'est pas coché.`);
 }
 
 // Des acronymes en double ne masquent des contacts que lorsque Grist envoie
 // l'établissement en texte : avec un identifiant de ligne, chaque contact garde
 // le statut de sa propre ligne d'Etablissements.
-function resolvedByLabel(scopedRows) {
-  return scopedRows.some(row => typeof row.Etablissement === 'string' && text(row.Etablissement));
+function resolvedByLabel(rows) {
+  return rows.some(row => typeof row.Etablissement === 'string' && text(row.Etablissement));
 }
 
 // Messages du bandeau d'état pour tout ce qui rend l'annuaire incomplet.
-function directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason }) {
+function directoryIssues({ unreadable, unlabeled, etabFlags, rows, emptyReason }) {
   const issues = [];
   if (unreadable.length) {
     issues.push(`Tables illisibles (${unreadable.join(', ')}) : des libellés ou des tags peuvent manquer.`);
@@ -736,7 +727,7 @@ function directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyRe
     const expected = unlabeled.map(({ table, fields }) => `${table} (${fields.join(' ou ')})`).join(', ');
     issues.push(`Colonne de libellé introuvable : ${expected}. Les tags et le filtre correspondants restent vides.`);
   }
-  if (etabFlags.conflicts.length && resolvedByLabel(scopedRows)) {
+  if (etabFlags.conflicts.length && resolvedByLabel(rows)) {
     issues.push(`Acronymes en double dans Etablissements (${etabFlags.conflicts.join(', ')}) avec des statuts `
       + 'différents : leurs contacts sont masqués.');
   }
@@ -766,13 +757,12 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   const { referenceMaps, unreadable, unlabeled } = readReferenceMaps(results, previousMaps, log);
   referenceMaps[ETABLISSEMENT_NAMES] = labelMapFromRows(etablissementRows, ['nom_complet', 'acronyme']);
   const etabFlags = etablissementFlagsFromRows(etablissementRows);
-  const scopedRows = rows.filter(isInScope);
-  const contacts = buildContacts(scopedRows, referenceMaps, etabFlags);
+  const contacts = buildContacts(rows, referenceMaps, etabFlags);
   log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
-  warnAboutMissingEtablissement(scopedRows, log);
-  logWithoutConsent(scopedRows, log);
+  warnAboutMissingEtablissement(rows, log);
+  logWithoutConsent(rows, log);
 
-  const emptyReason = describeEmptyDirectory(rows.length, scopedRows, contacts);
+  const emptyReason = describeEmptyDirectory(rows, contacts);
   // Les colonnes de BDD viennent de la table elle-même : une table vide en a aussi.
   const mainTable = results[MAIN_TABLE].value;
   const columns = mainTable && typeof mainTable === 'object' && !Array.isArray(mainTable) ? Object.keys(mainTable) : undefined;
@@ -782,6 +772,6 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
     etabFlags,
     people: createPeopleIndex(rows, referenceMaps, etabFlags, columns),
     etablissementRows,
-    issues: directoryIssues({ unreadable, unlabeled, etabFlags, scopedRows, emptyReason })
+    issues: directoryIssues({ unreadable, unlabeled, etabFlags, rows, emptyReason })
   };
 }

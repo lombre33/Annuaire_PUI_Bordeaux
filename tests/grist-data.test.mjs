@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, normalizeForSearch,
+  safeValues, tableToRows, text, pickLabel, refId, refLabel, isEmptyReference, normalize, normalizeForSearch,
   compareLabels, compareContacts,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
-  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName, taskActionNumber, actionNumber, shownEmail,
+  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, describeVisibility, displayName, taskActionNumber, actionNumber, shownEmail,
   loadDirectory
 } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
@@ -200,14 +200,22 @@ test('referenceMapsEqual compares reference-table content regardless of key orde
   assert.equal(referenceMapsEqual({ Etablissements: { 1: 'CHU' } }, {}), false);
 });
 
-test('isInScope: regression test for the perimetre filter', () => {
-  // Avant correction, `Array.isArray(p) && p.length > 0` était toujours vrai
-  // car ['L'] (liste vide côté Grist) a une longueur de 1.
-  assert.equal(isInScope({ perimetre: ['L'] }), false, 'une liste Grist vide ne doit pas être "in scope"');
-  assert.equal(isInScope({ perimetre: ['L', 3] }), true);
-  assert.equal(isInScope({ perimetre: undefined }), false);
-  assert.equal(isInScope({ perimetre: [] }), false);
-  assert.equal(isInScope({ perimetre_all: ['L', 3] }), false, 'l\'ancienne colonne perimetre_all n\'existe plus dans BDD');
+test('le périmètre ne décide plus de qui apparaît : une fiche sans périmètre, ou sans colonne perimetre, s\'affiche', () => {
+  // Une personne apparaît si elle a accepté, si elle a un nom ou un prénom et si son établissement est éligible.
+  // Avant la 1.27.0 il lui fallait aussi une valeur dans `perimetre`, que le widget n'écrit jamais : une fiche
+  // qu'elle venait de créer restait masquée.
+  const referenceMaps = { etablissement: { 1: 'CHU' } };
+  const etabFlags = { byId: { 1: { fondateur: true, partenaire: false, ok_pour_apparaitre: true } }, byLabel: {}, conflicts: [] };
+  const person = extra => ({ id: 1, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Accepte_apparaitre: true, ...extra });
+  [{ perimetre: ['L'] }, { perimetre: ['L', 3] }, { perimetre: undefined }, {}].forEach(extra => {
+    const row = person(extra);
+    assert.deepEqual(buildContacts([row], referenceMaps, etabFlags).map(contact => contact.id), [1], JSON.stringify(extra));
+    assert.equal(describeVisibility(row, referenceMaps, etabFlags).visible, true, JSON.stringify(extra));
+  });
+  assert.equal('inScope' in describeVisibility(person({}), referenceMaps, etabFlags), false, 'plus de critère « périmètre » dans le verdict');
+  // Les autres critères comptent toujours, périmètre ou non.
+  assert.equal(describeVisibility(person({ Accepte_apparaitre: false }), referenceMaps, etabFlags).visible, false);
+  assert.equal(describeVisibility(person({ Etablissement: 0 }), referenceMaps, etabFlags).visible, false);
 });
 
 test('tableToRows converts a Grist column-oriented table into rows', () => {
