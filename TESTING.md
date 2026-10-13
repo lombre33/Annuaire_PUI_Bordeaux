@@ -141,7 +141,7 @@ Sans dépendance, un fichier de tests par module :
   seule requête réseau et ses protections, aucun stockage). Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
-`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 72
+`npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 73
 scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 (structure `BDD`) : nombre de contacts et badge établissement de chaque carte, cartes triées
 par nom (même quand Grist envoie les lignes dans le désordre), interrupteurs
@@ -161,7 +161,7 @@ scénarios sont ignorés.
 
 `tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Tâches rangé par action,
 sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
-sept boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
+huit boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
 en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
 filtres, nombres de cartes, recherche d'une action, d'une tâche ou d'un numéro, tag de
 carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numéros (console
@@ -274,8 +274,8 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
       `BDD`, et le nombre de cartes affichées (`#resultCount`) est
       inférieur ou égal à N (seuls les contacts avec `perimetre` non
       vide s'affichent — voir `isInScope()`).
-- [ ] Les 7 boutons de filtre (Actions, Tâches, Communautés, GT, Compétences,
-      Instances, Établissement) sont présents dans la barre d'outils. Il n'y a
+- [ ] Les 8 boutons de filtre (Actions, Tâches, Communautés, GT, Compétences,
+      Instances, Établissement, Rôle PUI) sont présents dans la barre d'outils. Il n'y a
       pas de bouton « Domaines » : les domaines sont dans le menu Compétences.
 - [ ] Sur une carte avec toutes les infos renseignées : initiales correctes
       dans l'avatar, nom + prénom, fonction visible, logo (ou pastille)
@@ -315,8 +315,8 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 
 ## 3. Chaque filtre, seul
 
-Pour chacun des 7 filtres (Actions, Tâches, Communautés, GT, Compétences,
-Instances, Établissement) :
+Pour chacun des 8 filtres (Actions, Tâches, Communautés, GT, Compétences,
+Instances, Établissement, Rôle PUI) :
 
 - [ ] Ouvrir le menu (clic sur le bouton) → seul ce menu est ouvert (les
       autres se ferment).
@@ -435,7 +435,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       correspondent aux deux restent.
 - [ ] Recherche libre + un filtre catégorie en même temps → les deux
       s'appliquent ensemble.
-- [ ] Les 7 filtres cochés simultanément (au moins une valeur chacun) →
+- [ ] Les 8 filtres cochés simultanément (au moins une valeur chacun) →
       résultat cohérent (potentiellement vide, mais sans erreur console).
 
 ## 5. Interactions carte → filtre
@@ -451,11 +451,11 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       case est bien cochée (pas seulement mise en évidence visuellement), et
       le badge de comptage sur le bouton du filtre est à jour — même
       résultat qu'en cochant la case directement dans le menu.
-- [ ] **Le tag "Rôle PUI" d'une carte n'est PAS cliquable** : curseur normal
-      au survol (pas de main), le cliquer ne change rien à la grille ni aux
-      filtres actifs. *(Rôle PUI est volontairement affiché mais non
-      filtrable — voir specs.md ; nouveau en 1.4.0 puisque ce tag était
-      invisible avant ce correctif, donc jamais testable.)*
+- [ ] **Le rôle PUI d'une carte (pastille sous le logo) est cliquable** (1.24.0) :
+      curseur "main" au survol, un clic coche la valeur dans le filtre
+      « Rôle PUI » et la grille se filtre ; un second clic la décoche. Un
+      rôle long (« Référent innovation et valorisation ») passe à la ligne
+      dans la pastille, sans être coupé ni sortir de la carte, même à 320 px.
 
 ## 6. Bouton Réinitialiser
 
@@ -475,7 +475,8 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       dans Grist (la quasi-totalité) → la carte affiche bien le 0 initial,
       formaté par paires (`05 56 78 90 12`), pas un nombre à 9 chiffres.
 - [ ] **Rôle PUI** : un contact avec `Role_dans_le_PUI` renseigné affiche
-      bien une section "Rôle PUI" dans ses tags de carte.
+      bien son rôle en pastille sous le logo de l'établissement, et le menu
+      du filtre « Rôle PUI » liste les valeurs de la table `Role_Dans_le_PUI`.
 - [ ] **Renommage de libellé** : dans Grist, cocher un filtre (ex.
       Établissement sur une valeur), puis renommer cette valeur dans la
       table de référence correspondante (ex. `Etablissements.acronyme`).

@@ -698,7 +698,8 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     // Avant : la carte de l'annuaire, sans aucun repère.
     assert.equal(await before.locator('.name').textContent(), 'Ana Martin');
     assert.equal(await before.locator('.fonction').textContent(), 'Pharmacienne');
-    assert.deepEqual(await before.locator('.tag').allTextContents(), ['CME', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur', 'Référent qualité']);
+    // Le rôle est la première pastille de la carte : il se lit sous le logo, en haut à droite.
+    assert.deepEqual(await before.locator('.tag').allTextContents(), ['Référent qualité', 'CME', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur']);
     assert.equal(await before.locator('.mk, .mk-gone, .mk-pill, .tag-add, .tag-del, .rv-ring').count(), 0);
 
     // Après : ce qui change se voit (contour, pastille écrite pour un texte, « + » pour un tag
@@ -711,7 +712,7 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     assert.deepEqual(await after.locator('.tag.tag-del').allTextContents(), ['CME (retiré)']);
     assert.equal(await after.locator('.name .mk, .tel .mk, .email .mk, .rv-ring').count(), 0, 'ce qui ne change pas n\'est pas repéré');
     assert.deepEqual(await after.locator('.tag:not(.tag-add):not(.tag-del)').allTextContents(),
-      ['Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur', 'Référent qualité']);
+      ['Référent qualité', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur']);
 
     // Les deux cartes sont des aperçus : rien n'y est cliquable.
     for (const card of [before, after]) {
@@ -798,7 +799,7 @@ test('« Valider » écrit en une seule action Grist, confirme, puis l\'annuaire
     await until(async () => (await gridCard(page, 'Ana Martin').locator('.fonction').textContent()) === 'Cheffe de service',
       'la carte de l\'annuaire n\'a pas été mise à jour');
     assert.deepEqual(await gridCard(page, 'Ana Martin').locator('.tag').allTextContents(),
-      ['COVIRIS', 'Vaccination', 'Oncologie', 'Hématologie', 'Pharmacovigilance', 'Réseau douleur', 'Référent qualité']);
+      ['Référent qualité', 'COVIRIS', 'Vaccination', 'Oncologie', 'Hématologie', 'Pharmacovigilance', 'Réseau douleur']);
 
     await waitForCards(page, 4);
     await focusReturnsTo(page, '#accountBar .account-edit');
@@ -1243,6 +1244,7 @@ test('changer le rôle ou le nom se voit sur la carte après, et le retirer barr
     assert.equal(await after.locator('.name').textContent(), 'Anna Martin modifié');
     assert.equal(await after.locator('.name .mk').textContent(), 'Anna Martin');
     assert.deepEqual(await after.locator('.tag.tag-del').allTextContents(), ['Référent qualité (retiré)']);
+    assert.equal(await after.locator('.etab-col .role-tag.tag-del').count(), 1, 'le rôle retiré reste barré sous le logo, là où la carte le montre');
     await press(page, 'Valider').click();
     await savedWith(page, 'Vos modifications sont enregistrées.');
     assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ prenom: 'Anna', Role_dans_le_PUI: 0 }]);

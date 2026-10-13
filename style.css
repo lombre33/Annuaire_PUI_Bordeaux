@@ -559,6 +559,16 @@ button.avatar:hover {
 .etab-actions {
   margin: 2px 0 0 8px;
 }
+/* Le rôle dans le PUI, sous le logo : une pastille qui passe à la ligne plutôt que d'être coupée (« Référent
+   innovation et valorisation » doit se lire en entier, sans survol sur un téléphone). Avec un logo, elle
+   s'aligne sur le bord du logo, que sa marge et sa bordure transparente (1 px + 4 px) écartent du bord. */
+.role-tag {
+  max-width: 136px;
+  margin: 4px 0 0 8px;
+}
+.card-body.with-logo .role-tag {
+  margin-right: 5px;
+}
 .etab-actions:empty {
   display: none;
 }

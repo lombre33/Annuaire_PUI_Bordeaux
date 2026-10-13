@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.23.0 — Créer sa fiche : « Publier ma fiche », et une recherche dans chaque liste à choix
+## 1.25.0 — Créer sa fiche : « Publier ma fiche », et une recherche dans chaque liste à choix
 
 Demande d'Antoine du 13 octobre 2026 (08 h 07, ses points 7 et 8).
 
@@ -25,6 +25,31 @@ Demande d'Antoine du 13 octobre 2026 (08 h 07, ses points 7 et 8).
   couvrent la case cochée et décochée, les messages, et la recherche de chaque sorte de liste ; ceux qui lisaient des noms complets lisent des acronymes.
 - Rien à changer dans le document Grist (la règle d'accès de 1.18.0 qui laisse ajouter sa ligne suffit ; `Accepte_apparaitre` doit rester une colonne de
   données). **Non essayé dans le vrai Grist d'Antoine.** Revenir en arrière : `git revert` de la fusion de cette version.
+
+## 1.24.0 — Filtre « Rôle PUI », et le rôle de la personne sous le logo de sa carte
+
+Demande d'Antoine du 13 octobre 2026, après sa démo (point 1 de sa liste).
+
+- **Un huitième filtre, « Rôle PUI »**, le dernier de la barre, d'après la table `Role_Dans_le_PUI` (colonne `Role`) : son menu liste les
+  rôles avec le nombre de cartes de chacun, et se combine (**et**) avec les autres filtres, comme eux (`FILTER_KEYS` dans `constants.js`).
+- **Le rôle s'affiche sous le logo de l'établissement** (sous sa pastille quand il n'a pas de logo), au lieu d'une section « Rôle PUI » dans
+  le bas de la carte (`fillRole` dans `render.js`). C'est une pastille violette qui filtre au clic, comme les autres étiquettes ; un rôle long
+  (« Référent innovation et valorisation ») passe à la ligne dans la pastille, sans être coupé ni sortir de la carte, de 320 px au grand
+  écran. Sur la carte « Après » de la relecture d'une fiche, un rôle ajouté est marqué et un rôle retiré reste barré, au même endroit.
+- **Les menus de filtre ne montrent plus deux fois un libellé qui ne diffère que par la casse ou les accents** (« Tâche 1.1 : Relecture » et
+  « tâche 1.1 : relecture ») : le menu garde la première écriture et sa case couvre les deux, comme le faisaient déjà les cartes et les
+  compteurs. Un test (`tests/load-directory.test.mjs`) fixe aussi que le rangement par « [ PUI ] Action n » suit les libellés corrigés.
+- **À faire dans Grist pour voir les rôles.** Dans le document d'Antoine, `BDD.Role_dans_le_PUI` est une colonne vide (la vraie référence est
+  dans l'ancienne table `Annuaire`) : le widget ne lit que `BDD`, donc aucun rôle ne s'affiche tant qu'elle n'est pas remplie. Il suffit
+  d'en faire une colonne de type Référence vers `Role_Dans_le_PUI` (colonne affichée `Role`) et de la remplir, par exemple avec la formule
+  `Annuaire.lookupOne(Email=$email).Role_dans_le_PUI` ; pour que « Modifier mon profil » puisse la changer, la convertir ensuite en colonne de
+  données (une colonne à formule est refusée à l'écriture, comme `BDD.Taches`).
+- Tests : un test navigateur du filtre (le menu, le clic sur le rôle d'une carte, le filtrage, « Réinitialiser »), un test du filtre sur les
+  données (`tests/filters.test.mjs`) et les tests existants mis à jour pour huit boutons et pour le rôle, première pastille d'une carte. La mise
+  en page de 320 px à 1 920 px (`tests/responsive.test.mjs`) a attrapé une première pastille coupée par « … » : elle passe maintenant à la ligne.
+  Deux captures du guide (`apercu.png`, `carte-anatomie.png`) sont refaites ; les autres, qui montrent encore sept filtres, le seront à la
+  passe finale de la documentation.
+- **Non essayé dans le vrai Grist d'Antoine.** Revenir en arrière : `git revert` de la fusion de cette version.
 
 ## 1.22.0 — Filtres, cartes et fenêtre de modification : la colonne « corrigé », à chaque fois
 

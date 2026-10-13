@@ -48,11 +48,11 @@ const consoleLines = async logs => (await Promise.all([...logs.warnings, ...logs
 
 // ===== Le menu : des actions repliées, « Sans action » en dernier =====
 
-test('la barre garde sept boutons : les actions rangent le menu Tâches sans avoir le leur, et le filtre Actions ne change pas', { skip }, () =>
+test('la barre garde huit boutons : les actions rangent le menu Tâches sans avoir le leur, et le filtre Actions ne change pas', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await page.locator('.filter-button > span:nth-child(2)').allTextContents(),
-      ['Actions', 'Tâches', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement']);
+      ['Actions', 'Tâches', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement', 'Rôle PUI']);
     assert.equal(await page.locator('.filter[data-filter-key="macroTaches"]').count(), 0);
     assert.match(await tasks.filter(page).locator('.filter-button').getAttribute('title'), /action/);
     assert.equal(await tasks.search(page).getAttribute('placeholder'), 'Action ou tâche…');

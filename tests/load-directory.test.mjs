@@ -380,6 +380,31 @@ test('loadDirectory names the group of a task by the label of its action, as the
     'le groupe porte le même nom que l\'option du filtre Actions');
 });
 
+test('loadDirectory makes one menu entry of the corrected labels that differ only by case, filtering on it covers every row, and the action of its number, written « [ PUI ] Action n », still ranges it', async () => {
+  const tables = withTaskActions();
+  tables.Actions.Actions = ['[ PUI ] Action 1: Vaccination', '[ PUI ] Action 2: Audit'];
+  tables.Taches = {
+    id: [1, 2, 3, 4, 5],
+    Taches: ['relecture', 'Relecture (v2)', 'RELECTURE', 'Inspection', 'Veille'],
+    Taches_corrige: ['Tâche 1.1 : Relecture', 'Tâche 1.1 : Relecture', 'tâche 1.1 : relecture', 'Tâche 2.1 : Inspection', 'Veille'],
+    Taches_role: ['', '', '', '', '']
+  };
+  // Ana porte la ligne 1, Bob les lignes 2 et 3 (écrites à la casse près), Gina la ligne 4, Hugo la ligne 5.
+  const tasksOf = { 1: ['L', 1], 2: ['L', 2, 3], 9: ['L', 4], 10: ['L', 5] };
+  tables.BDD.Taches = tables.BDD.id.map(id => tasksOf[id] || ['L']);
+  const { contacts, referenceMaps } = await load(tables);
+
+  assert.deepEqual(menuGroups(FILTERS.find(filter => filter.key === 'taches'), referenceMaps), [
+    { label: '[ PUI ] Action 1: Vaccination', values: ['Tâche 1.1 : Relecture'] },
+    { label: '[ PUI ] Action 2: Audit', values: ['Tâche 2.1 : Inspection'] },
+    { label: 'Sans action', values: ['Veille'] }
+  ]);
+  const state = createEmptyFilterState();
+  state.taches.add('Tâche 1.1 : Relecture');
+  assert.deepEqual(filterContacts(contacts, state, '').map(contact => contact.nom).sort(), ['Durand', 'Martin'],
+    'les porteurs de la ligne 1, de la ligne 2 et de la ligne 3 sont tous trouvés');
+});
+
 test('loadDirectory reads the number in the label the menu shows: the corrected label of a task, not its raw label', async () => {
   const tables = withTaskActions();
   tables.Taches.Taches_corrige = ['1.1 Relecture', '1.2 rappel vaccinal', '2.1 Inspection', '2.4 Veille réglementaire']; // « Veille » reçoit un numéro, corrigé
