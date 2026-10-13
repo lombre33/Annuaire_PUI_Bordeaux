@@ -119,6 +119,14 @@ const NEAR_WHITE = 235;
 const isClear = (pixels, index) => pixels[index + 3] < MIN_ALPHA
   || Math.min(pixels[index], pixels[index + 1], pixels[index + 2]) >= NEAR_WHITE;
 
+// Il y a quelque chose à voir : un pixel au moins n'est ni transparent ni à peu près blanc.
+export function hasInk(pixels) {
+  for (let index = 0; index + 3 < pixels.length; index += 4) {
+    if (!isClear(pixels, index)) return true;
+  }
+  return false;
+}
+
 // Le plus petit rectangle qui contient tout ce qui se voit d'un logo, sans ses marges transparentes ou blanches.
 // `pixels` : les octets RGBA de l'image (getImageData), `width` et `height` ses dimensions. Renvoie
 // { x, y, width, height }, ou null quand il n'y a rien à retirer : une image dont un coin porte une couleur

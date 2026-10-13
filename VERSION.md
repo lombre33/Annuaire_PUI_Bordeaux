@@ -1,4 +1,4 @@
-# Version 1.25.1 — La pastille du rôle, plus petite et à sa place sur la carte (voir CHANGELOG.md)
+# Version 1.25.2 — Logos des cartes : l'image qu'on voit ne dépend plus de la lecture de ses pixels (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -66,4 +66,6 @@ bouton en « Publier ma fiche » (une fiche publiée n'apparaît qu'une fois son
 d'établissements des fenêtres ne montrent que les acronymes ; chaque liste à choix des fenêtres a un champ de recherche (non essayé dans le vrai Grist).
 Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite : à droite de la fonction et de l'e-mail, sous le logo, sur une carte de 480 px ou
 plus ; sous l'e-mail sur une carte plus étroite.
-927 tests (dont 332 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.25.2, le logo qu'on voit sur une carte est une image ordinaire (sans CORS) : ses pixels sont lus à part, et si Grist ou le navigateur
+refuse ou tarde (3 s), le logo se montre quand même, sans recadrage (rejoué dans Chromium, pas essayé dans un vrai Grist ni sur Firefox).
+931 tests (dont 335 dans un vrai navigateur, optionnels sans Playwright).
