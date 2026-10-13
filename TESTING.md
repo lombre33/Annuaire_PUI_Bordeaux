@@ -744,8 +744,8 @@ la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
 - [ ] Onglet Réseau : **une seule** demande de jeton au chargement, puis une demande par logo à une adresse de
       la forme `…/attachments/<numéro>/download?auth=…`, réponse 200 de type image (pas 401, 403 ni 404).
       Aucun avertissement `[LOGOS]` dans la console (les lignes d'information `Version …` et `Bilan : …` y sont normales).
-- [ ] **Chaque logo n'est demandé qu'une fois, et un redessin ne le fait pas disparaître (1.28.1)** : dans **Firefox** de préférence (c'est lui qui annule
-      la demande d'une image retirée en cours de chargement, `NS_BINDING_ABORTED`), onglet Réseau et console (filtre « LOGOS ») ouverts, recharger le widget et taper vite dans la recherche pendant que les
+- [ ] **Chaque logo n'est demandé qu'une fois, et un redessin ne le fait pas disparaître (1.28.1)** : dans **Firefox** de préférence (il annule la demande
+      d'une image retirée en cours de chargement, `NS_BINDING_ABORTED` ; ce mécanisme n'a jamais été observé dans un vrai Grist), onglet Réseau et console (filtre « LOGOS ») ouverts, recharger le widget et taper vite dans la recherche pendant que les
       logos arrivent : tous les logos des cartes et du bandeau s'affichent, l'onglet Réseau montre **une seule** demande par logo (pas une par carte) et aucune ligne
       `NS_BINDING_ABORTED`, la ligne `[LOGOS] Bilan : N logos chargés sur N ; affichés : x/x sur les cartes, y/y dans le bandeau` arrive dans les
       15 secondes (avertissement s'il en manque : elle dit combien sont refusés, sans réponse ou sans jeton), et le bas de la page dit « Version … » comme le titre du CHANGELOG (sinon le
@@ -760,10 +760,13 @@ la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
 - [ ] Cartes : tous les logos ont la **même hauteur** (64 px sur une carte d'au moins 380 px de large, 48 px dès 330 px,
       32 px en dessous), quelle que soit leur forme ; un logo très large
       est réduit à ses proportions au lieu de déborder sur le nom de la personne.
-- [ ] **Les droits** : avec un compte **Lecteur**, puis un compte **Éditeur**, les logos s'affichent dans les
-      deux cas (le jeton demandé est en lecture seule). Les règles d'accès de l'étape 4 posées, un compte
-      ordinaire voit toujours les logos ; sinon, noter lesquels sont refusés (les noms les remplacent, sans
-      bandeau rouge).
+- [ ] **Les droits (1.28.2)** : avec « Voir en tant que » un propriétaire, un **Éditeur** (et un **Lecteur**, si les
+      Lecteurs lisent l'annuaire), les logos s'affichent dans tous les cas, les règles d'accès de l'étape 4 posées.
+      Le jeton est en lecture seule, donc compté comme un Lecteur : si la colonne `logo` ne leur est pas lisible, la
+      console dit `[LOGOS] Bilan : 0 logo chargé sur N (N refusés…` et le premier avertissement `ne se charge pas`
+      donne la cause probable et le remède (règle de colonne sur `logo`, `GRIST_SETUP.md` étape 5) ; si elle n'est pas
+      lisible par les Éditeurs, la ligne `Version …` dit `0 avec un logo dans la colonne logo`. Les noms remplacent
+      les logos refusés, sans bandeau rouge.
 - [ ] **Expiration du jeton** : laisser la page ouverte plus longtemps que sa validité (quelques minutes),
       puis cocher et décocher un filtre : les logos des cartes reviennent (un nouveau jeton est demandé, visible
       dans l'onglet Réseau), sans cadre cassé ni nom à leur place.
