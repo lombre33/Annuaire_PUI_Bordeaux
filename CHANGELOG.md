@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.26.0 — Le rôle de la personne dans une tâche, au survol de son étiquette
+
+Demande d'Antoine du 13 octobre 2026, après sa démo (point 9) : montrer le `Taches_role` de la table `Taches`, « en se basant bien sur la
+colonne Taches et pas Taches_corrige ». Les 1.25.0 (« Publier ma fiche », PR #48), 1.25.1 (pastille du rôle, PR #50) et 1.25.2 (logos des cartes, PR #52) sont fusionnées entre-temps.
+
+- **Le rôle se lit sur les lignes brutes de la personne.** Plusieurs lignes brutes de `Taches` ont le même libellé corrigé : c'est ce qui n'en fait
+  qu'une étiquette sur la carte. Le widget prend le `Taches_role` des lignes que `BDD.Taches` désigne pour cette personne, jamais celui d'une ligne
+  voisine qui partage l'étiquette. Quand l'étiquette en regroupe plusieurs chez elle, tous leurs rôles sont dits, sans doublon (« Rôles : Pilote,
+  Contributeur »). Rôle vide, colonne `Taches_role` absente, ligne sans libellé corrigé (donc jamais affichée) : rien ne s'affiche et rien n'est signalé.
+- **À la souris**, une bulle « Rôle : Pilote » s'ouvre au-dessus de l'étiquette de la tâche et se ferme en la quittant. **Au clavier**, la même bulle
+  s'ouvre quand le focus arrive sur l'étiquette, et Échap la ferme. Un lecteur d'écran lit le rôle avec la tâche. **Sur un téléphone**, qui ne survole
+  pas, le rôle s'écrit directement sous le nom de la tâche, dans l'étiquette. Cliquer sur l'étiquette filtre toujours (`attachTagNotes` dans `render.js`).
+- Le rôle ne se montre pas sur la carte « Après » de la relecture d'une modification de fiche : il ne s'y modifie pas.
+- À savoir : le rôle se retrouve par l'identifiant de ligne que Grist envoie pour `BDD.Taches`, ce que renvoie `fetchTable` (les listes que
+  Grist enverrait déjà résolues en texte n'ont pas de rôle plutôt qu'un rôle faux). Aucune colonne ni table à ajouter : `Taches_role` existe déjà.
+- Tests : `tests/task-roles.test.mjs` (4 tests des données : lignes de la personne et non du libellé corrigé, colonne absente, table illisible) et
+  `tests/e2e-task-roles.test.mjs` (4 tests dans Chromium : souris, clavier, écran tactile). **Non essayé dans le vrai Grist d'Antoine ni sur un
+  vrai téléphone.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.25.2 — Logos des cartes : l'image qu'on voit ne dépend plus de la lecture de ses pixels
 
 Signalé par Antoine le 13 octobre 2026 (10 h 40) : « les logos ont disparu des fiches ».

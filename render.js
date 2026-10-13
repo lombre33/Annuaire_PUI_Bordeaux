@@ -450,15 +450,24 @@ function fillEmail(link, email, linked) {
   if (href) link.href = href;
 }
 
+// Le rôle de la personne dans une tâche (taskRolesOf dans grist-data.js), écrit dans l'étiquette de la tâche : les
+// lecteurs d'écran le lisent avec elle, la bulle d'attachTagNotes le montre au survol et au clavier, et sur un écran
+// qui ne survole pas (téléphone) style.css l'affiche sous le nom de la tâche. Masqué à l'écran sinon.
+const roleNote = roles => `${roles.length > 1 ? 'Rôles' : 'Rôle'} : ${roles.join(', ')}`;
+
 // Un tag d'une catégorie sans filtre serait fait de <span> non cliquables : un bouton qui ne
 // filtre rien induirait en erreur. Il en va de même sans `onToggle` (carte de relecture).
-function buildTag(group, value, onToggle, isNew) {
+function buildTag(group, value, onToggle, isNew, roles) {
   const filterable = Boolean(onToggle) && FILTERABLE_KEYS.has(group.key);
   const tag = document.createElement(filterable ? 'button' : 'span');
   if (filterable) tag.type = 'button';
   tag.className = filterable ? `tag tag-${group.key}` : `tag tag-${group.key} tag-static`;
   tag.style.backgroundColor = group.color;
   tag.textContent = value;
+  if (roles?.length) {
+    tag.classList.add('has-note');
+    tag.append(' ', el('span', 'tag-note', roleNote(roles)));
+  }
   if (filterable) tag.addEventListener('click', () => onToggle(group.key, value));
   if (isNew) {
     tag.classList.add('tag-add');
@@ -477,7 +486,7 @@ function buildRemovedTag(group, value) {
   return tag;
 }
 
-function buildTagGroup(group, labels, onToggle, change) {
+function buildTagGroup(group, labels, onToggle, change, roles) {
   const section = document.createElement('section');
   section.className = 'tag-group';
 
@@ -490,7 +499,10 @@ function buildTagGroup(group, labels, onToggle, change) {
   const values = document.createElement('div');
   values.className = 'tag-group-values';
   values.append(
-    ...labels.map(value => buildTag(group, value, onToggle, added.has(normalize(value)))),
+    ...labels.map(value => {
+      const key = normalize(value);
+      return buildTag(group, value, onToggle, added.has(key), roles?.[key]);
+    }),
     ...(change?.removed ?? []).map(value => buildRemovedTag(group, value))
   );
 
@@ -524,7 +536,9 @@ function fillTags(container, contact, onToggle, changes) {
     const labels = labelsOf(contact, group.key);
     const change = changes?.[group.key];
     if (labels.length > 0 || change?.removed.length > 0) {
-      container.appendChild(buildTagGroup(group, labels, onToggle, change));
+      // Le rôle dans une tâche ne se lit que dans l'annuaire, pas sur une carte de relecture (sans `onToggle`).
+      const roles = onToggle && group.key === 'taches' ? contact.taskRoles : null;
+      container.appendChild(buildTagGroup(group, labels, onToggle, change, roles));
     }
   });
 }
@@ -652,4 +666,82 @@ export function renderPreviewCard(template, contact, marks = null, logos = null)
   const card = buildCard(template, contact, null, { marks, logos });
   card.querySelector('.contact-card').classList.add('rv-card');
   return card;
+}
+
+// ===== Bulle du rôle dans une tâche =====
+
+// Au survol d'une étiquette de tâche, ou quand le clavier s'y pose, une bulle dit le rôle de la personne dans la tâche
+// (le texte de `.tag-note`, voir buildTag). Une seule bulle pour toute la grille, posée sur <body> : une carte coupe
+// ce qui la dépasse. Sur un écran qui ne survole pas (téléphone) elle ne sert pas : style.css écrit le rôle sous le
+// nom de la tâche. Échap la ferme et elle reste tant que la souris est sur l'étiquette ou sur elle (WCAG 1.4.13).
+const TIP_GAP = 6;
+const TIP_MARGIN = 8;
+const TIP_HIDE_DELAY_MS = 150;
+
+export function attachTagNotes(grid) {
+  const tip = el('div', 'tag-tip');
+  tip.hidden = true;
+  // Le rôle fait déjà partie du nom de l'étiquette pour un lecteur d'écran : la bulle ne le répète pas.
+  tip.setAttribute('aria-hidden', 'true');
+  document.body.append(tip);
+  let timer = 0;
+  let anchor = null; // l'étiquette de la bulle ouverte et l'endroit où elle était
+
+  const hide = () => {
+    clearTimeout(timer);
+    anchor = null;
+    tip.hidden = true;
+  };
+  const hideSoon = () => {
+    clearTimeout(timer);
+    timer = setTimeout(hide, TIP_HIDE_DELAY_MS);
+  };
+  const show = tag => {
+    clearTimeout(timer);
+    const note = tag.querySelector('.tag-note')?.textContent;
+    if (!note || window.matchMedia('(hover: none)').matches) return;
+    tip.textContent = note;
+    // Mesurée au coin du cadre, où rien ne la serre : sa largeur ne dépend pas de l'endroit où on la pose.
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+    tip.hidden = false;
+    const { left: tagLeft, top: tagTop, width, bottom } = tag.getBoundingClientRect();
+    const left = Math.min(Math.max(TIP_MARGIN, tagLeft + (width - tip.offsetWidth) / 2), window.innerWidth - tip.offsetWidth - TIP_MARGIN);
+    const above = tagTop - tip.offsetHeight - TIP_GAP;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${above >= TIP_MARGIN ? above : bottom + TIP_GAP}px`;
+    anchor = { tag, left: tagLeft, top: tagTop };
+  };
+  const tagOf = event => event.target.closest?.('.tag.has-note');
+  // Le défilement ou le redimensionnement du cadre déplace l'étiquette : la bulle, fixe, ne la suivrait pas.
+  const followOrHide = () => {
+    if (!anchor) return;
+    const { left, top } = anchor.tag.getBoundingClientRect();
+    if (left !== anchor.left || top !== anchor.top) hide();
+  };
+
+  grid.addEventListener('mouseover', event => {
+    const tag = tagOf(event);
+    if (tag) show(tag);
+  });
+  grid.addEventListener('mouseout', event => {
+    if (tagOf(event)) hideSoon();
+  });
+  grid.addEventListener('focusin', event => {
+    const tag = tagOf(event);
+    if (tag?.matches(':focus-visible')) show(tag);
+  });
+  grid.addEventListener('focusout', event => {
+    if (tagOf(event)) hide();
+  });
+  tip.addEventListener('mouseenter', () => clearTimeout(timer));
+  tip.addEventListener('mouseleave', hideSoon);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') hide();
+  });
+  window.addEventListener('scroll', followOrHide, true);
+  window.addEventListener('resize', followOrHide);
+  // Les cartes redessinées (un filtre, une recherche) emportent l'étiquette sans qu'aucun événement de souris
+  // ne le dise : la bulle s'efface.
+  new MutationObserver(hide).observe(grid, { childList: true });
 }

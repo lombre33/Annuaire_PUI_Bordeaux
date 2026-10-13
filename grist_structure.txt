@@ -100,6 +100,12 @@ Tables de référence (id -> libellé, chargées via fetchTable)
                        « Sans action » ; si aucune tâche n'a son action, le menu
                        Tâches reste à plat. Voir taskActionNumber() et
                        actionNumber() dans grist-data.js.
+                       + Taches_role (Text), facultative : le rôle de la personne dans la
+                       tâche, dit au survol de l'étiquette. Lu sur les lignes brutes
+                       (colonne Taches) que BDD.Taches désigne pour la personne, jamais
+                       sur le libellé corrigé, que plusieurs lignes se partagent.
+                       Vide ou absente : aucun rôle, sans message. Voir taskRolesOf()
+                       dans grist-data.js.
   Communautes        : communautes_corrigees (Text)   puis communautes (Text)
   GT                 : GT_corrige (Choice)            puis GT (Text)
   Competences        : Competences_corrigees (Text)   puis Competences (Text)

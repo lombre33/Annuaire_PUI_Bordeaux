@@ -90,12 +90,13 @@ after(async () => {
 // fichiers qui ont été téléchargés et les jetons employés ; `accessToken` est la réponse de
 // getAccessToken (null : Grist refuse), `withoutMethods` les méthodes de docApi qu'une
 // vieille version de Grist n'a pas ; `downloadCors` faux ou 'hang', un Grist qui ne donne pas les pièces jointes
-// en CORS (refus, ou pas de réponse), donc qui ne laisse pas lire les pixels d'un logo.
+// en CORS (refus, ou pas de réponse), donc qui ne laisse pas lire les pixels d'un logo ; `contextOptions` : les options
+// du contexte Playwright (un écran tactile, sans survol : { hasTouch: true, isMobile: true }).
 export async function openWidget({
   tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false,
-  accessToken, withoutMethods = [], downloadCors = true
+  accessToken, withoutMethods = [], downloadCors = true, contextOptions = {}
 } = {}) {
-  const context = await browser.newContext();
+  const context = await browser.newContext(contextOptions);
   // Hermétique : seuls le serveur local, l'API Grist simulée et ses pièces jointes répondent.
   await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
   await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));

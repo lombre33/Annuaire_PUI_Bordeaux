@@ -876,6 +876,46 @@ button.avatar:hover {
 .tag-static {
   cursor: default;
 }
+/* Le rôle de la personne dans une tâche (render.js, buildTag) : écrit dans l'étiquette mais hors de vue, pour les
+   lecteurs d'écran ; la souris et le clavier le voient dans la bulle (.tag-tip, attachTagNotes), le toucher
+   (pas de survol) sous le nom de la tâche. */
+.tag-note {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.tag-tip {
+  position: fixed;
+  z-index: 60;
+  max-width: min(260px, calc(100vw - 16px));
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--ink);
+  box-shadow: 0 6px 16px #17203340;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+@media (hover: none) {
+  .tag-note {
+    position: static;
+    display: block;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    font-weight: 600;
+  }
+  .tag.has-note {
+    border-radius: 14px;
+  }
+}
 .scope-toggle {
   display: flex;
   flex: 0 0 auto;
@@ -1249,6 +1289,9 @@ button.avatar:hover {
 /* Couleurs imposées (mode contraste élevé) : la piste et le curseur y prendraient le même fond et
    l'interrupteur ne montrerait plus son état. On les pose en couleurs système, que le mode respecte. */
 @media (forced-colors: active) {
+  .tag-tip {
+    border: 1px solid CanvasText;
+  }
   input[type="checkbox"] {
     -webkit-appearance: auto;
     appearance: auto;

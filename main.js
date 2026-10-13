@@ -11,7 +11,7 @@
 import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS } from './constants.js';
 import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
-import { createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
+import { attachTagNotes, createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
@@ -140,6 +140,9 @@ function refreshCards() {
   elements.emptyState.hidden = filtered.length !== 0;
   updateFilterCounts(elements.filtersContainer, currentCounts());
 }
+
+// La bulle du rôle dans une tâche, un seul écouteur lui aussi (render.js).
+attachTagNotes(elements.grid);
 
 // Un seul écouteur pour tous les boutons « Modifier » et les photos à agrandir : les cartes sont
 // reconstruites à chaque filtre. Les cartes étant redessinées après un enregistrement, le focus revient

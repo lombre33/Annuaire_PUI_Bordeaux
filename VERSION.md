@@ -1,4 +1,4 @@
-# Version 1.25.2 — Logos des cartes : l'image qu'on voit ne dépend plus de la lecture de ses pixels (voir CHANGELOG.md)
+# Version 1.26.0 — Le rôle de la personne dans une tâche, au survol de son étiquette (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -68,4 +68,6 @@ Depuis la 1.25.1, la pastille du rôle a sa propre boîte, plus petite : à droi
 plus ; sous l'e-mail sur une carte plus étroite.
 Depuis la 1.25.2, le logo qu'on voit sur une carte est une image ordinaire (sans CORS) : ses pixels sont lus à part, et si Grist ou le navigateur
 refuse ou tarde (3 s), le logo se montre quand même, sans recadrage (rejoué dans Chromium, pas essayé dans un vrai Grist ni sur Firefox).
-931 tests (dont 335 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.26.0, l'étiquette d'une tâche dit le rôle de la personne dans cette tâche (colonne facultative `Taches_role` de `Taches`, lue sur les lignes brutes
+que `BDD.Taches` désigne pour elle, pas sur le libellé corrigé) : dans une bulle à la souris et au clavier, sous le nom de la tâche sur un téléphone.
+939 tests (dont 339 dans un vrai navigateur, optionnels sans Playwright).

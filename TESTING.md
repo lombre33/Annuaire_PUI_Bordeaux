@@ -41,6 +41,10 @@ Sans dépendance, un fichier de tests par module :
   doublons d'acronymes, domaines des compétences, tâches rangées par action
   d'après leur numéro : formats de libellé, repli « Sans action », menu à plat,
   lectures en panne).
+- `tests/task-roles.test.mjs` — le rôle de la personne dans une tâche (`Taches_role`) : lu sur les lignes
+  brutes que `BDD.Taches` lui désigne et non sur le libellé corrigé que plusieurs lignes partagent, tous les
+  rôles d'une étiquette qui regroupe plusieurs de ses lignes, colonne absente ou vide sans message, table
+  illisible (rôles précédents gardés), texte déjà résolu sans rôle.
 - `tests/identity.test.mjs` — `readIdentity` avec un faux document Grist (adresse
   lue sur la ligne de la sonde, administrateur d'après `ACL`, établissements dont la
   personne est responsable d'après la colonne `Responsable_de`, compte Lecteur,
@@ -167,6 +171,11 @@ filtres, nombres de cartes, recherche d'une action, d'une tâche ou d'un numéro
 carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numéros (console
 et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
 les tâches par action.
+
+`tests/e2e-task-roles.test.mjs` y ajoute 4 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
+`tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
+(au-dessus, dans le cadre, refermée en la quittant), au clavier (Échap, cartes redessinées) et, sur un écran
+tactile émulé, le rôle sous le nom de la tâche sans bulle.
 
 `tests/e2e-profile.test.mjs` y ajoute 63 scénarios sur la modification d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
