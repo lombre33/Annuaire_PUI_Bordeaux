@@ -1,4 +1,4 @@
-# Version 1.21.0 — Financeurs fixes, logos des cartes à la même hauteur, règles de la sonde (voir CHANGELOG.md)
+# Version 1.21.1 — Logos des cartes deux fois plus grands (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -41,4 +41,6 @@ préfixe entre crochets (« [ PUI ] Action 1: … ») : le préfixe est ignoré 
 Depuis la 1.21.0, les financeurs (le visuel de l'en-tête et le rond France 2030 du bandeau du bas) sont deux images fixes du
 widget, sans table `Financeurs` dans Grist ; tous les logos des cartes ont la même hauteur (32 px) ; `GRIST_SETUP.md` donne
 les deux règles d'accès d'`Annuaire_Sonde` (ajouter, lire et supprimer sa propre ligne, ne rien modifier).
+Depuis la 1.21.1, les logos des cartes font 64 px de haut sur une carte d'au moins 380 px de large (48 px dès 330 px, 32 px
+en dessous), pour garder la place du nom.
 896 tests (dont 321 dans un vrai navigateur, optionnels sans Playwright).

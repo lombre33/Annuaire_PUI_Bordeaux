@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.21.1 — Logos des cartes deux fois plus grands
+
+Demande d'Antoine du 13 octobre 2026 (« faire un ×2 sur la taille »), la veille d'une démo : sur une carte assez large, le
+logo de l'établissement fait 64 px de haut au lieu de 32, avec une largeur maximale doublée (240 px, la moitié de la carte).
+Pour que le nom garde sa place, la hauteur suit la largeur de la carte (requêtes de conteneur dans `style.css`) : 64 px dès
+380 px de large, 48 px dès 330 px, 32 px en dessous ; sur une carte étroite le logo garde donc sa taille d'avant. Quand un logo
+agrandit la carte, l'avatar se centre sur le nom et la fonction. Seuls les logos des cartes changent (le bandeau du bas, non),
+et le test de leur hauteur suit les trois paliers. Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.21.0 — Financeurs en éléments fixes, logos des cartes à la même hauteur, règles de la sonde
 
 Demandes d'Antoine du 13 octobre 2026 (05 h 20 à 05 h 27), captures à l'appui.

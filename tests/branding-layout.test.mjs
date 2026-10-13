@@ -311,38 +311,50 @@ test('à 1480px avec logos : trois colonnes, logo dans le coin haut droit comme 
     assert.ok(card.badgeFromRight >= 9 && card.badgeFromRight <= 13, `logo à ${card.badgeFromRight}px du bord droit`);
     assert.ok(card.badgeFromTop >= 12 && card.badgeFromTop <= 16, `logo à ${card.badgeFromTop}px du haut`);
     assert.ok(card.imageFromBadgeRight >= 0 && card.imageFromBadgeRight <= 6, `l'image est calée à droite de son cadre (${card.imageFromBadgeRight}px)`);
-    assert.ok(card.image.width <= 120.5 && card.image.height <= 32.5, `le logo fait ${Math.round(card.image.width)}x${Math.round(card.image.height)}px`);
+    assert.ok(card.image.width <= 240.5 && card.image.height <= 64.5, `le logo fait ${Math.round(card.image.width)}x${Math.round(card.image.height)}px`);
     assert.ok(card.image.height >= 14, `le logo reste lisible (${Math.round(card.image.height)}px de haut)`);
     assert.ok(Math.abs(card.nameVsAvatar) <= 2, `nom décalé de ${card.nameVsAvatar}px par rapport à l'avatar`);
     assert.ok(Math.abs(card.nameAndFunctionVsAvatar) <= 3, `nom et fonction décalés de ${card.nameAndFunctionVsAvatar}px par rapport à l'avatar`);
   }));
 
 // Les logos ont des formes différentes (de 1,2 à 6 fois plus larges que hauts dans ces fichiers) : sur
-// la carte, tous gardent la même hauteur. Seul un logo que la largeur maximale (120px, et 38% de la
-// carte pour qu'une carte étroite garde la place du nom) empêche d'avoir cette hauteur est plus petit,
-// à ses proportions.
-test('cartes : tous les logos ont la même hauteur de 32px, à leurs proportions, tant que la largeur maximale le permet', { skip }, () =>
+// une carte, tous gardent la même hauteur, qui suit la place que la carte leur laisse (style.css, requêtes
+// de conteneur : 32px sur une carte étroite, 48px dès 330px de large, 64px dès 380px). Seul un logo que la
+// largeur maximale (une part de la carte, pour qu'elle garde la place du nom) empêche d'avoir cette hauteur
+// est plus petit, à ses proportions.
+const LOGO_STEPS = [
+  { from: 380, height: 64, max: 240, share: 0.5 },
+  { from: 330, height: 48, max: 180, share: 0.45 },
+  { from: 0, height: 32, max: 120, share: 0.38 }
+];
+
+test('cartes : tous les logos ont la même hauteur, à leurs proportions, tant que la largeur maximale le permet', { skip }, () =>
   withWidget({ tables: crowdedBranding() }, async ({ page }) => {
-    await atEachWidth(page, [320, 600, 840, 1024, 1280, 1480], async width => {
-      const logos = await page.locator('.contact-card').evaluateAll(cards => cards.map(card => {
+    const heights = new Set();
+    await atEachWidth(page, [320, 600, 840, 1024, 1150, 1280, 1480], async width => {
+      const logos = await page.locator('.contact-card').evaluateAll((cards, steps) => cards.map(card => {
         const image = card.querySelector('.etablissement-tag img');
         const box = image.getBoundingClientRect();
         const ratio = image.naturalWidth / image.naturalHeight;
         // Ce qui se voit : l'image tient dans sa case (object-fit: contain), à ses proportions.
         const shown = Math.min(box.width / ratio, box.height);
-        return { alt: image.alt, boxWidth: box.width, boxHeight: box.height, ratio, shown, cap: Math.min(120, 0.38 * card.getBoundingClientRect().width) };
-      }));
+        // La largeur de la carte hors bordures : celle que mesurent les requêtes de conteneur et les cqw.
+        const step = steps.find(candidate => card.clientWidth >= candidate.from);
+        return { alt: image.alt, boxWidth: box.width, boxHeight: box.height, ratio, shown, height: step.height, cap: Math.min(step.max, step.share * card.clientWidth) };
+      }), LOGO_STEPS);
       assert.ok(logos.length >= 12, `à ${width}px : assez de cartes pour comparer (${logos.length})`);
-      logos.forEach(({ alt, boxWidth, boxHeight, ratio, shown, cap }) => {
+      logos.forEach(({ alt, boxWidth, boxHeight, ratio, shown, height, cap }) => {
         const message = `à ${width}px, ${alt}`;
-        assert.ok(Math.abs(boxHeight - 32) <= 0.5, `${message} : la case fait ${Math.round(boxHeight)}px de haut`);
+        heights.add(height);
+        assert.ok(Math.abs(boxHeight - height) <= 0.5, `${message} : la case fait ${Math.round(boxHeight)}px de haut au lieu de ${height}`);
         assert.ok(boxWidth <= cap + 0.5, `${message} : ${Math.round(boxWidth)}px de large, plus que le maximum (${Math.round(cap)}px)`);
-        if (32 * ratio <= cap) assert.ok(Math.abs(shown - 32) <= 0.5, `${message} : ${shown.toFixed(1)}px de haut au lieu de 32`);
-        else assert.ok(Math.abs(shown - cap / ratio) <= 0.5 && shown < 32, `${message} : réduit à ses proportions (${shown.toFixed(1)}px de haut)`);
+        if (height * ratio <= cap) assert.ok(Math.abs(shown - height) <= 0.5, `${message} : ${shown.toFixed(1)}px de haut au lieu de ${height}`);
+        else assert.ok(Math.abs(shown - cap / ratio) <= 0.5 && shown < height, `${message} : réduit à ses proportions (${shown.toFixed(1)}px de haut)`);
       });
-      // Le test n'est pas vide : sur une carte large, la plupart des formes ont bien 32px de haut.
-      if (width >= 1280) assert.ok(logos.filter(({ shown }) => Math.abs(shown - 32) <= 0.5).length >= 8, `à ${width}px : trop peu de logos à 32px de haut`);
+      // Le test n'est pas vide : sur une carte large, plusieurs formes ont bien la hauteur pleine.
+      if (width >= 1280) assert.ok(logos.filter(({ shown, height }) => Math.abs(shown - height) <= 0.5).length >= 4, `à ${width}px : trop peu de logos à leur hauteur pleine`);
     });
+    assert.deepEqual([...heights].sort((a, b) => a - b), [32, 48, 64], 'les trois hauteurs de carte sont toutes essayées');
   }));
 
 test('sur téléphone avec logos, le nom reste centré sur l\'avatar et le logo dans le coin de la carte', { skip }, () =>
@@ -507,7 +519,7 @@ test('un logo très haut, une bannière très large ou un SVG sans dimensions re
         const ratio = image.naturalWidth / image.naturalHeight;
         return { alt: image.alt, width, height, shown: { width: Math.min(width, height * ratio), height: Math.min(height, width / ratio) } };
       }));
-      assert.ok(cards.every(({ width, height }) => width <= 120.5 && height <= 32.5 && height >= 4), `${message} : logos des cartes bornés`);
+      assert.ok(cards.every(({ width, height }) => width <= 240.5 && height <= 64.5 && height >= 4), `${message} : logos des cartes bornés`);
       // Même sur une carte, le logo en hauteur, la bannière et le SVG sans dimensions gardent leurs proportions.
       const expectedRatios = { UB: 40 / 120, 'Bordeaux INP': 300 / 30, BSA: 100 / 50 };
       Object.entries(expectedRatios).forEach(([alt, expectedRatio]) => {

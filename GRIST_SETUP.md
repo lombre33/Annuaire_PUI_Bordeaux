@@ -328,8 +328,8 @@ le bandeau reste lisible avec seize logos.
 
 - **PNG ou SVG**, de préférence **SVG** (net à toute taille), sur **fond transparent**,
   **rognés au plus près du dessin**. Sur les cartes, le widget donne à tous les logos la
-  même hauteur (32 px), quelle que soit leur forme, et en borne la largeur pour qu'une
-  bannière très large ne déborde pas ; dans le bandeau du bas, il ajuste la taille de chacun
+  même hauteur (64 px sur une carte assez large, 32 px sur une carte étroite), quelle que soit
+  leur forme, et en borne la largeur pour qu'une bannière très large ne déborde pas ; dans le bandeau du bas, il ajuste la taille de chacun
   pour qu'une rangée de logos de formes différentes (un emblème carré, une bannière large,
   une signature haute) ait un poids visuel voisin. Une marge blanche autour d'un logo le
   ferait paraître plus petit que les autres, et un fond blanc opaque dessinerait un

@@ -732,7 +732,8 @@ la console, l'adresse de l'image dans l'onglet Réseau et le code de réponse.
 - [ ] Bandeau tout en bas : seuls les fondateurs **validés**, dans l'ordre d'`ordre_bandeau` ; le rond
       « France 2030 » à droite (image fixe) ; la phrase de financement dont le lien ouvre la page
       du projet dans un nouvel onglet ; une infobulle donne le nom complet de chaque établissement.
-- [ ] Cartes : tous les logos ont la **même hauteur** (32 px), quelle que soit leur forme ; un logo très large
+- [ ] Cartes : tous les logos ont la **même hauteur** (64 px sur une carte d'au moins 380 px de large, 48 px dès 330 px,
+      32 px en dessous), quelle que soit leur forme ; un logo très large
       est réduit à ses proportions au lieu de déborder sur le nom de la personne.
 - [ ] **Les droits** : avec un compte **Lecteur**, puis un compte **Éditeur**, les logos s'affichent dans les
       deux cas (le jeton demandé est en lecture seule). Les règles d'accès de l'étape 4 posées, un compte
