@@ -1,4 +1,4 @@
-# Version 1.21.2 — Cases à cocher dessinées par le widget, plus de carré noir sur Firefox Android (voir CHANGELOG.md)
+# Version 1.21.3 — Recherche : le texte tapé reste lisible sur Firefox mobile (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -45,4 +45,6 @@ Depuis la 1.21.1, les logos des cartes font 64 px de haut sur une carte d'au moi
 en dessous), pour garder la place du nom.
 Depuis la 1.21.2, les cases à cocher sont dessinées par la feuille de style (fond blanc, bordure, coche) et le widget impose
 son thème clair : plus de carré noir sur Firefox Android.
-898 tests (dont 322 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.21.3, les boutons et les champs prennent la couleur du texte de la page et le texte d'invite est gris foncé : ce qu'on tape
+dans la recherche reste lisible sur Firefox mobile en thème sombre (rejoué dans Chromium en schéma sombre imposé, pas essayé dans Firefox).
+899 tests (dont 323 dans un vrai navigateur, optionnels sans Playwright).

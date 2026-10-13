@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.21.3 — Recherche : le texte tapé reste lisible sur Firefox mobile
+
+Signalé par Antoine le 13 octobre 2026 (06 h 32) : sur Firefox mobile, « quand on tape dans la barre de recherche, le filtre marche mais on
+ne voit pas les caractères tapés ». Même famille que les cases noires de la 1.21.2 : le widget ne fixait pas la couleur du texte des champs, que
+le navigateur choisissait, et Firefox sur téléphone en thème sombre y mettait du blanc, sur le fond clair du champ. Le thème clair imposé par la
+1.21.2 n'y suffisait pas à coup sûr (non essayé sur Firefox) ; la couleur est maintenant écrite par le widget.
+
+- Les boutons et les champs prennent la couleur du texte de la page (`color: inherit`, sans effet sur ceux qui fixent la leur) : le texte tapé dans la
+  recherche, dans la recherche d'un menu de filtre et dans les champs des fenêtres est celui du widget, 15:1 sur le fond du champ.
+- Le texte d'invite (« Rechercher par nom ou prénom… ») est gris foncé et plein (5,9:1) au lieu de la couleur que choisissait chaque navigateur.
+- Un test de non-régression (`tests/accessibility.test.mjs`) rejoue le cas dans Chromium en lui imposant un schéma sombre sur la page : il échoue sur la
+  1.21.2 (texte blanc sur fond clair) et passe maintenant. Non essayé sur un vrai Firefox mobile : à confirmer à l'œil. Revenir en arrière : `git revert`.
+
 ## 1.21.2 — Cases à cocher des filtres : plus de carré noir sur Firefox Android
 
 Signalé par Antoine le 13 octobre 2026 : sur Firefox pour Android, les cases à cocher vides des menus de filtre

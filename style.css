@@ -35,6 +35,20 @@ button,
 input {
   font: inherit;
 }
+/* Les boutons et les champs prennent la couleur du texte de la page, jamais celle du navigateur : en
+   thème sombre, Firefox sur téléphone y mettait du blanc, invisible sur nos fonds clairs (ce qu'on
+   tape dans la recherche). Une règle de classe qui fixe sa propre couleur l'emporte. */
+button,
+input,
+select,
+textarea {
+  color: inherit;
+}
+/* Texte d'invite : plein et foncé, au lieu du texte du champ rendu translucide par le navigateur. */
+::placeholder {
+  color: #566177; /* 5,9:1 sur le fond du champ de recherche, 4,5:1 exigés (WCAG 1.4.3) */
+  opacity: 1;
+}
 /* Un élément `hidden` le reste, même quand une classe lui donne un affichage. */
 [hidden] {
   display: none !important;

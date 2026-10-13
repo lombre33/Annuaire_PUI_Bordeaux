@@ -435,3 +435,41 @@ test('sur la page rendue, une case de filtre vide est blanche à bordure visible
     }, 'case cochée : violet et coche');
   });
 });
+
+// ===== Texte des champs, navigateur en thème sombre =====
+
+// Sur Firefox mobile en thème sombre, ce qu'on tapait dans la recherche restait invisible : le navigateur y
+// mettait du blanc, sur le fond clair du champ, parce que le widget ne fixait pas la couleur du texte. Chromium
+// ne passe pas ses champs en sombre de lui-même : on lui impose le schéma sombre sur la page (`!important`
+// passe devant la déclaration du widget) pour rejouer le cas. Seules des couleurs écrites par le widget tiennent.
+test('même si le navigateur passe en sombre, ce qu\'on tape dans la recherche et son texte d\'invite restent lisibles (Firefox mobile, 1.21.3)', { skip }, async () => {
+  await withWidget({ tables: sampleTables() }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.addStyleTag({ content: ':root { color-scheme: dark !important }' });
+    await page.locator('.filter-button', { hasText: 'Compétences' }).click();
+    const looks = await page.evaluate(() => {
+      const background = element => {
+        for (let node = element; node; node = node.parentElement) {
+          const color = getComputedStyle(node).backgroundColor;
+          if (color !== 'rgba(0, 0, 0, 0)') return color;
+        }
+        return 'rgb(255, 255, 255)';
+      };
+      return [['la recherche', document.getElementById('searchInput')], ['la recherche d\'un menu', document.querySelector('.filter.open .filter-search-input')]]
+        .map(([name, field]) => ({
+          name,
+          color: getComputedStyle(field).color,
+          background: background(field),
+          placeholder: getComputedStyle(field, '::placeholder').color,
+          placeholderOpacity: getComputedStyle(field, '::placeholder').opacity
+        }));
+    });
+    assert.equal(looks.length, 2);
+    for (const field of looks) {
+      assert.ok(contrastRatio(field.color, field.background) >= 4.5, `${field.name} : texte ${field.color} sur ${field.background}`);
+      assert.ok(contrastRatio(field.placeholder, field.background) >= 4.5 && field.placeholderOpacity === '1',
+        `${field.name} : texte d'invite ${field.placeholder} (opacité ${field.placeholderOpacity}) sur ${field.background}`);
+    }
+  });
+});
