@@ -4,7 +4,7 @@
 // le DOM, avec textContent. Les financeurs sont deux images fixes de index.html.
 
 import { BAND_LOGO, CARD_LOGO, PUI_URL } from './constants.js';
-import { logoSize, inkBounds } from './branding.js';
+import { logoSize, inkBounds, hasInk } from './branding.js';
 
 // Un logo : une <img> invisible tant qu'elle n'est pas chargée (ni cadre cassé ni texte
 // alternatif qui clignote). Quand Grist ne donne pas le fichier (pas de jeton, fichier
@@ -13,11 +13,13 @@ import { logoSize, inkBounds } from './branding.js';
 // pendant que la page restait ouverte. Les photos de profil (avatar-ui.js) passent par ici aussi.
 //   eager   charger tout de suite (les logos de l'en-tête et du pied de page) ; sinon
 //           l'image attend d'approcher de l'écran, comme celles des cartes
-//   onLoad  appelé avec l'image dès qu'elle est chargée, avant qu'elle ne devienne visible ; s'il
-//           renvoie false, l'image va être remplacée et c'est son prochain chargement qui la montre
-//   cors    demander l'image en CORS pour pouvoir lire ses pixels (fitCardLogo) ; si Grist la refuse ainsi,
-//           elle est redemandée sans, et seule la lecture des pixels est perdue
-export function createLogoImage(attachments, attachmentId, alt, onFail, { eager = false, onLoad, cors = false } = {}) {
+//   onLoad  appelé avec l'image et `show` (qui la rend visible) dès qu'elle est chargée, avant qu'elle ne
+//           devienne visible ; s'il renvoie false, l'image reste cachée jusqu'à ce que l'appelant appelle `show`
+//           ou que son prochain chargement la montre
+// L'image qu'on voit se demande toujours comme une image ordinaire, sans CORS : un Grist qui ne la donnerait
+// pas en CORS, ou un navigateur qui bride la lecture des pixels, ne doit jamais faire disparaître un logo
+// (1.24.1). Lire ses pixels, c'est à fitCardLogo de le tenter, sur une copie à part.
+export function createLogoImage(attachments, attachmentId, alt, onFail, { eager = false, onLoad } = {}) {
   const image = document.createElement('img');
   image.className = 'logo-img';
   image.alt = alt;
@@ -26,7 +28,6 @@ export function createLogoImage(attachments, attachmentId, alt, onFail, { eager 
   image.draggable = false;
   // L'adresse de la page du widget n'a pas à être envoyée au serveur de Grist.
   image.referrerPolicy = 'no-referrer';
-  if (cors) image.crossOrigin = 'anonymous';
 
   let failed = false;
   let retried = false;
@@ -42,18 +43,13 @@ export function createLogoImage(attachments, attachmentId, alt, onFail, { eager 
     return requested !== '';
   };
 
+  const show = () => image.classList.add('loaded');
   image.addEventListener('load', () => {
-    if (onLoad?.(image) === false) return;
-    image.classList.add('loaded');
+    if (onLoad?.(image, show) === false) return;
+    show();
   });
   image.addEventListener('error', async () => {
     if (failed) return;
-    // Grist ne donne pas l'image en CORS : le logo se montre quand même, sans que ses pixels soient lus.
-    if (image.crossOrigin && requested) {
-      image.removeAttribute('crossorigin');
-      image.src = requested;
-      return;
-    }
     if (retried) {
       fail();
       return;
@@ -84,13 +80,18 @@ export function sizeLogo(image, limits) {
 }
 
 // Les logos des cartes sont fournis avec des marges de toutes tailles (un logo large au milieu d'un carré
-// transparent paraît minuscule à côté d'un logo coupé au ras). Le logo chargé est donc lu : son encre (inkBounds)
-// est recadrée dans une copie, puis sa taille se tire de sa surface (sizeLogo, CARD_LOGO), pas de celle du fichier.
-// Un logo dont les pixels ne se lisent pas (Grist refuse le CORS) garde sa taille de repli de style.css.
+// transparent paraît minuscule à côté d'un logo coupé au ras). Le logo est donc lu : son encre (inkBounds) est
+// recadrée dans une copie, puis sa taille se tire de sa surface (sizeLogo, CARD_LOGO), pas de celle du fichier.
+// La lecture se fait sur une copie du fichier demandée à part, en CORS (sans CORS, le navigateur interdit de lire les
+// pixels) : l'image qu'on voit, elle, reste une image ordinaire. Un logo dont les pixels ne se lisent pas (Grist ne le
+// donne pas en CORS, le navigateur bride le canvas, la lecture tarde) garde sa taille de repli de style.css, mais se montre.
 const ANALYSIS_SIDE = 256; // côté le plus long de l'image sur laquelle l'encre est cherchée
 const COPY_SIDE = 320; // côté le plus long de la copie recadrée
 const NO_MARGIN = 0.97; // une encre qui occupe déjà 97 % de l'image dans les deux sens n'est pas recadrée
-const fittedLogos = new Map(); // identifiant de la pièce jointe -> { readable, url }
+export const ANALYSIS_TIMEOUT_MS = 3000; // une lecture plus longue est abandonnée : le logo se montre tel quel
+const PROBE_PARAM = 'annuaire_pixels'; // distingue la lecture des pixels de l'image affichée (probeUrl)
+const UNREADABLE = { readable: false, url: null };
+const analyses = new Map(); // identifiant de la pièce jointe -> Promise<{ readable, url }>
 
 function readInk(image) {
   const { naturalWidth: width, naturalHeight: height } = image;
@@ -120,30 +121,78 @@ function readInk(image) {
     const copy = document.createElement('canvas');
     copy.width = Math.max(1, Math.round(sw * shrink));
     copy.height = Math.max(1, Math.round(sh * shrink));
-    copy.getContext('2d').drawImage(image, sx, sy, sw, sh, 0, 0, copy.width, copy.height);
+    const copyContext = copy.getContext('2d', { willReadFrequently: true });
+    copyContext.drawImage(image, sx, sy, sw, sh, 0, 0, copy.width, copy.height);
+    // Un navigateur qui brouille ou vide les lectures de canvas rendrait une copie blanche : le logo ne serait plus
+    // le sien. Une copie sans rien dedans n'est pas utilisée.
+    if (!hasInk(copyContext.getImageData(0, 0, copy.width, copy.height).data)) return UNREADABLE;
     return { readable: true, url: copy.toDataURL('image/png') };
   } catch {
-    return { readable: false, url: null };
+    return UNREADABLE;
   }
 }
 
-// À appeler au chargement (onLoad de createLogoImage, option cors) d'un logo de carte ; renvoie false quand le logo
-// est remplacé par sa copie recadrée, dont le chargement appellera de nouveau cette fonction.
-export function fitCardLogo(image, attachmentId) {
+// Une adresse distincte de celle de l'image affichée, que Grist traite comme elle (il ignore le paramètre) : l'image affichée
+// vient d'être chargée sans CORS, et la réponse que le cache en garde (Grist la garde une heure, sans `Vary: Origin`) n'a
+// pas les en-têtes CORS ; la même adresse redemandée en CORS y serait prise puis refusée. Une adresse qui n'est pas
+// celle d'un serveur (une image en data:) est gardée telle quelle.
+function probeUrl(source) {
+  try {
+    const url = new URL(source);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return source;
+    url.searchParams.set(PROBE_PARAM, '1');
+    return url.href;
+  } catch {
+    return source;
+  }
+}
+
+// La lecture d'un logo, une seule fois par pièce jointe : toutes les cartes d'un même établissement attendent la même.
+// Le fichier est redemandé à Grist dans une image à part, en CORS (seule façon d'en lire les pixels). Elle ne répond
+// jamais d'une erreur : refusée, illisible ou trop lente, la lecture rend UNREADABLE.
+function analyseInk(image, attachmentId) {
+  if (!analyses.has(attachmentId)) {
+    analyses.set(attachmentId, new Promise(resolve => {
+      const copy = new Image();
+      copy.crossOrigin = 'anonymous';
+      copy.referrerPolicy = 'no-referrer';
+      const finish = result => {
+        clearTimeout(timer);
+        copy.onload = copy.onerror = null;
+        resolve(result);
+      };
+      const timer = setTimeout(() => finish(UNREADABLE), ANALYSIS_TIMEOUT_MS);
+      copy.onload = () => finish(readInk(copy));
+      copy.onerror = () => finish(UNREADABLE);
+      copy.src = probeUrl(image.currentSrc || image.src);
+    }));
+  }
+  return analyses.get(attachmentId);
+}
+
+// À appeler au chargement (onLoad de createLogoImage) d'un logo de carte, avec le `show` qu'il reçoit. Renvoie
+// toujours false : le logo reste caché le temps de la lecture, puis se montre à sa taille (recadré, ou tel
+// quel s'il n'a pas de marges), ou à la taille de repli de la feuille de style s'il ne s'est pas laissé lire.
+// Recadré, il est remplacé par sa copie, dont le chargement appelle de nouveau cette fonction.
+export function fitCardLogo(image, attachmentId, show) {
   const finish = () => {
     sizeLogo(image, CARD_LOGO);
     image.parentElement?.classList.add('fitted');
   };
-  if (image.dataset.fit === 'trimmed') return finish();
-  let result = fittedLogos.get(attachmentId);
-  if (!result) {
-    result = readInk(image);
-    fittedLogos.set(attachmentId, result);
+  if (image.dataset.fit === 'trimmed') {
+    finish();
+    show();
+    return false;
   }
-  if (!result.readable) return undefined;
-  if (!result.url) return finish();
-  image.dataset.fit = 'trimmed';
-  image.src = result.url;
+  analyseInk(image, attachmentId).then(result => {
+    if (result.url) {
+      image.dataset.fit = 'trimmed';
+      image.src = result.url;
+      return;
+    }
+    if (result.readable) finish();
+    show();
+  }).catch(show);
   return false;
 }
 

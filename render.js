@@ -436,8 +436,8 @@ function fillEtablissement(badge, label, onToggle, logo) {
   badge.classList.add('visible', 'has-logo');
   body?.classList.add('with-logo');
   badge.title = logo.name;
-  const onLoad = image => fitCardLogo(image, logo.attachment);
-  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { cors: true, onLoad }));
+  const onLoad = (image, show) => fitCardLogo(image, logo.attachment, show);
+  badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { onLoad }));
 }
 
 // Sans `onToggle` (carte de relecture), l'adresse est du texte : un clic ne doit pas

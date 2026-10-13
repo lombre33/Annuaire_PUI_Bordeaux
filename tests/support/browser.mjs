@@ -89,16 +89,18 @@ after(async () => {
 // Les logos sont des pièces jointes : `files` (tests/support/fake-attachments.mjs) compte les
 // fichiers qui ont été téléchargés et les jetons employés ; `accessToken` est la réponse de
 // getAccessToken (null : Grist refuse), `withoutMethods` les méthodes de docApi qu'une
-// vieille version de Grist n'a pas.
+// vieille version de Grist n'a pas ; `downloadCors` faux ou 'hang', un Grist qui ne donne pas les pièces jointes
+// en CORS (refus, ou pas de réponse), donc qui ne laisse pas lire les pixels d'un logo.
 export async function openWidget({
   tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false,
-  accessToken, withoutMethods = []
+  accessToken, withoutMethods = [], downloadCors = true
 } = {}) {
   const context = await browser.newContext();
   // Hermétique : seuls le serveur local, l'API Grist simulée et ses pièces jointes répondent.
   await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
   await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));
   const files = await routeAttachments(context);
+  files.download.cors = downloadCors;
   const page = await context.newPage();
   const logs = { errors: [], warnings: [], infos: [] };
   page.on('pageerror', error => logs.errors.push(error.message));

@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.24.1 — Logos des cartes : l'image qu'on voit ne dépend plus de la lecture de ses pixels
+
+Signalé par Antoine le 13 octobre 2026 (10 h 40) : « les logos ont disparu des fiches ».
+
+- **Ce qui a pu les faire disparaître.** Depuis la 1.21.4, le logo qu'on voit sur une carte était lui-même demandé à Grist en CORS
+  (`crossorigin`), pour que le widget en lise les pixels et en retire les marges, et il restait invisible (`opacity: 0`) tant que cette
+  lecture n'avait pas abouti. Un Grist qui ne répond pas à une demande CORS, ou un navigateur qui la traite autrement qu'en erreur
+  nette, laissait donc le logo caché pour toujours. Rejoué dans Chromium avec le code d'avant ce correctif : une demande CORS laissée
+  sans réponse garde les trois logos d'un établissement invisibles ; un refus net, lui, s'affichait déjà (le repli de la 1.21.4
+  redemande le fichier sans CORS). Les versions 1.21.5 à 1.24.0 ne touchent à rien de cette chaîne (différences relues une à une).
+- **Le logo qu'on voit est de nouveau une image ordinaire**, sans `crossorigin`, comme avant la 1.21.4 : un refus de CORS, une
+  lecture de pixels bridée par le navigateur ou une lecture qui tarde ne peuvent plus le cacher (`createLogoImage` n'a plus d'option
+  `cors`). Ses pixels sont lus à part (`analyseInk` dans `branding-ui.js`) : le fichier est redemandé dans une image en CORS, à une **adresse
+  distincte** (un paramètre `annuaire_pixels=1` que Grist ignore), parce que l'image affichée vient d'être chargée sans CORS et que Grist
+  garde sa réponse une heure sans `Vary: Origin` : la même adresse redemandée en CORS aurait été prise dans le cache puis refusée
+  (rejoué dans Chromium contre un vrai serveur HTTP d'une autre origine). Si cette lecture est refusée, échoue ou dépasse
+  3 secondes (`ANALYSIS_TIMEOUT_MS`), le logo se montre quand même, tel quel, dans sa case de repli de 104 x 42 px.
+- **Une copie recadrée qui ne contient rien n'est plus utilisée** (`hasInk` dans `branding.js`) : un navigateur qui vide les lectures de
+  canvas (protection contre le pistage des empreintes) rendrait sinon un logo blanc à la place du sien.
+- Tests : trois tests navigateur (le logo affiché n'a jamais `crossorigin` ; un Grist qui refuse la lecture en CORS ; un Grist qui ne
+  répond pas à la lecture) et un test de `hasInk`. Le faux Grist des tests peut maintenant refuser ou laisser sans réponse les demandes
+  CORS (`downloadCors`) : une réponse fabriquée sans en-têtes CORS passe quand même le contrôle de Chromium, c'est donc la demande qu'on
+  fait échouer. Avant ce correctif, le test du logo sans `crossorigin` et celui du silence échouaient ; celui du refus passait déjà.
+- **Non essayé dans le vrai Grist d'Antoine ni sur Firefox mobile**, et la panne d'Antoine n'a pas pu être rejouée à l'identique : si des
+  logos manquent encore après cette version, la cause est ailleurs (jeton ou règle d'accès du document, colonne `logo` de
+  `Etablissements`, cache du navigateur) et la console du navigateur le dira. Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.24.0 — Filtre « Rôle PUI », et le rôle de la personne sous le logo de sa carte
 
 Demande d'Antoine du 13 octobre 2026, après sa démo (point 1 de sa liste).

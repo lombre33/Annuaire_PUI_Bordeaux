@@ -390,12 +390,14 @@ test('logos des cartes : les marges transparentes sont retirées, et les logos o
         await image.decode();
         holder.append(image);
         document.body.append(holder);
-        id++;
-        const copied = fitCardLogo(image, id) === false;
-        if (copied) {
-          await new Promise(resolve => image.addEventListener('load', resolve, { once: true }));
-          fitCardLogo(image, id);
-        }
+        const key = ++id;
+        // Comme createLogoImage : chaque chargement de l'image rappelle fitCardLogo, qui la montre (`show`) quand elle
+        // est à sa taille ; un logo recadré est remplacé par sa copie, dont le chargement rappelle fitCardLogo.
+        await new Promise(show => {
+          image.addEventListener('load', () => fitCardLogo(image, key, show));
+          fitCardLogo(image, key, show);
+        });
+        const copied = image.dataset.fit === 'trimmed';
         results[name] = {
           copied,
           natural: [image.naturalWidth, image.naturalHeight],
