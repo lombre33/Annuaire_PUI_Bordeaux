@@ -55,6 +55,8 @@ exige d'une requête qui écrit avec un jeton d'accès : sans lui le navigateur 
 serveur HTTP d'une autre origine ; pas encore essayé dans le vrai Grist d'Antoine).
 Depuis la 1.21.6, la fenêtre « Modifier mon profil » ne propose qu'une entrée par libellé dans ses listes : plusieurs lignes brutes
 qui ont le même libellé corrigé (une tâche proposée trois fois) ne forment plus qu'une case, qui les couvre toutes.
+Depuis la 1.21.7, le widget attend la réponse de Grist à la suppression de la ligne qu'il ajoute à `Annuaire_Sonde`, la retente une fois,
+dit dans la console pourquoi si Grist la refuse, et supprime les anciennes lignes laissées à l'adresse de la personne (jamais celles des autres).
 Depuis la 1.22.0, les filtres, les cartes et la fenêtre de modification ne lisent que la colonne « corrigé » des tables de référence dès qu'une
 table en remplit une : une ligne sans libellé corrigé n'apparaît plus (une table qui n'en remplit aucune garde ses libellés bruts).
-907 tests (dont 327 dans un vrai navigateur, optionnels sans Playwright).
+916 tests (dont 327 dans un vrai navigateur, optionnels sans Playwright).

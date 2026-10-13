@@ -260,6 +260,15 @@ fiches : le widget ne lit que la ligne qu'il vient d'ajouter, et ce sont les rè
 condition (une ligne qui n'existe pas encore n'a pas d'adresse à comparer). Le widget fonctionne
 avec ces droits : il ajoute une ligne, la relit, puis la supprime. À essayer sur une copie.
 
+**Si des lignes restent dans `Annuaire_Sonde`.** La table doit être vide au repos. Depuis la 1.21.7,
+le widget attend la réponse de Grist à la suppression de sa ligne, la retente une fois et, si Grist la
+refuse, écrit dans la console du navigateur (F12) une phrase qui commence par
+`[IDENTITE] la ligne … n'a pas pu être supprimée :`, suivie de la raison donnée par Grist (en général
+une règle d'accès qui n'autorise pas « Supprimer » à `rec.Email == user.Email`, la règle 1 ci-dessus).
+À chaque chargement, il supprime aussi les lignes plus anciennes laissées à l'adresse de la personne,
+jamais celles des autres. Les lignes déjà présentes peuvent être supprimées à la main sans risque :
+le widget ne les relit pas.
+
 Pour « un responsable de cette ligne d'`Etablissements` » (ou de cette ligne d'`ACL`), un
 attribut d'utilisateur qui cherche `user.Email` dans la colonne `email` d'`ACL` ne rend que
 la **première** ligne : pour une personne responsable de plusieurs établissements, une
