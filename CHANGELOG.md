@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.20.1 — Menu « Tâches » : les actions préfixées « [ PUI ] » rangent de nouveau les tâches
+
+Signalé par Antoine le 13 octobre 2026 (captures à l'appui) : depuis qu'il a ajouté « [ PUI ] » devant le libellé
+de ses actions (« [ PUI ] Action 1: Instances de pilotage »), le menu « Tâches » était à plat, sans groupes par
+action, alors que les tâches (« Tâche 1.1 : Pilotage/Suivi ») sont écrites comme avant.
+
+- **La cause.** Le numéro de l'action est lu au début de son libellé (règle de la 1.16.0 : `numberedIn`, dans
+  `constants.js`, et `completeGroupMap()`, dans `grist-data.js`). Le crochet ouvrant du préfixe n'est pas un
+  numéro : aucune action n'était trouvée, aucune tâche n'était rattachée, et le menu retombait à plat (la console
+  le disait : « aucune ligne n'est rattachée à une action »).
+- **Le correctif.** `numberIn()` (`grist-data.js`) ignore, avant de chercher le numéro, un ou plusieurs préfixes
+  entre crochets **au tout début** du libellé (« [ PUI ] », « [X][Y] »). Le libellé n'est pas modifié : le groupe
+  du menu « Tâches » garde le libellé complet de l'action, préfixe compris, comme le menu « Actions ». Les
+  libellés sans préfixe se lisent comme avant, et un crochet ailleurs que tout au début n'est pas ignoré.
+- **Ce qui ne change pas.** Aucune colonne ni aucune table dans Grist, aucune écriture ; rien d'autre que la
+  lecture du numéro d'une action ou d'une tâche.
+- **Tests.** 904 tests (323 dans un vrai navigateur, optionnels sans Playwright), 2 de plus qu'à la 1.20.0 :
+  la lecture du numéro avec et sans préfixe, et le menu « Tâches » rangé par action avec les libellés exacts des
+  captures.
+- **Revenir en arrière** : `git revert` de la fusion de cette version.
+
 ## 1.20.0 — Le widget crée lui-même la table `Annuaire_Sonde` quand elle manque
 
 Demande d'Antoine du 13 octobre 2026 (04 h 29) : la table n'existait pas dans son document, donc le widget ne

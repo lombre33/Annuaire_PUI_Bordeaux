@@ -568,8 +568,13 @@ const TASK_ACTION_NUMBER = /^\s*(?:t(?:[aâ]che)?\.?\s*)?(?:n\s*°\s*)?(\d+)\s*\
 // → 1. Un numéro de la forme 1.3 est celui d'une tâche, pas d'une action.
 const ACTION_NUMBER = /^\s*(?:action|a)?\s*(?:n\s*°\s*)?(\d+)(?!\d|\s*[.,]\s*\d)/i;
 
+// Des crochets en tête (« [ PUI ] Action 1: Pilotage », « [X][Y] 1.3 Animer ») sont un préfixe que la
+// personne a ajouté aux libellés, pas le numéro : on les ignore pour lire le numéro. Le libellé, lui,
+// reste entier (c'est lui que le menu affiche).
+const LEADING_BRACKETS = /^(?:\s*\[[^\]]*\])+/;
+
 const numberIn = (pattern, label) => {
-  const match = pattern.exec(text(label));
+  const match = pattern.exec(text(label).replace(LEADING_BRACKETS, ''));
   return match ? Number(match[1]) : null;
 };
 

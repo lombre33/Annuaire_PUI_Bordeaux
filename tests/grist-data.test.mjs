@@ -4,8 +4,11 @@ import {
   safeValues, tableToRows, isInScope, text, pickLabel, refId, refLabel, isEmptyReference, normalize, normalizeForSearch,
   compareLabels, compareContacts,
   formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
-  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName, taskActionNumber, actionNumber, shownEmail
+  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, displayName, taskActionNumber, actionNumber, shownEmail,
+  loadDirectory
 } from '../grist-data.js';
+import { createFakeGrist } from './support/fake-grist.js';
+import { sampleTables } from './fixtures.mjs';
 
 test('safeValues strips the Grist list marker "L" and empty values', () => {
   assert.deepEqual(safeValues(['L']), []);
@@ -123,6 +126,37 @@ test('actionNumber finds no number in a label that has none, or whose number is 
   ['Gouvernance', 'Audit', 'Action', 'Actions 3', 'Axe 1', '', null, undefined, '1.3 Animer', 'Action 1.3', 'Action 12.5', 'Action 1,5 M€',
     'Ancienne action 2', 'Vaccination 2030'
   ].forEach(label => assert.equal(actionNumber(label), null, JSON.stringify(label)));
+});
+
+// Les actions d'Antoine portent un préfixe entre crochets (« [ PUI ] Action 1: … ») : sans lui, aucune action n'était
+// trouvée et le menu Tâches restait à plat (libellés des captures du 13 octobre 2026).
+test('actionNumber and taskActionNumber ignore bracketed prefixes at the start of the label, and only there', () => {
+  [['[ PUI ] Action 1: Instances de pilotage', 1], ['[PUI] Action 2 : Processus métiers', 2], ['[ PUI ][ UB ] Action 10: Évaluation', 10],
+    ['  [X] 8. Gouvernance', 8], ['[ PUI ]Action 3', 3]
+  ].forEach(([label, number]) => assert.equal(actionNumber(label), number, label));
+  [['[ PUI ] Tâche 1.1 : Pilotage/Suivi', 1], ['[PUI] 2.3 Dispositif', 2]
+  ].forEach(([label, number]) => assert.equal(taskActionNumber(label), number, label));
+  ['[ PUI ] Gouvernance', '[1] Gouvernance', '[ PUI ] Action 1.3', '[ PUI Action 1: x', 'Ancienne [ PUI ] Action 2', '[ PUI ]', '[]'
+  ].forEach(label => assert.equal(actionNumber(label), null, JSON.stringify(label)));
+});
+
+test('loadDirectory groups the tasks by action when the action labels carry a prefix such as « [ PUI ] », under the full label', async () => {
+  const tables = sampleTables();
+  tables.Actions = {
+    id: [1, 2, 3],
+    Actions: ['[ PUI ] Action 1: Instances de pilotage', '[ PUI ] Action 2: Processus métiers', '[ PUI ] Action 3: Développement et mise en œuvre d\'outils de pilotage'],
+    Actions_corrigees: ['', '', '']
+  };
+  tables.Taches = {
+    id: [1, 2, 3, 4],
+    Taches: ['Tâche 1.1 : Pilotage/Suivi', 'Tâche 1.3 : Comité d\'arbitrage', 'Tâche 2.1 : Animation de la communauté', 'Tâche 3.1 : Signature électronique'],
+    Taches_corrige: ['', '', '', ''], Taches_role: ['', '', '', '']
+  };
+  const { referenceMaps } = await loadDirectory(createFakeGrist({ tables }).docApi, { log: { info() {}, warn() {} } });
+  assert.deepEqual(referenceMaps.macroTaches, {
+    1: '[ PUI ] Action 1: Instances de pilotage', 2: '[ PUI ] Action 1: Instances de pilotage',
+    3: '[ PUI ] Action 2: Processus métiers', 4: '[ PUI ] Action 3: Développement et mise en œuvre d\'outils de pilotage'
+  });
 });
 
 test('the number of a task and the number of an action are read by two rules that never both apply to the same label', () => {
