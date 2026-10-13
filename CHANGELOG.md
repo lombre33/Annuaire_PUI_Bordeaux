@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.21.5 — Envoi d'une photo depuis l'ordinateur : l'en-tête que Grist exige
+
+Signalé par Antoine le 13 octobre 2026, après sa démo : dans « Modifier mon profil », envoyer une photo depuis l'ordinateur
+échouait avec « L'envoi du fichier à Grist a échoué : le navigateur n'a pas pu joindre le serveur, ou l'a refusé ». Antoine
+soupçonnait un problème de CORS entre la page du widget (GitHub Pages) et Grist : le navigateur le dit bien ainsi, mais la cause
+est une règle de Grist. Dans son code actuel (`grist-core`, `Authorizer.ts`, `addRequestUser`), une requête qui écrit dans le
+document et que seul un jeton d'accès authentifie doit porter l'en-tête `X-Requested-With: XMLHttpRequest`, sinon Grist répond 401 ;
+cette réponse part avant ses en-têtes CORS, donc le navigateur la cache au widget, dont `fetch` échoue comme sur une panne de réseau.
+Le widget n'envoyait pas cet en-tête : les photos (1.19.0) et les logos d'établissement (1.17.0) étaient touchés.
+
+- `upload.js` envoie maintenant `X-Requested-With: XMLHttpRequest`, comme l'exemple d'envoi d'une pièce jointe depuis un widget publié
+  sur le forum de la communauté Grist. Le navigateur fait alors précéder l'envoi d'une requête de vérification (OPTIONS), que Grist
+  accepte de toute origine tant qu'aucun cookie ne l'accompagne (`trustOriginHandler`) ; le widget n'envoie toujours ni cookie ni
+  adresse de page.
+- Aucune clé, ni d'API ni de formulaire, dans le code : le jeton reste celui que Grist donne au widget pour cet envoi et qui est jeté
+  ensuite. Rien à changer dans le document Grist, aucune table.
+- Un test de non-régression dans un vrai navigateur (`tests/e2e-upload-cors.test.mjs`) envoie le fichier depuis la page du widget à un
+  vrai serveur HTTP d'une autre origine, qui reprend l'ordre des intergiciels de Grist (Chromium applique CORS) : sur la 1.21.4 il
+  échoue avec la phrase d'Antoine, il passe maintenant. Un second test montre que la requête sans l'en-tête est refusée comme chez
+  Antoine, et `tests/upload.test.mjs` vérifie l'en-tête.
+- **Non essayé dans le vrai Grist d'Antoine** (hors de portée de l'environnement de développement), ni avec un compte qui n'est pas
+  propriétaire du document. Si l'envoi échoue encore, la console du navigateur (F12) en donne la raison. Revenir en arrière : `git revert`.
+
 ## 1.21.4 — Logos des cartes : même taille visuelle, quelles que soient leurs marges
 
 Demande d'Antoine du 13 octobre 2026 (capture à l'appui) : malgré la hauteur commune de 1.21.0, les logos paraissaient de

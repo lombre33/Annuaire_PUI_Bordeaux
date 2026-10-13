@@ -58,6 +58,14 @@ test('uploadAttachment asks Grist for a write token, posts the file as multipart
   assert.deepEqual([...options.body.keys()], ['upload']);
 });
 
+test('uploadAttachment sends the X-Requested-With header Grist requires of an access token, and no Content-Type of its own', async () => {
+  const server = answering(ok([7]));
+  await send(createFakeGrist({}).docApi, server);
+  const { headers } = server.requests[0].options;
+  assert.deepEqual(headers, { 'X-Requested-With': 'XMLHttpRequest' }, 'sans lui, Grist répond 401 sans en-têtes CORS et le navigateur ne montre qu\'une panne de réseau');
+  assert.ok(!Object.keys(headers).some(name => name.toLowerCase() === 'content-type'), 'le navigateur écrit lui-même le Content-Type du multipart, avec sa limite');
+});
+
 test('uploadAttachment sends no cookie and no referrer, and gives up after a delay', async () => {
   const server = answering(ok([5]));
   await send(createFakeGrist({}).docApi, server);
