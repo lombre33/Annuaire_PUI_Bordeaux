@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.20.0 — Le widget crée lui-même la table `Annuaire_Sonde` quand elle manque
+
+Demande d'Antoine du 13 octobre 2026 (04 h 29) : la table n'existait pas dans son document, donc le widget ne
+savait pas qui était connecté (ni « Modifier », ni « Créer ma fiche », ni mode admin). Il la crée désormais au
+chargement, puis continue normalement.
+
+- **Ce qui change.** Si `listTables` ne contient pas `Annuaire_Sonde`, le widget l'ajoute par une seule action
+  Grist (`AddTable`) avec les trois colonnes de `GRIST_SETUP.md` (étape 2) : `Email` (Texte, formule de
+  déclenchement `user.Email`), `Admin` (Case à cocher : l'adresse figure dans `ACL` avec `admin` coché) et
+  `Responsable_de` (Texte : les établissements dont la personne est responsable d'après `ACL`). Ce sont des
+  colonnes de **données** dont la formule se calcule à la création d'une ligne et à rien d'autre (ni `recalcWhen`
+  ni `recalcDeps`). Il ajoute ensuite sa ligne de sonde, la relit et la supprime, comme avant.
+- **Ce qui ne change pas.** Rien n'est créé si la table existe, et ses colonnes ou formules ne sont jamais
+  modifiées. Un compte Lecteur (`readonly=true`) n'essaie rien. C'est la **seule table** que le widget crée
+  (règle d'Antoine : aucune autre).
+- **Si Grist refuse** (compte sans droit sur la structure du document, règle d'accès) : personne n'est identifié,
+  comme avant, et la console dit `table « Annuaire_Sonde » introuvable, et Grist n'a pas permis de la créer : …`.
+  Il suffit alors qu'un propriétaire ouvre le widget, ou de créer la table à la main (étape 2).
+- **Deux personnes au même instant.** Si l'autre a créé la table entre-temps, Grist numérote la nôtre
+  (`Annuaire_Sonde2`) : le widget la retire (`RemoveTable`) et utilise la première.
+- **Non essayé dans un vrai Grist**, à voir sur une copie du document : ouvrir le widget avec un compte
+  propriétaire doit faire apparaître `Annuaire_Sonde` dans les données brutes, vide, et le bandeau « Ma présence ».
+  La table créée ne s'efface pas toute seule en cas de retour en arrière (`git revert` de la fusion) : elle est
+  vide, supprimez-la si vous n'en voulez plus.
+- **Pour la passe de documentation** : `docs/securite.md` (« Ce que le widget lit, écrit et envoie » : le nombre
+  d'emplois d'`applyUserActions`, « ne crée … jamais de table »), `docs/developpeurs.md` (lignes sur la structure
+  du document et sur le widget qui « ne crée aucune table »), `docs/utilisateurs.md` (« aucune table dans le
+  document Grist »), `grist_structure.txt`, `README.md`, `TESTING.md`.
+- **Tests.** 902 tests (323 dans un vrai navigateur, optionnels sans Playwright), 3 de plus qu'à la 1.19.0 :
+  la création avec les colonnes et formules documentées, le refus de Grist, la table numérotée retirée, et
+  deux scénarios dans Chromium (création de bout en bout, refus).
+
 ## 1.19.0 — Photo de profil : ajoutée, changée ou retirée depuis la fiche, relue avant d'être enregistrée
 
 Demande d'Antoine du 12 octobre 2026 : la colonne `Avatar` de `BDD` (type « Pièces jointes ») porte la photo

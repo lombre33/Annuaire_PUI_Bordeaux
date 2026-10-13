@@ -1,4 +1,4 @@
-# Version 1.19.0 — Photo de profil (voir CHANGELOG.md)
+# Version 1.20.0 — Le widget crée la table Annuaire_Sonde quand elle manque (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
@@ -34,4 +34,6 @@ Depuis la 1.19.0, une personne ajoute, change ou retire sa **photo de profil** (
 étape 6 de `GRIST_SETUP.md`) : elle remplace les initiales sur la carte, s'agrandit au clic, passe par la relecture avant et après,
 et le widget l'envoie lui-même à Grist, redessinée en carré de 256 px (JPEG, sans métadonnées ; envoi et règles d'accès non
 essayés dans un vrai Grist).
-899 tests (dont 322 dans un vrai navigateur, optionnels sans Playwright).
+Depuis la 1.20.0, le widget crée lui-même la table `Annuaire_Sonde` (qui est connecté ?, étape 2 de `GRIST_SETUP.md`)
+quand elle manque, avec ses trois colonnes à formule de déclenchement ; c'est la seule table qu'il crée.
+902 tests (dont 323 dans un vrai navigateur, optionnels sans Playwright).

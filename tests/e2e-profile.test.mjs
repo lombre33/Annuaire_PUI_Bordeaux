@@ -471,7 +471,7 @@ for (const [who, options, wait] of [
   ['un compte anonyme', { tables: withIdentity(), user: null }, settled.probeRemoved],
   ['une adresse que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.fr' }, settled.probeRemoved],
   ['un compte Lecteur', { tables: withIdentity(), user: ANA_EMAIL, readOnly: true }, settled.immediately],
-  ['un document sans table-sonde', { tables: sampleTables(), user: ANA_EMAIL }, settled.warned]
+  ['un document sans table-sonde que Grist refuse de créer', { tables: sampleTables(), user: ANA_EMAIL, denyWrites: ['Annuaire_Sonde'] }, settled.warned]
 ]) {
   test(`${who} : aucun bouton « Modifier », nulle part`, { skip }, () =>
     withWidget(options, async ({ page, logs }) => {

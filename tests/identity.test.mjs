@@ -127,17 +127,55 @@ test('readIdentity does not even try for a read-only (viewer) account', async ()
   assert.deepEqual(s.calls, [], 'un Lecteur ne peut rien écrire : aucune tentative');
 });
 
-test('readIdentity reports the missing probe table without writing anything', async () => {
+// ===== La table-sonde absente : le widget la crée (GRIST_SETUP.md, étape 2), la seule table qu'il crée =====
+
+const withoutProbe = () => {
   const tables = withIdentity();
   delete tables.Annuaire_Sonde;
-  const s = session(ANA_EMAIL, tables);
+  return tables;
+};
+
+test('readIdentity creates the missing probe table with the documented trigger-formula columns, then identifies the person', async () => {
+  const s = session(ANA_EMAIL, withoutProbe());
+  const identity = await identify(s);
+  await settle();
+  assert.deepEqual(identity, { status: 'ready', email: ANA_EMAIL, admin: true, etablissements: [1], reason: '' });
+  assert.deepEqual(s.calls.map(call => [call.action, call.table]),
+    [['AddTable', 'Annuaire_Sonde'], ['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
+  const columns = s.calls[0].values;
+  assert.deepEqual(columns.map(({ id, type, isFormula }) => [id, type, isFormula]),
+    [['Email', 'Text', false], ['Admin', 'Bool', false], ['Responsable_de', 'Text', false]],
+    'des colonnes de données à formule de déclenchement, pas des colonnes à formule');
+  assert.equal(columns[0].formula, 'user.Email');
+  assert.match(columns[1].formula, /user\.Email.*bool\(r\.admin\) for r in ACL\.all/s);
+  assert.match(columns[2].formula, /user\.Email.*Responsable_de_l_Etablissement.*ACL\.all/s);
+  assert.ok(columns.every(column => !('recalcWhen' in column) && !('recalcDeps' in column)), 'calculées à la création d\'une ligne, rien d\'autre');
+  assert.deepEqual(s.tables.Annuaire_Sonde, { id: [], Email: [], Admin: [], Responsable_de: [] }, 'vide au repos, comme la table faite à la main');
+  assert.match(s.log.infos[0][0], /\[IDENTITE\].*Annuaire_Sonde.*créée/);
+});
+
+test('readIdentity fails closed, never throws, when Grist refuses to create the missing probe table', async () => {
+  const s = session(ANA_EMAIL, withoutProbe(), { denyWrites: ['Annuaire_Sonde'] });
   const identity = await identify(s);
   assert.equal(identity.status, 'unavailable');
   assert.equal(identity.email, '');
   assert.equal(identity.admin, false);
-  assert.match(identity.reason, /Annuaire_Sonde/);
+  assert.match(identity.reason, /Annuaire_Sonde.*introuvable.*créer/);
   assert.match(s.log.warnings[0][0], /\[IDENTITE\].*Annuaire_Sonde.*GRIST_SETUP\.md/);
-  assert.deepEqual(s.calls, []);
+  assert.equal(s.tables.Annuaire_Sonde, undefined, 'rien n\'a été créé');
+  assert.deepEqual(s.calls.map(call => [call.action, call.table, call.ok]), [['AddTable', 'Annuaire_Sonde', false]]);
+});
+
+test('readIdentity drops the duplicate table Grist numbers when another person created the probe table at the same moment', async () => {
+  const s = session(BOB_EMAIL); // la table existe, mais la liste lue par le widget date d'avant sa création
+  s.docApi.listTables = async () => [];
+  const identity = await identify(s);
+  await settle();
+  assert.equal(identity.status, 'ready');
+  assert.deepEqual(s.calls.map(call => [call.action, call.table]),
+    [['AddTable', 'Annuaire_Sonde'], ['RemoveTable', 'Annuaire_Sonde2'], ['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
+  assert.equal(s.tables.Annuaire_Sonde2, undefined, 'la table numérotée est retirée : une seule sonde dans le document');
+  assert.ok('Annuaire_Sonde' in s.tables);
 });
 
 test('readIdentity gives up, never throws, when the probe formula returns no address (anonymous account)', async () => {

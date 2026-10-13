@@ -875,13 +875,27 @@ const grist = page => page.evaluate(() => window.__fake.calls);
 const writesTo = async (page, table) => (await grist(page)).filter(call => call.table === table);
 const identityLogs = async logs => (await Promise.all([...logs.warnings, ...logs.infos])).filter(line => line.includes('[IDENTITE]'));
 
-// Pas de table-sonde : personne n'est identifié, l'annuaire s'affiche comme avant.
-test('sans table-sonde (Annuaire_Sonde) personne n\'est identifié : pas de bandeau, annuaire intact, aucune écriture', { skip }, () =>
+// Pas de table-sonde : le widget la crée (c'est la seule table qu'il crée) et la personne est identifiée.
+test('sans table-sonde (Annuaire_Sonde) le widget la crée au chargement et identifie la personne : la table reste vide', { skip }, () =>
   withWidget({ user: ANA_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    await page.waitForFunction(() => window.__fake.calls !== undefined);
+    await waitForAccountBar(page);
+    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    assert.deepEqual((await grist(page)).map(call => [call.action, call.table]),
+      [['AddTable', 'Annuaire_Sonde'], ['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
+    assert.deepEqual(await page.evaluate(() => window.__tables.Annuaire_Sonde), { id: [], Email: [], Admin: [], Responsable_de: [] });
+    assert.ok((await identityLogs(logs)).some(line => /Annuaire_Sonde.*créée/.test(line)));
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
+// Grist refuse de la créer (compte sans droit sur la structure) : personne n'est identifié, l'annuaire s'affiche comme avant.
+test('Grist refuse de créer la table-sonde : personne n\'est identifié, pas de bandeau, annuaire intact, rien d\'écrit', { skip }, () =>
+  withWidget({ user: ANA_EMAIL, denyWrites: ['Annuaire_Sonde'] }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.waitForFunction(() => window.__fake.calls.length > 0);
     assert.equal(await accountBar(page).isHidden(), true);
-    assert.deepEqual(await grist(page), [], 'rien n\'est écrit dans le document');
+    assert.deepEqual((await grist(page)).map(call => [call.action, call.table, call.ok]), [['AddTable', 'Annuaire_Sonde', false]]);
+    assert.equal(await page.evaluate(() => 'Annuaire_Sonde' in window.__tables), false, 'aucune table créée');
     const warning = (await Promise.all(logs.warnings)).find(line => line.includes('[IDENTITE]'));
     assert.match(warning, /Annuaire_Sonde.*GRIST_SETUP\.md/);
     assert.deepEqual(await Promise.all(logs.errors), []);
