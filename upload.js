@@ -8,7 +8,7 @@
 // répond par l'identifiant de la pièce jointe. L'écriture dans la cellule (`['L', identifiant]`)
 // est ensuite une action Grist ordinaire (etablissement-save.js, profile-save.js).
 //
-// L'en-tête `X-Requested-With: XMLHttpRequest` est INDISPENSABLE (1.21.5). Pour toute requête qui écrit
+// L'en-tête `X-Requested-With` est INDISPENSABLE (1.21.5). Pour toute requête qui écrit
 // dans le document et que seul le jeton authentifie, Grist exige cet en-tête (ou un corps JSON, impossible
 // pour un fichier), sinon il répond 401 AVANT d'ajouter ses en-têtes CORS (Authorizer.ts, `addRequestUser`,
 // puis FlexServer.ts, `trustOriginHandler`) : le navigateur cache alors ce 401 au widget, dont `fetch`
