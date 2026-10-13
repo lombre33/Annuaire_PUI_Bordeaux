@@ -33,8 +33,16 @@ const viewer = page => page.locator('#photoDialog');
 const press = (page, name) => dialog(page).getByRole('button', { name, exact: true });
 const heading = page => page.locator('#profileTitle');
 const headingIs = (page, expected) => page.waitForFunction(value => document.getElementById('profileTitle').textContent === value, expected);
-const closed = page => page.waitForFunction(() => !document.getElementById('profileDialog').open);
-const viewerClosed = page => page.waitForFunction(() => !document.getElementById('photoDialog').open);
+// « Fermée » veut dire aussi que l'événement « close » est passé : Chromium l'envoie à l'image suivante, pas dans la tâche qui ferme
+// la fenêtre, et c'est lui qui la vide. Un test rapide qui la rouvre aussitôt la verrait vidée par cet événement en retard.
+const closed = page => page.waitForFunction(() => {
+  const dialog = document.getElementById('profileDialog');
+  return !dialog.open && dialog.querySelector('.dlg-body').childElementCount === 0;
+});
+const viewerClosed = page => page.waitForFunction(() => {
+  const dialog = document.getElementById('photoDialog');
+  return !dialog.open && dialog.querySelector('.photo-stage').childElementCount === 0;
+});
 const summary = page => dialog(page).locator('.dlg-summary').textContent();
 const notices = page => dialog(page).locator('.notice');
 const alertText = page => dialog(page).locator('.dlg-alert [role="alert"]').textContent();
@@ -1120,11 +1128,11 @@ test('« Créer ma fiche » n\'offre pas la photo, qui s\'ajoute ensuite : la fi
     assert.equal(await dialog(page).locator('input[type="file"]').count(), 0);
 
     await dialog(page).locator('#profile-prenom').fill('Zoé');
-    await dialog(page).locator('#profile-Etablissement').selectOption({ label: 'CHU de Bordeaux' });
+    await dialog(page).locator('#profile-Etablissement').selectOption({ label: 'CHU' });
     await press(page, 'Relire ma fiche').click();
-    await headingIs(page, 'Relire avant de créer');
+    await headingIs(page, 'Relire avant de publier');
     assert.equal(await dialog(page).locator('.avatar-zoom, .mark-avatar, .thumb').count(), 0, 'rien de la photo dans la relecture d\'une création');
-    await press(page, 'Créer ma fiche').click();
+    await press(page, 'Publier ma fiche').click();
     await closed(page);
 
     const calls = await bddCalls(page);

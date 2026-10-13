@@ -531,8 +531,8 @@ test('profileFormModel offers the e-mail and the établissement to an administra
   const etab = field(admin, 'Etablissement');
   assert.deepEqual([etab.kind, etab.category, etab.value, etab.required], ['reference', 'etablissement', 2, true]);
   assert.deepEqual(etab.options.map(option => option.label),
-    ['Clinique du Parc', 'CHU de Bordeaux', 'INSERM', 'Institut Bergonié', 'Université Bordeaux Montaigne'].sort((a, b) => a.localeCompare(b, 'fr-FR')),
-    'tous les établissements, validés ou non, par leur nom complet, triés');
+    ['Clinique', 'CHU', 'INSERM', 'Institut Bergonié', 'UBM'].sort((a, b) => a.localeCompare(b, 'fr-FR')),
+    'tous les établissements, validés ou non, par leur acronyme (leur nom complet seulement quand ils n\'en ont pas), triés');
   for (const forbidden of ['perimetre', 'Accepte_apparaitre', 'Avatar']) assert.equal(field(admin, forbidden), undefined, forbidden);
   for (const model of [profileFormModel(row(2), referenceMaps), profileFormModel(row(2), referenceMaps, { admin: false }), profileFormModel(row(2), referenceMaps, {})]) {
     assert.equal(field(model, 'email'), undefined);
@@ -570,12 +570,14 @@ test('diffProfile names the owner of a taken e-mail when the caller gives a name
   assert.equal(fault(() => false), undefined);
 });
 
-test('profileFormModel falls back to the acronyms of the établissements when Grist gave no full names', async () => {
+test('the list of établissements offers the acronym of each one, never a mix with the full names, whatever Grist gave as full names', async () => {
   const { referenceMaps, row } = await setup();
-  const withoutNames = { ...referenceMaps, etablissementNom: {} };
-  const options = field(profileFormModel(row(2), withoutNames, { admin: true }), 'Etablissement').options;
-  assert.deepEqual(options.map(option => option.label).sort(), ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'].sort());
-  const next = diffProfile(row(2), { Etablissement: 1 }, withoutNames, { admin: true }).champs.Etablissement;
+  const labels = maps => field(profileFormModel(row(2), maps, { admin: true }), 'Etablissement').options.map(option => option.label).sort();
+  const acronyms = ['CHU', 'Clinique', 'INSERM', 'Institut Bergonié', 'UBM'].sort(); // « Institut Bergonié » n'a pas d'acronyme : son nom complet
+  assert.deepEqual(labels(referenceMaps), acronyms);
+  assert.deepEqual(labels({ ...referenceMaps, etablissementNom: {} }), acronyms, 'les noms complets ne comptent pas');
+  assert.deepEqual(labels({ ...referenceMaps, etablissementNom: { 1: 'Nom complet de tout autre établissement' } }), acronyms);
+  const next = diffProfile(row(2), { Etablissement: 1 }, referenceMaps, { admin: true }).champs.Etablissement;
   assert.deepEqual(next, { avant: { id: 2, label: 'UBM' }, apres: { id: 1, label: 'CHU' } });
 });
 
@@ -612,7 +614,7 @@ test('diffProfile lets an administrator move a person to another établissement,
   const { referenceMaps, row } = await setup();
   const next = (draft, fiche = 2) => diffProfile(row(fiche), draft, referenceMaps, { admin: true });
   assert.deepEqual(next({ Etablissement: 1 }).champs.Etablissement,
-    { avant: { id: 2, label: 'Université Bordeaux Montaigne' }, apres: { id: 1, label: 'CHU de Bordeaux' } });
+    { avant: { id: 2, label: 'UBM' }, apres: { id: 1, label: 'CHU' } });
   assert.deepEqual(next({ Etablissement: 2 }).champs, {}, 'même établissement : pas un changement');
   assert.deepEqual(next({ Etablissement: 0 }).fieldErrors, { Etablissement: 'Une valeur est requise.' });
   assert.deepEqual(next({ Etablissement: 99 }).fieldErrors, { Etablissement: 'Valeur inconnue.' });
@@ -645,7 +647,7 @@ test('rebaseChanges rebuilds the e-mail and the établissement from the current 
   const moved = rebaseChanges(champs, { ...row(2), email: 'autre@exemple.fr', Etablissement: 4 }, referenceMaps, { admin: true });
   assert.deepEqual(moved.moved, ['E-mail', 'Établissement']);
   assert.deepEqual(moved.champs.email, { avant: 'autre@exemple.fr', apres: 'nouveau@u-bordeaux-montaigne.fr' });
-  assert.deepEqual(moved.champs.Etablissement, { avant: { id: 4, label: 'INSERM' }, apres: { id: 1, label: 'CHU de Bordeaux' } });
+  assert.deepEqual(moved.champs.Etablissement, { avant: { id: 4, label: 'INSERM' }, apres: { id: 1, label: 'CHU' } });
   // Déjà fait par un autre : plus rien à écrire.
   assert.deepEqual(rebaseChanges(champs, { ...row(2), email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1 }, referenceMaps, { admin: true }).champs, {});
   // Sans administrateur, ces deux champs sont écartés.
@@ -659,7 +661,7 @@ test('describeChanges says the e-mail and the établissement like any other text
   assert.deepEqual(describeChanges(champs), [
     { key: 'prenom', label: 'Prénom', kind: 'text', before: 'Bob', after: 'Robert' },
     { key: 'email', label: 'E-mail', kind: 'email', before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@u-bordeaux-montaigne.fr' },
-    { key: 'Etablissement', label: 'Établissement', kind: 'reference', before: 'Université Bordeaux Montaigne', after: 'CHU de Bordeaux' }
+    { key: 'Etablissement', label: 'Établissement', kind: 'reference', before: 'UBM', after: 'CHU' }
   ]);
 });
 
@@ -846,7 +848,7 @@ test('a person who creates her fiche picks her établissement, is asked for a na
   const done = create({ prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 });
   assert.deepEqual(done.errors, []);
   assert.deepEqual(Object.keys(done.champs), ['prenom', 'nom', 'Etablissement']);
-  assert.equal(done.champs.Etablissement.apres.label, 'CHU de Bordeaux');
+  assert.equal(done.champs.Etablissement.apres.label, 'CHU');
   assert.equal(create({ prenom: 'Zoé', Etablissement: 1, email: 'autre@exemple.fr' }).champs.email, undefined, 'l\'adresse est celle du compte');
   assert.deepEqual(diffProfile(blank, { ...draft, Etablissement: 1 }, referenceMaps).champs, {}, 'hors création, l\'établissement ne se choisit pas');
 });
