@@ -31,13 +31,14 @@ const state = {
   allContacts: [],
   referenceMaps: {},
   // referenceMaps (libellés par clé de catégorie) dont celui des établissements
-  // est restreint aux lignes ok_pour_apparaitre : réservé aux menus de filtres,
-  // jamais utilisé pour résoudre le libellé d'un contact.
+  // est restreint à ceux dont une fiche peut s'afficher (filterVisibleEstablishments) :
+  // réservé aux menus de filtres, jamais utilisé pour résoudre le libellé d'un contact.
   filterReferenceMaps: {},
   activeFilters: createEmptyFilterState(),
   searchTerm: '',
   // Interrupteurs Fondateurs/Partenaires (specs.md), hors de activeFilters :
-  // ce ne sont pas des valeurs de menu. « Réinitialiser » n'y touche pas.
+  // ce ne sont pas des valeurs de menu. « Réinitialiser » n'y touche pas. Ils règlent
+  // aussi la liste du menu Établissement (refreshFilterMenus).
   scope: { fondateur: true, partenaire: false },
   // La personne connectée (identity.js ; null tant qu'elle n'est pas lue) et
   // l'index des lignes de BDD par e-mail et par identifiant (grist-data.js), pour
@@ -133,6 +134,24 @@ function rebuildFilterUI() {
     { onToggle: toggleFilter, onToggleGroup: toggleFilterGroup }, currentCounts());
 }
 
+// Met les menus d'accord avec ce que Grist a donné et avec les interrupteurs Fondateurs/Partenaires :
+// la liste des établissements est restreinte à ceux dont une fiche peut s'afficher, donc elle change
+// quand un interrupteur change. Une sélection dont l'option a disparu (libellé supprimé dans Grist,
+// établissement que les interrupteurs ne laissent plus voir) est purgée : invisible, elle bloquerait
+// les résultats à 0. Reconstruire les menus ferme ceux qui sont ouverts : seulement si leurs libellés
+// ont changé. Les cartes se redessinent à part (refreshCards).
+function refreshFilterMenus() {
+  if (!state.etabFlags) return; // l'annuaire n'est pas encore lu : pas de menu à tenir à jour
+  const filterReferenceMaps = {
+    ...state.referenceMaps,
+    etablissement: filterVisibleEstablishments(state.referenceMaps.etablissement, state.etabFlags, state.scope)
+  };
+  const menusChanged = !referenceMapsEqual(state.filterReferenceMaps, filterReferenceMaps);
+  state.filterReferenceMaps = filterReferenceMaps;
+  state.activeFilters = pruneStaleFilters(state.activeFilters, filterReferenceMaps);
+  if (menusChanged) rebuildFilterUI();
+}
+
 function refreshCards() {
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
   renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights);
@@ -189,6 +208,7 @@ elements.scopeButtons.forEach(button => {
     state.scope[key] = !state.scope[key];
     button.classList.toggle('active', state.scope[key]);
     button.setAttribute('aria-pressed', String(state.scope[key]));
+    refreshFilterMenus();
     refreshCards();
   });
 });
@@ -255,24 +275,12 @@ function applyBranding({ etablissementRows }) {
 }
 
 function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissementRows }) {
-  const filterReferenceMaps = {
-    ...referenceMaps,
-    etablissement: filterVisibleEstablishments(referenceMaps.etablissement, etabFlags)
-  };
-  // Reconstruire les menus ferme ceux qui sont ouverts : seulement si les
-  // libellés ont changé.
-  const referenceMapsChanged = !referenceMapsEqual(state.filterReferenceMaps, filterReferenceMaps);
   state.referenceMaps = referenceMaps;
-  state.filterReferenceMaps = filterReferenceMaps;
-
-  // Une sélection dont le libellé a disparu côté Grist est purgée avant de filtrer.
-  state.activeFilters = pruneStaleFilters(state.activeFilters, filterReferenceMaps);
-
+  state.etabFlags = etabFlags;
   state.allContacts = contacts;
   state.people = people;
-  state.etabFlags = etabFlags;
   applyBranding({ etablissementRows });
-  if (referenceMapsChanged) rebuildFilterUI();
+  refreshFilterMenus();
   refreshCards();
   refreshAccount();
 }

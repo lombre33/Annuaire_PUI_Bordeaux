@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tableToRows, etablissementFlagsFromRows, etablissementFlags, isEtablissementEligible,
-  filterVisibleEstablishments
+  filterVisibleEstablishments, buildContacts
 } from '../grist-data.js';
+import { createEmptyFilterState, filterContacts } from '../filters.js';
 
 test('etablissementFlagsFromRows indexes the fondateur/partenaire/ok_pour_apparaitre booleans by row id AND by resolved label', () => {
   const rows = tableToRows({
@@ -92,4 +93,51 @@ test('filterVisibleEstablishments keeps only ok_pour_apparaitre establishments, 
   assert.deepEqual(filterVisibleEstablishments(labelMap, etabFlags), { 1: 'CHU' });
   assert.deepEqual(filterVisibleEstablishments({}, etabFlags), {});
   assert.deepEqual(filterVisibleEstablishments(labelMap, undefined), {}, 'etabFlags absent: aucune option (pas de validation connue)');
+});
+
+// Les établissements de l'exemple : validé ou non, fondateur, partenaire, les deux, ni l'un ni l'autre (« autres »).
+const MENU_LABELS = { 1: 'CHU', 2: 'UBM', 3: 'Clinique', 4: 'INSERM', 5: 'Bergonié', 6: 'ClinX' };
+const MENU_FLAGS = {
+  byId: {
+    1: { fondateur: true, partenaire: false, ok_pour_apparaitre: true },
+    2: { fondateur: false, partenaire: true, ok_pour_apparaitre: true },
+    3: { fondateur: false, partenaire: false, ok_pour_apparaitre: true }, // « autres » : jamais
+    4: { fondateur: true, partenaire: false, ok_pour_apparaitre: false }, // pas validé : jamais
+    5: { fondateur: true, partenaire: true, ok_pour_apparaitre: true }
+    // id 6 absent d'Etablissements : jamais
+  },
+  byLabel: {}
+};
+
+test('le menu Établissement ne propose un partenaire que si Partenaires est allumé, et un fondateur que si Fondateurs l\'est', () => {
+  const menu = scope => Object.values(filterVisibleEstablishments(MENU_LABELS, MENU_FLAGS, scope));
+  assert.deepEqual(menu({ fondateur: true, partenaire: false }), ['CHU', 'Bergonié'], 'au départ : les fondateurs validés, pas UBM (partenaire)');
+  assert.deepEqual(menu({ fondateur: true, partenaire: true }), ['CHU', 'UBM', 'Bergonié']);
+  assert.deepEqual(menu({ fondateur: false, partenaire: true }), ['UBM', 'Bergonié'], 'Partenaires seuls : plus CHU');
+  assert.deepEqual(menu({ fondateur: false, partenaire: false }), [], 'aucun interrupteur : aucune carte, donc aucune option');
+  assert.deepEqual(menu(undefined), ['CHU', 'UBM', 'Bergonié'], 'sans interrupteurs : tous ceux qui peuvent s\'afficher, jamais « autres », non validé ni inconnu');
+});
+
+test('le menu Établissement propose un établissement exactement quand ses contacts peuvent s\'afficher, quelle que soit la position des interrupteurs', () => {
+  // Un contact qui a accepté, dans chacun des huit statuts possibles (validé, fondateur, partenaire).
+  const labels = {};
+  const byId = {};
+  const rows = [];
+  let id = 0;
+  [true, false].forEach(ok => [true, false].forEach(fondateur => [true, false].forEach(partenaire => {
+    id += 1;
+    labels[id] = `E${id}`;
+    byId[id] = { fondateur, partenaire, ok_pour_apparaitre: ok };
+    rows.push({ id, prenom: 'Ana', nom: `N${id}`, Etablissement: id, Accepte_apparaitre: true });
+  })));
+  const etabFlags = { byId, byLabel: {} };
+  const contacts = buildContacts(rows, { etablissement: labels }, etabFlags);
+
+  [{ fondateur: true, partenaire: false }, { fondateur: true, partenaire: true },
+    { fondateur: false, partenaire: true }, { fondateur: false, partenaire: false }].forEach(scope => {
+    const offered = Object.values(filterVisibleEstablishments(labels, etabFlags, scope)).sort();
+    const shown = filterContacts(contacts, createEmptyFilterState(), '', scope).map(contact => contact.etablissement_label).sort();
+    assert.deepEqual(offered, shown, `Fondateurs ${scope.fondateur}, Partenaires ${scope.partenaire} : le menu offre ce que les cartes montrent`);
+  });
+  assert.equal(contacts.length, 3, 'des huit statuts, trois peuvent s\'afficher (validé et fondateur ou partenaire)');
 });
