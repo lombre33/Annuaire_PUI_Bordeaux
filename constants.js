@@ -54,6 +54,13 @@ export const IMAGE_RULES = {
 // dizaine de pour cent près, les tailles du bandeau fourni.
 export const BAND_LOGO = { area: 4150, maxWidth: 118, maxHeight: 58 };
 
+// Logos des cartes : même poids visuel les uns que les autres (logoSize() dans branding.js), mesuré sur
+// l'encre du logo une fois ses marges retirées (fitCardLogo dans branding-ui.js). Taille en pixels sur une
+// carte d'au moins 380 px de large ; style.css la réduit à 85 % dès 330 px et à 70 % en dessous. Calée sur
+// les repères d'Antoine (13 octobre 2026) : environ 1,5 fois Bordeaux Sciences Agro et 0,85 fois Bordeaux INP,
+// tels qu'ils s'affichaient en 1.21.1.
+export const CARD_LOGO = { area: 3200, maxWidth: 104, maxHeight: 42 };
+
 // Recherche principale : les cartes ne se redessinent qu'une fois la frappe arrêtée depuis ce
 // nombre de millisecondes. Chaque lettre tapée redessinerait sinon toute la liste (0,15 s
 // à 400 contacts d'après l'audit) : un mot de six lettres n'en provoque plus qu'un seul.
