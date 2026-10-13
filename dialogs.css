@@ -825,7 +825,7 @@ textarea {
   width: 18px;
   height: 18px;
   margin-top: 1px;
-  accent-color: var(--teal-deep);
+  --check: var(--teal-deep);
 }
 .es-chk-label {
   display: block;

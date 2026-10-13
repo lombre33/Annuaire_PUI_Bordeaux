@@ -391,3 +391,67 @@ test('sur la carte de la personne connectée, « Votre fiche » et les boutons �
     }
   });
 });
+
+// ===== Navigateur en thème sombre (Firefox sur téléphone, 1.21.2) =====
+
+// Sur Firefox mobile en thème sombre, ce qu'on tapait dans la recherche restait invisible (texte blanc sur
+// fond clair) et les cases vides des filtres étaient noires : le widget laissait le navigateur choisir ces
+// couleurs. Chromium ne passe pas ses champs en sombre de lui-même ; on lui impose donc le schéma sombre sur
+// la page (`!important` passe devant la déclaration du widget) pour rejouer le cas : seules des couleurs
+// écrites par le widget tiennent.
+const FORCE_DARK = ':root { color-scheme: dark !important }';
+
+test('le widget se déclare clair : la balise et la feuille de style ne laissent pas le navigateur choisir ses couleurs', () => {
+  assert.match(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), /<meta name="color-scheme" content="light">/);
+  assert.match(readCss('style.css'), /:root\s*\{\s*color-scheme:\s*light;/);
+});
+
+test('même si le navigateur passe en sombre, la recherche reste lisible et les cases à cocher restent claires (Firefox mobile, 1.21.2)', { skip }, async () => {
+  await withWidget({ tables: sampleTables() }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.addStyleTag({ content: FORCE_DARK });
+    await page.locator('.filter-button', { hasText: 'Compétences' }).click();
+    await page.locator('.filter.open .group-toggle').first().click();
+    const looks = await page.evaluate(() => {
+      const background = element => {
+        for (let node = element; node; node = node.parentElement) {
+          const color = getComputedStyle(node).backgroundColor;
+          if (color !== 'rgba(0, 0, 0, 0)') return color;
+        }
+        return 'rgb(255, 255, 255)';
+      };
+      const field = element => ({
+        color: getComputedStyle(element).color,
+        background: background(element),
+        placeholder: getComputedStyle(element, '::placeholder').color,
+        placeholderOpacity: getComputedStyle(element, '::placeholder').opacity
+      });
+      const box = element => {
+        const style = getComputedStyle(element);
+        return { appearance: style.appearance, background: style.backgroundColor, border: style.borderTopColor,
+          borderWidth: parseFloat(style.borderTopWidth), image: style.backgroundImage };
+      };
+      const value = document.querySelector('.filter.open .filter-option input');
+      const head = document.querySelector('.filter.open .group-option input');
+      const result = { search: field(document.getElementById('searchInput')), menuSearch: field(document.querySelector('.filter.open .filter-search-input')), empty: box(value) };
+      value.checked = true;
+      result.checked = box(value);
+      head.indeterminate = true;
+      result.partial = box(head);
+      return result;
+    });
+    for (const [name, field] of [['la recherche', looks.search], ['la recherche d’un menu', looks.menuSearch]]) {
+      assert.ok(contrastRatio(field.color, field.background) >= 4.5, `${name} : texte ${field.color} sur ${field.background}`);
+      assert.ok(contrastRatio(field.placeholder, field.background) >= 4.5 && field.placeholderOpacity === '1', `${name} : texte d’invite ${field.placeholder} sur ${field.background}`);
+    }
+    assert.equal(looks.empty.appearance, 'none', 'une case vide est dessinée par le widget, pas par le navigateur');
+    assert.equal(looks.empty.background, 'rgb(255, 255, 255)', 'une case vide est blanche');
+    assert.ok(looks.empty.borderWidth >= 1 && contrastRatio(looks.empty.border, '#fff') >= 3, `bordure d’une case vide : ${looks.empty.borderWidth}px ${looks.empty.border}`);
+    for (const [name, state] of [['cochée', looks.checked], ['partielle', looks.partial]]) {
+      assert.equal(state.background, 'rgb(98, 87, 217)', `une case ${name} est violette`);
+      assert.match(state.image, /^url\("data:image\/svg\+xml/, `une case ${name} porte sa coche`);
+    }
+    assert.notEqual(looks.checked.image, looks.partial.image, 'la coche et le tiret sont deux dessins');
+  });
+});

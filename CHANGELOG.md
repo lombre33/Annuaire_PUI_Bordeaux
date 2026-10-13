@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.21.2 — Firefox sur téléphone : recherche lisible, cases à cocher claires
+
+Retours d'Antoine du 13 octobre 2026 (06 h 31 et 06 h 32), sur Firefox mobile : « les cases à cocher des filtres, quand elles sont
+vides, apparaissent comme un carré noir » et « quand on tape dans la barre de recherche, le filtre marche mais on ne voit pas les
+caractères tapés ». Même cause : le widget laissait le navigateur choisir la couleur du texte des champs et le dessin des
+cases ; Firefox sur téléphone en thème sombre y mettait du blanc et du noir, sur nos fonds clairs. Corrigé sans essai possible sur
+Firefox ni sur un vrai téléphone (le cas est rejoué dans Chromium en lui imposant un schéma sombre) : à confirmer à l'œil.
+
+- **Le widget se déclare clair** : `color-scheme: light` dans `style.css` et dans une balise `<meta>` d'`index.html`. Le navigateur n'applique
+  plus ses couleurs sombres à nos champs, nos défilements ni nos menus déroulants.
+- **Texte des champs** : les boutons et les champs prennent la couleur du texte de la page (`color: inherit`, sans effet sur ceux qui fixent la leur), et le
+  texte d'invite des champs de recherche est gris foncé (5,9:1), plein, au lieu de la couleur que choisissait chaque navigateur.
+- **Cases à cocher dessinées par le widget** : fond blanc, bordure grise (4,8:1 sur blanc), violette et pleine une fois cochée, avec une coche
+  blanche, ou un tiret quand un domaine n'a qu'une partie de ses compétences cochée ; la case de la fenêtre d'un établissement reste verte. Seul
+  écart visible sur ordinateur : la case fait 16 px au lieu de 13 px (18 px au doigt, comme avant). En contraste élevé de Windows, le navigateur reprend le dessin.
+- Deux tests de non-régression (`tests/accessibility.test.mjs`) échouent sur l'ancien code : le widget se déclare clair, et, sous un schéma sombre imposé,
+  la recherche reste lisible (4,5:1 au moins, texte et invite) et les cases vides sont blanches et bordées. Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.21.1 — Logos des cartes deux fois plus grands
 
 Demande d'Antoine du 13 octobre 2026 (« faire un ×2 sur la taille »), la veille d'une démo : sur une carte assez large, le
