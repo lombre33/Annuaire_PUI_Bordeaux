@@ -342,8 +342,9 @@ Spécifique **Compétences** (et toutes les catégories issues d'une table de
 référence) :
 
 - [ ] Le menu propose un seul libellé par compétence : le libellé corrigé
-      (`Competences_corrigees`) quand il est rempli, le libellé brut sinon.
-      Les compétences d'une carte portent les mêmes libellés que le menu.
+      (`Competences_corrigees`). Une compétence dont il est vide n'est pas proposée tant
+      que la table en remplit au moins un ; une table qui n'en remplit aucun garde les
+      libellés bruts. Les compétences d'une carte portent les mêmes libellés que le menu.
 - [ ] Cocher une compétence dans le menu garde exactement les contacts dont
       la carte affiche cette compétence.
 

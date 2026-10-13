@@ -54,6 +54,20 @@ test('profileFormModel lists the options of each reference sorted by label, and 
   }
 });
 
+test('profileFormModel offers the corrected labels only, like the filters: a row without a corrected label is not offered, and the person\'s own value for it is left alone', async () => {
+  const tables = sampleTables();
+  tables.Competences.Competences_corrigees = ['Oncologie', 'Hématologie', '', 'Divers'];
+  tables.BDD.Competences[0] = ['L', 1, 2, 3]; // Ana porte aussi la ligne 3, qui n'a pas de libellé corrigé
+  const { referenceMaps, row } = await setup(tables);
+  const competences = field(profileFormModel(row(1), referenceMaps), 'Competences');
+  assert.deepEqual(competences.options.map(option => option.label).sort(), ['Divers', 'Hématologie', 'Oncologie'],
+    'pas « Pharmacovigilance » : sa colonne corrigée est vide');
+  assert.deepEqual(competences.value, [1, 2], 'la ligne 3 n\'est pas montrée : elle ne peut ni être retirée ni être comptée comme cochée');
+  const draft = draftOf(profileFormModel(row(1), referenceMaps));
+  draft.Competences = [1];
+  assert.deepEqual(diffProfile(row(1), draft, referenceMaps).champs.Competences.retrait.map(entry => entry.id), [2], 'seule la ligne montrée est retirée');
+});
+
 test('profileFormModel groups the competences by domain, the fallback domain last, and leaves other lists ungrouped', async () => {
   const { referenceMaps, row } = await setup();
   const model = profileFormModel(row(1), referenceMaps);
