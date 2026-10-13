@@ -303,7 +303,7 @@ test('une modification dans Grist (une action renommée, renumérotée, une tâc
     assert.deepEqual(await cardNames(page), [BOB, ANA]);
 
     // Le libellé de la tâche change : comme pour tout libellé renommé dans Grist, la coche tombe.
-    await page.evaluate(() => { window.__tables.Taches.Taches[2] = '1.3 Inspection'; });
+    await page.evaluate(() => { window.__tables.Taches.Taches_corrige[2] = '1.3 Inspection'; });
     await reload(page);
     await page.waitForFunction(() => document.querySelector('.filter-group[data-value="Action 1 : Vaccination"] .filter-option[data-value="1.3 Inspection"]'));
     assert.deepEqual(await tasks.groupNames(page), [VACCINATION, NONE]);
