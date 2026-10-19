@@ -358,6 +358,8 @@ const SCENES = [
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       await exigerHabillage(page, { cartes: CARTES_ATTENDUES.fondateurs });
       exiger(await page.locator('#bandLink').getAttribute('href') !== null, 'le lien du bandeau ne mène nulle part');
+      // La ligne « Version … » sous le bandeau changerait à chaque version : elle n'a pas sa place sur une capture.
+      await page.evaluate(() => { document.getElementById('versionNote').style.visibility = 'hidden'; });
     }
   },
   {

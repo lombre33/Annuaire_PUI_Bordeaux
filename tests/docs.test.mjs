@@ -30,7 +30,7 @@ import { displayName, loadDirectory } from '../grist-data.js';
 import { avatarIdOf } from '../attachments.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
 import { readIdentity } from '../identity.js';
-import { describePresence, describeHiddenFiche, describeUnknownAccount, setPresence, explainWriteError } from '../presence.js';
+import { describePresence, describeHiddenFiche, describeCreated, describeUnknownAccount, setPresence, explainWriteError } from '../presence.js';
 import { rightsFor, profileFormModel, draftOf, MAX_TEXT_LENGTH } from '../profile.js';
 import { PHOTO_UPLOAD_HINT, prepareReview, saveProfile } from '../profile-save.js';
 import { diffEtablissement, draftOfEtablissement, etablissementRightsFor, nominate, toggleResponsable } from '../etablissement.js';
@@ -571,12 +571,15 @@ const withUploadHint = (code, hint) => code
   .replaceAll('${lowerFirst(hint)}', lowerFirst(hint))
   .replaceAll('${hint}', hint);
 
-test('les messages cités dans « Modifier ma fiche » sont ceux du code', () => {
+test('les messages cités dans « Modifier ma fiche » et « Créer ma fiche » sont ceux du code', () => {
   const guide = read('docs/utilisateurs.md');
   const start = guide.indexOf('\n## Modifier ma fiche');
   assert.ok(start >= 0, 'Le guide utilisateur doit avoir une section « Modifier ma fiche ».');
   const end = guide.indexOf('\n## ', start + 1);
-  const section = guide.slice(start, end);
+  // La création d'une fiche (1.18.0) a sa propre section, qui cite les mêmes messages de la même fenêtre.
+  const createStart = guide.indexOf('\n## Créer ma fiche');
+  assert.ok(createStart >= 0, 'Le guide utilisateur doit avoir une section « Créer ma fiche ».');
+  const section = guide.slice(start, end) + guide.slice(createStart, guide.indexOf('\n## ', createStart + 1));
 
   // Messages composés à l'exécution : on les demande à la fonction qui les compose.
   const hidden = overrides => ({ accepted: true, visible: false, named: true, etablissement: 'not_validated', ...overrides });
@@ -588,7 +591,9 @@ test('les messages cités dans « Modifier ma fiche » sont ceux du code', () =>
     checkImageFile({ type: 'image/jpeg', size: 0 }, IMAGE_RULES.avatar)
   ];
   const composed = [describeHiddenFiche(hidden({}), { own: true }), describeHiddenFiche(hidden({}), { own: false }),
-    describeHiddenFiche(hidden({ etablissement: 'not_eligible' }), { own: false }), ...photoRefusals];
+    describeHiddenFiche(hidden({ etablissement: 'not_eligible' }), { own: false }), ...photoRefusals,
+    // ce que la personne lit une fois sa fiche créée (la raison d'une fiche masquée varie : le guide la remplace par …)
+    describeCreated({ visible: true }, true), describeCreated({ visible: false }, false), describeCreated(null, true)];
   composed.forEach(message => assert.ok(section.includes(message), `Le guide doit citer : ${message}`));
 
   const code = withUploadHint(widgetCode(), PHOTO_UPLOAD_HINT);

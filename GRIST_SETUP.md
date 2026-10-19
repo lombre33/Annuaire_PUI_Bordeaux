@@ -6,10 +6,10 @@ la faire et comment vérifier qu'elle a marché.
 
 | Étape | Quoi | Sans elle |
 |---|---|---|
-| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** | l'interrupteur « Ma présence » ou l'enregistrement d'une fiche échoue, avec un message qui renvoie ici |
+| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** | l'interrupteur « Ma présence », l'enregistrement ou la création d'une fiche échoue, avec un message qui renvoie ici |
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement : **le widget la crée lui-même** au premier chargement, ouvert par un compte qui peut modifier la structure du document | si le widget n'a pas pu la créer, personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
-| 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, et depuis la 1.17.0 une fiche d'établissement aussi |
+| 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, depuis la 1.17.0 une fiche d'établissement aussi, et depuis la 1.18.0 une personne crée elle-même sa fiche |
 | 5 | Les logos des établissements : colonnes `logo` et `ordre_bandeau` dans `Etablissements` (facultatif) ; le remplacement d'un logo depuis le widget en dépend. Les financeurs n'en dépendent pas : ce sont deux images fixes du widget | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas ; un responsable ne peut plus changer le logo de son établissement depuis le widget (la fenêtre le dit) ; rien d'autre ne change |
 | 6 | La photo de profil : colonne `Avatar` (Pièces jointes) dans `BDD` (facultatif) | les cartes gardent les initiales et le formulaire de modification n'a pas de carte « Photo de profil » ; rien d'autre ne change |
 
@@ -17,7 +17,7 @@ Le widget ne modifie jamais la structure du document (colonne, règle d'accès) 
 qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2) : tout le reste de ce qui
 est ci-dessous se fait à la main, une fois. Hors cette création, il n'écrit que
 des lignes et des cellules : celle de la personne connectée dans `BDD` (son choix de présence, sa
-fiche) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
+fiche, ou la fiche qu'elle crée quand elle n'en a pas) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
 passagère d'`Annuaire_Sonde` et, pour un responsable d'établissement, la ligne de son établissement
 dans `Etablissements` (nom complet, visibilité, logo) et les lignes d'`ACL` de ses responsables.
 Quand un responsable remplace le logo, ou une personne sa photo de profil (étape 6), il ajoute aussi
@@ -25,17 +25,38 @@ une **pièce jointe** au document. Les logos et les photos affichés (étapes 5 
 
 ## 1. Les colonnes que le widget écrit : des colonnes de données
 
-Le widget écrit dans `BDD` dans trois cas :
+Le widget écrit dans `BDD` dans quatre cas :
 
 - quand une personne utilise l'interrupteur « Ma présence » : la colonne
   `Accepte_apparaitre` ;
 - quand elle enregistre la modification de sa fiche : `prenom`, `nom`, `Fonction`,
-  `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`,
-  `Competences`, `Communautes`, `Taches` et, si elle existe (étape 6), `Avatar` ;
+  `email_affiche` (si la colonne existe, voir plus bas), `numero_de_telephone`,
+  `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`,
+  `Taches` et, si elle existe (étape 6), `Avatar` ;
+- quand une personne dont l'adresse ne figure dans aucune fiche clique sur
+  « Créer ma fiche » (1.18.0) : il **ajoute une ligne**, c'est la seule fois où le widget
+  crée une fiche. Elle porte l'adresse du compte (`email`, en minuscules), l'établissement
+  que la personne a choisi (`Etablissement`), son choix d'apparaître (`Accepte_apparaitre`,
+  la case « Apparaître dans l’annuaire », cochée d'avance) et les colonnes qu'elle a
+  remplies parmi celles du cas précédent, sauf `Avatar` : la photo s'ajoute ensuite ;
 - quand un administrateur, mode admin allumé, enregistre la fiche d'une autre
-  personne : les mêmes colonnes, plus `email` et `Etablissement`.
+  personne : les mêmes colonnes que pour la modification d'une fiche, plus `email` et
+  `Etablissement`.
 
-Jamais `perimetre` (le widget ne le lit ni ne l'écrit plus depuis la 1.27.0), ni `Accepte_apparaitre` depuis la fenêtre de modification.
+Jamais `perimetre` (le widget ne le lit ni ne l'écrit plus depuis la 1.27.0), ni
+`Accepte_apparaitre` depuis la fenêtre de modification (seulement avec l'interrupteur, ou à la
+création d'une fiche). Une fiche créée apparaît tout de suite dans l'annuaire quand rien ne la
+masque : l'établissement choisi a validé sa présence (`ok_pour_apparaitre`) et est fondateur ou
+partenaire, la case est restée cochée, et la fiche a un prénom ou un nom. Sinon elle est créée,
+masquée, et la personne le lit.
+
+**`email_affiche` (facultative, 1.18.0).** Pour qu'une fiche puisse montrer une autre adresse
+e-mail que celle du compte (une boîte de service, par exemple), ajoutez à `BDD` une colonne de
+type **Texte** nommée `email_affiche`. Quand elle n'est pas vide, la carte, son lien `mailto:` et
+la relecture montrent cette adresse à la place de `email`, qui reste la seule identité : qui est
+connecté, les droits et la recherche de la fiche ne lisent jamais `email_affiche`. Sans la colonne,
+le formulaire n'a pas le champ « E-mail affiché » et la carte montre `email`. Comme les autres
+colonnes de la fiche, elle doit être une colonne de **données** (voir ci-dessous).
 
 Grist refuse d'écrire dans une colonne **à formule** : chacune doit être une colonne
 de **données**. `Accepte_apparaitre` est de type **Case à cocher** (Bascule) ;
@@ -48,6 +69,10 @@ la colonne (il lit son type dans les métadonnées du document).
    données », choisissez-le.
 3. Pour `Accepte_apparaitre`, type **Case à cocher** ; cochez la case des personnes
    qui ont déjà donné leur accord. Une case vide ou décochée masque la personne.
+4. Pour `Role_dans_le_PUI`, type **Référence** vers la table `Role_Dans_le_PUI` (colonne
+   affichée `Role`) : c'est elle qui alimente le filtre « Rôle PUI » et le rôle de la carte
+   (1.24.0). Une colonne à formule qui la remplit se convertit en colonne de données pour que
+   la personne puisse la changer depuis « Modifier mon profil ».
 
 Depuis la 1.17.0, le widget écrit aussi, quand un responsable enregistre la fiche de
 son établissement, dans trois colonnes d'`Etablissements` (`nom_complet`,
@@ -232,10 +257,11 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 | Où | Qui peut | Pourquoi |
 |---|---|---|
 | `Annuaire_Sonde` : ajouter une ligne, lire et supprimer **la sienne**, ne rien modifier | toute personne qui peut modifier le document (les deux règles exactes sont plus bas) | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
-| `BDD` : modifier `prenom`, `nom`, `Fonction`, `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Avatar` (si vous l'avez ajoutée, étape 6), `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
+| `BDD` : modifier `prenom`, `nom`, `Fonction`, `email_affiche` (si vous l'avez ajoutée, étape 1), `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Avatar` (si vous l'avez ajoutée, étape 6), `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
 | `BDD` : modifier `email`, `Etablissement` | les administrateurs | c'est ce que le widget écrit quand un administrateur, mode admin allumé, change l'adresse ou l'établissement d'une autre personne. `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` décide de qui apparaît |
 | `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais, et ne le lit plus depuis la 1.27.0 : il ne décide plus de qui apparaît |
-| `BDD` : ajouter ou supprimer une ligne | les administrateurs | le widget ne crée ni ne supprime jamais de fiche |
+| `BDD` : **ajouter** une ligne dont `email` est le sien (`newRec.email == user.Email`) | toute personne qui peut modifier le document, et les administrateurs | c'est ce que le widget écrit quand une personne crée sa fiche (« Créer ma fiche », 1.18.0) : une seule ligne, avec son adresse, son établissement et son choix d'apparaître. Sans cette règle, Grist refuse la création et le widget le dit (« Grist a refusé la création : vos droits ne permettent pas d'ajouter une fiche… ») sans rien écrire. Le widget écrit l'adresse en minuscules : elle doit s'écrire comme celle du compte Grist (voir plus bas) |
+| `BDD` : ajouter une ligne qui porte l'adresse d'une autre personne, **supprimer** une ligne | les administrateurs | le widget ne crée que la fiche de la personne connectée, et ne supprime jamais de fiche |
 | `ACL` : lire les lignes de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce qui affiche la liste des responsables dans la fiche. Si la règle la leur refuse, la fiche s'ouvre sans cette liste et le dit |
 | `ACL` : ajouter, supprimer, modifier `email` et `Responsable_de_l_Etablissement` d'une ligne de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce que le widget écrit quand un responsable nomme ou retire un responsable. **`admin` : les administrateurs seulement** (le widget ne l'écrit jamais ; sans cette règle, un responsable pourrait se donner le droit d'administrateur depuis la console) |
 | `Etablissements` : modifier `nom_complet`, `ok_pour_apparaitre` et `logo` d'**une ligne** | les responsables de cette ligne, et les administrateurs | c'est ce que le widget écrit pour la fiche d'un établissement. `ok_pour_apparaitre` décide de qui apparaît ; `acronyme`, `fondateur`, `partenaire` et `autres` : l'équipe du PUI seulement, le widget ne les écrit pas |
@@ -361,9 +387,12 @@ le bandeau reste lisible avec seize logos.
 **Préparer les fichiers**
 
 - **PNG ou SVG**, de préférence **SVG** (net à toute taille), sur **fond transparent**,
-  **rognés au plus près du dessin**. Sur les cartes, le widget donne à tous les logos la
-  même hauteur (64 px sur une carte assez large, 32 px sur une carte étroite), quelle que soit
-  leur forme, et en borne la largeur pour qu'une bannière très large ne déborde pas ; dans le bandeau du bas, il ajuste la taille de chacun
+  **rognés au plus près du dessin**. Sur les cartes, le widget place chaque logo dans une même
+  case, de 104 px de large et 42 px de haut au plus (un peu moins sur une carte étroite), et
+  retire les marges transparentes ou blanches d'un logo quand le navigateur laisse lire ses pixels,
+  pour que tous aient une surface voisine : une bannière très large remplit la case en largeur,
+  un emblème carré en hauteur. Si les pixels ne se lisent pas, le logo se montre quand même, tel
+  quel, dans cette case ; dans le bandeau du bas, il ajuste la taille de chacun
   pour qu'une rangée de logos de formes différentes (un emblème carré, une bannière large,
   une signature haute) ait un poids visuel voisin. Une marge blanche autour d'un logo le
   ferait paraître plus petit que les autres, et un fond blanc opaque dessinerait un
@@ -507,7 +536,8 @@ marche pas, rien n'est cassé : le widget affiche une phrase (« … Contactez u
 administrateur si le problème persiste. ») et la photo se pose dans Grist, comme ci-dessus.
 
 Vérifier : une personne qui a une photo la voit à la place de ses initiales sur sa carte,
-un clic l'agrandit, et la console ne montre ni `[LOGOS]` ni `[ENVOI]`.
+un clic l'agrandit, et la console ne montre ni avertissement `[LOGOS]` (la ligne d'information
+`[LOGOS] Version …` est normale) ni ligne `[ENVOI]`.
 
 | Ce que vous voyez | Cause | Remède |
 |---|---|---|
@@ -550,8 +580,15 @@ un clic l'agrandit, et la console ne montre ni `[LOGOS]` ni `[ENVOI]`.
   dans les pièces jointes du document ; de même, une photo retirée ou remplacée laisse
   l'ancien fichier. Le widget ne sait pas supprimer une pièce jointe.
 - **Une adresse sur plusieurs lignes de `BDD`** : le choix de présence s'applique à
-  toutes ces lignes (la console le signale). Mieux vaut corriger les doublons.
+  toutes ces lignes (la console le signale). Mieux vaut corriger les doublons. Le widget,
+  lui, ne crée jamais une seconde fiche à une adresse qui en a déjà une : il relit `BDD`
+  avant d'écrire.
 - **Une personne connectée avec une autre adresse que celle de `BDD`** n'est pas
   retrouvée : le bandeau dit « Compte absent de l'annuaire » (« Administrateur » pour
   un administrateur, « Fiche introuvable » si `BDD` n'a pas de colonne `email`), sans
-  interrupteur de présence ni bouton « Modifier ».
+  interrupteur de présence ni bouton « Modifier », mais avec un bouton « Créer ma fiche »
+  (sauf quand `BDD` n'a pas de colonne `email`).
+- **Le rôle de la personne dans une tâche** (1.26.0) : si la table `Taches` a une colonne
+  `Taches_role`, le widget la lit sur les lignes de `Taches` que `BDD.Taches` désigne pour
+  cette personne et la montre au survol de l'étiquette de la tâche. Sans la colonne, ou
+  quand le rôle est vide, rien ne s'affiche et rien n'est signalé.
