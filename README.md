@@ -156,6 +156,8 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── CHANGELOG.md          Historique des versions
 ├── VERSION.md            Version courante
 ├── TESTING.md            Protocole de test manuel
+├── LICENSE               Licence : GNU GPL version 3 ou ultérieure
+├── SECURITY.md           Comment signaler un problème de sécurité
 ├── tests/                Tests unitaires et tests navigateur
 ├── docs/                 Documentation, images, démonstration fictive
 └── .github/workflows/    Intégration continue
@@ -200,6 +202,12 @@ Le détail, avec les cas que le bandeau ne signale pas, est dans [Maintenance](d
 - **Un hébergement fragile à ce jour.** Le dépôt et le site GitHub Pages appartiennent au compte personnel de la personne qui a créé le widget ; une migration vers le GitLab UB est impossible, faute de module « Pages », et la piste proposée est un GitHub DIESE. Dans Grist, les administrateurs sont uniquement des agents en poste.
 
 Le détail est dans [Sécurité et confidentialité](docs/securite.md#lintelligence-artificielle-dans-ce-projet) et dans [Maintenance](docs/maintenance.md#hébergement-et-risques-à-ce-jour).
+
+## Licence
+
+Ce widget est un logiciel libre, publié sous la **licence publique générale GNU version 3, ou toute version ultérieure** (GNU GPL v3+ ; identifiant SPDX `GPL-3.0-or-later`). Le texte complet est dans [`LICENSE`](LICENSE). Toute personne peut utiliser, étudier, modifier et redistribuer le code ; une version modifiée qu'elle redistribue reste sous cette même licence, code source compris. Copyright © 2026 lombre33.
+
+Le script de l'API de Grist n'est pas dans le dépôt : `index.html` le charge depuis `docs.getgrist.com` à l'exécution. Les logos des financeurs (dossier `assets/`) appartiennent à leurs titulaires : la licence ne les couvre pas.
 
 ## Règles du projet
 

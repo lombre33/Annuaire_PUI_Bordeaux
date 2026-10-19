@@ -1,4 +1,4 @@
-# Version 1.28.3 — Audit exhaustif, lot 1 : un libellé « constructor » ne casse plus rien, le gris des textes secondaires passe 4,5:1, le groupe de filtres a un rôle (voir CHANGELOG.md)
+# Version 1.28.4 — Licence GNU GPL v3 et politique de sécurité du dépôt (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
