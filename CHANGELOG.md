@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.28.5 — Audit exhaustif, lot 2 : les fonctions trop complexes sont découpées, sans rien changer pour les personnes
+
+Deuxième lot de l'audit exhaustif du 19 octobre 2026. Rien ne change pour les personnes : le comportement est identique, ce que les contrôles ci-dessous établissent.
+
+- **Neuf fonctions dépassaient la complexité que tolère le module GWaudit (15)** ; elles passent toutes sous le seuil, chacune coupée en petites étapes nommées :
+  - `profile.js` : `diffProfile` (111 lignes, complexité 41) et `rebaseChanges` (20) : une petite fonction par sorte de champ (`diffText`, `diffPhone`, `diffReference`, `diffList`, `diffImage`, `diffEmail`, puis `rebaseText`, `rebasePhone`…), rangées dans deux tables (`DIFFERS`, `REBASERS`) ;
+  - `profile-save.js` : `buildRowUpdate` (21) : une fonction d'écriture par sorte de champ (`WRITERS`) ; `saveProfile` (18) : `checkSaveable`, `inspectFiche`, `writeFiche` ;
+  - `etablissement-save.js` : `saveEtablissement` (18) : `checkSaveable`, `writeEtablissement` ;
+  - `etablissement.js` : `diffEtablissement` (18) : `diffLogo`, `diffName`, `diffVisible`, `diffResponsables` ;
+  - `image-prep.js` : `prepareImage` (16) : `decode`, `draw` ;
+  - `upload.js` : `uploadAttachment` (17) : `writeAccess`, `post`, `attachmentIdOf` ;
+  - `render.js` : `buildCard` (19) : `fillAvatar`, `fillName`, `fillTexts`.
+- **Une duplication de moins : `save-upload.js`** (nouveau module). « Envoyer le fichier, puis relire l'état avant d'écrire » était écrit deux fois, dans `saveProfile` et dans `saveEtablissement` ; `uploadThenRecheck()` le fait pour les deux. Les phrases d'erreur, les lignes de console
+  (`[PROFIL]`, `[FICHE-ETAB]`) et l'identifiant du fichier resté dans Grist (`leftover`) sont ceux d'avant.
+- **Comment on sait que rien n'a changé.** (1) 6 000 cas tirés au hasard (graine fixe), joués sur la 1.28.2 et sur ce code, donnent des sorties identiques octet pour octet pour `diffProfile`, `rebaseChanges`, `describeChanges` et `buildRowUpdate`, et 6 000 autres
+  pour `diffEtablissement` et `summaryOf` ; le banc d'essai repère les fautes qu'on y introduit exprès. (2) Le DOM de 18 écrans (l'annuaire public, celui d'une administratrice avec ou sans mode admin, d'un responsable, le formulaire du profil ouvert, sa liste
+  ouverte, en erreur, modifié puis relu avec une photo, la fiche de l'établissement ouverte, modifiée, en erreur) est identique à celui de la 1.28.2, sauf le rôle du groupe de filtres posé en 1.28.3. (3) Les tests existants passent ; `tests/save-upload.test.mjs`
+  (5 tests) couvre le nouveau module.
+- **GWaudit** : 77/100 → 82/100 (qualité du code 46 → 63, aucun bloquant : la licence est là depuis la 1.28.4). Reste : les quatre grandes fonctions de fenêtres (`createProfileDialog`, `createEtablissementDialog`, `createAccountBar`, `dropdown`) et le code
+  dupliqué des tests de mise en page.
+- **Documentation** : `docs/developpeurs.md` (le module, le schéma des imports, le test) et l'arbre du README citent `save-upload.js`.
+
 ## 1.28.4 — Licence GNU GPL v3 et politique de sécurité du dépôt
 
 Antoine a choisi la licence le 19 octobre 2026 (« licences GNU GPL »). Aucun changement de code : seul le numéro de version bouge.

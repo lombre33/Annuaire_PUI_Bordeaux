@@ -161,6 +161,44 @@ export function nominate(draft, input) {
 export const NAME_REQUIRED = 'Indiquez le nom complet de l’établissement.';
 export const KEEP_ONE = 'Un établissement doit garder au moins un responsable.';
 
+// Le logo : { action } si la personne le remplace (par un fichier) ou le retire (alors qu'il y en a un), sinon null.
+function diffLogo(before, draft) {
+  const action = draft.logo?.action;
+  if (action === 'replace' && draft.logo.file) return { action: 'replace' };
+  if (action === 'remove' && before.logo.length > 0) return { action: 'remove' };
+  return null;
+}
+
+// Le nom : { change: { avant, apres } } s'il change, { error } s'il est refusé, {} sinon. Un nom laissé tel quel n'est
+// pas un changement, même s'il ne serait pas accepté tapé aujourd'hui.
+function diffName(before, draft) {
+  const typed = String(draft.name ?? '');
+  const name = cleanText(typed);
+  if (typed === before.name || name === before.name) return {};
+  const fault = textFault(name);
+  if (name === '') return { error: NAME_REQUIRED };
+  if (fault) return { error: `${fault.charAt(0).toUpperCase()}${fault.slice(1)}.` };
+  return { change: { avant: before.name, apres: name } };
+}
+
+const diffVisible = (before, draft) => (typeof draft.visible === 'boolean' && draft.visible !== before.visible
+  ? { avant: before.visible, apres: draft.visible }
+  : null);
+
+// Les responsables : { change: { ajout, retrait } } (des adresses) s'il y en a, { error } si la liste n'en garderait
+// aucun. La règle protège contre le retrait du dernier responsable ; elle ne reproche pas à la personne une liste
+// qu'elle n'a pas touchée.
+function diffResponsables(draft) {
+  const ajout = draft.responsables.filter(item => item.state === 'added').map(item => item.email);
+  const retrait = draft.responsables.filter(item => item.state === 'removed').map(item => item.email);
+  return {
+    change: ajout.length + retrait.length > 0 ? { ajout, retrait } : null,
+    error: retrait.length > 0 && keptOf(draft).length === 0 ? KEEP_ONE : null
+  };
+}
+
+const LABELS = { logo: 'logo', name: 'nom', visible: 'visibilité', responsables: 'responsables' };
+
 // Compare le brouillon à l'établissement tel que la fenêtre l'a montré. `before` : { name, visible,
 // logo } d'etablissementOf et `responsables` les adresses de départ ; `readable` : la liste des
 // responsables a pu être lue (sinon elle n'est ni montrée ni modifiée). Renvoie { champs, labels,
@@ -174,38 +212,21 @@ export function diffEtablissement(before, draft, { readable = true } = {}) {
   const champs = {};
   const fieldErrors = {};
 
-  const action = draft.logo?.action;
-  if (action === 'replace' && draft.logo.file) champs.logo = { action: 'replace' };
-  else if (action === 'remove' && before.logo.length > 0) champs.logo = { action: 'remove' };
-
-  // Un nom laissé tel quel n'est pas un changement, même s'il ne serait pas accepté tapé aujourd'hui.
-  const typed = String(draft.name ?? '');
-  const name = cleanText(typed);
-  if (typed !== before.name && name !== before.name) {
-    const fault = textFault(name);
-    if (name === '') fieldErrors.name = NAME_REQUIRED;
-    else if (fault) fieldErrors.name = `${fault.charAt(0).toUpperCase()}${fault.slice(1)}.`;
-    else champs.name = { avant: before.name, apres: name };
-  }
-
-  if (typeof draft.visible === 'boolean' && draft.visible !== before.visible) {
-    champs.visible = { avant: before.visible, apres: draft.visible };
-  }
-
-  const errors = [];
+  const logo = diffLogo(before, draft);
+  if (logo) champs.logo = logo;
+  const name = diffName(before, draft);
+  if (name.error) fieldErrors.name = name.error;
+  else if (name.change) champs.name = name.change;
+  const visible = diffVisible(before, draft);
+  if (visible) champs.visible = visible;
   if (readable) {
-    const ajout = draft.responsables.filter(item => item.state === 'added').map(item => item.email);
-    const retrait = draft.responsables.filter(item => item.state === 'removed').map(item => item.email);
-    if (ajout.length + retrait.length > 0) champs.responsables = { ajout, retrait };
-    // La règle protège contre le retrait du dernier responsable ; elle ne reproche pas à la personne
-    // une liste qu'elle n'a pas touchée.
-    if (retrait.length > 0 && keptOf(draft).length === 0) fieldErrors.responsables = KEEP_ONE;
+    const responsables = diffResponsables(draft);
+    if (responsables.change) champs.responsables = responsables.change;
+    if (responsables.error) fieldErrors.responsables = responsables.error;
   }
 
-  const labels = ['logo', 'name', 'visible', 'responsables'].filter(key => champs[key])
-    .map(key => ({ logo: 'logo', name: 'nom', visible: 'visibilité', responsables: 'responsables' })[key]);
-  if (fieldErrors.name) errors.push(fieldErrors.name);
-  if (fieldErrors.responsables) errors.push(fieldErrors.responsables);
+  const labels = Object.keys(LABELS).filter(key => champs[key]).map(key => LABELS[key]);
+  const errors = [fieldErrors.name, fieldErrors.responsables].filter(Boolean);
   return { champs, labels, errors, fieldErrors };
 }
 
