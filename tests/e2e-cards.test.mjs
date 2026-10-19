@@ -9,7 +9,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ANA_EMAIL, sampleTables, withBranding, withClones, withIdentity } from './fixtures.mjs';
-import { cardCount, gridCard, reload, skip, until, waitForCards, waitForEditButtons, withWidget } from './support/browser.mjs';
+import { cardCount, gridCard, openOwn, reload, skip, until, waitForCards, waitForEditButtons, withWidget } from './support/browser.mjs';
+import { profileDialogPage } from './support/dialog-page.mjs';
+
+const { review } = profileDialogPage();
 
 // 4 cartes de départ (Ana, Hostile, Gina, Hugo) et 60 « Copie n » : de quoi remplir bien plus d'un écran.
 const CLONES = 60;
@@ -201,6 +204,31 @@ test('les cartes hors de l\'écran sont différées par le navigateur, celles de
     assert.equal(await skipped(ALL_CARDS - 1), true, 'la dernière carte est loin sous l\'écran : le navigateur ne la dessine pas encore');
     await page.locator('.contact-card').last().scrollIntoViewIfNeeded();
     await until(async () => !(await skipped(ALL_CARDS - 1)), 'la dernière carte est dessinée quand on y arrive');
+  }));
+
+test('les deux cartes de la relecture ne sont pas différées : la colonne « Avant » a sa vraie hauteur dès la première image', { skip }, () =>
+  withWidget({ tables: crowdWithAna(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOwn(page, ALL_CARDS);
+    await page.locator('#profile-prenom').fill('Anaïs');
+    // La hauteur de la colonne « Avant » à chaque image dès qu'elle existe : une carte différée y aurait paru à sa hauteur estimée
+    // (480 px) avant de reprendre la vraie.
+    await page.evaluate(() => {
+      window.__heights = [];
+      const sample = () => {
+        const column = document.querySelector('#profileDialog .rv-col-before');
+        if (column) window.__heights.push(Math.round(column.getBoundingClientRect().height));
+        if (window.__heights.length < 12) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+    await review(page);
+    await until(async () => (await page.evaluate(() => window.__heights.length)) >= 12, 'douze images relevées');
+    const heights = await page.evaluate(() => window.__heights);
+    assert.equal(new Set(heights).size, 1, `la colonne « Avant » ne change pas de hauteur (${heights.join(', ')} px)`);
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#profileDialog .rv-card')].map(card => getComputedStyle(card).contentVisibility)),
+      ['visible', 'visible'], 'les cartes de la relecture sont toujours dessinées');
+    assert.equal(await page.locator('#cardsGrid .contact-card').first().evaluate(card => getComputedStyle(card).contentVisibility), 'auto',
+      'celles de la grille, non');
   }));
 
 test('au clavier, Tab atteint toutes les cartes, celles que le navigateur différait comprises', { skip, timeout: 120000 }, () =>

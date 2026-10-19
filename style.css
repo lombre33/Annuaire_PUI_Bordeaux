@@ -457,17 +457,21 @@ h1 {
 .contact-card {
   /* La place du logo d'établissement se mesure sur la carte (cqw, voir .logo-img plus bas) */
   container-type: inline-size;
-  /* Une carte loin de l'écran n'est ni mise en page ni dessinée avant qu'on s'en approche : avec des milliers de cartes, c'est ce qui
-     garde une recherche rapide. Elle reste dans la page pour la tabulation, la recherche du navigateur et les lecteurs d'écran.
-     480px : la hauteur d'une carte moyenne, de quoi donner à la barre de défilement une longueur vraisemblable ; `auto` retient la
-     vraie hauteur d'une carte une fois qu'elle a été vue. */
-  content-visibility: auto;
-  contain-intrinsic-block-size: auto 480px;
   overflow: hidden;
   background: #fff;
   border: 1px solid #e8eaf2;
   border-radius: 14px;
   box-shadow: 0 6px 16px #252a4d0f;
+}
+/* Une carte de la grille loin de l'écran n'est ni mise en page ni dessinée avant qu'on s'en approche : avec des milliers de cartes,
+   c'est ce qui garde une recherche rapide. Elle reste dans la page pour la tabulation, la recherche du navigateur et les lecteurs
+   d'écran. 480px : la hauteur d'une carte moyenne, de quoi donner à la barre de défilement une longueur vraisemblable ; `auto` retient
+   la vraie hauteur d'une carte une fois qu'elle a été vue. Pas pour les deux cartes de la relecture (.rv-card) : elles sont à l'écran
+   dès leur ouverture, et leur hauteur estimée y paraîtrait une image (507px au lieu de 141px mesurés), le temps que le navigateur les
+   juge visibles. */
+.cards-grid > .contact-card {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 480px;
 }
 .card-topline {
   height: 3px;

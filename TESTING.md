@@ -269,7 +269,7 @@ les tâches par action.
 tactile émulé, le rôle sous le nom de la tâche sans bulle ; une tâche qui s'appelle « constructor » s'écrit
 comme les autres, sans rôle ni erreur.
 
-`tests/e2e-cards.test.mjs` y ajoute 9 scénarios sur les cartes à grande échelle (1.29.0), avec 64 fiches
+`tests/e2e-cards.test.mjs` y ajoute 10 scénarios sur les cartes à grande échelle (1.29.0, 1.29.1), avec 64 fiches
 (`withClones` dans `tests/fixtures.mjs`) : les cartes gardées d'un dessin à l'autre (une recherche puis son
 effacement rendent les mêmes éléments dans le même ordre ; un filtre, l'interrupteur « Partenaires » et
 « Réinitialiser » réutilisent aussi les cartes), une relecture de Grist qui reconstruit toutes les cartes et
@@ -279,7 +279,8 @@ le logo, sans toucher aux cartes d'un autre établissement, le contrat de `rende
 ingrédients d'une carte, un seul à la fois, la fait reconstruire, et rien d'autre), une rafale de cinq éditions
 dans Grist qui ne provoque qu'une relecture de `BDD`, 250 ms après la dernière, les cartes éloignées de l'écran
 que le navigateur ne dessine pas (`content-visibility`) et la tabulation, qui passe par chaque carte, celles que
-le navigateur n'avait pas encore dessinées comprises.
+le navigateur n'avait pas encore dessinées comprises, et les deux cartes de la relecture, qui ne sont jamais
+différées (1.29.1 : leur hauteur estimée y paraissait une image, 507 px au lieu de 141 px).
 
 `tests/e2e-csp.test.mjs` y ajoute 16 scénarios sur la politique de sécurité de contenu (1.29.1), joués dans la
 vraie page : 14 tentatives que la politique doit refuser, chacune signalée par le navigateur (événement
