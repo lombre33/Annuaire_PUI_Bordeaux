@@ -18,6 +18,15 @@ export async function reload(page) {
   await page.evaluate(() => window.__triggerRecords());
 }
 
+// Change la fonction d'une personne « dans Grist » (ligne `row` de BDD), rejoue onRecords et attend que sa carte la montre : l'annuaire
+// a bien été relu.
+export async function changeFonction(page, { row, name, fonction }) {
+  await page.evaluate(([index, value]) => { window.__tables.BDD.Fonction[index] = value; }, [row, fonction]);
+  await reload(page);
+  await until(async () => (await gridCard(page, name).locator('.fonction').textContent()) === fonction,
+    `l'annuaire n'a pas été relu : la carte de ${name} garde son ancienne fonction`);
+}
+
 // Attend qu'une condition (asynchrone) devienne vraie, 5 s au plus ; sinon le test échoue avec `message`.
 export async function until(condition, message) {
   const deadline = Date.now() + 5000;

@@ -164,7 +164,8 @@ Sans dépendance, un fichier de tests par module :
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : ce harnais, et les attentes
   que ces tests partagent (cartes, bandeau, message, focus rendu, sa propre fiche ouverte,
   actions envoyées à `BDD`, ni jeton ni adresse du document dans la console, aucune violation de la
-  politique de sécurité de contenu, mise en page posée, pied d'une fenêtre sur une ou deux lignes).
+  politique de sécurité de contenu, mise en page posée, pied d'une fenêtre sur une ou deux lignes,
+  une fonction changée « dans Grist » puis l'annuaire relu : `changeFonction`).
 - `tests/support/layout.mjs` — le même harnais avec les barres de défilement (dans Grist elles
   retirent 15 px de large), les largeurs testées et les mesures de cartes de
   `tests/responsive.test.mjs` et `tests/branding-layout.test.mjs`.

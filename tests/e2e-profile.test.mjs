@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withIdentity, withSchema, withShownEmail, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
 import {
-  assertFooterWraps, bddCalls, bddCell, focusReturnsTo, gridCard, openOwn, probeRemoved, reload, skip, toast, until, waitForCards,
+  assertFooterWraps, bddCalls, bddCell, changeFonction, focusReturnsTo, gridCard, openOwn, probeRemoved, reload, skip, toast, until, waitForCards,
   waitForEditButtons, withWidget
 } from './support/browser.mjs';
 import { FITS, assertTabStaysInDialog, dialogFit, profileDialogPage, spillOf, unnamedControls } from './support/dialog-page.mjs';
@@ -382,9 +382,7 @@ test('le mode admin s\'allume au clavier, annonce son état, et garde le focus q
 test('le mode admin reste allumé quand l\'annuaire est relu après une modification dans Grist', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await enableAdminMode(page);
-    await page.evaluate(() => { window.__tables.BDD.Fonction[9] = 'Directeur'; });
-    await reload(page);
-    await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.fonction').textContent()) === 'Directeur', 'l\'annuaire n\'a pas été relu');
+    await changeFonction(page, { row: 9, name: 'Hugo Bernard', fonction: 'Directeur' });
     assert.equal(await isAdminMode(page), true);
     await waitForEditButtons(page, 4);
     assert.equal(await adminStrip(page).isVisible(), true);
