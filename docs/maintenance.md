@@ -237,7 +237,7 @@ La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[
 ## Avant de publier une modification du code
 
 1. `node --test` est entièrement vert, avec Playwright installé pour exécuter aussi les scénarios navigateur ([documentation développeur](developpeurs.md#tests)).
-2. Si `main.js`, `render.js`, `profile-ui.js`, `index.html`, `style.css` ou `dialogs.css` ont changé : jouer le protocole manuel de [`TESTING.md`](../TESTING.md) dans une **copie** du document Grist.
+2. Si `main.js`, `render.js`, `profile-ui.js`, `profile-form.js`, `profile-review.js`, `dialog-shell.js`, `index.html`, `style.css` ou `dialogs.css` ont changé : jouer le protocole manuel de [`TESTING.md`](../TESTING.md) dans une **copie** du document Grist.
 3. Une correction a son test de non-régression.
 4. [`CHANGELOG.md`](../CHANGELOG.md) et [`VERSION.md`](../VERSION.md) sont à jour.
 5. Si l'interface a changé : captures régénérées (`node docs/demo/capturer.mjs`) et [guide utilisateur](utilisateurs.md) corrigé.

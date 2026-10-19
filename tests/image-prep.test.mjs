@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ImageError, checkImageFile, fitWithin, megabytes, prepareImage, squareCrop } from '../image-prep.js';
+import { ImageError, checkImageFile, fitWithin, imageFaultMessage, megabytes, prepareImage, squareCrop } from '../image-prep.js';
 import { IMAGE_RULES } from '../constants.js';
 
 // ===== image-prep : ce qui se décide avant de dessiner (le dessin lui-même est essayé dans
@@ -119,4 +119,23 @@ test('prepareImage with the avatar rules refuses a bad file before drawing anyth
   assert.match(await refused(fileOf(10, 'image/svg+xml')), /JPG, PNG ou WebP/);
   assert.match(await refused(fileOf(IMAGE_RULES.avatar.maxBytes + 1, 'image/jpeg')), /pèse 2,1 Mo/);
   assert.match(await refused(fileOf(0, 'image/png')), /vide/);
+});
+
+test('imageFaultMessage rend la phrase d\'une ImageError telle quelle, sans rien écrire dans la console', t => {
+  const lines = [];
+  t.mock.method(console, 'error', (...args) => lines.push(args));
+  assert.equal(imageFaultMessage(new ImageError('Ce fichier est vide : choisissez-en un autre.')), 'Ce fichier est vide : choisissez-en un autre.');
+  assert.deepEqual(lines, []);
+});
+
+test('imageFaultMessage dit « illisible » pour toute autre erreur et garde la cause dans la console, jamais dans la phrase', t => {
+  const lines = [];
+  t.mock.method(console, 'error', (...args) => lines.push(args));
+  const cause = new TypeError('boom pour ana.martin@chu-bordeaux.fr');
+  const message = imageFaultMessage(cause);
+  assert.equal(message, 'Cette image n’a pas pu être lue : choisissez un autre fichier.');
+  assert.doesNotMatch(message, /boom/);
+  assert.deepEqual(lines, [['[IMAGE] Préparation de l\'image impossible :', cause]]);
+  imageFaultMessage(undefined);
+  assert.equal(lines.length, 2, 'même une erreur absente est consignée');
 });

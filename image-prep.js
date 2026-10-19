@@ -35,6 +35,14 @@ const FAILURES = {
   huge: 'Cette image est beaucoup trop grande : choisissez-en une plus petite.'
 };
 
+// La phrase à montrer pour une image qui n'a pas pu être préparée : celle d'une ImageError, telle quelle. Toute autre erreur
+// (imprévue) va dans la console, et la personne lit la phrase d'un fichier illisible.
+export function imageFaultMessage(error) {
+  if (error?.name === 'ImageError') return error.message;
+  console.error('[IMAGE] Préparation de l\'image impossible :', error);
+  return FAILURES.unreadable;
+}
+
 // Pourquoi le fichier choisi est refusé avant même d'être lu, ou '' s'il convient.
 export function checkImageFile(file, rules = IMAGE_RULES.logo) {
   if (!file || !rules.types.includes(file.type)) {

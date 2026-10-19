@@ -1,4 +1,4 @@
-# Version 1.28.6 — Audit exhaustif, lot 3 : le bandeau du compte et la liste déroulante sont découpés, sans rien changer pour les personnes (voir CHANGELOG.md)
+# Version 1.28.7 — Audit exhaustif, lot 4 : la fenêtre de modification d'une fiche est découpée en modules, sans rien changer pour les personnes (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
