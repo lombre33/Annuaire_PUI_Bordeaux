@@ -111,7 +111,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 | **Utiliser l'annuaire** : rechercher, filtrer, modifier sa fiche, comprendre un message, vocabulaire du PUI | [Guide utilisateur](docs/utilisateurs.md) |
 | **Comprendre et modifier le code** : architecture, chargement des données, règles, tests, recettes | [Documentation développeur](docs/developpeurs.md) |
 | **Régler le document Grist** : colonne de consentement, table-sonde, administrateurs, règles d'accès, logos et photos | [`GRIST_SETUP.md`](GRIST_SETUP.md) |
-| **Évaluer les risques** : accès demandé à Grist, écritures, usage de l'IA, données personnelles, recommandations | [Sécurité et confidentialité](docs/securite.md) |
+| **Évaluer les risques** : accès demandé à Grist, écritures, usage de l'IA, données personnelles, politique de sécurité de contenu, signalement d'un problème, recommandations | [Sécurité et confidentialité](docs/securite.md) |
 | **Faire vivre l'annuaire** : règles de visibilité, diagnostic, publication, retour arrière, continuité (départs, absence d'administrateur), hébergement | [Maintenance](docs/maintenance.md) |
 | **Consulter le cahier des charges** | [`specs.md`](specs.md) |
 | **Tester à la main avant un déploiement** | [`TESTING.md`](TESTING.md) |
