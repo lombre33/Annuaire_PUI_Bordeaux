@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.28.3 — Audit exhaustif, lot 1 : un libellé « constructor » ne casse plus rien, le gris des textes secondaires passe 4,5:1, le groupe de filtres a un rôle
+
+Premier lot de l'audit exhaustif relancé le 19 octobre 2026 sur la 1.28.2 (lecture du code, puis le module GWaudit d'Antoine). Rien ne change pour les personnes, sauf un gris un peu plus foncé.
+
+- **Un libellé qui porte le nom d'une propriété d'objet ne casse plus rien.** Les dictionnaires indexés par libellé (compteurs des menus, rôle dans une tâche, indicateurs d'un établissement) étaient des objets ordinaires : un libellé
+  normalisé égal à `constructor` y trouvait la fonction `Object` au lieu de « rien ». Pour une tâche de ce nom, la carte de la personne ne se dessinait plus (`roles.join is not a function`) ; le compteur de l'option affichait du texte.
+  Les lectures passent par `ownValue` (`grist-data.js`) et les compteurs comme les indicateurs se construisent avec des `Map`. Aucune attaque possible par là (les libellés viennent des tables de référence que les administrateurs
+  tiennent), mais une donnée ne doit pas pouvoir rendre l'annuaire muet.
+- **Contraste.** `--muted`, le gris des textes secondaires, passe de `#68738a` à `#636e85` : 4,49:1 sur le fond du sélecteur Fondateurs / Partenaires (`#f7f8fc`, le bouton « Partenaires » relevé par axe-core) et 4,41:1 sur `--wash` avant,
+  4,83:1 et 4,74:1 après (4,5:1 exigés, WCAG 1.4.3). **Écart avec la maquette v5**, imperceptible (5 sur 255 par canal) mais écart quand même : il est signalé à Antoine.
+- **Le conteneur des filtres a un rôle** (`role="group"`, comme le sélecteur Fondateurs / Partenaires) : `aria-label` est interdit sur un `div` sans rôle (axe-core, `aria-prohibited-attr`), les lecteurs d'écran l'ignoraient.
+- **Les jetons de test** (`tests/attachments.test.mjs`, `tests/upload.test.mjs`, `tests/support/grist-rest-server.mjs`) s'appellent `test-jeton-…` : aucun n'est un secret, mais un outil de détection de secrets les signalait.
+- Tests : trois tests qui échouaient sur la 1.28.2 (compteurs, indicateurs et carte d'une tâche « constructor ») et deux tests d'accessibilité sans navigateur (gris, `aria-label` sans rôle dans `index.html`). Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.28.2 — Logos : la console dit pourquoi Grist les refuse (règles d'accès) et comment y remédier, la documentation aussi
 
 Retour d'Antoine du 13 octobre 2026 (entre 13 h 27 et 14 h 18, heure de Paris), sur la 1.28.1 : sa console disait « 17 avec un logo dans la colonne logo », puis `[LOGOS] Bilan : 0 logo chargé sur 16 (16 refusés)`, et aucun logo

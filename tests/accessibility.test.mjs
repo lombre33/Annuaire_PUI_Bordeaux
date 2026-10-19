@@ -90,6 +90,39 @@ test('le lien e-mail d’une carte garde 4,5:1 sur le fond blanc de la carte (WC
   assert.ok(ratio >= MIN_TEXT_CONTRAST, `${variable} ${color} : ${ratio.toFixed(2)}:1 au lieu de 4,5:1`);
 });
 
+// Le gris des textes secondaires (`--muted`) se pose sur le blanc des cartes, sur le fond des champs et de
+// l'interrupteur Fondateurs / Partenaires (#f7f8fc) et sur le fond clair de la page (--wash). Avant la 1.28.3
+// (#68738a), il faisait 4,49:1 sur #f7f8fc (le bouton « Partenaires », relevé par axe-core) et 4,41:1 sur --wash.
+test('le gris des textes secondaires garde 4,5:1 sur chacun des fonds clairs où il se pose (WCAG 1.4.3)', () => {
+  const css = readCss('style.css');
+  const colorOf = name => new RegExp(`${name}:\\s*(#[0-9a-f]{3,8})`, 'i').exec(css)?.[1];
+  const muted = colorOf('--muted');
+  assert.ok(muted, '--muted est déclarée en hexadécimal dans :root');
+  const backgrounds = { blanc: '#ffffff', 'fond des champs et du sélecteur': '#f7f8fc', '--wash': colorOf('--wash') };
+  assert.ok(backgrounds['--wash'], '--wash est déclarée en hexadécimal dans :root');
+  const tooPale = Object.entries(backgrounds)
+    .map(([label, background]) => ({ label, ratio: contrastRatio(muted, background) }))
+    .filter(({ ratio }) => ratio < MIN_TEXT_CONTRAST)
+    .map(({ label, ratio }) => `${muted} sur ${label} : ${ratio.toFixed(2)}:1`);
+  assert.deepEqual(tooPale, [], 'foncer --muted (style.css) à teinte constante');
+  const used = new Set([...css.matchAll(/background(?:-color)?:\s*(#[0-9a-f]{6})\b/gi)].map(match => match[1].toLowerCase()));
+  assert.ok(used.has('#f7f8fc'), 'le fond des champs n\'a pas changé : mettre ce test à jour avec lui');
+});
+
+// ===== Noms accessibles du HTML (sans navigateur) =====
+
+// `aria-label` est interdit sur un élément sans rôle (div, span, p : « generic », « paragraph ») : les lecteurs d'écran
+// l'ignorent et axe-core le relève (aria-prohibited-attr). Un groupe de contrôles prend `role="group"`, comme l'interrupteur
+// Fondateurs / Partenaires.
+test('index.html ne nomme avec aria-label aucun élément sans rôle (div, span, p)', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const unnamed = [...html.matchAll(/<(div|span|p)\b[^>]*\saria-label=[^>]*>/g)]
+    .map(([tag]) => tag)
+    .filter(tag => !/\srole=/.test(tag));
+  assert.deepEqual(unnamed, [], 'ajouter un role (group, region…) à ces éléments');
+  assert.match(html, /<div id="filtersContainer"[^>]*\srole="group"[^>]*\saria-label="Filtres"/);
+});
+
 // ===== Interrupteur de présence (sans navigateur) =====
 
 // L'état de l'interrupteur « Apparaître dans l'annuaire » ne tient qu'à sa piste et à son curseur (le

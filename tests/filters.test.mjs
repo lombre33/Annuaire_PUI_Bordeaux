@@ -244,6 +244,20 @@ test('computeFilterCounts keys are normalized (case/accent-insensitive), matchin
   assert.equal(counts.competences[normalize('Oncologie')], 1, 'le tally doit matcher un libellé de référence "Oncologie" malgré la casse différente');
 });
 
+test('computeFilterCounts counts a label that is the name of an object property (« constructor », « __proto__ ») like any other', () => {
+  const contacts = [
+    { nom: 'A', labels: { competences: ['constructor', '__proto__'] } },
+    { nom: 'B', labels: { competences: ['Constructor'] } }
+  ];
+  const { competences } = computeFilterCounts(contacts, createEmptyFilterState(), '', undefined);
+  assert.equal(Object.hasOwn(competences, 'constructor'), true);
+  assert.equal(competences.constructor, 2, 'deux personnes, à la casse près : un nombre, pas du texte');
+  assert.equal(Object.hasOwn(competences, '__proto__'), true);
+  assert.equal(Object.getOwnPropertyDescriptor(competences, '__proto__').value, 1);
+  assert.equal(Object.getPrototypeOf(competences), Object.prototype, 'un objet ordinaire, comme avant');
+  assert.deepEqual(computeFilterCounts([], createEmptyFilterState(), '', undefined).competences, {});
+});
+
 // ===== Compétences et domaines : un seul menu, un seul filtre =====
 // Les domaines (compétences macro) rangent le menu Compétences : cocher un domaine coche
 // toutes ses compétences. Le filtre ne connaît que des compétences.

@@ -1,7 +1,7 @@
 // Construction du DOM (menus de filtres, cartes), sans logique métier.
 
 import { CATEGORIES, ETABLISSEMENT_TABLE, TAG_GROUPS, FILTERS } from './constants.js';
-import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, refId, shownEmail, sortWithCheckedFirst, normalize, uniqueLabels } from './grist-data.js';
+import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, normalize, ownValue, refId, shownEmail, sortWithCheckedFirst, uniqueLabels } from './grist-data.js';
 import { el } from './dom.js';
 import { groupState, menuGroups, selectionCount } from './filters.js';
 import { createLogoImage, fitCardLogo } from './branding-ui.js';
@@ -34,7 +34,7 @@ function optionValue(option) {
 
 // Nombre de cartes que donnerait l'option `value` de la catégorie `countKey`.
 function countFor(counts, countKey, value) {
-  return counts?.[countKey]?.[normalize(value)] ?? 0;
+  return ownValue(counts?.[countKey], normalize(value)) ?? 0;
 }
 
 // Cochées d'abord ; chaque groupe reste trié alphabétiquement. Une valeur écrite deux fois (à la casse
@@ -527,7 +527,7 @@ function buildTagGroup(group, labels, onToggle, change, roles) {
   values.append(
     ...labels.map(value => {
       const key = normalize(value);
-      return buildTag(group, value, onToggle, added.has(key), roles?.[key]);
+      return buildTag(group, value, onToggle, added.has(key), ownValue(roles, key));
     }),
     ...(change?.removed ?? []).map(value => buildRemovedTag(group, value))
   );
