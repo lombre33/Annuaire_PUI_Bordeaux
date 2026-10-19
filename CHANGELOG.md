@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.28.6 — Audit exhaustif, lot 3 : le bandeau du compte et la liste déroulante sont découpés, sans rien changer pour les personnes
+
+Troisième lot de l'audit exhaustif du 19 octobre 2026. Rien ne change pour les personnes : le comportement est identique, ce que les contrôles ci-dessous établissent.
+
+- **`createAccountBar` (138 lignes) devient cinq petites fonctions** dans `account-ui.js` : `accountParts` (les éléments du bandeau), `avatarPainter` (l'avatar n'est refait que si les initiales ou la photo changent), `buttonPlacer` (le rangement des boutons dans
+  l'en-tête), `statusLine` (le message passager et son annonce aux lecteurs d'écran) et `focusIfShown` (rendre le focus au bouton d'où une fenêtre a été ouverte, qui était écrit trois fois).
+- **`dropdown` (178 lignes) devient quatre fonctions** dans `dom.js` : `dropdownParts` (le DOM : bouton, panneau, recherche, une entrée par option), `optionList` (le choix montré, l'option désignée, le filtre), `panelControl` (ouvrir et fermer le panneau, le clic
+  ailleurs) et `wireDropdown` (la souris et le clavier). `dropdown()` les assemble et renvoie la même chose qu'avant.
+- **Comment on sait que rien n'a changé.** (1) 31 instantanés du DOM, de l'élément qui a le focus et du défilement de la liste, pris à chaque étape d'une liste déroulante (fermée, ouverte, flèches jusqu'au bout, recherche, « Aucun résultat », Échap, survol, clic, Tab, clic
+  ailleurs, ouverture au clavier, établissement choisi par un administrateur) et du bandeau (interrupteur, message annoncé puis effacé, focus rendu à « Mon établissement » et à « Créer ma fiche »), sont identiques à ceux de la 1.28.2 ; le banc d'essai repère les
+  fautes qu'on y introduit exprès. (2) Les 18 écrans de la 1.28.5 sont inchangés. (3) Les 352 tests de l'interface (profil, établissement, avatar, bandeau, accessibilité, mise en page) passent.
+
 ## 1.28.5 — Audit exhaustif, lot 2 : les fonctions trop complexes sont découpées, sans rien changer pour les personnes
 
 Deuxième lot de l'audit exhaustif du 19 octobre 2026. Rien ne change pour les personnes : le comportement est identique, ce que les contrôles ci-dessous établissent.

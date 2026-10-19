@@ -54,27 +54,10 @@ export const matchesTerm = (label, term) => term === '' || normalize(label).incl
 // valeurs répondent.
 export const foundText = (term, count) => (term === '' ? '' : count === 0 ? 'Aucun résultat' : `${count} résultat${count > 1 ? 's' : ''}`);
 
-// Une liste déroulante avec la recherche dedans, pour choisir une valeur parmi beaucoup (l'établissement, le rôle).
-// Fermée, c'est un bouton qui montre le choix, de la forme d'un champ ; ouverte, un panneau où la recherche est en haut
-// et les valeurs dessous, réduites en direct à ce qui répond, comme un menu de filtre (render.js). Au clavier : Entrée,
-// Espace ou une flèche l'ouvre, les flèches parcourent, Entrée choisit et Échap referme le panneau sans fermer la fenêtre.
-// Sur un écran tactile le panneau s'ouvre sans prendre le focus : le clavier du téléphone ne cache pas les valeurs.
-//   id           identifiant du bouton (celui du champ)
-//   labelId      identifiant du libellé du champ : il nomme le bouton et la liste
-//   options      [{ id, label }] ; un identifiant 0 est « aucune valeur » (« Non renseigné »)
-//   value        identifiant du choix actuel ; 0, ou absent de la liste, le bouton montre `placeholder`
-//   placeholder  ce que le bouton montre tant que rien n'est choisi
-//   searchLabel  nom de la recherche, qui sert aussi de texte d'invite
-//   color        (facultatif) la couleur du filet du panneau, celle de la catégorie comme sur les menus de filtre
-//   onChange     identifiant choisi → appelé à chaque changement de choix
-// Renvoie { element, trigger } : le bloc à poser dans le formulaire, et son bouton (aria-invalid, aria-describedby).
-export function dropdown({ id, labelId, options, value, placeholder, searchLabel, color, onChange }) {
+// Les éléments d'une liste déroulante, sans leur comportement : le bloc (`root`), le bouton, le texte du choix, le panneau
+// (recherche, liste, « aucun résultat » et sa version pour les lecteurs d'écran) et une entrée par option, { option, item }.
+function dropdownParts({ id, labelId, options, searchLabel, color, onTerm }) {
   const listId = `${id}-list`;
-  let chosen = value;
-  let open = false;
-  let active = null;
-  let pointer = [0, 0];
-
   const root = el('div', 'dd');
   const trigger = button('', 'dd-trigger');
   trigger.id = id;
@@ -98,7 +81,7 @@ export function dropdown({ id, labelId, options, value, placeholder, searchLabel
   none.setAttribute('aria-hidden', 'true'); // le lecteur d'écran l'entend par `status`
   const status = el('p', 'sr-only');
   status.setAttribute('role', 'status');
-  const search = searchField({ label: searchLabel, placeholder: `${searchLabel}…`, onTerm: paint });
+  const search = searchField({ label: searchLabel, placeholder: `${searchLabel}…`, onTerm });
   search.classList.add('dd-search');
   search.setAttribute('aria-controls', listId);
   panel.append(search, list, none, status);
@@ -110,32 +93,30 @@ export function dropdown({ id, labelId, options, value, placeholder, searchLabel
   });
 
   const entries = options.map(option => {
-    const entry = { option, item: el('li', 'dd-option', option.label) };
-    entry.item.id = `${id}-option-${option.id}`;
-    entry.item.setAttribute('role', 'option');
-    entry.item.addEventListener('click', () => choose(option.id));
-    // La souris désigne l'option sous elle, sauf quand c'est le défilement au clavier qui la fait passer là.
-    entry.item.addEventListener('pointermove', event => {
-      if (event.clientX === pointer[0] && event.clientY === pointer[1]) return;
-      pointer = [event.clientX, event.clientY];
-      setActive(entry);
-    });
-    return entry;
+    const item = el('li', 'dd-option', option.label);
+    item.id = `${id}-option-${option.id}`;
+    item.setAttribute('role', 'option');
+    return { option, item };
   });
   list.append(...entries.map(entry => entry.item));
+  return { root, trigger, shown, panel, list, none, status, search, entries };
+}
 
+// Les valeurs de la liste : le choix que montre le bouton, l'option désignée (celle qu'Entrée choisit), la recherche.
+// `state` : { chosen, active }. Renvoie { showChoice, setActive, move, paint }.
+function optionList({ trigger, shown, list, none, status, search, entries }, state, placeholder) {
   const visibleEntries = () => entries.filter(entry => !entry.item.hidden);
 
   function showChoice() {
-    const current = entries.find(entry => entry.option.id === chosen);
+    const current = entries.find(entry => entry.option.id === state.chosen);
     shown.textContent = current ? current.option.label : placeholder;
-    trigger.classList.toggle('empty', !current || chosen === 0);
+    trigger.classList.toggle('empty', !current || state.chosen === 0);
     entries.forEach(entry => entry.item.setAttribute('aria-selected', String(entry === current)));
   }
 
   function setActive(entry) {
-    active?.item.classList.remove('active');
-    active = entry;
+    state.active?.item.classList.remove('active');
+    state.active = entry;
     if (entry) {
       entry.item.classList.add('active');
       search.setAttribute('aria-activedescendant', entry.item.id);
@@ -154,7 +135,7 @@ export function dropdown({ id, labelId, options, value, placeholder, searchLabel
   function move(step) {
     const visible = visibleEntries();
     if (visible.length === 0) return;
-    const next = visible[Math.min(Math.max(visible.indexOf(active) + step, 0), visible.length - 1)];
+    const next = visible[Math.min(Math.max(visible.indexOf(state.active) + step, 0), visible.length - 1)];
     setActive(next);
     reveal(next);
   }
@@ -168,15 +149,21 @@ export function dropdown({ id, labelId, options, value, placeholder, searchLabel
     const visible = visibleEntries();
     none.hidden = visible.length > 0;
     status.textContent = foundText(term, visible.length);
-    const target = (term === '' && visible.find(entry => entry.option.id === chosen)) || visible[0] || null;
+    const target = (term === '' && visible.find(entry => entry.option.id === state.chosen)) || visible[0] || null;
     setActive(target);
     list.scrollTop = 0;
     if (target) reveal(target);
   }
 
+  return { showChoice, setActive, move, paint };
+}
+
+// Le panneau : ouvert, la recherche y prend le focus (sauf sur un écran tactile) et un clic ailleurs le referme.
+// `state` : { open }. Renvoie { openPanel, close }.
+function panelControl({ root, trigger, panel, search }, state, choices) {
   function outsidePointer(event) {
     if (!root.isConnected) { // la fenêtre s'est fermée panneau ouvert : plus rien à refermer
-      open = false;
+      state.open = false;
       document.removeEventListener('pointerdown', outsidePointer, true);
     } else if (!root.contains(event.target)) {
       close(false);
@@ -184,13 +171,13 @@ export function dropdown({ id, labelId, options, value, placeholder, searchLabel
   }
 
   function openPanel() {
-    if (open) return;
-    open = true;
+    if (state.open) return;
+    state.open = true;
     root.classList.add('open');
     trigger.setAttribute('aria-expanded', 'true');
     panel.hidden = false;
     search.value = '';
-    paint('');
+    choices.paint('');
     panel.scrollIntoView({ block: 'nearest' });
     if (!window.matchMedia('(pointer: coarse)').matches) search.focus({ preventScroll: true });
     document.addEventListener('pointerdown', outsidePointer, true);
@@ -198,8 +185,8 @@ export function dropdown({ id, labelId, options, value, placeholder, searchLabel
 
   // `refocus` : rend le focus au bouton, quand il était dans le panneau qui disparaît.
   function close(refocus) {
-    if (!open) return;
-    open = false;
+    if (!state.open) return;
+    state.open = false;
     root.classList.remove('open');
     trigger.setAttribute('aria-expanded', 'false');
     panel.hidden = true;
@@ -207,42 +194,79 @@ export function dropdown({ id, labelId, options, value, placeholder, searchLabel
     if (refocus) trigger.focus({ preventScroll: true });
   }
 
+  return { openPanel, close };
+}
+
+// Les gestes : un clic sur une valeur la choisit ; au clavier, les flèches parcourent, Entrée choisit, Échap referme le panneau.
+function wireDropdown(parts, state, choices, panelOf, onChange) {
+  const { root, trigger, search, entries } = parts;
+
   function choose(next) {
-    const changed = next !== chosen;
-    chosen = next;
-    showChoice();
-    close(true);
+    const changed = next !== state.chosen;
+    state.chosen = next;
+    choices.showChoice();
+    panelOf.close(true);
     if (changed) onChange(next);
   }
 
-  trigger.addEventListener('click', () => (open ? close(true) : openPanel()));
+  entries.forEach(entry => {
+    entry.item.addEventListener('click', () => choose(entry.option.id));
+    // La souris désigne l'option sous elle, sauf quand c'est le défilement au clavier qui la fait passer là.
+    entry.item.addEventListener('pointermove', event => {
+      if (event.clientX === state.pointer[0] && event.clientY === state.pointer[1]) return;
+      state.pointer = [event.clientX, event.clientY];
+      choices.setActive(entry);
+    });
+  });
+  trigger.addEventListener('click', () => (state.open ? panelOf.close(true) : panelOf.openPanel()));
   trigger.addEventListener('keydown', event => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
-    if (open) move(event.key === 'ArrowDown' ? 1 : -1);
-    else openPanel();
+    if (state.open) choices.move(event.key === 'ArrowDown' ? 1 : -1);
+    else panelOf.openPanel();
   });
   search.addEventListener('keydown', event => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      move(event.key === 'ArrowDown' ? 1 : -1);
+      choices.move(event.key === 'ArrowDown' ? 1 : -1);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      if (active) choose(active.option.id);
+      if (state.active) choose(state.active.option.id);
     }
   });
   // Échap referme le panneau et s'arrête là : la touche ne doit pas atteindre la fenêtre, qu'elle fermerait.
   root.addEventListener('keydown', event => {
-    if (event.key !== 'Escape' || !open) return;
+    if (event.key !== 'Escape' || !state.open) return;
     event.preventDefault();
     event.stopPropagation();
-    close(true);
+    panelOf.close(true);
   });
   // Tabulation vers un autre champ : le panneau se referme (un clic ailleurs est traité par outsidePointer).
   root.addEventListener('focusout', event => {
-    if (open && event.relatedTarget && !root.contains(event.relatedTarget)) close(false);
+    if (state.open && event.relatedTarget && !root.contains(event.relatedTarget)) panelOf.close(false);
   });
+}
 
-  showChoice();
-  return { element: root, trigger };
+// Une liste déroulante avec la recherche dedans, pour choisir une valeur parmi beaucoup (l'établissement, le rôle).
+// Fermée, c'est un bouton qui montre le choix, de la forme d'un champ ; ouverte, un panneau où la recherche est en haut
+// et les valeurs dessous, réduites en direct à ce qui répond, comme un menu de filtre (render.js). Au clavier : Entrée,
+// Espace ou une flèche l'ouvre, les flèches parcourent, Entrée choisit et Échap referme le panneau sans fermer la fenêtre.
+// Sur un écran tactile le panneau s'ouvre sans prendre le focus : le clavier du téléphone ne cache pas les valeurs.
+//   id           identifiant du bouton (celui du champ)
+//   labelId      identifiant du libellé du champ : il nomme le bouton et la liste
+//   options      [{ id, label }] ; un identifiant 0 est « aucune valeur » (« Non renseigné »)
+//   value        identifiant du choix actuel ; 0, ou absent de la liste, le bouton montre `placeholder`
+//   placeholder  ce que le bouton montre tant que rien n'est choisi
+//   searchLabel  nom de la recherche, qui sert aussi de texte d'invite
+//   color        (facultatif) la couleur du filet du panneau, celle de la catégorie comme sur les menus de filtre
+//   onChange     identifiant choisi → appelé à chaque changement de choix
+// Renvoie { element, trigger } : le bloc à poser dans le formulaire, et son bouton (aria-invalid, aria-describedby).
+export function dropdown({ id, labelId, options, value, placeholder, searchLabel, color, onChange }) {
+  const state = { chosen: value, open: false, active: null, pointer: [0, 0] };
+  let choices;
+  const parts = dropdownParts({ id, labelId, options, searchLabel, color, onTerm: term => choices.paint(term) });
+  choices = optionList(parts, state, placeholder);
+  wireDropdown(parts, state, choices, panelControl(parts, state, choices), onChange);
+  choices.showChoice();
+  return { element: parts.root, trigger: parts.trigger };
 }
