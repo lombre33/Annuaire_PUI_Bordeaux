@@ -67,10 +67,61 @@ function startStaticServer() {
       response.writeHead(404).end();
       return;
     }
-    response.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+    // GitHub Pages répond avec « access-control-allow-origin: * » : sans lui, un cadre sandbox sans allow-same-origin (origine opaque)
+    // ne pourrait pas charger les modules du widget, qui se chargent en CORS.
+    response.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'access-control-allow-origin': '*' });
     response.end(fs.readFileSync(file));
   });
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
+}
+
+// La page n'a rien chargé ni exécuté que la politique de sécurité de contenu de index.html refuse. Sans ce contrôle, une
+// ressource refusée passerait inaperçue des tests (l'image manque, le script ne part pas) et ne se verrait qu'en production,
+// dans la console d'une personne. `widget` : ce que renvoie openWidget(). Un test qui refuse exprès une ressource vide ensuite
+// `widget.logs.cspViolations`.
+export async function assertNoCspViolation({ page, logs }) {
+  await page.evaluate(() => 0).catch(() => {}); // laisse arriver les signalements encore en route (la page a pu se fermer)
+  assert.deepEqual(logs.cspViolations, [], 'la page a enfreint la politique de sécurité de contenu de index.html');
+}
+
+// La mise en page se pose quelques images après un changement de largeur : le navigateur ne dessine que les cartes proches de
+// l'écran (`content-visibility: auto`, 1.29.0) et remplace la hauteur estimée des autres par la leur dès qu'il les dessine. Deux
+// mesures séparées par ce changement (le bandeau « sous la dernière carte » de l'une, la dernière carte de l'autre) ne se recoupent
+// pas. `layoutSettled` attend donc que la hauteur de la page et le bas de la dernière carte restent les mêmes pendant `frames`
+// images de suite ; openWidget() y soumet chaque `page.setViewportSize`. Au bout de `timeout` ms elle échoue : une page qui bouge
+// sans cesse ne se mesure pas.
+export const layoutSettled = (page, { frames = 6, timeout = 5000 } = {}) => page.evaluate(({ stableFor, limit }) => new Promise((resolve, reject) => {
+  const signature = () => {
+    const cards = document.querySelectorAll('.contact-card');
+    const last = cards.length > 0 ? cards[cards.length - 1].getBoundingClientRect().bottom : 0;
+    return [document.documentElement.scrollHeight, document.documentElement.scrollWidth, last].join(' ');
+  };
+  let previous = signature();
+  let stable = 0;
+  let over = false;
+  const timer = setTimeout(() => { over = true; reject(new Error(`la mise en page ne se pose pas (${signature()})`)); }, limit);
+  const tick = () => {
+    if (over) return;
+    const current = signature();
+    stable = current === previous ? stable + 1 : 0;
+    previous = current;
+    if (stable < stableFor) { requestAnimationFrame(tick); return; }
+    over = true;
+    clearTimeout(timer);
+    resolve();
+  };
+  requestAnimationFrame(tick);
+}), { stableFor: frames, limit: timeout });
+
+// Joue `run` sur la page ouverte, vérifie qu'elle n'a pas enfreint sa politique de sécurité de contenu, puis ferme le contexte :
+// la fin commune de `withWidget` ici et dans tests/support/layout.mjs.
+export async function runWidget(widget, run) {
+  try {
+    await run(widget);
+    await assertNoCspViolation(widget);
+  } finally {
+    await widget.context.close();
+  }
 }
 
 // Renvoie { skip, openWidget, withWidget }. `skip` : faux quand le navigateur est là, sinon la raison pour laquelle les tests
@@ -102,7 +153,8 @@ export async function createHarness({ keepScrollbars = false } = {}) {
   // `files.release()` ; `downloadFirst` : 'abort' ou 'hang', la première demande de chaque fichier échoue ou n'a jamais de réponse (les
   // suivantes passent) ; `initScript` : un script (texte) exécuté dans la page avant tout autre ; `contextOptions` : les options du
   // contexte Playwright (un écran tactile, sans survol : { hasTouch: true, isMobile: true }). `logs.pageErrors` : les exceptions
-  // que la page n'a pas rattrapées, sans les messages d'erreur de sa console.
+  // que la page n'a pas rattrapées, sans les messages d'erreur de sa console ; `logs.cspViolations` : ce que la politique de
+  // sécurité de contenu de index.html a refusé à la page (voir assertNoCspViolation).
   async function openWidget({
     tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false,
     accessToken, withoutMethods = [], downloadCors = true, downloadHold = false, downloadFirst = null, initScript = null,
@@ -117,7 +169,13 @@ export async function createHarness({ keepScrollbars = false } = {}) {
     files.download.hold = downloadHold;
     files.download.first = downloadFirst;
     const page = await context.newPage();
-    const logs = { errors: [], warnings: [], infos: [], pageErrors: [] };
+    const logs = { errors: [], warnings: [], infos: [], pageErrors: [], cspViolations: [] };
+    // Chaque changement de largeur attend que la mise en page se pose (voir layoutSettled).
+    const resize = page.setViewportSize.bind(page);
+    page.setViewportSize = async size => {
+      await resize(size);
+      await layoutSettled(page);
+    };
     page.on('pageerror', error => {
       logs.pageErrors.push(error.message);
       logs.errors.push(error.message);
@@ -137,6 +195,14 @@ export async function createHarness({ keepScrollbars = false } = {}) {
       if (message.type() === 'warning') keep(logs.warnings);
       if (message.type() === 'info') keep(logs.infos);
     });
+    // Le navigateur signale chaque ressource ou script que la politique de sécurité de contenu de index.html refuse à la page
+    // (événement securitypolicyviolation) ; la page le passe au test, qui garde aussi ceux d'avant un rechargement.
+    await page.exposeFunction('__reportCspViolation', line => { logs.cspViolations.push(line); });
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', event => {
+        window.__reportCspViolation(`${event.violatedDirective} : ${event.blockedURI}`);
+      });
+    });
     await page.addInitScript(values => {
       window.__tables = values.tables;
       window.__failTables = values.failTables;
@@ -155,14 +221,7 @@ export async function createHarness({ keepScrollbars = false } = {}) {
     return { page, context, logs, files };
   }
 
-  async function withWidget(options, run) {
-    const widget = await openWidget(options);
-    try {
-      await run(widget);
-    } finally {
-      await widget.context.close();
-    }
-  }
+  const withWidget = async (options, run) => runWidget(await openWidget(options), run);
 
   return { skip, openWidget, withWidget };
 }

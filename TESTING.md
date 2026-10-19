@@ -151,11 +151,20 @@ Sans dépendance, un fichier de tests par module :
   fichier. Chaque fichier de test en lance sa propre instance (`createHarness()`). La page n'attend
   plus l'événement `load` quand un test retient ou suspend le téléchargement d'un logo
   (`downloadHold`, `downloadFirst`, `downloadCors`) : depuis la 1.29.0 la première lecture part tout de suite, les
-  logos sont demandés avant `load`, et `load` attendrait la réponse qu'on retient exprès.
+  logos sont demandés avant `load`, et `load` attendrait la réponse qu'on retient exprès. Depuis la 1.29.1, chaque
+  ressource que la politique de sécurité de contenu de `index.html` refuse à la page est relevée
+  (`logs.cspViolations`) et `withWidget` fait échouer tout scénario dont la page l'enfreint
+  (`assertNoCspViolation`) : une ressource refusée ne passe plus inaperçue, ni à la mise en page de
+  `tests/support/layout.mjs`, qui passe par le même `runWidget`. Chaque `page.setViewportSize` ne rend
+  la main qu'une fois la mise en page posée (`layoutSettled` : la hauteur de la page et le bas de la
+  dernière carte ne bougent plus pendant six images) : depuis la 1.29.0 le navigateur ne dessine que les
+  cartes proches de l'écran et corrige la hauteur estimée des autres une ou deux images après un
+  changement de largeur, ce qui faisait échouer par intermittence deux mesures de
+  `tests/branding-layout.test.mjs` (1.29.1).
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : ce harnais, et les attentes
   que ces tests partagent (cartes, bandeau, message, focus rendu, sa propre fiche ouverte,
-  actions envoyées à `BDD`, ni jeton ni adresse du document dans la console, pied d'une
-  fenêtre sur une ou deux lignes).
+  actions envoyées à `BDD`, ni jeton ni adresse du document dans la console, aucune violation de la
+  politique de sécurité de contenu, mise en page posée, pied d'une fenêtre sur une ou deux lignes).
 - `tests/support/layout.mjs` — le même harnais avec les barres de défilement (dans Grist elles
   retirent 15 px de large), les largeurs testées et les mesures de cartes de
   `tests/responsive.test.mjs` et `tests/branding-layout.test.mjs`.
@@ -173,10 +182,14 @@ Sans dépendance, un fichier de tests par module :
 - `tests/support/multipart.mjs` — la lecture d'un fichier envoyé en `multipart/form-data`
   (`readMultipartFile`), commune aux faux serveurs de pièces jointes, au serveur REST des
   tests et au serveur de démonstration.
+- `tests/support/widget-sources.mjs` — le code du widget tel que les tests de garde le lisent
+  (`WIDGET_SOURCES` : les modules à la racine, `withoutComments` : sans leurs commentaires), pour
+  `tests/docs.test.mjs` et `tests/csp.test.mjs`.
 - `tests/support-helpers.test.mjs` — les aides ci-dessus refusent ce qu'elles doivent refuser :
   chaque cas leur donne une page volontairement fautive (un bouton sans nom, un élément qui
   sort de la fenêtre ou de la carte, une tabulation qui s'échappe, le jeton dans la console, un
-  mauvais parcours au clavier) et attend leur refus.
+  mauvais parcours au clavier, une page qui enfreint sa politique de sécurité de contenu, relevée
+  par `assertNoCspViolation` comme par `withWidget`) et attend leur refus.
 - `tests/support/fake-attachments.mjs` — les pièces jointes du faux Grist pour les tests
   navigateur : des logos dessinés à la demande (proportions variées, un logo très haut,
   une bannière très large, un SVG sans dimensions), un fichier supprimé (404), un
@@ -212,6 +225,14 @@ Sans dépendance, un fichier de tests par module :
   `<link rel="modulepreload">` est exactement l'ensemble des modules que `main.js` importe, directement
   ou non, chacun une fois (un module oublié revient à l'ancienne attente, un module supprimé est une
   erreur 404) ; le script de la page est `main.js`, en module. Sans navigateur.
+- `tests/csp.test.mjs` — la politique de sécurité de contenu de `index.html` (1.29.1), lue telle qu'elle est
+  écrite : une seule balise, dans l'en-tête, avant toute ressource ; aucune directive que le navigateur
+  ignorerait dans une balise (`frame-ancestors`, `report-uri`) ; tout fermé par défaut, ni joker, ni `http` en
+  clair hors de la boucle locale, `'unsafe-inline'` pour les styles seulement ; `script-src` d'accord avec les
+  balises `<script>` de la page (changer l'adresse de l'API Grist sans la politique, ou l'inverse, casserait le
+  widget) ; ni script, ni gestionnaire d'événement, ni formulaire en ligne dans la page, ni script, cadre,
+  formulaire, gestionnaire ou minuterie à texte fabriqués par le code ; et `docs/securite.md` qui recopie la
+  politique mot pour mot. Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
 `npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 75
@@ -259,6 +280,15 @@ ingrédients d'une carte, un seul à la fois, la fait reconstruire, et rien d'au
 dans Grist qui ne provoque qu'une relecture de `BDD`, 250 ms après la dernière, les cartes éloignées de l'écran
 que le navigateur ne dessine pas (`content-visibility`) et la tabulation, qui passe par chaque carte, celles que
 le navigateur n'avait pas encore dessinées comprises.
+
+`tests/e2e-csp.test.mjs` y ajoute 16 scénarios sur la politique de sécurité de contenu (1.29.1), joués dans la
+vraie page : 14 tentatives que la politique doit refuser, chacune signalée par le navigateur (événement
+`securitypolicyviolation`) sans que rien ne s'exécute ni que la page ne quitte le widget (script et gestionnaire
+d'événement en ligne, adresse `javascript:`, script ou feuille de style d'un autre site, image ou requête en `http`
+vers un autre site, cadre, objet, police, média, travailleur, balise `<base>`, formulaire), un scénario de
+ce qu'elle doit laisser passer (images et requêtes en `https`, aperçus `data:` et `blob:`, boucle locale) et un
+dernier où le widget se charge dans un cadre sandbox sans `allow-same-origin` (origine opaque, comme Grist peut
+l'encadrer) : `'self'` doit y laisser charger les fichiers du dépôt.
 
 `tests/e2e-profile.test.mjs` y ajoute 68 scénarios sur la modification et la création d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
@@ -367,7 +397,8 @@ il ne garantit pas que Grist envoie toujours ces formes — d'où le protocole
 manuel ci-dessous, à jouer dans un vrai document avant déploiement. Ce que Grist accepte d'écrire ou de
 lire ne l'est pas davantage : la ligne d'une fiche créée par une personne ordinaire et la table-sonde que
 crée le widget (sections 11 et 19), la colonne `Taches_role` (section 20), l'envoi d'un logo ou d'une
-photo (sections 17 et 18) et l'affichage des logos (section 14).
+photo (sections 17 et 18), l'affichage des logos (section 14) et la politique de sécurité de contenu, dont le Grist
+simulé ne demande rien qu'elle refuse (section 22).
 
 Si vous ajoutez une fonction à `grist-data.js` ou `filters.js` : ajoutez son
 test dans le fichier de `tests/` qui correspond à son rôle (liste ci-dessus).
@@ -1454,3 +1485,36 @@ les mesures de l'audit (500 à 20 000 lignes) viennent de Chromium, sur des donn
 - [ ] **Navigateurs sans `content-visibility`** (Firefox avant la 125, Safari avant la 18) : la règle est ignorée,
       toutes les cartes sont dessinées comme avant la 1.29.0 ; rien ne change à l'écran, seule la rapidité
       sur un très grand annuaire est moindre.
+
+
+## 22. Politique de sécurité de contenu (1.29.1)
+
+Réglages d'abord : aucun. À jouer dans le vrai Grist, la console du navigateur (F12) ouverte **avant** de recharger la page,
+sur un ordinateur puis sur un téléphone. **Ce protocole est le seul contrôle de la politique de `index.html` dans un vrai
+Grist : les tests la vérifient sur un Grist simulé, dont le script ne demande rien de plus que ce qu'elle laisse passer.** Si
+une case échoue, la cause probable est une ressource que la politique refuse, et la console dit laquelle.
+
+- [ ] **Aucun refus dans la console.** Recharger la page de Grist qui contient le widget, chercher « Content Security Policy »
+      et « Refused to » dans la console : aucune ligne. Une ligne comme « Refused to load the script/stylesheet/image …
+      because it violates the following Content Security Policy directive » nomme la directive et l'adresse refusées :
+      les relever, puis ajouter l'origine à la directive (`docs/developpeurs.md`, recette « Charger une ressource d'un autre
+      site ») ou revenir en arrière (dernière case).
+- [ ] **Le widget s'ouvre comme avant.** Les cartes, les financeurs, le bandeau du bas, les filtres et leurs menus, la
+      recherche, le bandeau « Ma présence » : rien ne manque ni ne change par rapport à la 1.29.0 (sections 1 à 6, 11).
+- [ ] **Les logos et les photos s'affichent** (sections 14 et 18). Si seuls ceux-là manquent et que la console dit
+      `img-src`, l'adresse des pièces jointes de Grist n'est pas en `https` : relever laquelle.
+- [ ] **Le choix d'une image montre son aperçu** (sections 17 et 18) : « ✎ Modifier » sous un logo, ou « ✎ Modifier mon
+      profil » puis « Photo de profil », choisir un fichier : l'aperçu apparaît (images `blob:` et `data:`).
+- [ ] **L'envoi d'une image aboutit** (sur une copie du document, sections 17 et 18) : la requête d'envoi n'est pas refusée
+      (`connect-src`) et l'image s'affiche ensuite.
+- [ ] **Les fenêtres de modification** (sections 13 et 17) s'ouvrent, se valident et se ferment comme avant : le script de
+      Grist ajoute une balise `<style>` au document, que `style-src 'unsafe-inline'` laisse passer.
+- [ ] **Essai sans `'unsafe-eval'` (facultatif).** Retirer `'unsafe-eval'` de `script-src` dans une copie de `index.html` servie
+      pour l'essai (dans Chrome, les remplacements locaux des outils de développement évitent de publier), recharger :
+      si la console ne dit rien de plus et si tout ci-dessus marche, le retirer pour de bon dans `index.html` et dans
+      `docs/securite.md` (`tests/csp.test.mjs` les compare).
+- [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles. Ces navigateurs ne disent pas les refus avec
+      les mêmes mots, mais le résultat visible doit être le même.
+- [ ] **Retour en arrière** si le widget ne s'ouvre pas ou s'ouvre incomplet : supprimer la balise
+      `<meta http-equiv="Content-Security-Policy" …>` de `index.html` (le reste du code n'en dépend pas) et noter ce que la
+      console avait dit.

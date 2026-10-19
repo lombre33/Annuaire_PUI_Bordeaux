@@ -23,7 +23,9 @@ jobs:
           npm install --no-save --no-package-lock playwright@1.64.0
           npx playwright install --with-deps chromium
       - name: Tests
-        run: node --test
+        # Le rapport « spec » finit par la liste des tests en échec, avec leur message : on la lit sans fouiller le rapport TAP
+        # (six mille lignes, dont les échecs sont au milieu).
+        run: node --test --test-reporter=spec
         env:
           # Échoue si le test navigateur ne peut pas démarrer, au lieu de l'ignorer.
           REQUIRE_E2E: '1'

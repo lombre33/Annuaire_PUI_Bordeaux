@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ANA_EMAIL, withIdentity } from './fixtures.mjs';
-import { assertNoSecretLogged, openOwn, skip, until, waitForCards, withWidget } from './support/browser.mjs';
+import { assertNoCspViolation, assertNoSecretLogged, layoutSettled, openOwn, skip, until, waitForCards, withWidget } from './support/browser.mjs';
 import { FITS, assertTabStaysInDialog, dialogFit, profileDialogPage, spillOf, unnamedControls } from './support/dialog-page.mjs';
 import { assertKeyboardWalk, groupedMenu } from './support/grouped-menu.mjs';
 
@@ -107,3 +107,81 @@ test('assertKeyboardWalk : le parcours du bon groupe passe, celui d\'un autre gr
   await assert.rejects(walk('Pharmacie', 'Hématologie'));
   await assert.rejects(walk('Cancérologie', 'Oncologie'));
 });
+
+test('assertNoCspViolation : une page saine passe, un script en ligne que la politique refuse est repéré', { skip }, () =>
+  withWidget({}, async widget => {
+    await waitForCards(widget.page, 4);
+    await assertNoCspViolation(widget);
+    await widget.page.evaluate(() => {
+      const script = document.createElement('script');
+      script.textContent = 'window.__ran = true';
+      document.head.append(script);
+    });
+    await until(() => widget.logs.cspViolations.length > 0, 'le navigateur a signalé le script refusé');
+    await assert.rejects(assertNoCspViolation(widget), /politique de sécurité de contenu/);
+    widget.logs.cspViolations.length = 0; // refus voulu : withWidget ne doit pas l'échouer
+  }));
+
+test('withWidget : un scénario dont la page enfreint sa politique de sécurité de contenu échoue, même si le scénario ne le regarde pas', { skip }, () =>
+  assert.rejects(withWidget({}, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    await page.evaluate(() => { new Image().src = 'http://evil.example/p.png'; });
+    await until(() => logs.cspViolations.length > 0, 'le navigateur a signalé l\'image refusée');
+  }), /politique de sécurité de contenu/));
+
+// Une page dont la hauteur change à chaque image pendant `count` images, comme le bas d'une grille de cartes dont le navigateur
+// corrige les hauteurs estimées : `window.__grow(count)`, jouée dans la page.
+const installGrowth = page => page.evaluate(() => {
+  window.__grow = count => {
+    const spacer = document.createElement('div');
+    document.getElementById('cardsGrid').before(spacer);
+    let drawn = 0;
+    const next = () => {
+      spacer.style.height = `${(drawn += 1) * 7}px`;
+      if (drawn < count) requestAnimationFrame(next);
+    };
+    requestAnimationFrame(next);
+  };
+});
+const pageHeight = page => page.evaluate(() => document.documentElement.scrollHeight);
+const framesLater = (page, count) => page.evaluate(frames => new Promise(resolve => {
+  const wait = left => (left === 0 ? resolve() : requestAnimationFrame(() => wait(left - 1)));
+  wait(frames);
+}), count);
+
+test('layoutSettled : attend qu\'une page qui bouge se pose, et refuse une page qui ne se pose jamais', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await installGrowth(page);
+    const before = await pageHeight(page);
+    await page.evaluate(() => window.__grow(30));
+    await layoutSettled(page);
+    const settled = await pageHeight(page);
+    assert.ok(settled >= before + 200, `la page a fini de grandir (${before} → ${settled} px)`);
+    await framesLater(page, 10);
+    assert.equal(await pageHeight(page), settled, 'une fois posée, la page ne bouge plus');
+    // Une page qui bouge à chaque image ne se pose jamais : on le dit au lieu de laisser mesurer n'importe quand.
+    await page.evaluate(() => {
+      let flip = 0;
+      const flicker = () => {
+        document.getElementById('cardsGrid').style.marginTop = `${44 + (flip++ % 2) * 10}px`;
+        requestAnimationFrame(flicker);
+      };
+      requestAnimationFrame(flicker);
+    });
+    await assert.rejects(layoutSettled(page, { timeout: 300 }), /ne se pose pas/);
+  }));
+
+test('page.setViewportSize : le harnais ne rend la main qu\'une fois la mise en page posée', { skip }, () =>
+  withWidget({}, async ({ page }) => {
+    await waitForCards(page, 4);
+    await installGrowth(page);
+    // Le navigateur ajuste la page pendant une vingtaine d'images après chaque changement de largeur.
+    await page.evaluate(() => window.addEventListener('resize', () => window.__grow(20)));
+    const before = await pageHeight(page);
+    await page.setViewportSize({ width: 700, height: 800 });
+    const settled = await pageHeight(page);
+    assert.ok(settled >= before + 100, `la page a fini de s'ajuster (${before} → ${settled} px)`);
+    await framesLater(page, 10);
+    assert.equal(await pageHeight(page), settled, 'la mise en page est posée dès le retour de setViewportSize');
+  }));
