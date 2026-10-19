@@ -29,11 +29,12 @@ Sans dépendance, un fichier de tests par module :
   colonnes ignorées, indicateurs) et `labelsOf`.
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
-  libellé), `isEtablissementEligible`, `filterVisibleEstablishments` (le menu Établissement offre ce que les cartes
+  libellé, jamais une propriété d'`Object`), `isEtablissementEligible`, `filterVisibleEstablishments` (le menu Établissement offre ce que les cartes
   peuvent montrer, selon les interrupteurs).
 - `tests/filters.test.mjs` — `filterContacts` (dont la recherche « prénom nom », mot par
   mot et dans n'importe quel ordre, et ses écritures tolérées), `pruneStaleFilters`,
-  `computeFilterCounts` (dont les compteurs des domaines et des actions) et le menu
+  `computeFilterCounts` (dont les compteurs des domaines et des actions, et un libellé qui porte le nom d'une
+  propriété d'objet : « constructor », « __proto__ ») et le menu
   rangé par groupe, domaine ou action : `menuGroups`, `groupState`, `toggleGroup`,
   `selectionCount`.
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
@@ -200,10 +201,11 @@ carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numé
 et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
 les tâches par action.
 
-`tests/e2e-task-roles.test.mjs` y ajoute 4 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
+`tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
 (au-dessus, dans le cadre, refermée en la quittant), au clavier (Échap, cartes redessinées) et, sur un écran
-tactile émulé, le rôle sous le nom de la tâche sans bulle.
+tactile émulé, le rôle sous le nom de la tâche sans bulle ; une tâche qui s'appelle « constructor » s'écrit
+comme les autres, sans rôle ni erreur.
 
 `tests/e2e-profile.test.mjs` y ajoute 68 scénarios sur la modification et la création d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
@@ -286,11 +288,12 @@ autre origine (`tests/support/grist-rest-server.mjs`), dans l'ordre des intergic
 que Chromium applique lui-même : l'envoi aboutit avec l'en-tête `X-Requested-With` (1.21.5) ; sans lui, la même
 requête échoue comme la panne signalée le 13 octobre 2026 (401 sans en-têtes CORS, donc une simple panne de
 réseau pour la page).
-`tests/accessibility.test.mjs` y ajoute 11 scénarios (et 6 tests sans navigateur : les rapports de
+`tests/accessibility.test.mjs` y ajoute 11 scénarios (et 8 tests sans navigateur : les rapports de
 contraste de référence, une garde sur les feuilles de style qui refuse tout `outline: 0` ou
 `outline: none` non justifié, le contraste de chaque couleur de catégorie et du lien e-mail, et celui de la
 piste et du curseur de l'interrupteur de présence, et la case à cocher dessinée par la feuille de style :
-thème clair imposé, fond blanc, bordure à 3:1) sur le clavier, le lecteur d'écran et les couleurs : le
+thème clair imposé, fond blanc, bordure à 3:1, le gris des textes secondaires à 4,5:1 sur chacun des fonds clairs où
+il se pose, et une garde sur `index.html` : aucun `aria-label` sur un élément sans rôle) sur le clavier, le lecteur d'écran et les couleurs : le
 champ de recherche nommé par son rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au repos,
 menu ouvert), le parcours complet à la tabulation (page, puis menu ouvert) où chaque arrêt change de capture
 avec et sans focus, avec un anneau plein de 2 px au moins et de 3:1 au moins, les pastilles, les titres de
