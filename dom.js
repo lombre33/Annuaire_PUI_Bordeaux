@@ -1,5 +1,5 @@
-// Petits outils partagés par les fenêtres (profile-ui.js, etablissement-ui.js, changes-ui.js). Rien
-// ne s'exécute à l'import : les fonctions qui touchent au DOM ne sont appelées que par les écrans.
+// Petits outils partagés par les fenêtres (profile-form.js, profile-review.js, etablissement-ui.js,
+// etablissement-form.js, changes-ui.js...). Rien ne s'exécute à l'import : les fonctions qui touchent au DOM ne sont appelées que par les écrans.
 
 import { normalize } from './grist-data.js';
 
