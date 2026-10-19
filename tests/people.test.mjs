@@ -20,7 +20,7 @@ const statusOf = async (people, email) => {
 };
 
 test('normalizeEmail ignores case and surrounding spaces, and tolerates empty values', () => {
-  assert.equal(normalizeEmail('  Ana.Martin@CHU-Bordeaux.fr '), 'ana.martin@chu-bordeaux.fr');
+  assert.equal(normalizeEmail('  Ana.Martin@CHU-Bordeaux.example '), 'ana.martin@chu-bordeaux.example');
   assert.equal(normalizeEmail(null), '');
   assert.equal(normalizeEmail(undefined), '');
 });
@@ -36,7 +36,7 @@ test('loadDirectory returns an index of every BDD row by e-mail address, whateve
 
 test('findByEmail finds nobody for an unknown, empty or missing address', async () => {
   const { people } = await directory();
-  assert.deepEqual(people.findByEmail('inconnu@example.fr'), []);
+  assert.deepEqual(people.findByEmail('inconnu@example.example'), []);
   assert.deepEqual(people.findByEmail(''), []);
   assert.deepEqual(people.findByEmail(null), []);
   assert.deepEqual(people.findByEmail(undefined), []);
@@ -55,13 +55,13 @@ test('describeVisibility says what keeps each person out of the directory', asyn
   const expected = {
     [ANA_EMAIL]: { accepted: true, named: true, etablissement: 'ok', partnerOnly: false, visible: true },
     [BOB_EMAIL]: { accepted: true, named: true, etablissement: 'ok', partnerOnly: true, visible: true },
-    'carla@clinique.fr': { accepted: true, named: true, etablissement: 'not_eligible', partnerOnly: false, visible: false },
-    'dan@inserm.fr': { accepted: true, named: true, etablissement: 'not_validated', partnerOnly: false, visible: false },
-    'eve@example.fr': { accepted: true, named: true, etablissement: 'missing', partnerOnly: false, visible: false },
-    'fred@chu-bordeaux.fr': { accepted: true, named: true, etablissement: 'unknown', partnerOnly: false, visible: false },
+    'carla@clinique.example': { accepted: true, named: true, etablissement: 'not_eligible', partnerOnly: false, visible: false },
+    'dan@inserm.example': { accepted: true, named: true, etablissement: 'not_validated', partnerOnly: false, visible: false },
+    'eve@example.example': { accepted: true, named: true, etablissement: 'missing', partnerOnly: false, visible: false },
+    'fred@chu-bordeaux.example': { accepted: true, named: true, etablissement: 'unknown', partnerOnly: false, visible: false },
     [IRIS_EMAIL]: { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, visible: false },
-    'jules@chu-bordeaux.fr': { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, visible: false },
-    'x@chu-bordeaux.fr': { accepted: true, named: false, etablissement: 'ok', partnerOnly: false, visible: false }
+    'jules@chu-bordeaux.example': { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, visible: false },
+    'x@chu-bordeaux.example': { accepted: true, named: false, etablissement: 'ok', partnerOnly: false, visible: false }
   };
   for (const [email, status] of Object.entries(expected)) {
     assert.deepEqual(await statusOf(people, email), status, email);

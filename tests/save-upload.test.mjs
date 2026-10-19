@@ -59,7 +59,7 @@ test('uploadThenRecheck rend la phrase d\'un UploadError telle quelle, sans rien
 });
 
 test('uploadThenRecheck dit la phrase de repli pour toute autre erreur, garde la cause dans la console et jamais son texte', async () => {
-  const fault = new Error('boom 500 pour ana.martin@chu-bordeaux.fr');
+  const fault = new Error('boom 500 pour ana.martin@chu-bordeaux.example');
   const { lines, options } = setup({ upload: async () => { throw fault; } });
   await assert.rejects(uploadThenRecheck(FILE, options), error => {
     assert.ok(error instanceof SaveError);

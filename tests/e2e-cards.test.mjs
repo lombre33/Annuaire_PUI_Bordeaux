@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ANA_EMAIL, sampleTables, withBranding, withClones, withIdentity } from './fixtures.mjs';
-import { cardCount, gridCard, openOwn, reload, skip, until, waitForCards, waitForEditButtons, withWidget } from './support/browser.mjs';
+import { cardCount, changeFonction, gridCard, openOwn, skip, until, waitForCards, waitForEditButtons, withWidget } from './support/browser.mjs';
 import { profileDialogPage } from './support/dialog-page.mjs';
 
 const { review } = profileDialogPage();
@@ -69,9 +69,7 @@ test('une relecture de Grist reconstruit toutes les cartes : elles montrent les 
   withWidget({ tables: crowd(), user: null }, async ({ page }) => {
     await waitForCards(page, ALL_CARDS);
     await markCards(page);
-    await page.evaluate(() => { window.__tables.BDD.Fonction[0] = 'Cheffe de pôle'; });
-    await reload(page);
-    await until(async () => (await gridCard(page, 'Ana').locator('.fonction').textContent()) === 'Cheffe de pôle', 'la carte d\'Ana montre sa nouvelle fonction');
+    await changeFonction(page, { row: 0, name: 'Ana', fonction: 'Cheffe de pôle' });
     assert.deepEqual(kept(await marks(page)), [], 'aucune carte n\'a survécu à la relecture : les contacts sont neufs');
   }));
 

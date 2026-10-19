@@ -131,7 +131,7 @@ test('imageFaultMessage rend la phrase d\'une ImageError telle quelle, sans rien
 test('imageFaultMessage dit « illisible » pour toute autre erreur et garde la cause dans la console, jamais dans la phrase', t => {
   const lines = [];
   t.mock.method(console, 'error', (...args) => lines.push(args));
-  const cause = new TypeError('boom pour ana.martin@chu-bordeaux.fr');
+  const cause = new TypeError('boom pour ana.martin@chu-bordeaux.example');
   const message = imageFaultMessage(cause);
   assert.equal(message, 'Cette image n’a pas pu être lue : choisissez un autre fichier.');
   assert.doesNotMatch(message, /boom/);

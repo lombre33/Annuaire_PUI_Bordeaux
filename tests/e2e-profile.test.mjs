@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withIdentity, withSchema, withShownEmail, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
 import {
-  assertFooterWraps, bddCalls, bddCell, focusReturnsTo, gridCard, openOwn, probeRemoved, reload, skip, toast, until, waitForCards,
+  assertFooterWraps, bddCalls, bddCell, changeFonction, focusReturnsTo, gridCard, openOwn, probeRemoved, reload, skip, toast, until, waitForCards,
   waitForEditButtons, withWidget
 } from './support/browser.mjs';
 import { FITS, assertTabStaysInDialog, dialogFit, profileDialogPage, spillOf, unnamedControls } from './support/dialog-page.mjs';
@@ -37,7 +37,7 @@ function withDuplicate(tables) {
 // Le téléphone est une colonne de texte, comme dans un document où elle n'est pas numérique.
 function textPhoneTables() {
   const tables = withSchema(memberTables(), { phoneType: 'Text' });
-  tables.BDD.numero_de_telephone = tables.BDD.numero_de_telephone.map(value => (value ? '05 56 78 90 12' : ''));
+  tables.BDD.numero_de_telephone = tables.BDD.numero_de_telephone.map(value => (value ? '05 36 49 90 12' : ''));
   return tables;
 }
 
@@ -382,9 +382,7 @@ test('le mode admin s\'allume au clavier, annonce son état, et garde le focus q
 test('le mode admin reste allumé quand l\'annuaire est relu après une modification dans Grist', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await enableAdminMode(page);
-    await page.evaluate(() => { window.__tables.BDD.Fonction[9] = 'Directeur'; });
-    await reload(page);
-    await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.fonction').textContent()) === 'Directeur', 'l\'annuaire n\'a pas été relu');
+    await changeFonction(page, { row: 9, name: 'Hugo Bernard', fonction: 'Directeur' });
     assert.equal(await isAdminMode(page), true);
     await waitForEditButtons(page, 4);
     assert.equal(await adminStrip(page).isVisible(), true);
@@ -410,7 +408,7 @@ test('un administrateur qui n\'a pas de fiche a un bandeau sans interrupteur de 
 for (const [who, options] of [
   ['un membre', { tables: memberTables(), user: ANA_EMAIL }],
   ['une personne dont la fiche est masquée', { tables: withIdentity(), user: IRIS_EMAIL }],
-  ['une personne que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.fr' }]
+  ['une personne que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.example' }]
 ]) {
   test(`${who} ne voit jamais « Mode admin », et ne peut pas l'allumer en forçant le bouton`, { skip }, () =>
     withWidget(options, async ({ page }) => {
@@ -445,7 +443,7 @@ const settled = {
 
 for (const [who, options, wait] of [
   ['un compte anonyme', { tables: withIdentity(), user: null }, settled.probeRemoved],
-  ['une adresse que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.fr' }, settled.probeRemoved],
+  ['une adresse que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.example' }, settled.probeRemoved],
   ['un compte Lecteur', { tables: withIdentity(), user: ANA_EMAIL, readOnly: true }, settled.immediately],
   ['un document sans table-sonde que Grist refuse de créer', { tables: sampleTables(), user: ANA_EMAIL, denyWrites: ['Annuaire_Sonde'] }, settled.warned]
 ]) {
@@ -497,7 +495,7 @@ test('« Modifier mon profil » ouvre le formulaire avec les valeurs de la fiche
     assert.equal(await field(page, 'prenom').inputValue(), 'Ana');
     assert.equal(await field(page, 'nom').inputValue(), 'Martin');
     assert.equal(await field(page, 'Fonction').inputValue(), 'Pharmacienne');
-    assert.equal(await field(page, 'numero_de_telephone').inputValue(), '05 56 78 90 12');
+    assert.equal(await field(page, 'numero_de_telephone').inputValue(), '05 36 49 90 12');
     assert.equal(await chosenOf(page, 'Role_dans_le_PUI'), 'Référent qualité');
 
     assert.deepEqual(await dialog(page).locator('.grp-title').allTextContents(),
@@ -521,12 +519,12 @@ test('une saisie refusée est signalée sous son champ et ne laisse pas passer �
     await openOwn(page);
     const phoneError = page.locator('#profile-numero_de_telephone-error');
     await field(page, 'numero_de_telephone').fill('12');
-    assert.equal(await phoneError.textContent(), 'Un numéro français compte 10 chiffres, par exemple 05 56 78 90 12.');
+    assert.equal(await phoneError.textContent(), 'Un numéro français compte 10 chiffres, par exemple 05 36 49 90 12.');
     assert.equal(await field(page, 'numero_de_telephone').getAttribute('aria-invalid'), 'true');
     assert.equal(await summary(page), 'Corrigez le numéro de téléphone', 'le pied de fenêtre nomme le problème');
     assert.equal(await press(page, 'Relire mes modifications').isDisabled(), true);
 
-    await field(page, 'numero_de_telephone').fill('05 56 78 90 12');
+    await field(page, 'numero_de_telephone').fill('05 36 49 90 12');
     assert.equal(await phoneError.isHidden(), true);
     assert.equal(await summary(page), 'Aucune modification');
 
@@ -551,9 +549,9 @@ test('une saisie refusée est signalée sous son champ et ne laisse pas passer �
 test('le numéro saisi sans espaces est remis en forme en quittant le champ', { skip }, () =>
   withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
-    await field(page, 'numero_de_telephone').fill('0556789013');
+    await field(page, 'numero_de_telephone').fill('0536499013');
     await field(page, 'numero_de_telephone').blur();
-    assert.equal(await field(page, 'numero_de_telephone').inputValue(), '05 56 78 90 13');
+    assert.equal(await field(page, 'numero_de_telephone').inputValue(), '05 36 49 90 13');
     assert.equal(await summary(page), '1 champ modifié');
   }));
 
@@ -942,7 +940,7 @@ test('un administrateur voit l\'e-mail et l\'établissement d\'une autre personn
   await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await openOther(page, 'Hostile');
     assert.equal(await field(page, 'email').getAttribute('type'), 'email');
-    assert.equal(await field(page, 'email').inputValue(), 'hostile@chu-bordeaux.fr');
+    assert.equal(await field(page, 'email').inputValue(), 'hostile@chu-bordeaux.example');
     assert.equal(await selectedLabel(page), 'CHU');
     await field(page, 'Etablissement').click();
     assert.deepEqual(await shownOptions(page, 'Etablissement'),
@@ -979,7 +977,7 @@ test('le nouvel e-mail et le nouvel établissement se voient sur la carte après
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await openOther(page, 'Hugo Bernard'); // pas d'adresse, au CHU
     assert.equal(await field(page, 'email').inputValue(), '');
-    await field(page, 'email').fill('  Hugo.Bernard@CHU-Bordeaux.fr ');
+    await field(page, 'email').fill('  Hugo.Bernard@CHU-Bordeaux.example ');
     await pickOption(page, 'Etablissement', 'Institut Bergonié');
     assert.equal(await summary(page), '2 champs modifiés');
     await press(page, 'Relire les modifications').click();
@@ -999,8 +997,8 @@ test('le nouvel e-mail et le nouvel établissement se voient sur la carte après
     assert.equal(await after.locator('.etablissement-tag').textContent(), 'Institut Bergonié');
     assert.equal(await after.locator('.etablissement-tag').evaluate(node => node.classList.contains('rv-ring')), true);
     assert.equal(await after.locator('.etab-col .mk-pill').textContent(), 'modifié');
-    assert.equal(await after.locator('a.email').textContent(), 'hugo.bernard@chu-bordeaux.fr ajouté');
-    assert.equal(await after.locator('a.email .mk').textContent(), 'hugo.bernard@chu-bordeaux.fr');
+    assert.equal(await after.locator('a.email').textContent(), 'hugo.bernard@chu-bordeaux.example ajouté');
+    assert.equal(await after.locator('a.email .mk').textContent(), 'hugo.bernard@chu-bordeaux.example');
     assert.equal(await after.locator('a.email').getAttribute('href'), null, 'un aperçu n\'est pas cliquable');
     assert.equal(await after.locator('.etablissement-tag').isDisabled(), true);
     assert.deepEqual(await after.locator('.etablissement-tag').evaluate(badge => {
@@ -1020,19 +1018,19 @@ test('le nouvel e-mail et le nouvel établissement se voient sur la carte après
     assert.deepEqual(await dialog(page).locator('.recap .diff-label').allTextContents(), ['E-mail', 'Établissement']);
     const rows = dialog(page).locator('.recap .diff-row');
     assert.equal(await rows.nth(0).locator('.none').first().textContent(), 'non renseigné');
-    assert.equal(await rows.nth(0).locator('ins').textContent(), 'hugo.bernard@chu-bordeaux.fr');
+    assert.equal(await rows.nth(0).locator('ins').textContent(), 'hugo.bernard@chu-bordeaux.example');
     assert.equal(await rows.nth(1).locator('del').textContent(), 'CHU');
     assert.equal(await rows.nth(1).locator('ins').textContent(), 'Institut Bergonié');
     assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
 
     await validateWith(page, 'La fiche de Hugo Bernard est enregistrée.');
     assert.deepEqual(await bddCalls(page), [{
-      action: 'UpdateRecord', table: 'BDD', rowId: 10, ok: true, values: { email: 'hugo.bernard@chu-bordeaux.fr', Etablissement: 5 }
+      action: 'UpdateRecord', table: 'BDD', rowId: 10, ok: true, values: { email: 'hugo.bernard@chu-bordeaux.example', Etablissement: 5 }
     }]);
     assert.deepEqual(await bddCell(page, 'Instances', 9), ['L', 999], 'ce que la fenêtre ne montre pas est conservé');
     await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.etablissement-tag').textContent()) === 'Institut Bergonié', 'la carte n\'a pas été mise à jour');
-    assert.equal(await gridCard(page, 'Hugo Bernard').locator('a.email').textContent(), 'hugo.bernard@chu-bordeaux.fr');
-    assert.equal(await gridCard(page, 'Hugo Bernard').locator('a.email').getAttribute('href'), 'mailto:hugo.bernard@chu-bordeaux.fr');
+    assert.equal(await gridCard(page, 'Hugo Bernard').locator('a.email').textContent(), 'hugo.bernard@chu-bordeaux.example');
+    assert.equal(await gridCard(page, 'Hugo Bernard').locator('a.email').getAttribute('href'), 'mailto:hugo.bernard@chu-bordeaux.example');
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
@@ -1072,7 +1070,7 @@ test('un e-mail refusé est signalé sous son champ : mal formé, déjà pris, v
     assert.equal(await relire.isDisabled(), true);
 
     // Une fiche visible dans l'annuaire se nomme (son nom s'y lit déjà) ; une fiche masquée, non.
-    await field(page, 'email').fill('ANA.Martin@chu-bordeaux.fr');
+    await field(page, 'email').fill('ANA.Martin@chu-bordeaux.example');
     assert.equal(await emailError.textContent(), 'Cette adresse est déjà utilisée par Ana Martin.');
     assert.equal(await relire.isDisabled(), true);
     await field(page, 'email').fill(IRIS_EMAIL);
@@ -1082,15 +1080,15 @@ test('un e-mail refusé est signalé sous son champ : mal formé, déjà pris, v
     assert.equal(await emailError.textContent(), 'Indiquez une adresse e-mail valide.');
     assert.equal(await relire.isDisabled(), true);
 
-    await field(page, 'email').fill('=cmd@chu.fr');
+    await field(page, 'email').fill('=cmd@chu.example');
     assert.equal(await emailError.textContent(), 'Ne peut pas commencer par = + - ou @.');
 
-    await field(page, 'email').fill('hostile.nouveau@chu-bordeaux.fr');
+    await field(page, 'email').fill('hostile.nouveau@chu-bordeaux.example');
     assert.equal(await emailError.isHidden(), true);
     assert.equal(await field(page, 'email').getAttribute('aria-invalid'), 'false');
     assert.equal(await relire.isEnabled(), true);
     // Revenir à l'adresse d'origine, écrite autrement, n'est pas une modification.
-    await field(page, 'email').fill('HOSTILE@chu-bordeaux.fr');
+    await field(page, 'email').fill('HOSTILE@chu-bordeaux.example');
     assert.equal(await summary(page), 'Aucune modification');
     assert.deepEqual(await bddCalls(page), []);
   }));
@@ -1098,10 +1096,10 @@ test('un e-mail refusé est signalé sous son champ : mal formé, déjà pris, v
 test('une adresse prise par une autre fiche pendant la relecture n\'est pas écrite : la fenêtre le dit et reste sur la relecture', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await openOther(page, 'Hugo Bernard');
-    await field(page, 'email').fill('convoite@exemple.fr');
+    await field(page, 'email').fill('convoite@exemple.example');
     await press(page, 'Relire les modifications').click();
     await headingIs(page, 'Relire avant de valider');
-    await page.evaluate(() => { window.__tables.BDD.email[3] = 'Convoite@Exemple.fr'; }); // Dan, hors de la vue
+    await page.evaluate(() => { window.__tables.BDD.email[3] = 'Convoite@Exemple.example'; }); // Dan, hors de la vue
     await press(page, 'Valider').click();
     await alert(page).waitFor();
     assert.match(await alertText(page), /Cette adresse e-mail est maintenant celle d'une autre fiche : rien n'a été modifié\./);
@@ -1111,7 +1109,7 @@ test('une adresse prise par une autre fiche pendant la relecture n\'est pas écr
     // On peut revenir à la fiche et en choisir une autre.
     await press(page, 'Retour').click();
     await headingIs(page, 'Modifier la fiche de Hugo Bernard');
-    assert.equal(await field(page, 'email').inputValue(), 'convoite@exemple.fr', 'le brouillon est intact');
+    assert.equal(await field(page, 'email').inputValue(), 'convoite@exemple.example', 'le brouillon est intact');
   }));
 
 for (const width of [280, 360]) {
@@ -1120,7 +1118,7 @@ for (const width of [280, 360]) {
       await page.setViewportSize({ width, height: 640 });
       await openOther(page, 'Hostile');
       assert.deepEqual(await dialogFit(page, '#profileDialog'), FITS);
-      await field(page, 'email').fill('une.adresse.assez.longue.pour.mettre.la.mise.en.page.a.l.epreuve@laboratoire-de-recherche-bordeaux.example.fr');
+      await field(page, 'email').fill('une.adresse.assez.longue.pour.mettre.la.mise.en.page.a.l.epreuve@laboratoire-de-recherche-bordeaux.example.example');
       await pickOption(page, 'Etablissement', 'Institut Bergonié');
       assert.deepEqual(await dialogFit(page, '#profileDialog'), FITS);
       await press(page, 'Relire les modifications').click();
@@ -1147,21 +1145,21 @@ test('une personne qui n\'apparaît pas dans l\'annuaire modifie quand même sa 
   }));
 
 for (const [type, tables, written] of [
-  ['numérique', withSchema(memberTables()), 556789013],
-  ['de texte', textPhoneTables(), '05 56 78 90 13']
+  ['numérique', withSchema(memberTables()), 536499013],
+  ['de texte', textPhoneTables(), '05 36 49 90 13']
 ]) {
   test(`le téléphone s'écrit dans la forme de sa colonne (${type}) et s'affiche pareil`, { skip }, () =>
     withWidget({ tables, user: ANA_EMAIL }, async ({ page }) => {
       await openOwn(page);
-      assert.equal(await field(page, 'numero_de_telephone').inputValue(), '05 56 78 90 12');
-      await field(page, 'numero_de_telephone').fill('0556789013');
+      assert.equal(await field(page, 'numero_de_telephone').inputValue(), '05 36 49 90 12');
+      await field(page, 'numero_de_telephone').fill('0536499013');
       await field(page, 'numero_de_telephone').blur();
       await review(page);
-      assert.equal(await column(page, 'before').locator('.tel').textContent(), '☎ 05 56 78 90 12');
-      assert.equal(await column(page, 'after').locator('.tel').textContent(), '☎ 05 56 78 90 13 modifié');
+      assert.equal(await column(page, 'before').locator('.tel').textContent(), '☎ 05 36 49 90 12');
+      assert.equal(await column(page, 'after').locator('.tel').textContent(), '☎ 05 36 49 90 13 modifié');
       await validateWith(page, 'Vos modifications sont enregistrées.');
       assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ numero_de_telephone: written }]);
-      await until(async () => (await gridCard(page, 'Ana Martin').locator('.tel').textContent()) === '☎ 05 56 78 90 13', 'le numéro n\'a pas été mis à jour');
+      await until(async () => (await gridCard(page, 'Ana Martin').locator('.tel').textContent()) === '☎ 05 36 49 90 13', 'le numéro n\'a pas été mis à jour');
     }));
 }
 
@@ -1171,8 +1169,8 @@ test('vider le téléphone barre l\'ancien numéro dans la carte après, et écr
     await field(page, 'numero_de_telephone').fill('');
     await review(page);
     const tel = column(page, 'after').locator('.tel');
-    assert.equal(await tel.textContent(), '☎ 05 56 78 90 12 supprimé');
-    assert.equal(await tel.locator('.mk-gone').textContent(), '☎ 05 56 78 90 12', 'l\'ancien numéro reste lisible, barré');
+    assert.equal(await tel.textContent(), '☎ 05 36 49 90 12 supprimé');
+    assert.equal(await tel.locator('.mk-gone').textContent(), '☎ 05 36 49 90 12', 'l\'ancien numéro reste lisible, barré');
     assert.equal(await tel.locator('.mk-pill-del').textContent(), 'supprimé');
     assert.equal(await dialog(page).locator('.recap .diff-row .none').textContent(), 'supprimé');
     await validateWith(page, 'Vos modifications sont enregistrées.');
@@ -1197,7 +1195,7 @@ test('changer le rôle ou le nom se voit sur la carte après, et le retirer barr
   }));
 
 test('la relecture dit pourquoi une fiche acceptée reste hors de l\'annuaire : son établissement n\'est pas validé', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'dan@inserm.fr' }, async ({ page }) => {
+  withWidget({ tables: withIdentity(), user: 'dan@inserm.example' }, async ({ page }) => {
     await openOwn(page);
     await field(page, 'Fonction').fill('Chargé de projet');
     await review(page);
@@ -1210,13 +1208,13 @@ test('la relecture dit pourquoi une fiche acceptée reste hors de l\'annuaire : 
   }));
 
 test('une ligne ajoutée porte la pastille « ajouté », sur la carte après seulement', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'bob@u-bordeaux-montaigne.fr' }, async ({ page }) => {
+  withWidget({ tables: withIdentity(), user: 'bob@u-bordeaux-montaigne.example' }, async ({ page }) => {
     await openOwn(page);
-    await field(page, 'numero_de_telephone').fill('0556789014');
+    await field(page, 'numero_de_telephone').fill('0536499014');
     await field(page, 'prenom').fill('Robert');
     await review(page);
     const after = column(page, 'after').locator('.contact-card');
-    assert.equal(await after.locator('.tel').textContent(), '☎ 05 56 78 90 14 ajouté');
+    assert.equal(await after.locator('.tel').textContent(), '☎ 05 36 49 90 14 ajouté');
     assert.equal(await after.locator('.name').textContent(), 'Robert Durand modifié');
     assert.equal(await column(page, 'before').locator('.mk-pill').count(), 0, 'la carte avant n\'a aucun repère');
     assert.equal(await notices(page).count(), 0, 'Bob est partenaire, validé : sa fiche figure dans l\'annuaire');
@@ -1273,12 +1271,12 @@ test('si la fiche change dans Grist pendant la relecture, rien n\'est écrit : o
 test('ce qu\'un autre a changé dans une autre colonne pendant la relecture n\'est pas écrasé', { skip }, () =>
   withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
-    await field(page, 'numero_de_telephone').fill('0556789013');
+    await field(page, 'numero_de_telephone').fill('0536499013');
     await review(page);
     await page.evaluate(() => { window.__tables.BDD.Fonction[0] = 'Directrice'; });
     await validateWith(page, 'Vos modifications sont enregistrées.');
     assert.equal(await bddCell(page, 'Fonction'), 'Directrice');
-    assert.equal(await bddCell(page, 'numero_de_telephone'), 556789013);
+    assert.equal(await bddCell(page, 'numero_de_telephone'), 536499013);
   }));
 
 test('si les champs modifiés ont changé dans Grist avant la relecture, la fenêtre le dit', { skip }, () =>
@@ -1379,7 +1377,7 @@ test('la fenêtre est une vraie boîte de dialogue : nommée, modale, et le rest
 // horizontal, jusque dans la relecture la plus chargée (avis, pastilles, listes de tags).
 for (const width of [280, 320, 360]) {
   test(`dans un cadre de ${width} px, la fenêtre tient dans l'écran et la relecture empile la carte avant sous la carte après`, { skip }, () =>
-    withWidget({ tables: withIdentity(), user: 'dan@inserm.fr' }, async ({ page }) => {
+    withWidget({ tables: withIdentity(), user: 'dan@inserm.example' }, async ({ page }) => {
       await page.setViewportSize({ width, height: 640 });
       await waitForCards(page, 4);
       await page.locator('#accountBar .account-edit').waitFor();
@@ -1612,12 +1610,12 @@ test('« Créer ma fiche » avec la case « Apparaître dans l’annuaire » dé
 
 test('l\'e-mail affiché remplace l\'adresse du compte sur la carte et dans son lien, se modifie dans la fenêtre et se vide pour revenir à l\'adresse du compte', { skip }, () => {
   const tables = withSchema(withShownEmail(memberTables()));
-  tables.BDD.email_affiche[9] = 'hugo@exemple.fr'; // Hugo : une adresse affichée, et aucune adresse de compte
+  tables.BDD.email_affiche[9] = 'hugo@exemple.example'; // Hugo : une adresse affichée, et aucune adresse de compte
   return withWidget({ tables, user: ANA_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     const shown = name => gridCard(page, name).locator('.email');
-    assert.equal(await shown('Hugo Bernard').textContent(), 'hugo@exemple.fr');
-    assert.equal(await shown('Hugo Bernard').getAttribute('href'), 'mailto:hugo@exemple.fr');
+    assert.equal(await shown('Hugo Bernard').textContent(), 'hugo@exemple.example');
+    assert.equal(await shown('Hugo Bernard').getAttribute('href'), 'mailto:hugo@exemple.example');
     assert.equal(await shown('Ana Martin').textContent(), ANA_EMAIL, 'sans adresse affichée, celle du compte');
 
     await openOwn(page);
@@ -1626,23 +1624,23 @@ test('l\'e-mail affiché remplace l\'adresse du compte sur la carte et dans son 
     await field(page, 'email_affiche').fill('pas une adresse');
     assert.equal(await summary(page), 'Corrigez l’adresse e-mail');
     assert.equal(await press(page, 'Relire mes modifications').isDisabled(), true);
-    await field(page, 'email_affiche').fill(' Contact@CHU-Bordeaux.fr ');
+    await field(page, 'email_affiche').fill(' Contact@CHU-Bordeaux.example ');
     await review(page);
     assert.equal(await column(page, 'before').locator('.email').textContent(), ANA_EMAIL);
-    assert.match(await column(page, 'after').locator('.email').textContent(), /^contact@chu-bordeaux\.fr/);
+    assert.match(await column(page, 'after').locator('.email').textContent(), /^contact@chu-bordeaux\.example/);
     await validateWith(page, 'Vos modifications sont enregistrées.');
 
     // Une seule colonne écrite : l'adresse du compte, qui désigne la personne, n'a pas bougé.
-    assert.deepEqual(await bddCalls(page), [{ action: 'UpdateRecord', table: 'BDD', rowId: 1, ok: true, values: { email_affiche: 'contact@chu-bordeaux.fr' } }]);
+    assert.deepEqual(await bddCalls(page), [{ action: 'UpdateRecord', table: 'BDD', rowId: 1, ok: true, values: { email_affiche: 'contact@chu-bordeaux.example' } }]);
     assert.equal(await bddCell(page, 'email'), ANA_EMAIL);
-    await until(async () => (await shown('Ana Martin').textContent()) === 'contact@chu-bordeaux.fr', 'la carte n\'a pas pris l\'adresse affichée');
-    assert.equal(await shown('Ana Martin').getAttribute('href'), 'mailto:contact@chu-bordeaux.fr');
+    await until(async () => (await shown('Ana Martin').textContent()) === 'contact@chu-bordeaux.example', 'la carte n\'a pas pris l\'adresse affichée');
+    assert.equal(await shown('Ana Martin').getAttribute('href'), 'mailto:contact@chu-bordeaux.example');
     assert.equal(await gridCard(page, 'Ana Martin').locator('.card-edit').isVisible(), true, 'elle reste reconnue par l\'adresse de son compte');
 
     // Vidée, la carte revient à l'adresse du compte.
     await focusReturnsTo(page, '#accountBar .account-edit');
     await openOwn(page);
-    assert.equal(await field(page, 'email_affiche').inputValue(), 'contact@chu-bordeaux.fr');
+    assert.equal(await field(page, 'email_affiche').inputValue(), 'contact@chu-bordeaux.example');
     await field(page, 'email_affiche').fill('');
     await review(page);
     await validateWith(page, 'Vos modifications sont enregistrées.');

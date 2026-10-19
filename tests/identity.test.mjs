@@ -33,7 +33,7 @@ test('readIdentity returns the e-mail Grist stamped on the probe row, and no adm
 test('readIdentity reports administrator rights from the ACL table, ignoring case and spaces in both addresses', async () => {
   const ana = await identify(session(` ${ANA_EMAIL.toUpperCase()} `));
   assert.equal(ana.status, 'ready');
-  assert.equal(ana.admin, true, 'ACL écrit « Ana.Martin@CHU-Bordeaux.fr » : même personne');
+  assert.equal(ana.admin, true, 'ACL écrit « Ana.Martin@CHU-Bordeaux.example » : même personne');
   assert.equal((await identify(session(ADMIN_EMAIL))).admin, true);
   assert.equal((await identify(session(IRIS_EMAIL))).admin, false, 'présente dans BDD mais absente d\'ACL');
 });
@@ -297,7 +297,7 @@ test('readIdentity gives up, never throws, when the probe formula returns no add
 });
 
 test('readIdentity rejects a stamped value that is not an e-mail address', async () => {
-  for (const stamped of ['not-an-address', 'two words@x.fr', '@x.fr', 'a@', '']) {
+  for (const stamped of ['not-an-address', 'two words@x.example', '@x.example', 'a@', '']) {
     const s = session(stamped);
     assert.equal((await identify(s)).status, 'unavailable', `« ${stamped} » n'est pas une adresse`);
   }

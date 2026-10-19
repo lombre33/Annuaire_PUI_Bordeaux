@@ -173,7 +173,7 @@ test('loadDirectory falls back to the raw label with a console warning when only
 test('loadDirectory reads the phone and the PUI role that BDD now holds', async () => {
   const { contacts } = await load(sampleTables());
   const [ana, bob] = ['Ana', 'Bob'].map(prenom => contacts.find(contact => contact.prenom === prenom));
-  assert.equal(ana.numero_de_telephone, 556789012);
+  assert.equal(ana.numero_de_telephone, 536499012);
   assert.deepEqual(ana.labels.role, ['Référent qualité']);
   assert.deepEqual(bob.labels.role, []);
 });

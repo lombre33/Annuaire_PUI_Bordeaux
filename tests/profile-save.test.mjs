@@ -75,13 +75,13 @@ test('buildRowUpdate refuses to rewrite a list that holds values it cannot repre
 
 test('buildRowUpdate writes the phone in the form of its column: a number when Numeric, a text otherwise', async () => {
   const w = await world();
-  const change = { numero_de_telephone: { avant: '', apres: '0556789013' } };
-  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Numeric' }).values, { numero_de_telephone: 556789013 });
-  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Int' }).values, { numero_de_telephone: 556789013 });
-  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Text' }).values, { numero_de_telephone: '05 56 78 90 13' });
-  assert.deepEqual(buildRowUpdate(change, w.row(1), {}).values, { numero_de_telephone: 556789013 }, 'type inconnu : la cellule est un nombre');
-  assert.deepEqual(buildRowUpdate(change, { ...w.row(1), numero_de_telephone: '05 56 78 90 12' }, {}).values,
-    { numero_de_telephone: '05 56 78 90 13' }, 'type inconnu : la cellule est un texte');
+  const change = { numero_de_telephone: { avant: '', apres: '0536499013' } };
+  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Numeric' }).values, { numero_de_telephone: 536499013 });
+  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Int' }).values, { numero_de_telephone: 536499013 });
+  assert.deepEqual(buildRowUpdate(change, w.row(1), { numero_de_telephone: 'Text' }).values, { numero_de_telephone: '05 36 49 90 13' });
+  assert.deepEqual(buildRowUpdate(change, w.row(1), {}).values, { numero_de_telephone: 536499013 }, 'type inconnu : la cellule est un nombre');
+  assert.deepEqual(buildRowUpdate(change, { ...w.row(1), numero_de_telephone: '05 36 49 90 12' }, {}).values,
+    { numero_de_telephone: '05 36 49 90 13' }, 'type inconnu : la cellule est un texte');
   const clear = { numero_de_telephone: { avant: '', apres: '' } };
   assert.deepEqual(buildRowUpdate(clear, w.row(1), { numero_de_telephone: 'Numeric' }).values, { numero_de_telephone: null });
   assert.deepEqual(buildRowUpdate(clear, w.row(1), { numero_de_telephone: 'Text' }).values, { numero_de_telephone: '' });
@@ -98,7 +98,7 @@ test('buildRowUpdate writes text and references, and refuses a nameless row or a
     'une fiche déjà sans nom peut changer autre chose');
   assert.match(buildRowUpdate({ prenom: { avant: '', apres: '' } }, alreadyNameless).error, /ni prénom ni nom/);
   const { numero_de_telephone: _omitted, ...withoutPhone } = w.row(1);
-  assert.match(buildRowUpdate({ numero_de_telephone: { avant: '', apres: '0102030405' } }, withoutPhone).error, /la colonne numero_de_telephone n'existe pas/);
+  assert.match(buildRowUpdate({ numero_de_telephone: { avant: '', apres: '0536499013' } }, withoutPhone).error, /la colonne numero_de_telephone n'existe pas/);
 });
 
 test('buildRowUpdate writes nothing for an empty set of changes, and only the columns that changed', async () => {
@@ -139,11 +139,11 @@ test('readRow gives the row as Grist holds it now, and says so in French when it
 
 test('prepareReview builds the card before and after from the fiche as Grist holds it, and writes nothing', async () => {
   const w = await world();
-  const next = await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '05 56 78 90 13', Role_dans_le_PUI: 0, Competences: [2, 3] });
+  const next = await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '05 36 49 90 13', Role_dans_le_PUI: 0, Competences: [2, 3] });
   assert.equal(next.rowId, 1);
   assert.equal(next.before.Fonction, 'Pharmacienne');
   assert.equal(next.after.Fonction, 'Cheffe de service');
-  assert.equal(next.after.numero_de_telephone, 556789013, 'la carte « après » montre ce que Grist stockera');
+  assert.equal(next.after.numero_de_telephone, 536499013, 'la carte « après » montre ce que Grist stockera');
   assert.deepEqual(next.after.labels.competences, ['Hématologie', 'Pharmacovigilance']);
   assert.deepEqual(next.after.labels.role, []);
   assert.deepEqual(next.before.labels.competences, ['Oncologie', 'Hématologie']);
@@ -181,7 +181,7 @@ test('prepareReview refuses to review nothing, and a draft that has errors', asy
 
 test('prepareReview never drops a refused field silently: one error stops the whole review, even beside valid changes', async () => {
   const w = await world();
-  await assert.rejects(review(w, 1, { Fonction: '=1+1', numero_de_telephone: '05 56 78 90 13' }),
+  await assert.rejects(review(w, 1, { Fonction: '=1+1', numero_de_telephone: '05 36 49 90 13' }),
     error => error instanceof ProfileSaveError && /rien à relire/.test(error.message));
   await assert.rejects(review(w, 1, { prenom: '', nom: '', Fonction: 'Cheffe' }), /rien à relire/);
   assert.deepEqual(writes(w), []);
@@ -225,17 +225,17 @@ test('prepareReview reports a fiche that was deleted, a table it cannot read, an
   const missing = await world();
   const opened = missing.form(1);
   delete missing.tables.BDD.numero_de_telephone;
-  await assert.rejects(prepareReview(missing.docApi, opened.row, { ...opened.draft, numero_de_telephone: '05 56 78 90 13' }, missing.context),
+  await assert.rejects(prepareReview(missing.docApi, opened.row, { ...opened.draft, numero_de_telephone: '05 36 49 90 13' }, missing.context),
     /la colonne numero_de_telephone n'existe pas dans BDD/);
 });
 
 test('prepareReview writes the phone in the form of the column the document declares, and in the form of the cell without metadata', async () => {
   const text = await world({ tables: withSchema(withIdentity(), { phoneType: 'Text' }) });
-  assert.equal((await review(text, 1, { numero_de_telephone: '0556789013' })).after.numero_de_telephone, '05 56 78 90 13');
+  assert.equal((await review(text, 1, { numero_de_telephone: '0536499013' })).after.numero_de_telephone, '05 36 49 90 13');
   const noMeta = await world({ tables: withIdentity() });
-  const next = await review(noMeta, 1, { numero_de_telephone: '0556789013' });
+  const next = await review(noMeta, 1, { numero_de_telephone: '0536499013' });
   assert.deepEqual(next.columnTypes, {});
-  assert.equal(next.after.numero_de_telephone, 556789013, 'sans métadonnées, la cellule est un nombre : on écrit un nombre');
+  assert.equal(next.after.numero_de_telephone, 536499013, 'sans métadonnées, la cellule est un nombre : on écrit un nombre');
 });
 
 test('prepareReview keeps the unnamed values of a list and refuses to rewrite a list it cannot read', async () => {
@@ -249,12 +249,12 @@ test('prepareReview keeps the unnamed values of a list and refuses to rewrite a 
 
 test('saveProfile writes the changes in one single UpdateRecord of the fiche, and only the columns that changed', async () => {
   const w = await world();
-  const next = await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '+33 5 56 78 90 13', Competences: [2, 3] });
+  const next = await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '+33 5 36 49 90 13', Competences: [2, 3] });
   const result = await saveProfile(w.docApi, next, { log: quiet });
   assert.equal(result.status, 'saved');
   assert.deepEqual(writes(w), [{
     action: 'UpdateRecord', table: 'BDD', rowId: 1, ok: true,
-    values: { Fonction: 'Cheffe de service', numero_de_telephone: 556789013, Competences: ['L', 2, 3] }
+    values: { Fonction: 'Cheffe de service', numero_de_telephone: 536499013, Competences: ['L', 2, 3] }
   }]);
   assert.deepEqual(result.values, writes(w)[0].values);
   assert.equal(w.row(1).email, ANA_EMAIL, 'l\'adresse n\'est jamais écrite');
@@ -275,12 +275,12 @@ test('saveProfile leaves every other fiche alone, and the cells of the fiche it 
 
 test('after saving, the directory shows the new values: the whole path, from the form to the card', async () => {
   const w = await world();
-  await saveProfile(w.docApi, await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '+33 5 56 78 90 14', Competences: [3], prenom: 'Anna' }), { log: quiet });
+  await saveProfile(w.docApi, await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '+33 5 36 49 90 14', Competences: [3], prenom: 'Anna' }), { log: quiet });
   const { contacts } = await loadDirectory(w.docApi, { log: quiet });
   const ana = contacts.find(contact => contact.id === 1);
   assert.equal(ana.prenom, 'Anna');
   assert.equal(ana.Fonction, 'Cheffe de service');
-  assert.equal(ana.numero_de_telephone, 556789014);
+  assert.equal(ana.numero_de_telephone, 536499014);
   assert.deepEqual(ana.labels.competences, ['Pharmacovigilance']);
 });
 
@@ -316,11 +316,11 @@ test('saveProfile also asks for a new review when a touched list changed meanwhi
 
 test('saveProfile ignores what changed in a field the person did not touch, and keeps it', async () => {
   const w = await world();
-  const next = await review(w, 1, { numero_de_telephone: '05 56 78 90 13' });
+  const next = await review(w, 1, { numero_de_telephone: '05 36 49 90 13' });
   w.tables.BDD.Fonction[0] = 'Directrice'; // une autre colonne, changée entre-temps
   assert.equal((await saveProfile(w.docApi, next, { log: quiet })).status, 'saved');
   assert.equal(w.tables.BDD.Fonction[0], 'Directrice', 'ce qu\'un autre a changé n\'est pas écrasé');
-  assert.equal(w.tables.BDD.numero_de_telephone[0], 556789013);
+  assert.equal(w.tables.BDD.numero_de_telephone[0], 536499013);
 });
 
 test('saveProfile writes only once for a given review: a second attempt finds the fiche already changed', async () => {
@@ -381,7 +381,7 @@ test('saveProfile never logs the address of the person, nor the values it writes
 });
 
 test('an administrator saves the fiche of someone else the same way, on that fiche only', async () => {
-  const w = await world({ user: { email: 'admin@chu-bordeaux.fr' } });
+  const w = await world({ user: { email: 'admin@chu-bordeaux.example' } });
   await saveProfile(w.docApi, await review(w, 9, { Fonction: 'Directrice générale' }), { log: quiet });
   assert.deepEqual(writes(w).map(call => [call.table, call.rowId]), [['BDD', 9]]);
   assert.equal(w.tables.BDD.Fonction[8], 'Directrice générale');
@@ -404,10 +404,10 @@ test('unsavedLabels is empty when Grist kept everything, and names the fields it
 test('buildRowUpdate writes the e-mail as a text and the établissement as a row id', async () => {
   const w = await world();
   const change = {
-    email: { avant: 'bob@u-bordeaux-montaigne.fr', apres: 'nouveau@u-bordeaux-montaigne.fr' },
+    email: { avant: 'bob@u-bordeaux-montaigne.example', apres: 'nouveau@u-bordeaux-montaigne.example' },
     Etablissement: { avant: { id: 2, label: 'UBM' }, apres: { id: 1, label: 'CHU' } }
   };
-  assert.deepEqual(buildRowUpdate(change, w.row(2)).values, { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1 });
+  assert.deepEqual(buildRowUpdate(change, w.row(2)).values, { email: 'nouveau@u-bordeaux-montaigne.example', Etablissement: 1 });
   const noColumn = { ...w.row(2) };
   delete noColumn.email;
   assert.match(buildRowUpdate({ email: change.email }, noColumn).error, /E-mail : la colonne email n'existe pas dans BDD/);
@@ -415,21 +415,21 @@ test('buildRowUpdate writes the e-mail as a text and the établissement as a row
 
 test('prepareReview for an administrator shows the new address and the new établissement on the card after, and marks them', async () => {
   const w = await world();
-  const next = await review(w, 2, { email: ' Nouveau@U-Bordeaux-Montaigne.fr ', Etablissement: 1 }, { admin: true });
+  const next = await review(w, 2, { email: ' Nouveau@U-Bordeaux-Montaigne.example ', Etablissement: 1 }, { admin: true });
   assert.equal(next.admin, true);
   assert.deepEqual(Object.keys(next.champs), ['email', 'Etablissement']);
-  assert.equal(next.before.email, 'bob@u-bordeaux-montaigne.fr');
-  assert.equal(next.after.email, 'nouveau@u-bordeaux-montaigne.fr');
+  assert.equal(next.before.email, 'bob@u-bordeaux-montaigne.example');
+  assert.equal(next.after.email, 'nouveau@u-bordeaux-montaigne.example');
   assert.equal(next.before.etablissement_label, 'UBM');
   assert.equal(next.after.etablissement_label, 'CHU');
   assert.equal(next.after.etablissement_fondateur, true, 'la carte « après » prend les indicateurs du nouvel établissement');
   assert.deepEqual(next.marks.texts, {
     etab: { before: 'UBM', after: 'CHU' },
-    email: { before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@u-bordeaux-montaigne.fr' }
+    email: { before: 'bob@u-bordeaux-montaigne.example', after: 'nouveau@u-bordeaux-montaigne.example' }
   });
   // Le détail des changements parle d'acronymes comme la liste du formulaire et la carte.
   assert.deepEqual(next.lines.map(line => [line.key, line.before, line.after]), [
-    ['email', 'bob@u-bordeaux-montaigne.fr', 'nouveau@u-bordeaux-montaigne.fr'],
+    ['email', 'bob@u-bordeaux-montaigne.example', 'nouveau@u-bordeaux-montaigne.example'],
     ['Etablissement', 'UBM', 'CHU']
   ]);
   assert.deepEqual(writes(w), []);
@@ -450,44 +450,44 @@ test('prepareReview says that a fiche moved to an établissement that has not va
 
 test('prepareReview refuses an address that another fiche already holds, whatever its case, even when the form did not know', async () => {
   const w = await world();
-  await assert.rejects(review(w, 2, { email: 'ANA.MARTIN@chu-bordeaux.fr' }, { admin: true }),
+  await assert.rejects(review(w, 2, { email: 'ANA.MARTIN@chu-bordeaux.example' }, { admin: true }),
     error => error instanceof ProfileSaveError && /rien à relire/.test(error.message));
   // Le formulaire ne connaissait pas cette adresse : c'est la relecture de Grist qui la voit.
   const { row, draft } = w.form(2, { admin: true });
-  w.tables.BDD.email[3] = 'libre@exemple.fr'; // Dan
-  await assert.rejects(prepareReview(w.docApi, row, { ...draft, email: 'libre@exemple.fr' }, { ...w.context, admin: true }), /rien à relire/);
+  w.tables.BDD.email[3] = 'libre@exemple.example'; // Dan
+  await assert.rejects(prepareReview(w.docApi, row, { ...draft, email: 'libre@exemple.example' }, { ...w.context, admin: true }), /rien à relire/);
   assert.deepEqual(writes(w), []);
-  assert.equal((await review(w, 2, { email: 'encore.libre@exemple.fr' }, { admin: true })).after.email, 'encore.libre@exemple.fr');
+  assert.equal((await review(w, 2, { email: 'encore.libre@exemple.example' }, { admin: true })).after.email, 'encore.libre@exemple.example');
 });
 
 test('prepareReview does not read the e-mail or the établissement of a draft unless an administrator is at work', async () => {
   const w = await world();
   const { row, draft } = w.form(2);
-  await assert.rejects(prepareReview(w.docApi, row, { ...draft, email: 'intrus@exemple.fr', Etablissement: 1 }, w.context),
+  await assert.rejects(prepareReview(w.docApi, row, { ...draft, email: 'intrus@exemple.example', Etablissement: 1 }, w.context),
     error => error instanceof ProfileSaveError && /rien à relire/.test(error.message), 'rien d\'autre n\'est modifié : rien à relire');
-  const beside = await prepareReview(w.docApi, row, { ...draft, email: 'intrus@exemple.fr', Etablissement: 1, Fonction: 'Chef' }, w.context);
+  const beside = await prepareReview(w.docApi, row, { ...draft, email: 'intrus@exemple.example', Etablissement: 1, Fonction: 'Chef' }, w.context);
   assert.deepEqual(Object.keys(beside.champs), ['Fonction'], 'ces deux champs sont écartés, le reste passe');
   assert.equal(beside.admin, false);
-  assert.equal(beside.after.email, 'bob@u-bordeaux-montaigne.fr');
+  assert.equal(beside.after.email, 'bob@u-bordeaux-montaigne.example');
 });
 
 test('saveProfile writes the e-mail and the établissement beside the other columns in one single UpdateRecord', async () => {
   const w = await world();
-  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1, Fonction: 'Chef' }, { admin: true });
+  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.example', Etablissement: 1, Fonction: 'Chef' }, { admin: true });
   const result = await saveProfile(w.docApi, next, { log: quiet });
   assert.equal(result.status, 'saved');
   assert.deepEqual(writes(w), [{
     action: 'UpdateRecord', table: 'BDD', rowId: 2, ok: true,
-    values: { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1, Fonction: 'Chef' }
+    values: { email: 'nouveau@u-bordeaux-montaigne.example', Etablissement: 1, Fonction: 'Chef' }
   }]);
-  assert.equal(w.tables.BDD.email[1], 'nouveau@u-bordeaux-montaigne.fr');
+  assert.equal(w.tables.BDD.email[1], 'nouveau@u-bordeaux-montaigne.example');
   assert.equal(w.tables.BDD.Etablissement[1], 1);
 });
 
 test('saveProfile refuses an address that another fiche took since the review, and writes nothing', async () => {
   const w = await world();
-  const next = await review(w, 2, { email: 'convoite@exemple.fr' }, { admin: true });
-  w.tables.BDD.email[3] = 'Convoite@Exemple.fr'; // Dan a pris l'adresse entre-temps (sans toucher à la fiche de Bob)
+  const next = await review(w, 2, { email: 'convoite@exemple.example' }, { admin: true });
+  w.tables.BDD.email[3] = 'Convoite@Exemple.example'; // Dan a pris l'adresse entre-temps (sans toucher à la fiche de Bob)
   await assert.rejects(saveProfile(w.docApi, next, { log: quiet }),
     error => error instanceof ProfileSaveError && /Cette adresse e-mail est maintenant celle d'une autre fiche : rien n'a été modifié/.test(error.message));
   assert.deepEqual(writes(w), []);
@@ -500,14 +500,14 @@ test('saveProfile gives the review back when somebody changed the e-mail or the 
   const result = await saveProfile(w.docApi, next, { log: quiet });
   assert.equal(result.status, 'changed', 'la signature couvre l\'établissement');
   assert.deepEqual(writes(w), []);
-  const mail = await review(w, 2, { email: 'autre@exemple.fr' }, { admin: true });
-  w.tables.BDD.email[1] = 'ailleurs@exemple.fr';
+  const mail = await review(w, 2, { email: 'autre@exemple.example' }, { admin: true });
+  w.tables.BDD.email[1] = 'ailleurs@exemple.example';
   assert.equal((await saveProfile(w.docApi, mail, { log: quiet })).status, 'changed', 'la signature couvre l\'e-mail');
 });
 
 test('saveProfile closed by default: a review that was not prepared for an administrator cannot write the e-mail or the établissement', async () => {
   const w = await world();
-  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.fr' }, { admin: true });
+  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.example' }, { admin: true });
   for (const admin of [false, undefined, 'oui', 1]) {
     await assert.rejects(saveProfile(w.docApi, { ...next, admin }, { log: quiet }),
       error => error instanceof ProfileSaveError && /réservés à un administrateur/.test(error.message), JSON.stringify(admin));
@@ -519,7 +519,7 @@ test('saveProfile closed by default: a review that was not prepared for an admin
 
 test('unsavedLabels notices an e-mail or an établissement that Grist did not keep', async () => {
   const w = await world();
-  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.fr', Etablissement: 1 }, { admin: true });
+  const next = await review(w, 2, { email: 'nouveau@u-bordeaux-montaigne.example', Etablissement: 1 }, { admin: true });
   assert.deepEqual(unsavedLabels(next, w.row(2), w.referenceMaps), ['E-mail', 'Établissement']);
   await saveProfile(w.docApi, next, { log: quiet });
   const saved = tableToRows(w.tables.BDD).find(candidate => candidate.id === 2);
@@ -725,8 +725,8 @@ test('saveProfile reports the leftover file when the fiche is gone, or the addre
     error => error instanceof ProfileSaveError && /n'existe plus dans Grist/.test(error.message) && error.leftover === 2000);
 
   const taken = await avatarWorld();
-  const mail = await review(taken, 2, { email: 'convoite@exemple.fr', Avatar: photo() }, { admin: true });
-  const sentTaken = uploader(taken, { during: () => { taken.tables.BDD.email[3] = 'convoite@exemple.fr'; } });
+  const mail = await review(taken, 2, { email: 'convoite@exemple.example', Avatar: photo() }, { admin: true });
+  const sentTaken = uploader(taken, { during: () => { taken.tables.BDD.email[3] = 'convoite@exemple.example'; } });
   await assert.rejects(saveProfile(taken.docApi, mail, { upload: sentTaken.upload, log: quiet }),
     error => error instanceof ProfileSaveError && /Cette adresse e-mail est maintenant celle d'une autre fiche/.test(error.message) && error.leftover === 2000);
   assert.deepEqual(writes(taken), []);
@@ -751,7 +751,7 @@ test('saveProfile says what it can of any other upload failure, logs the cause, 
   const w = await avatarWorld();
   const next = await review(w, 1, { Avatar: photo() });
   const { lines, log } = logged();
-  const { upload } = uploader(w, { fail: new Error('boom 500 pour ana.martin@chu-bordeaux.fr') });
+  const { upload } = uploader(w, { fail: new Error('boom 500 pour ana.martin@chu-bordeaux.example') });
   await assert.rejects(saveProfile(w.docApi, next, { upload, log }), error => {
     assert.match(error.message, /^La modification n'a pas pu être enregistrée\. Réessayez/);
     assert.doesNotMatch(error.message, /boom/);
@@ -788,7 +788,7 @@ test('saveProfile also refuses, after the upload, a review whose column cannot t
 });
 
 test('an administrator replaces or removes the photo of someone else, on that fiche only', async () => {
-  const w = await avatarWorld({ user: { email: 'admin@chu-bordeaux.fr' } });
+  const w = await avatarWorld({ user: { email: 'admin@chu-bordeaux.example' } });
   await saveProfile(w.docApi, await review(w, 2, { Avatar: photo() }, { admin: true }), { upload: uploader(w).upload, log: quiet });
   await saveProfile(w.docApi, await review(w, 1, { Avatar: 0 }, { admin: true }), { log: quiet });
   assert.deepEqual(writes(w).map(call => [call.rowId, call.values]), [[2, { Avatar: ['L', 2000] }], [1, { Avatar: ['L'] }]]);
@@ -821,7 +821,7 @@ const newcomer = () => world({ tables: withSchema(withIdentity(withShownEmail())
 
 test('createProfile adds one row to BDD with the address of the account and what was filled in, and nothing else', async () => {
   const w = await newcomer();
-  const next = await creation(w, { prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission', email_affiche: 'Zoe@CHU-Bordeaux.fr', Competences: [3] });
+  const next = await creation(w, { prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission', email_affiche: 'Zoe@CHU-Bordeaux.example', Competences: [3] });
   assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien');
   assert.equal(next.after.prenom, 'Zoé');
   assert.equal(next.after.etablissement_label, 'CHU');
@@ -832,7 +832,7 @@ test('createProfile adds one row to BDD with the address of the account and what
   assert.deepEqual(result, { status: 'created', rowId: 13 });
   assert.deepEqual(writes(w), [{
     action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
-    values: { email: NEW_EMAIL, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission', email_affiche: 'zoe@chu-bordeaux.fr', Competences: ['L', 3] }
+    values: { email: NEW_EMAIL, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission', email_affiche: 'zoe@chu-bordeaux.example', Competences: ['L', 3] }
   }]);
   assert.equal(w.tables.BDD.id.length, 13, 'une ligne de plus');
   assert.deepEqual(unsavedLabels(next, tableToRows(w.tables.BDD).find(row => row.id === 13), w.referenceMaps), []);

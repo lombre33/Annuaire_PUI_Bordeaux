@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { sampleTables, withBranding, withIdentity, withSchema, HOSTILE_FIRST_NAME, ANA_EMAIL } from './fixtures.mjs';
 import { FAKE_ATTACHMENTS_URL } from './support/fake-grist.js';
 import { MISSING_FILE, BROKEN_FILE, PADDED_FILE } from './support/fake-attachments.mjs';
-import { skip, reload, waitForCards, withWidget as withWidgetOn } from './support/browser.mjs';
+import { changeFonction, skip, reload, waitForCards, withWidget as withWidgetOn } from './support/browser.mjs';
 import { CARD_LOGO, PUI_URL, VERSION } from '../constants.js';
 import { ANALYSIS_TIMEOUT_MS, FIT_GATE_MS } from '../branding-ui.js';
 
@@ -484,10 +484,7 @@ test('une lecture de Grist qui ne change aucun logo ne reconstruit pas le bandea
     await waitForCards(page, 4);
     await waitForLogos(page, 3);
     await page.evaluate(() => { document.querySelector('#bandLogos li').dataset.kept = 'oui'; });
-    await page.evaluate(() => { window.__tables.BDD.Fonction[0] = 'Cheffe de projet'; });
-    await reload(page);
-    await page.waitForFunction(() => [...document.querySelectorAll('.contact-card')].some(card =>
-      card.querySelector('.name').textContent === 'Ana Martin' && card.querySelector('.fonction').textContent === 'Cheffe de projet'));
+    await changeFonction(page, { row: 0, name: 'Ana Martin', fonction: 'Cheffe de projet' });
     assert.equal(await page.locator('#bandLogos li').first().getAttribute('data-kept'), 'oui');
   }));
 

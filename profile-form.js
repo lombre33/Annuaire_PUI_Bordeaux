@@ -216,7 +216,7 @@ function textField(ctx, field) {
     refreshForm(ctx);
   });
   if (field.kind === 'phone') {
-    // Un numéro valide se remet en forme à la sortie du champ : « 0556789012 » devient « 05 56 78 90 12 ».
+    // Un numéro valide se remet en forme à la sortie du champ : « 0536499012 » devient « 05 36 49 90 12 ».
     input.addEventListener('blur', () => {
       const digits = frenchPhoneDigits(input.value);
       if (!digits) return;

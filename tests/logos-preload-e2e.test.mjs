@@ -52,7 +52,7 @@ function sixteenFounders() {
     id: column(index => index + 1),
     prenom: column(index => `Prenom${index}`),
     nom: column(index => `Nom${String(index).padStart(3, '0')}`),
-    email: column(index => `p${index}@e${owners[index]}.fr`),
+    email: column(index => `p${index}@e${owners[index]}.example`),
     Fonction: column('Chargé de mission'),
     Etablissement: owners,
     Instances: column(() => ['L']),

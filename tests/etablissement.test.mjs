@@ -78,17 +78,17 @@ test('responsablesOf lists the people ACL names for the establishment, ignoring 
 
 test('responsablesOf groups the rows of one address, keeps each row’s own admin flag and skips rows it cannot place', () => {
   const rows = [
-    { id: 1, email: ' Ana@X.fr ', Responsable_de_l_Etablissement: 7, admin: true },
-    { id: 2, email: 'ana@x.fr', Responsable_de_l_Etablissement: 7, admin: false },
-    { id: 3, email: 'bob@x.fr', Responsable_de_l_Etablissement: 'CHU', admin: false },
+    { id: 1, email: ' Ana@X.example ', Responsable_de_l_Etablissement: 7, admin: true },
+    { id: 2, email: 'ana@x.example', Responsable_de_l_Etablissement: 7, admin: false },
+    { id: 3, email: 'bob@x.example', Responsable_de_l_Etablissement: 'CHU', admin: false },
     { id: 4, email: '', Responsable_de_l_Etablissement: 7, admin: false },
-    { id: 5, email: 'cat@x.fr', Responsable_de_l_Etablissement: 8, admin: false },
-    { id: 6, email: 'dan@x.fr', Responsable_de_l_Etablissement: 0, admin: true },
-    { id: 7, email: 'eve@x.fr', Responsable_de_l_Etablissement: 7, admin: 'oui' }
+    { id: 5, email: 'cat@x.example', Responsable_de_l_Etablissement: 8, admin: false },
+    { id: 6, email: 'dan@x.example', Responsable_de_l_Etablissement: 0, admin: true },
+    { id: 7, email: 'eve@x.example', Responsable_de_l_Etablissement: 7, admin: 'oui' }
   ];
   assert.deepEqual(responsablesOf(rows, 7), [
-    { email: 'ana@x.fr', rows: [{ id: 1, admin: true }, { id: 2, admin: false }] },
-    { email: 'eve@x.fr', rows: [{ id: 7, admin: false }] }
+    { email: 'ana@x.example', rows: [{ id: 1, admin: true }, { id: 2, admin: false }] },
+    { email: 'eve@x.example', rows: [{ id: 7, admin: false }] }
   ]);
 });
 
@@ -99,37 +99,37 @@ const initialsOf = contact => `${contact.prenom.charAt(0)}${contact.nom.charAt(0
 
 test('peopleOfEtablissement lists, alphabetically and once per address, the people the directory shows for the establishment', () => {
   const contacts = [
-    card('Zoé', 'Zola', 'zoe@x.fr', 1),
-    card('Ana', 'Martin', 'Ana.Martin@CHU-Bordeaux.fr', 1),
-    card('Ana', 'Martin', 'ana.martin@chu-bordeaux.fr', 1),
-    card('Bob', 'Durand', 'bob@x.fr', 2),
+    card('Zoé', 'Zola', 'zoe@x.example', 1),
+    card('Ana', 'Martin', 'Ana.Martin@CHU-Bordeaux.example', 1),
+    card('Ana', 'Martin', 'ana.martin@chu-bordeaux.example', 1),
+    card('Bob', 'Durand', 'bob@x.example', 2),
     card('Sans', 'Courriel', '', 1),
     card('Mal', 'Écrit', 'pas-une-adresse', 1)
   ];
-  const result = peopleOfEtablissement(contacts, 1, 'zoe@x.fr', initialsOf);
+  const result = peopleOfEtablissement(contacts, 1, 'zoe@x.example', initialsOf);
   assert.deepEqual(result.candidates, [
-    { email: 'ana.martin@chu-bordeaux.fr', name: 'Ana Martin', initials: 'AM' },
-    { email: 'zoe@x.fr', name: 'Zoé Zola', initials: 'ZZ' }
+    { email: 'ana.martin@chu-bordeaux.example', name: 'Ana Martin', initials: 'AM' },
+    { email: 'zoe@x.example', name: 'Zoé Zola', initials: 'ZZ' }
   ]);
   assert.equal(result.hidden, 5, 'cinq cartes de l’établissement 1 disparaîtraient, adresse ou non');
   assert.equal(result.includesMe, true);
 });
 
 test('peopleOfEtablissement keeps the first card of an address that two cards share', () => {
-  const contacts = [card('Ana', 'Martin', 'partagee@x.fr', 1), card('Anne', 'Dupont', 'PARTAGEE@x.fr', 1)];
+  const contacts = [card('Ana', 'Martin', 'partagee@x.example', 1), card('Anne', 'Dupont', 'PARTAGEE@x.example', 1)];
   assert.deepEqual(peopleOfEtablissement(contacts, 1, '', initialsOf).candidates, [
-    { email: 'partagee@x.fr', name: 'Ana Martin', initials: 'AM' }
+    { email: 'partagee@x.example', name: 'Ana Martin', initials: 'AM' }
   ]);
 });
 
 test('peopleOfEtablissement does not count the cards of other establishments, nor invent a presence for me', () => {
-  const contacts = [card('Bob', 'Durand', 'bob@x.fr', 2), card('Ana', 'Martin', 'ana@x.fr', ['R', 'Etablissements', 1])];
-  assert.deepEqual(peopleOfEtablissement(contacts, 2, 'ana@x.fr', initialsOf), {
-    candidates: [{ email: 'bob@x.fr', name: 'Bob Durand', initials: 'BD' }], hidden: 1, includesMe: false
+  const contacts = [card('Bob', 'Durand', 'bob@x.example', 2), card('Ana', 'Martin', 'ana@x.example', ['R', 'Etablissements', 1])];
+  assert.deepEqual(peopleOfEtablissement(contacts, 2, 'ana@x.example', initialsOf), {
+    candidates: [{ email: 'bob@x.example', name: 'Bob Durand', initials: 'BD' }], hidden: 1, includesMe: false
   });
-  assert.equal(peopleOfEtablissement(contacts, 1, 'ANA@x.fr', initialsOf).includesMe, true, 'adresse comparée sans casse, référence en liste lue aussi');
+  assert.equal(peopleOfEtablissement(contacts, 1, 'ANA@x.example', initialsOf).includesMe, true, 'adresse comparée sans casse, référence en liste lue aussi');
   assert.equal(peopleOfEtablissement(contacts, 1, '', initialsOf).includesMe, false);
-  assert.deepEqual(peopleOfEtablissement([], 1, 'ana@x.fr', initialsOf), { candidates: [], hidden: 0, includesMe: false });
+  assert.deepEqual(peopleOfEtablissement([], 1, 'ana@x.example', initialsOf), { candidates: [], hidden: 0, includesMe: false });
 });
 
 // ----- Le brouillon -----
@@ -150,10 +150,10 @@ test('toggleResponsable marks a responsable removed, then brings them back; an a
   assert.equal(draft.responsables[0].state, 'removed');
   toggleResponsable(draft, ANA_EMAIL);
   assert.equal(draft.responsables[0].state, 'kept');
-  assert.equal(nominate(draft, 'nouveau@x.fr'), '');
-  toggleResponsable(draft, 'nouveau@x.fr');
+  assert.equal(nominate(draft, 'nouveau@x.example'), '');
+  toggleResponsable(draft, 'nouveau@x.example');
   assert.deepEqual(draft.responsables.map(item => item.email), [ANA_EMAIL]);
-  toggleResponsable(draft, 'inconnu@x.fr');
+  toggleResponsable(draft, 'inconnu@x.example');
   assert.equal(draft.responsables.length, 1, 'une adresse absente ne change rien');
 });
 
@@ -163,35 +163,35 @@ test('rebaseDraft brings the draft onto the list Grist holds now, keeping what t
   draft.visible = false;
   draft.logo = { action: 'remove' };
   toggleResponsable(draft, BOB_EMAIL);
-  nominate(draft, 'claire@x.fr');
-  nominate(draft, 'dan@x.fr');
+  nominate(draft, 'claire@x.example');
+  nominate(draft, 'dan@x.example');
   // Entre-temps : Ana est partie, Dan a été nommé par un autre, Eve aussi.
-  const now = [{ email: BOB_EMAIL }, { email: 'dan@x.fr' }, { email: 'eve@x.fr' }];
+  const now = [{ email: BOB_EMAIL }, { email: 'dan@x.example' }, { email: 'eve@x.example' }];
   const rebased = rebaseDraft(draft, now);
   assert.deepEqual(rebased.responsables, [
     { email: BOB_EMAIL, state: 'removed' },
-    { email: 'dan@x.fr', state: 'kept' },
-    { email: 'eve@x.fr', state: 'kept' },
-    { email: 'claire@x.fr', state: 'added' }
+    { email: 'dan@x.example', state: 'kept' },
+    { email: 'eve@x.example', state: 'kept' },
+    { email: 'claire@x.example', state: 'added' }
   ]);
   assert.deepEqual([rebased.name, rebased.visible, rebased.logo], ['Nom tapé', false, { action: 'remove' }]);
   assert.equal(draft.responsables.length, 4, 'le brouillon d’origine n’est pas modifié');
 });
 
 test('rebaseDraft makes a plain draft of the current list when nothing was touched', () => {
-  assert.deepEqual(rebaseDraft(draftWith(ANA_EMAIL), [{ email: 'x@y.fr' }]).responsables, [{ email: 'x@y.fr', state: 'kept' }]);
+  assert.deepEqual(rebaseDraft(draftWith(ANA_EMAIL), [{ email: 'x@y.example' }]).responsables, [{ email: 'x@y.example', state: 'kept' }]);
   assert.deepEqual(rebaseDraft(draftWith(ANA_EMAIL), []).responsables, []);
 });
 
 test('nominate adds a responsable in lower case, once, and says why when it refuses', () => {
   const draft = draftWith(ANA_EMAIL);
-  assert.equal(nominate(draft, '  Nouveau.Nom@Exemple.FR '), '');
-  assert.deepEqual(draft.responsables.at(-1), { email: 'nouveau.nom@exemple.fr', state: 'added' });
-  assert.equal(nominate(draft, 'NOUVEAU.NOM@exemple.fr'), 'Cette personne est déjà responsable.');
+  assert.equal(nominate(draft, '  Nouveau.Nom@Exemple.EXAMPLE '), '');
+  assert.deepEqual(draft.responsables.at(-1), { email: 'nouveau.nom@exemple.example', state: 'added' });
+  assert.equal(nominate(draft, 'NOUVEAU.NOM@exemple.example'), 'Cette personne est déjà responsable.');
   assert.equal(nominate(draft, ANA_EMAIL.toUpperCase()), 'Cette personne est déjà responsable.');
   assert.equal(nominate(draft, ''), 'Choisissez une personne ou saisissez une adresse e-mail.');
   assert.equal(nominate(draft, '   '), 'Choisissez une personne ou saisissez une adresse e-mail.');
-  for (const bad of ['pas une adresse', 'a@b', '@x.fr', 'deux@x.fr, trois@x.fr', 'a b@x.fr', '+x@exemple.fr', `${'a'.repeat(MAX_TEXT_LENGTH)}@x.fr`]) {
+  for (const bad of ['pas une adresse', 'a@b', '@x.example', 'deux@x.example, trois@x.example', 'a b@x.example', '+x@exemple.example', `${'a'.repeat(MAX_TEXT_LENGTH)}@x.example`]) {
     assert.equal(nominate(draft, bad), 'Indiquez une adresse e-mail valide.', bad);
   }
   assert.equal(draft.responsables.length, 2, 'rien n’a été ajouté par un refus');
@@ -292,9 +292,9 @@ test('diffEtablissement reports a logo only when there is a file to send or a lo
 test('diffEtablissement lists the responsables added and removed, never the whole list', () => {
   const draft = draftWith(ANA_EMAIL, BOB_EMAIL);
   toggleResponsable(draft, BOB_EMAIL);
-  nominate(draft, 'Claire@x.fr');
+  nominate(draft, 'Claire@x.example');
   const result = diff(draft);
-  assert.deepEqual(result.champs.responsables, { ajout: ['claire@x.fr'], retrait: [BOB_EMAIL] });
+  assert.deepEqual(result.champs.responsables, { ajout: ['claire@x.example'], retrait: [BOB_EMAIL] });
   assert.deepEqual(result.labels, ['responsables']);
   assert.equal(summaryOf(result), '1 modification : responsables');
 });
@@ -306,7 +306,7 @@ test('diffEtablissement refuses to leave the establishment without a responsable
   assert.equal(result.fieldErrors.responsables, KEEP_ONE);
   assert.deepEqual(result.errors, [KEEP_ONE]);
   assert.equal(summaryOf(result), 'Gardez au moins un responsable');
-  nominate(draft, 'relais@x.fr');
+  nominate(draft, 'relais@x.example');
   assert.deepEqual(diff(draft).fieldErrors, {}, 'un autre responsable suffit');
 });
 
@@ -316,8 +316,8 @@ test('diffEtablissement does not reproach an empty responsables list nobody touc
   const result = diff(draft);
   assert.deepEqual(result.fieldErrors, {});
   assert.deepEqual(Object.keys(result.champs), ['visible']);
-  nominate(draft, 'premier@x.fr');
-  assert.deepEqual(diff(draft).champs.responsables, { ajout: ['premier@x.fr'], retrait: [] });
+  nominate(draft, 'premier@x.example');
+  assert.deepEqual(diff(draft).champs.responsables, { ajout: ['premier@x.example'], retrait: [] });
 });
 
 test('diffEtablissement leaves the responsables alone when the list could not be read', () => {
@@ -334,7 +334,7 @@ test('diffEtablissement orders the summary like the sheet and counts a single ch
   draft.name = 'Autre nom';
   draft.visible = false;
   draft.logo = { action: 'remove' };
-  nominate(draft, 'nouveau@x.fr');
+  nominate(draft, 'nouveau@x.example');
   const result = diff(draft);
   assert.deepEqual(result.labels, ['logo', 'nom', 'visibilité', 'responsables']);
   assert.equal(summaryOf(result), '4 modifications : logo, nom, visibilité, responsables');

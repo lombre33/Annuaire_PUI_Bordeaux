@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withAvatars, withBranding, withIdentity, withSchema, ANA_EMAIL, IRIS_EMAIL, NEW_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
 import {
-  assertNoSecretLogged, bddCalls, bddCell, focusReturnsTo, gridCard, openOwn, reload, skip, tokenRequests, toast, until, waitForCards,
+  assertNoSecretLogged, bddCalls, bddCell, changeFonction, focusReturnsTo, gridCard, openOwn, skip, tokenRequests, toast, until, waitForCards,
   waitForEditButtons, withWidget
 } from './support/browser.mjs';
 import { FITS, assertTabStaysInDialog, dialogFit, profileDialogPage, spillOf, unnamedControls } from './support/dialog-page.mjs';
@@ -233,9 +233,7 @@ test('le bandeau « Ma présence » montre la photo de la personne connectée, o
     assert.equal(await avatar.evaluate(node => node.tagName), 'DIV', 'rien à agrandir dans le bandeau');
     // Une relecture de Grist ne repeint pas l'avatar : la photo reste la même image, sans clignoter ni être redemandée.
     const picture = await avatar.locator('img').elementHandle();
-    await page.evaluate(() => { window.__tables.BDD.Fonction[9] = 'Directeur'; });
-    await reload(page);
-    await until(async () => (await gridCard(page, 'Hugo Bernard').locator('.fonction').textContent()) === 'Directeur', 'l\'annuaire n\'a pas été relu');
+    await changeFonction(page, { row: 9, name: 'Hugo Bernard', fonction: 'Directeur' });
     assert.equal(await picture.evaluate(node => node.isConnected), true, 'le bandeau n\'est pas repeint quand Grist renvoie les mêmes photo et initiales');
   });
   // Iris n'apparaît pas dans l'annuaire mais a une fiche, sans photo.

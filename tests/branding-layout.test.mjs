@@ -425,7 +425,7 @@ for (const [label, tables, waitLogos] of [['avec logos', withShortRole(crowdedBr
 // que quelques lettres : il disparaît plutôt que de s'afficher en miette, et l'e-mail ne bouge pas.
 test('un e-mail très long ne laisse pas de place au rôle : il disparaît, sans faire passer l\'e-mail à la ligne', { skip }, () => {
   const tables = withShortRole(crowdedTables());
-  tables.BDD.email = tables.BDD.email.map(() => 'prenom.nom-de-famille.tres-long@service-recherche-et-innovation.universite-de-bordeaux.fr');
+  tables.BDD.email = tables.BDD.email.map(() => 'prenom.nom-de-famille.tres-long@service-recherche-et-innovation.universite-de-bordeaux.example');
   return withWidget({ tables, waitLogos: false }, async ({ page }) => {
     await atEachWidth(page, [320, 414, 600, 1280, 1920], async width => {
       const cards = await roleCards(page);

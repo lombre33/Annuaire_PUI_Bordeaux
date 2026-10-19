@@ -25,9 +25,9 @@ export function sampleTables() {
       id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       prenom: ['Ana', 'Bob', 'Carla', 'Dan', 'Eve', HOSTILE_FIRST_NAME, 'Fred', '', 'Gina', 'Hugo', 'Iris', 'Jules'],
       nom: ['Martin', 'Durand', 'Lopez', 'Petit', 'Sans', 'Hostile', 'Inconnu', '', 'Bergonié', 'Bernard', 'Refus', 'Sansreponse'],
-      email: ['ana.martin@chu-bordeaux.fr', 'bob@u-bordeaux-montaigne.fr', 'carla@clinique.fr', 'dan@inserm.fr',
-        'eve@example.fr', 'hostile@chu-bordeaux.fr', 'fred@chu-bordeaux.fr', 'x@chu-bordeaux.fr',
-        'gina@bergonie.fr?cc=intrus@example.fr', '', 'iris@chu-bordeaux.fr', 'jules@chu-bordeaux.fr'],
+      email: ['ana.martin@chu-bordeaux.example', 'bob@u-bordeaux-montaigne.example', 'carla@clinique.example', 'dan@inserm.example',
+        'eve@example.example', 'hostile@chu-bordeaux.example', 'fred@chu-bordeaux.example', 'x@chu-bordeaux.example',
+        'gina@bergonie.example?cc=intrus@example.example', '', 'iris@chu-bordeaux.example', 'jules@chu-bordeaux.example'],
       Fonction: ['Pharmacienne', 'Chargé de mission', '', '', '', '', '', '', 'Directrice', '', '', ''],
       // Référence vers Etablissements : identifiant de ligne, 0 quand elle est vide.
       Etablissement: [1, 2, 3, 4, 0, 1, 99, 1, 5, 1, 1, 1],
@@ -44,7 +44,7 @@ export function sampleTables() {
       perimetre: [['L', 1], ['L', 2], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 3], ['L'], ['L', 1], ['L', 1]],
       // Colonnes facultatives, rajoutées dans BDD sous ces noms : Numeric (le 0
       // initial est perdu) et Référence vers Role_Dans_le_PUI (0 = vide).
-      numero_de_telephone: [556789012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      numero_de_telephone: [536499012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       Role_dans_le_PUI: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       // Case à cocher : seul `true` vaut accord. Iris a refusé, Jules n'a pas
       // répondu (cellule vide).
@@ -174,16 +174,16 @@ export function unrankableTaskTables() {
 // responsable du CHU, écrite avec des majuscules dans ACL) ; ADMIN_EMAIL est administrateur sans
 // ligne dans BDD ; Iris a refusé d'apparaître ; Bob est partenaire (UBM) et responsable de son
 // établissement.
-export const ANA_EMAIL = 'ana.martin@chu-bordeaux.fr';
-export const BOB_EMAIL = 'bob@u-bordeaux-montaigne.fr';
-export const IRIS_EMAIL = 'iris@chu-bordeaux.fr';
-export const ADMIN_EMAIL = 'admin@chu-bordeaux.fr';
+export const ANA_EMAIL = 'ana.martin@chu-bordeaux.example';
+export const BOB_EMAIL = 'bob@u-bordeaux-montaigne.example';
+export const IRIS_EMAIL = 'iris@chu-bordeaux.example';
+export const ADMIN_EMAIL = 'admin@chu-bordeaux.example';
 
 // Le document complété de la colonne facultative `email_affiche` de BDD : l'adresse que la carte montre
 // à la place de `email` quand elle n'est pas vide. Bob en a une (une boîte de service), les autres non.
 // NEW_EMAIL est une personne connectée qui n'a ni fiche dans BDD ni ligne dans ACL.
-export const BOB_SHOWN_EMAIL = 'contact@u-bordeaux-montaigne.fr';
-export const NEW_EMAIL = 'zoe.nouvelle@chu-bordeaux.fr';
+export const BOB_SHOWN_EMAIL = 'contact@u-bordeaux-montaigne.example';
+export const NEW_EMAIL = 'zoe.nouvelle@chu-bordeaux.example';
 export function withShownEmail(tables = sampleTables()) {
   const copy = structuredClone(tables);
   copy.BDD.email_affiche = copy.BDD.id.map(id => (id === 2 ? BOB_SHOWN_EMAIL : ''));
@@ -196,7 +196,7 @@ export function withIdentity(tables = sampleTables()) {
   const copy = structuredClone(tables);
   copy.ACL = {
     id: [1, 2, 3],
-    email: ['Ana.Martin@CHU-Bordeaux.fr', ADMIN_EMAIL, BOB_EMAIL],
+    email: ['Ana.Martin@CHU-Bordeaux.example', ADMIN_EMAIL, BOB_EMAIL],
     Responsable_de_l_Etablissement: [1, 0, 2],
     admin: [true, true, false]
   };
