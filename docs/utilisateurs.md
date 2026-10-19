@@ -129,7 +129,7 @@ Les logos de toutes ces captures sont **inventés**, comme le reste du jeu de d�
 
 **Quand un logo manque.** Le nom prend sa place : l'acronyme dans la pastille des cartes, le nom de la structure dans le bandeau du bas. Le visuel des financeurs, lui, ne dépend pas de Grist et s'affiche toujours. L'annuaire reste utilisable. Cela arrive quand le fichier n'a pas été ajouté dans Grist, quand il a été supprimé ou n'est pas une image lisible, ou quand Grist ne donne pas accès aux pièces jointes : ce dernier cas touche **tous** les logos à la fois.
 
-![L'en-tête et les premières cartes quand aucun logo ne se charge : les noms des financeurs remplacent leurs logos et chaque carte porte la pastille de l'acronyme de son établissement (CHD, UDD, EDD)](images/sans-logos.png)
+![L'en-tête et les premières cartes quand aucun logo d'établissement ne se charge : le visuel des financeurs reste affiché, et chaque carte porte la pastille de l'acronyme de son établissement (CHD, UDD, EDD)](images/sans-logos.png)
 
 Un logo absent ou mal affiché se corrige par le responsable de l'établissement, depuis sa fiche, ou dans Grist, par l'administrateur des données ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 5, et [maintenance](maintenance.md#les-logos-et-le-bandeau-du-bas)). Après un changement fait depuis la fiche, les cartes se mettent à jour d'elles-mêmes ; après un changement fait directement dans Grist, les tables de logos ne préviennent pas l'annuaire : rechargez la page.
 
@@ -310,7 +310,7 @@ Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, l'adres
 
 ### Remplir le formulaire
 
-![Le formulaire « Modifier mon profil » : un bloc d'identité verrouillé en haut, la carte « Photo de profil » avec le bouton « Ajouter une photo », les champs Prénom, Nom, Fonction et Téléphone, la liste Rôle dans le PUI, puis les listes Instances et Actions en pastilles à cocher ; en bas, le nombre de champs modifiés et les boutons « Annuler » et « Relire mes modifications »](images/modifier-fiche-formulaire.png)
+![Le formulaire « Modifier mon profil » : un bloc d'identité verrouillé en haut, la carte « Photo de profil » avec le bouton « Ajouter une photo », les champs Prénom, Nom, Fonction et Téléphone, la liste déroulante Rôle dans le PUI, puis les listes Instances et Actions, chacune avec son champ de recherche et ses pastilles à cocher ; en bas, le nombre de champs modifiés et les boutons « Annuler » et « Relire mes modifications »](images/modifier-fiche-formulaire.png)
 
 *Le formulaire de modification : l'identité verrouillée, la photo de profil, les champs de texte, le rôle et les six listes à cocher (la fenêtre défile pour atteindre les dernières). Le pied de fenêtre compte les champs modifiés.*
 
@@ -472,7 +472,7 @@ Un administrateur est une personne dont la case `admin` est cochée dans la tabl
 - **Un bouton dans le bandeau.** Seuls les administrateurs voient **Mode admin** dans le bandeau « Ma présence ». Un administrateur qui n'a pas de fiche le voit aussi : son adresse ne figure pas dans l'annuaire, le bandeau le dit, le mode admin lui reste et il peut se créer une fiche avec **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)). Le mode est **éteint à chaque ouverture** de l'annuaire : un administrateur modifie sa propre fiche comme tout le monde tant qu'il ne l'a pas allumé.
 - **Allumé,** il affiche un bandeau qui rappelle le mode et dit que vos changements sont relus avant d'être validés, et il ajoute le bouton **✎ Modifier la fiche** sur toutes les cartes affichées. Sa propre carte garde **✎ Modifier**. Un second clic sur **Mode admin** l'éteint, le bandeau disparaît et les boutons des autres cartes aussi.
 
-![La fenêtre « Modifier la fiche de … » ouverte par un administrateur sur la fiche de Camille Rousseau : l'identité sans verrou, les champs Prénom et Nom, E-mail et Établissement (une liste des noms complets), Fonction, Téléphone et Rôle dans le PUI, puis les listes à cocher ; en bas, « Aucune modification » et le bouton « Relire les modifications » grisé](images/modifier-fiche-admin.png)
+![La fenêtre « Modifier la fiche de … » ouverte par un administrateur sur la fiche de Camille Rousseau : l'identité sans verrou, les champs Prénom et Nom, E-mail et Établissement (une liste déroulante, où les établissements se lisent par leur sigle), Fonction, Téléphone et Rôle dans le PUI, puis les listes à cocher ; en bas, « Aucune modification » et le bouton « Relire les modifications » grisé](images/modifier-fiche-admin.png)
 
 *La fenêtre d'un administrateur sur la fiche d'une autre personne : l'e-mail et l'établissement sont des champs à modifier, et rien n'est verrouillé.*
 

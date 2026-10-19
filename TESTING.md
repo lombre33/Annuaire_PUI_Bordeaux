@@ -171,6 +171,9 @@ Sans dépendance, un fichier de tests par module :
   démonstration, phrases du guide utilisateur, schéma des imports, préfixes de la console et
   affirmations de la page de sécurité qui doivent suivre le code (méthodes de l'API Grist, une
   seule requête réseau et ses protections, aucun stockage). Sans navigateur.
+- `tests/license.test.mjs` — la licence : `LICENSE` est le texte officiel de la GNU GPL version 3
+  (empreinte vérifiée), le README la déclare et renvoie vers `LICENSE`, `SECURITY.md` dit où
+  signaler un problème sans issue publique ni adresse personnelle. Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
 `npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 75
