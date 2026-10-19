@@ -39,6 +39,7 @@ import { checkImageFile } from '../image-prep.js';
 import { tablesFictives, CARTES_ATTENDUES, PERSONNES_AVEC_PHOTO, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
 import { NOMBRE_VISAGES, PREMIER_PORTRAIT, portraitFictif } from '../docs/demo/portraits-fictifs.mjs';
 import { assertFictionalContacts } from './support/fiction.mjs';
+import { WIDGET_SOURCES, withoutComments } from './support/widget-sources.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -218,7 +219,9 @@ test('le serveur de démonstration sert le widget avec l\'API Grist simulée, et
   try {
     const page = await (await fetch(`${url}/`)).text();
     assert.match(page, /<script src="\/__grist-simule\.js"><\/script>/, 'L\'API Grist simulée doit remplacer grist-plugin-api.js.');
-    assert.doesNotMatch(page, /docs\.getgrist\.com/, 'Aucun script externe ne doit être chargé par la démonstration.');
+    assert.doesNotMatch(page, /<script\b[^>]*\bsrc="(?:https?:)?\/\//, 'Aucun script externe ne doit être chargé par la démonstration.');
+    // Le widget tourne tel qu'en production, sa politique de sécurité de contenu comprise (elle nomme docs.getgrist.com, sans le charger).
+    assert.match(page, /<meta http-equiv="Content-Security-Policy"/, 'La démonstration doit garder la politique de sécurité de contenu de index.html.');
     assert.equal((await fetch(`${url}/__grist-simule.js`)).status, 200);
     assert.equal((await fetch(`${url}/main.js`)).status, 200);
 
@@ -756,8 +759,6 @@ test('la page de maintenance donne la table et les colonnes de libellé de chaqu
 
 // ===== 6. La page de sécurité décrit fidèlement le code =====
 
-const WIDGET_SOURCES = () => fs.readdirSync(ROOT).filter(name => name.endsWith('.js')).map(name => ({ name, code: read(name) }));
-
 // docs/securite.md affirme : peu de méthodes de l'API de Grist, une seule requête réseau (l'envoi
 // d'un logo, testé plus bas), aucun stockage dans le navigateur, aucun texte de Grist inséré
 // comme HTML, un seul script externe. Ces affirmations sont vraies tant que ce test passe.
@@ -788,13 +789,6 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
   assert.deepEqual(external, ['https://docs.getgrist.com/grist-plugin-api.js'], 'index.html ne doit charger que le script de l\'API Grist.');
   assert.doesNotMatch(read('style.css'), /@import|url\(\s*["']?https?:/, 'style.css ne doit rien charger d\'externe.');
 });
-
-// Le code sans ses commentaires de ligne : de quoi chercher un appel sans tomber sur un commentaire qui
-// le nomme. Une adresse (`https://…`) n'est pas un commentaire : on ne coupe qu'un `//` précédé d'une espace.
-const withoutComments = code => code.split('\n')
-  .filter(line => !/^\s*\/\//.test(line))
-  .map(line => line.replace(/\s\/\/\s.*$/, ''))
-  .join('\n');
 
 // La seule requête réseau du widget, l'envoi du fichier d'un logo (docs/securite.md, « L'envoi d'un logo et le
 // jeton en écriture ») : ses protections sont écrites dans le code et dites dans la page. Perdre l'une d'elles

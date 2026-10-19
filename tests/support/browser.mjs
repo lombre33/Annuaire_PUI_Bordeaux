@@ -7,9 +7,10 @@
 // `node --test` reste vert. CHROMIUM_PATH désigne un Chromium déjà installé.
 
 import assert from 'node:assert/strict';
-import { createHarness } from './harness.mjs';
+import { assertNoCspViolation, createHarness, layoutSettled } from './harness.mjs';
 
-// openWidget(options) : voir tests/support/harness.mjs.
+// openWidget(options), assertNoCspViolation(widget), layoutSettled(page) : voir tests/support/harness.mjs.
+export { assertNoCspViolation, layoutSettled };
 export const { skip, openWidget, withWidget } = await createHarness();
 
 // Rejoue un onRecords (comme une édition dans Grist) et attend la fin du debounce.

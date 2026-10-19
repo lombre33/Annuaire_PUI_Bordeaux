@@ -2,6 +2,26 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <!-- Politique de sécurité de contenu : ce que la page peut charger, exécuter ou contacter, quoi qu'une donnée ou une
+       modification future y glisse. GitHub Pages n'envoie pas d'en-tête sur mesure, d'où cette balise (le navigateur n'y lit
+       ni frame-ancestors, ni report-uri, ni sandbox). Elle doit rester avant toute ressource.
+       script-src : les modules du dépôt et l'API de Grist (la balise script plus bas) ; 'unsafe-eval' par prudence pour cette
+         API, dont le fichier hébergé n'a pas pu être relu (le code du widget n'appelle ni eval ni new Function).
+       style-src 'unsafe-inline' : l'API de Grist ajoute une balise style au document.
+       img-src, connect-src : les pièces jointes viennent de l'instance Grist du document, dont l'adresse n'est pas connue
+         d'avance (https:) ; data: et blob: pour les aperçus et les copies de logos ; la boucle locale pour un Grist de test.
+       Le reste est fermé (default-src 'none' : ni cadre, ni police, ni média, ni travailleur), sans balise base, objet ni
+       formulaire. docs/securite.md (« Politique de sécurité de contenu ») donne le détail ; tests/csp.test.mjs et
+       tests/e2e-csp.test.mjs la gardent. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    script-src 'self' https://docs.getgrist.com 'unsafe-eval';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: blob: https: http://127.0.0.1:* http://localhost:*;
+    connect-src 'self' https: http://127.0.0.1:* http://localhost:*;
+    object-src 'none';
+    base-uri 'none';
+    form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Annuaire PUI Bordeaux</title>
   <link rel="stylesheet" href="style.css">

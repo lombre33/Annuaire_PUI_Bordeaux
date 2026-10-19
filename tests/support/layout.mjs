@@ -7,7 +7,7 @@
 // ignorés et `node --test` reste vert.
 
 import assert from 'node:assert/strict';
-import { createHarness } from './harness.mjs';
+import { createHarness, layoutSettled, runWidget } from './harness.mjs';
 
 const harness = await createHarness({ keepScrollbars: true });
 export const { skip } = harness;
@@ -17,9 +17,10 @@ export const WIDTHS = [320, 360, 414, 599, 600, 768, 839, 840, 1024, 1279, 1280,
 export const HEIGHT = 900;
 
 // `defaults` : { tables, ready } ; `tables()` donne le jeu de données de départ, `ready(page, options)` attend que la page soit
-// prête (les cartes sont là). Renvoie { openWidget, withWidget } : le cadre fait `width` px de large, avec un écran tactile
-// (pointer: coarse, ce qui déclenche les règles « doigt ») si `touch`. Les autres options sont celles de
-// tests/support/harness.mjs ; `withWidget(options, run)` vérifie en plus que la page n'a levé aucune exception.
+// prête (les cartes sont là), puis la mise en page se pose avant le premier contrôle (layoutSettled). Renvoie { openWidget,
+// withWidget } : le cadre fait `width` px de large, avec un écran tactile (pointer: coarse, ce qui déclenche les règles « doigt »)
+// si `touch`. Les autres options sont celles de tests/support/harness.mjs ; `withWidget(options, run)` vérifie en plus que la
+// page n'a levé aucune exception ni enfreint sa politique de sécurité de contenu.
 export function layoutWidgets({ tables: defaultTables, ready }) {
   async function openWidget({ width = 1480, touch = false, tables = defaultTables(), ...options } = {}) {
     const widget = await harness.openWidget({
@@ -28,23 +29,22 @@ export function layoutWidgets({ tables: defaultTables, ready }) {
       contextOptions: { viewport: { width, height: HEIGHT }, ...(touch ? { hasTouch: true, isMobile: true } : {}) }
     });
     await ready(widget.page, options);
+    await layoutSettled(widget.page);
     return widget;
   }
 
   async function withWidget(options, run) {
-    const widget = await openWidget(options);
-    try {
+    return runWidget(await openWidget(options), async widget => {
       await run(widget);
       assert.deepEqual(widget.logs.pageErrors, [], 'aucune erreur JavaScript dans la page');
-    } finally {
-      await widget.context.close();
-    }
+    });
   }
 
   return { openWidget, withWidget };
 }
 
-// Redimensionne le cadre, comme quand on élargit ou resserre le panneau dans Grist.
+// Redimensionne le cadre, comme quand on élargit ou resserre le panneau dans Grist ; la mise en page est posée au retour (le harnais
+// y attend après chaque page.setViewportSize, voir layoutSettled).
 export const resize = (page, width) => page.setViewportSize({ width, height: HEIGHT });
 
 // Pour chaque largeur de la liste, le même contrôle sur la même page : une erreur nomme la largeur fautive.

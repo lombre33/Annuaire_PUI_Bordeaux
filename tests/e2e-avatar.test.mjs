@@ -43,6 +43,14 @@ const photoError = page => dialog(page).locator('#profilePhotoError');
 // Une avatar montre sa photo : la classe qui cache les initiales, et une image chargée (pas un cadre vide).
 const showsPhoto = locator => locator.evaluate(node => node.classList.contains('has-photo') && node.querySelector('img')?.naturalWidth > 0);
 const photoSrc = locator => locator.locator('img').first().getAttribute('src');
+// L'adresse blob: d'un aperçu se sonde comme l'aperçu la lit, en image : « chargée » tant que le widget la garde, « libérée » une fois
+// révoquée. Un fetch ne convient pas : la politique de sécurité de contenu de index.html le refuse (connect-src), et il dirait « libérée » à tort.
+const blobState = (page, url) => page.evaluate(src => new Promise(resolve => {
+  const probe = new Image();
+  probe.onload = () => resolve('chargée');
+  probe.onerror = () => resolve('libérée');
+  probe.src = src;
+}), url);
 const waitForPhoto = async (locator, message = 'la photo se charge') => until(() => showsPhoto(locator).catch(() => false), message);
 // Un avatar de la grille avec le numéro de sa pièce jointe : « …/attachments/501/download?auth=… ».
 const isAttachment = (src, id) => new RegExp(`/attachments/${id}/download\\?auth=`).test(src ?? '');
@@ -769,10 +777,11 @@ test('choisir une photo puis la retirer revient à ne rien changer pour qui n\'e
     await pickPhoto(page);
     const blob = await photoSrc(photoField(page).locator('.photo-preview .avatar'));
     assert.equal(await summary(page), '1 champ modifié');
+    assert.equal(await blobState(page, blob), 'chargée', 'l\'image choisie est gardée tant que la photo l\'est');
     await photoField(page).getByRole('button', { name: 'Retirer la photo', exact: true }).click();
     assert.equal(await summary(page), 'Aucune modification');
     assert.equal(await press(page, 'Relire les modifications').isDisabled(), true);
-    assert.equal(await page.evaluate(url => fetch(url).then(() => 'chargée', () => 'libérée'), blob), 'libérée', 'l\'image abandonnée est libérée');
+    assert.equal(await blobState(page, blob), 'libérée', 'l\'image abandonnée est libérée');
   });
 });
 
@@ -939,12 +948,13 @@ test('abandonner une photo choisie : Échap prévient puis ferme, l\'image est l
     await openOwnWithPhoto(page);
     await pickPhoto(page);
     const blob = await photoSrc(photoField(page).locator('.photo-preview .avatar'));
+    assert.equal(await blobState(page, blob), 'chargée', 'l\'image choisie est gardée tant que la photo l\'est');
     await page.keyboard.press('Escape');
     assert.equal(await isOpen(page), true, 'le premier appui prévient');
     assert.equal(await dialog(page).locator('.dlg-hint').isVisible(), true);
     await page.keyboard.press('Escape');
     await closed(page);
-    await until(async () => (await page.evaluate(url => fetch(url).then(() => 'chargée', () => 'libérée'), blob)) === 'libérée', 'l\'image abandonnée est libérée');
+    await until(async () => (await blobState(page, blob)) === 'libérée', 'l\'image abandonnée est libérée');
     assert.equal(files.uploads.length, 0);
     assert.deepEqual(await bddCalls(page), []);
     await openOwnWithPhoto(page);
