@@ -16,12 +16,14 @@ node --test
 Sans dépendance, un fichier de tests par module :
 
 - `tests/grist-data.test.mjs` — décodage et formats des données Grist : `text`,
-  `normalize`, `normalizeForSearch` (œ, apostrophes, tirets, points, espaces),
+  `normalize` (dont sa mémoire, bornée à 20 000 textes : mêmes résultats qu'à froid, 1.29.0),
+  `normalizeForSearch` (œ, apostrophes, tirets, points, espaces),
   `compareLabels` (les nombres dans l'ordre), `compareContacts` (l'ordre des cartes), `formatPhone`,
   `safeValues`, `tableToRows`,
   `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `taskActionNumber`, `actionNumber`,
   `refId`, `refLabel`, `isEmptyReference`,
-  `resolveListItem`, `createRequestSequencer`,
+  `resolveListItem`, `createRequestSequencer`, `debounce` (une rafale n'appelle qu'une fois, le
+  premier appel part tout de suite, 1.29.0),
   `referenceMapsEqual`, `mailtoHref` et `shownEmail` (l'adresse montrée sur la carte : `email_affiche`,
   sinon celle du compte).
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
@@ -146,7 +148,10 @@ Sans dépendance, un fichier de tests par module :
 - `tests/support/harness.mjs` — le navigateur et le serveur des tests navigateur : serveur
   statique pour le vrai `index.html`, Chromium, faux Grist injecté dans la page, console des
   pages relue sans qu'une lecture interrompue par la fermeture de la page fasse échouer le
-  fichier. Chaque fichier de test en lance sa propre instance (`createHarness()`).
+  fichier. Chaque fichier de test en lance sa propre instance (`createHarness()`). La page n'attend
+  plus l'événement `load` quand un test retient ou suspend le téléchargement d'un logo
+  (`downloadHold`, `downloadFirst`, `downloadCors`) : depuis la 1.29.0 la première lecture part tout de suite, les
+  logos sont demandés avant `load`, et `load` attendrait la réponse qu'on retient exprès.
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : ce harnais, et les attentes
   que ces tests partagent (cartes, bandeau, message, focus rendu, sa propre fiche ouverte,
   actions envoyées à `BDD`, ni jeton ni adresse du document dans la console, pied d'une
@@ -203,6 +208,10 @@ Sans dépendance, un fichier de tests par module :
 - `tests/license.test.mjs` — la licence : `LICENSE` est le texte officiel de la GNU GPL version 3
   (empreinte vérifiée), le README la déclare et renvoie vers `LICENSE`, `SECURITY.md` dit où
   signaler un problème sans issue publique ni adresse personnelle. Sans navigateur.
+- `tests/index-html.test.mjs` — la page `index.html` (1.29.0) : la liste de ses
+  `<link rel="modulepreload">` est exactement l'ensemble des modules que `main.js` importe, directement
+  ou non, chacun une fois (un module oublié revient à l'ancienne attente, un module supprimé est une
+  erreur 404) ; le script de la page est `main.js`, en module. Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
 `npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 75
@@ -238,6 +247,18 @@ les tâches par action.
 (au-dessus, dans le cadre, refermée en la quittant), au clavier (Échap, cartes redessinées) et, sur un écran
 tactile émulé, le rôle sous le nom de la tâche sans bulle ; une tâche qui s'appelle « constructor » s'écrit
 comme les autres, sans rôle ni erreur.
+
+`tests/e2e-cards.test.mjs` y ajoute 9 scénarios sur les cartes à grande échelle (1.29.0), avec 64 fiches
+(`withClones` dans `tests/fixtures.mjs`) : les cartes gardées d'un dessin à l'autre (une recherche puis son
+effacement rendent les mêmes éléments dans le même ordre ; un filtre, l'interrupteur « Partenaires » et
+« Réinitialiser » réutilisent aussi les cartes), une relecture de Grist qui reconstruit toutes les cartes et
+montre la donnée nouvelle, le mode admin qui ne reconstruit que les cartes dont les droits changent, une
+identité qui arrive après les cartes (écriture lente de la sonde) et leur ajoute le bouton « ✎ Modifier » sous
+le logo, sans toucher aux cartes d'un autre établissement, le contrat de `renderCards` (chacun des six
+ingrédients d'une carte, un seul à la fois, la fait reconstruire, et rien d'autre), une rafale de cinq éditions
+dans Grist qui ne provoque qu'une relecture de `BDD`, 250 ms après la dernière, les cartes éloignées de l'écran
+que le navigateur ne dessine pas (`content-visibility`) et la tabulation, qui passe par chaque carte, celles que
+le navigateur n'avait pas encore dessinées comprises.
 
 `tests/e2e-profile.test.mjs` y ajoute 68 scénarios sur la modification et la création d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
@@ -1404,3 +1425,32 @@ automatiques simulent `fetchTable`.** Le rôle se retrouve par les identifiants 
 - [ ] La carte « Après » de la relecture d'une modification de fiche ne montre pas le rôle (il ne s'y modifie pas) ;
       enregistrer une fiche ne change aucune ligne de `Taches` : `Taches_role` est intact dans Grist.
 - [ ] Changer un rôle dans Grist : recharger le widget pour le voir.
+
+## 21. Rapidité à grande échelle (1.29.0)
+
+Réglages d'abord : aucun. À jouer dans le vrai Grist, sur une **copie** du document pour les points qui modifient
+une fiche. **Ce protocole est le seul contrôle de ces dispositifs dans un vrai Grist et sur un vrai Firefox mobile :
+les mesures de l'audit (500 à 20 000 lignes) viennent de Chromium, sur des données synthétiques et sans Grist.**
+
+- [ ] **Un seul chargement.** Ouvrir la console du navigateur, recharger la page de Grist : une seule ligne
+      `[GRIST] Enregistrements reçus: …` au chargement. Deux lignes à 0,25 s d'écart voudraient dire que Grist
+      rappelle `onRecords` de lui-même au démarrage : rien de faux à l'écran, mais une lecture de plus. Pour
+      revenir à l'ancienne attente, enlever le test `first` de `debounce()` (`grist-data.js`).
+- [ ] **Aucune erreur 404 dans la console** au chargement (l'onglet « Réseau » ne montre aucun module introuvable) :
+      la liste `<link rel="modulepreload">` de `index.html` nomme des fichiers qui existent.
+- [ ] **Défilement.** Descendre jusqu'en bas de l'annuaire à la molette et à la barre de défilement : les cartes
+      se dessinent avant d'arriver à l'écran (aucune carte vide qui se remplit sous les yeux) ; la barre peut se
+      corriger un peu en cours de route (la hauteur d'une carte jamais vue est estimée à 480 px). Les photos des
+      cartes lointaines arrivent à l'approche de la carte.
+- [ ] **Recherche du navigateur et clavier.** Ctrl+F d'un nom loin sous l'écran : le navigateur le trouve et y
+      mène, la carte est dessinée. Tab depuis le premier bouton d'une carte parcourt toutes les cartes, dans
+      l'ordre, sans en sauter.
+- [ ] **Les cartes ne se périment pas.** Dans Grist, modifier la fonction d'une personne affichée (copie du document) :
+      la carte du widget montre la nouvelle valeur après sa relecture, sans recharger la page. Allumer puis
+      éteindre le « mode admin » : les boutons « ✎ Modifier la fiche » apparaissent sur toutes les cartes, y
+      compris celles déjà vues avant, puis disparaissent toutes.
+- [ ] **Recherche et filtres vifs.** Taper dans la recherche, cocher un filtre, allumer et éteindre « Partenaires » : la
+      grille répond sans attente visible, sur l'annuaire entier, y compris sur le téléphone.
+- [ ] **Navigateurs sans `content-visibility`** (Firefox avant la 125, Safari avant la 18) : la règle est ignorée,
+      toutes les cartes sont dessinées comme avant la 1.29.0 ; rien ne change à l'écran, seule la rapidité
+      sur un très grand annuaire est moindre.

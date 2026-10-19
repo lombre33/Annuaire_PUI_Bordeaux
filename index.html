@@ -6,6 +6,38 @@
   <title>Annuaire PUI Bordeaux</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="dialogs.css">
+  <!-- Les modules du widget sont demandés tous ensemble, dès l'en-tête : sinon le navigateur ne découvre chaque niveau
+       d'import qu'en lisant le précédent, quatre allers-retours de suite avant que le widget ne s'exécute.
+       tests/index-html.test.mjs garde cette liste d'accord avec les import du code. -->
+  <link rel="modulepreload" href="main.js">
+  <link rel="modulepreload" href="account-ui.js">
+  <link rel="modulepreload" href="attachments.js">
+  <link rel="modulepreload" href="avatar-ui.js">
+  <link rel="modulepreload" href="branding-ui.js">
+  <link rel="modulepreload" href="branding.js">
+  <link rel="modulepreload" href="changes-ui.js">
+  <link rel="modulepreload" href="constants.js">
+  <link rel="modulepreload" href="dialog-shell.js">
+  <link rel="modulepreload" href="dom.js">
+  <link rel="modulepreload" href="etablissement-form.js">
+  <link rel="modulepreload" href="etablissement-save.js">
+  <link rel="modulepreload" href="etablissement-ui.js">
+  <link rel="modulepreload" href="etablissement.js">
+  <link rel="modulepreload" href="filters.js">
+  <link rel="modulepreload" href="grist-data.js">
+  <link rel="modulepreload" href="identity.js">
+  <link rel="modulepreload" href="image-prep.js">
+  <link rel="modulepreload" href="presence.js">
+  <link rel="modulepreload" href="preview.js">
+  <link rel="modulepreload" href="profile-form.js">
+  <link rel="modulepreload" href="profile-review.js">
+  <link rel="modulepreload" href="profile-save.js">
+  <link rel="modulepreload" href="profile-ui.js">
+  <link rel="modulepreload" href="profile.js">
+  <link rel="modulepreload" href="render.js">
+  <link rel="modulepreload" href="save-upload.js">
+  <link rel="modulepreload" href="schema.js">
+  <link rel="modulepreload" href="upload.js">
 </head>
 <body>
   <main class="widget-shell">

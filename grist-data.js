@@ -15,11 +15,22 @@ export function normalizeEmail(value) {
 
 // Comparaison insensible à la casse et aux accents : une compétence saisie à la
 // main (« oncologie ») doit retrouver l'option « Oncologie » du menu.
+//
+// Les mêmes libellés reviennent sans cesse (ceux des tables de référence, pour chaque contact, à chaque lecture, comptage et filtre) :
+// sur un grand annuaire, la décomposition et l'expression régulière prenaient les trois quarts du calcul. Le résultat est donc gardé,
+// par texte. La mémoire est bornée : une saisie libre ou une recherche tapée lettre à lettre ne doit pas la faire grossir sans fin.
+const NORMALIZED_LIMIT = 20000;
+const normalizedTexts = new Map();
+
 export function normalize(value) {
-  return text(value)
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLocaleLowerCase('fr-FR');
+  const input = text(value);
+  let result = normalizedTexts.get(input);
+  if (result === undefined) {
+    result = input.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('fr-FR');
+    if (normalizedTexts.size >= NORMALIZED_LIMIT) normalizedTexts.clear();
+    normalizedTexts.set(input, result);
+  }
+  return result;
 }
 
 // Comparaison de la recherche principale, un peu plus tolérante que normalize() (qui sert
@@ -150,6 +161,23 @@ export function labelMapFromRows(rows, labelFields) {
     if (label) map[String(row.id)] = label;
   });
   return map;
+}
+
+// `fn` ne s'exécute qu'après `wait` ms sans nouvel appel, avec les arguments du dernier : une rafale d'appels (les éditions d'un
+// tableur) n'en fait qu'un. Le tout premier appel passe sans attendre : c'est celui du chargement, qu'aucune rafale n'accompagne,
+// et l'attendre retardait de `wait` ms l'ouverture de l'annuaire.
+export function debounce(fn, wait) {
+  let timer = null;
+  let first = true;
+  return (...args) => {
+    clearTimeout(timer);
+    if (first) {
+      first = false;
+      fn(...args);
+      return;
+    }
+    timer = setTimeout(() => fn(...args), wait);
+  };
 }
 
 // Chaque lecture prend un numéro ; seule la plus récente peut appliquer son

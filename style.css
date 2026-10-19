@@ -457,6 +457,12 @@ h1 {
 .contact-card {
   /* La place du logo d'établissement se mesure sur la carte (cqw, voir .logo-img plus bas) */
   container-type: inline-size;
+  /* Une carte loin de l'écran n'est ni mise en page ni dessinée avant qu'on s'en approche : avec des milliers de cartes, c'est ce qui
+     garde une recherche rapide. Elle reste dans la page pour la tabulation, la recherche du navigateur et les lecteurs d'écran.
+     480px : la hauteur d'une carte moyenne, de quoi donner à la barre de défilement une longueur vraisemblable ; `auto` retient la
+     vraie hauteur d'une carte une fois qu'elle a été vue. */
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 480px;
   overflow: hidden;
   background: #fff;
   border: 1px solid #e8eaf2;

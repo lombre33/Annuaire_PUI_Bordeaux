@@ -677,7 +677,7 @@ function fillTexts(card, contact, onToggle, { marks, logos, etablissement }) {
 function buildCard(template, contact, onToggle, view = {}) {
   const { rights = null, marks = null, logos = null, etabRights = null } = view;
   const card = template.content.cloneNode(true);
-  const shown = { marks, logos, etablissement: logos?.attachments && logos.logoFor?.(contact) };
+  const shown = { marks, logos, etablissement: logoOf(logos, contact) };
 
   fillAvatar(card, contact, onToggle, shown);
   fillName(card.querySelector('.name'), contact, marks);
@@ -687,10 +687,41 @@ function buildCard(template, contact, onToggle, view = {}) {
   if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);
   // Fermé par défaut : seul un établissement dont la personne est responsable (et dont la carte
   // porte la référence) montre le bouton.
-  const etablissementId = refId(contact.Etablissement);
-  if (etabRights && etablissementId && contact.etablissement_label && etabRights(etablissementId)) {
-    fillEtablissementEdit(card.querySelector('.etab-actions'), etablissementId, contact.id, contact.etablissement_label);
-  }
+  const etablissementId = editableEtablissement(contact, etabRights);
+  if (etablissementId) fillEtablissementEdit(card.querySelector('.etab-actions'), etablissementId, contact.id, contact.etablissement_label);
+  return card;
+}
+
+// Le logo et le nom de l'établissement d'un contact (`logos.logoFor`), ou rien sans de quoi les montrer.
+function logoOf(logos, contact) {
+  return logos?.attachments && logos.logoFor?.(contact);
+}
+
+// L'identifiant de l'établissement du contact quand la personne connectée en est responsable (`etabRights`), sinon rien.
+function editableEtablissement(contact, etabRights) {
+  const id = refId(contact.Etablissement);
+  return etabRights && id && contact.etablissement_label && etabRights(id) ? id : null;
+}
+
+// ----- Cartes gardées d'un dessin à l'autre -----
+
+// Filtrer, chercher ou allumer un interrupteur redessine la grille, mais une carte ne dépend que de son contact, de ce que la
+// personne connectée peut en faire et du logo de son établissement : rien de ce que le dessin change. Les construire de
+// nouveau coûtait l'essentiel du temps (plus de 5 secondes pour 4 500 cartes) ; elles sont donc gardées, par contact, et
+// reviennent telles quelles. Une relecture de Grist produit de nouveaux contacts, donc de nouvelles cartes : rien ne se périme.
+// Ce qui peut changer sans nouveau contact (les droits de la personne connectée, le mode admin, le gabarit) est rangé avec la
+// carte, et une carte dont l'un de ces éléments a changé est reconstruite.
+const cardCache = new WeakMap(); // contact → { ingredients, card }
+
+const sameIngredients = (a, b) => a.every((value, index) => value === b[index]);
+
+function cardFor(contact, template, onToggle, { rightsOf, logos, etabRights }) {
+  const rights = rightsOf(contact);
+  const ingredients = [template, onToggle, rights, logos?.attachments, logoOf(logos, contact), editableEtablissement(contact, etabRights)];
+  const kept = cardCache.get(contact);
+  if (kept && sameIngredients(kept.ingredients, ingredients)) return kept.card;
+  const card = buildCard(template, contact, onToggle, { rights, logos, etabRights }).firstElementChild;
+  cardCache.set(contact, { ingredients, card });
   return card;
 }
 
@@ -699,8 +730,11 @@ function buildCard(template, contact, onToggle, view = {}) {
 // l'établissement, voir buildCard. `etabRights(identifiant)` (facultatif) : vrai pour un
 // établissement dont la personne est responsable (etablissementRightsFor).
 export function renderCards(grid, template, contacts, onToggle, rightsOf = () => null, logos = null, etabRights = null) {
-  grid.innerHTML = '';
-  contacts.forEach(contact => grid.appendChild(buildCard(template, contact, onToggle, { rights: rightsOf(contact), logos, etabRights })));
+  const view = { rightsOf, logos, etabRights };
+  // Un fragment plutôt que des arguments : des dizaines de milliers de cartes étalées en arguments dépasseraient la pile.
+  const cards = document.createDocumentFragment();
+  contacts.forEach(contact => cards.appendChild(cardFor(contact, template, onToggle, view)));
+  grid.replaceChildren(cards);
 }
 
 // Une carte pour la relecture d'une modification : même gabarit et mêmes classes que

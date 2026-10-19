@@ -104,6 +104,29 @@ export function withEtablissement(tables, row) {
   return copy;
 }
 
+// Le document avec `extra` fiches de plus dans BDD, de quoi remplir plus d'un écran de cartes. Chacune copie l'une des quatre premières
+// (Ana, Bob, Carla, Dan : des cartes de formes différentes, avec ou sans compétences, tâches, fonction), sous le nom « Copie n »
+// (n = 1, 2, … dans l'ordre) et une adresse à elle ; toutes sont au CHU, établissement fondateur validé, et ont accepté d'apparaître :
+// elles s'ajoutent aux 4 cartes de départ (Ana, Hostile, Gina, Hugo).
+export function withClones(tables, extra) {
+  const copy = structuredClone(tables);
+  const { BDD } = copy;
+  const first = BDD.id.length;
+  for (let n = 1; n <= extra; n += 1) {
+    const model = (n - 1) % 4;
+    Object.entries(BDD).forEach(([column, values]) => {
+      if (column === 'id') values.push(first + n);
+      else if (column === 'prenom') values.push('Copie');
+      else if (column === 'nom') values.push(String(n));
+      else if (column === 'email') values.push(`copie${n}@annuaire.example`);
+      else if (column === 'Etablissement') values.push(1);
+      else if (column === 'Accepte_apparaitre') values.push(true);
+      else values.push(structuredClone(values[model]));
+    });
+  }
+  return copy;
+}
+
 // Le document avec, dans Etablissements, une 2e ligne « CHU » non validée (la première l'est) : deux établissements portent le
 // même acronyme, et aucune personne n'est rattachée à la seconde.
 export const withDuplicateCHU = tables => withEtablissement(tables, {

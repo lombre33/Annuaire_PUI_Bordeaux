@@ -9,7 +9,7 @@
 // fondateurs) et avatar-ui.js (les photos de profil).
 
 import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
-import { loadDirectory, DirectoryLoadError, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
+import { loadDirectory, DirectoryLoadError, debounce, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { attachTagNotes, createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
@@ -291,17 +291,9 @@ function showLoadError(error) {
   if (state.allContacts.length === 0) elements.resultCount.textContent = 'Chargement impossible';
 }
 
-function debounce(fn, wait) {
-  let timer = null;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), wait);
-  };
-}
-
 // onRecords se redéclenche à chaque édition dans Grist. Le debounce absorbe les
-// rafales ; le sequencer écarte le résultat d'une lecture lente quand une plus
-// récente a déjà démarré.
+// rafales (sauf le premier appel, celui du chargement, qui part tout de suite) ; le
+// sequencer écarte le résultat d'une lecture lente quand une plus récente a déjà démarré.
 const recordsSequencer = createRequestSequencer();
 
 window.grist.ready({ requiredAccess: 'full' });

@@ -148,7 +148,10 @@ export async function createHarness({ keepScrollbars = false } = {}) {
       window.__withoutMethods = values.withoutMethods;
     }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, delay, accessToken, withoutMethods });
     if (initScript) await page.addInitScript(initScript);
-    await page.goto(`${baseUrl}/index.html${readOnly ? '?readonly=true' : ''}`);
+    // Le widget lit Grist dès son démarrage : ses cartes et leurs logos sont dans la page avant l'événement « load », qui attend les
+    // images. Quand un fichier est retenu ou ne reçoit jamais de réponse, il ne viendrait pas : la navigation n'attend alors que le document.
+    const downloadsStall = downloadHold || downloadFirst === 'hang' || downloadCors === 'hang';
+    await page.goto(`${baseUrl}/index.html${readOnly ? '?readonly=true' : ''}`, { waitUntil: downloadsStall ? 'domcontentloaded' : 'load' });
     return { page, context, logs, files };
   }
 
