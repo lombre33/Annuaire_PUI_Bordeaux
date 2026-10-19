@@ -327,7 +327,7 @@ Le formulaire s'ouvre avec les valeurs actuelles de la fiche. Sous le titre, une
 
 - Dans un **texte** (prénom, nom, fonction), les retours à la ligne et les espaces en trop sont retirés. Un texte ne peut pas commencer par = + - ou @ (un tableur y verrait une formule) ni dépasser 200 caractères.
 - **Prénom et nom** : l'un des deux au moins doit rester renseigné.
-- **Téléphone** : un numéro français à 10 chiffres, écrit comme vous voulez : « 05 56 78 90 12 », « 05.56.78.90.12 », « 0556789012 », « +33 5 56 78 90 12 » ou « 0033 5 56 78 90 12 ». Quand vous quittez le champ, un numéro valide est remis en forme (« 05 56 78 90 12 »). Pour effacer le numéro, videz le champ.
+- **Téléphone** : un numéro français à 10 chiffres, écrit comme vous voulez : « 05 36 49 90 12 », « 05.36.49.90.12 », « 0536499012 », « +33 5 36 49 90 12 » ou « 0033 5 36 49 90 12 ». Quand vous quittez le champ, un numéro valide est remis en forme (« 05 36 49 90 12 »). Pour effacer le numéro, videz le champ.
 - Un champ laissé tel quel n'est pas une modification.
 
 Un champ refusé est signalé sous le champ :
@@ -336,7 +336,7 @@ Un champ refusé est signalé sous le champ :
 |---|---|
 | « Ne peut pas commencer par = + - ou @. » | Le texte commence par l'un de ces signes |
 | « 200 caractères au plus. » | Le texte dépasse 200 caractères |
-| « Un numéro français compte 10 chiffres, par exemple 05 56 78 90 12. » | Le téléphone n'est pas un numéro français à 10 chiffres |
+| « Un numéro français compte 10 chiffres, par exemple 05 36 49 90 12. » | Le téléphone n'est pas un numéro français à 10 chiffres |
 | « Indiquez au moins un prénom ou un nom. » | Le prénom et le nom seraient tous deux vides (le message s'affiche sous le ou les champs que vous avez vidés) |
 
 En bas de la fenêtre, un résumé dit où vous en êtes : « Aucune modification », le nombre de champs modifiés (par exemple : 2 champs modifiés) ou ce qu'il faut corriger : « Indiquez au moins un prénom ou un nom », « Corrigez l’adresse e-mail », « Corrigez le numéro de téléphone » ou « Corrigez les champs signalés ». Le bouton **Relire mes modifications** reste grisé tant qu'il n'y a rien à relire ou qu'un champ est refusé.

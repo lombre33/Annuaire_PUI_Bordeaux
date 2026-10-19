@@ -105,7 +105,7 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
     const ana = cardNamed(page, 'Ana Martin');
     assert.equal(await ana.locator('.avatar').textContent(), 'AM');
     assert.equal(await ana.locator('.fonction').textContent(), 'Pharmacienne');
-    assert.equal(await ana.locator('.email').getAttribute('href'), 'mailto:ana.martin@chu-bordeaux.fr');
+    assert.equal(await ana.locator('.email').getAttribute('href'), 'mailto:ana.martin@chu-bordeaux.example');
     const tagsByGroup = await ana.locator('.tag-group').evaluateAll(groups =>
       groups.map(group => [group.querySelector('.tag-group-title').textContent,
         [...group.querySelectorAll('.tag')].map(tag => tag.textContent)]));
@@ -115,7 +115,7 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
       ['Compétences', ['Oncologie', 'Hématologie']],
       ['Communautés', ['Réseau douleur']]
     ]);
-    assert.equal(await ana.locator('.tel').textContent(), '☎ 05 56 78 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
+    assert.equal(await ana.locator('.tel').textContent(), '☎ 05 36 49 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
     const role = ana.locator('.role-col .role-tag');
     assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est un texte à part (.role-col), plus une section du bas de la carte');
     assert.equal(await role.evaluate(tag => tag.tagName), 'BUTTON', 'il filtre comme les autres tags');
@@ -158,7 +158,7 @@ test('ne crée un lien mailto que pour une adresse sans paramètre injectable', 
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const gina = cardNamed(page, 'Gina Bergonié');
-    assert.equal(await gina.locator('.email').textContent(), 'gina@bergonie.fr?cc=intrus@example.fr');
+    assert.equal(await gina.locator('.email').textContent(), 'gina@bergonie.example?cc=intrus@example.example');
     assert.equal(await gina.locator('.email').getAttribute('href'), null, 'adresse douteuse : texte sans lien');
   }));
 
@@ -208,7 +208,7 @@ function withPeople(tables, people) {
     tables.BDD.id[row] = 100 + index;
     tables.BDD.prenom[row] = prenom;
     tables.BDD.nom[row] = nom;
-    tables.BDD.email[row] = `personne${index}@chu-bordeaux.fr`;
+    tables.BDD.email[row] = `personne${index}@chu-bordeaux.example`;
   });
   return tables;
 }
@@ -991,7 +991,7 @@ test('l\'interrupteur fait apparaître puis disparaître la personne, en écriva
   }));
 
 test('une personne qui n\'a jamais répondu (case vide) est invitée comme les autres, et un clic coche la case', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'jules@chu-bordeaux.fr' }, async ({ page }) => {
+  withWidget({ tables: withIdentity(), user: 'jules@chu-bordeaux.example' }, async ({ page }) => {
     await waitForAccountBar(page);
     assert.equal(await isSwitchOn(page), false);
     await presenceSwitch(page).click();
@@ -1109,14 +1109,14 @@ test('écriture réussie mais annuaire impossible à relire : le bandeau le dit,
   }));
 
 test('une personne identifiée sans fiche dans BDD voit une mention sans interrupteur, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'inconnu@example.fr' }, async ({ page, logs }) => {
+  withWidget({ tables: withIdentity(), user: 'inconnu@example.example' }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await probeRemoved(page);
     await accountBar(page).waitFor();
     assert.equal(await accountName(page), 'Compte absent de l\'annuaire');
     assert.equal(await accountBar(page).locator('.account-avatar').textContent(), '?');
     assert.equal(await accountMessage(page),
-      'Connecté avec inconnu@example.fr : cette adresse ne figure pas dans l\'annuaire, il n\'y a donc pas de fiche à modifier.');
+      'Connecté avec inconnu@example.example : cette adresse ne figure pas dans l\'annuaire, il n\'y a donc pas de fiche à modifier.');
     assert.equal(await presenceSwitch(page).isHidden(), true, 'aucune fiche, aucun choix de présence');
     assert.equal(await accountBar(page).locator('.account-edit').isHidden(), true);
     assert.equal(await accountBar(page).locator('.account-admin').isHidden(), true);
@@ -1150,7 +1150,7 @@ test('un partenaire apprend qu\'il faut l\'interrupteur Partenaires pour le voir
   }));
 
 test('une personne qui a accepté mais reste masquée en apprend la raison', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'dan@inserm.fr' }, async ({ page }) => {
+  withWidget({ tables: withIdentity(), user: 'dan@inserm.example' }, async ({ page }) => {
     await waitForAccountBar(page);
     assert.equal(await isSwitchOn(page), true, 'elle a bien accepté');
     assert.match(await accountMessage(page), /votre établissement n'a pas encore été validé/);
@@ -1158,7 +1158,7 @@ test('une personne qui a accepté mais reste masquée en apprend la raison', { s
   }));
 
 test('le nom d\'une personne s\'affiche en texte brut dans le bandeau (aucune injection)', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'hostile@chu-bordeaux.fr' }, async ({ page }) => {
+  withWidget({ tables: withIdentity(), user: 'hostile@chu-bordeaux.example' }, async ({ page }) => {
     await waitForAccountBar(page);
     assert.equal(await accountName(page), `${HOSTILE_FIRST_NAME} Hostile`);
     assert.equal(await accountBar(page).locator('img').count(), 0);

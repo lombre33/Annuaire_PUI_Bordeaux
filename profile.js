@@ -105,8 +105,8 @@ function shownEmailFault(after) {
   return EMAIL_SHAPE.test(after) ? '' : 'Indiquez une adresse e-mail valide.';
 }
 
-// « 05 56 78 90 12 », « 05.56.78.90.12 », « +33 5 56 78 90 12 » ou « 0033 5 56 78 90 12 »
-// → « 0556789012 ».
+// « 05 36 49 90 12 », « 05.36.49.90.12 », « +33 5 36 49 90 12 » ou « 0033 5 36 49 90 12 »
+// → « 0536499012 ».
 // null pour tout ce qui n'est pas un numéro français à 10 chiffres.
 export function frenchPhoneDigits(input) {
   const raw = text(input);
@@ -291,7 +291,7 @@ function diffPhone(field, input, row) {
   if (String(input ?? '') === shown) return null; // laissé tel quel, même s'il n'est pas à la française
   const typed = cleanText(input);
   const after = typed === '' ? '' : frenchPhoneDigits(typed);
-  if (after === null) return { fault: 'Un numéro français compte 10 chiffres, par exemple 05 56 78 90 12.' };
+  if (after === null) return { fault: 'Un numéro français compte 10 chiffres, par exemple 05 36 49 90 12.' };
   return textChange(frenchPhoneDigits(shown) || '', after);
 }
 

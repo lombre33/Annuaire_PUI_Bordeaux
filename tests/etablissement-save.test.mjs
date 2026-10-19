@@ -169,10 +169,10 @@ test('saveEtablissement names the missing column instead of writing a partial ch
 
 test('saveEtablissement names a new responsable with an ACL row that carries only the address and the establishment', async () => {
   const w = world();
-  const { plan } = await prepare(w, UBM, draft => { nominate(draft, ' Claire.Moreau@U-Bordeaux-Montaigne.fr '); });
+  const { plan } = await prepare(w, UBM, draft => { nominate(draft, ' Claire.Moreau@U-Bordeaux-Montaigne.example '); });
   assert.equal((await save(w, plan)).status, 'saved');
   assert.deepEqual(writes(w).map(call => [call.action, call.table, call.values]), [
-    ['AddRecord', 'ACL', { email: 'claire.moreau@u-bordeaux-montaigne.fr', Responsable_de_l_Etablissement: UBM }]
+    ['AddRecord', 'ACL', { email: 'claire.moreau@u-bordeaux-montaigne.example', Responsable_de_l_Etablissement: UBM }]
   ]);
   assert.ok(!('admin' in writes(w)[0].values), 'la colonne admin n’est jamais écrite');
   const added = w.tables.ACL.id.length - 1;
@@ -190,20 +190,20 @@ test('saveEtablissement gives an administrator without establishment the establi
 
 test('saveEtablissement removes a responsable by deleting their ACL row, but keeps the row of an administrator', async () => {
   const w = world();
-  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.fr'); toggleResponsable(draft, BOB_EMAIL); });
+  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.example'); toggleResponsable(draft, BOB_EMAIL); });
   await save(w, plan);
   assert.deepEqual(writes(w).map(call => (call.action === 'AddRecord' ? [call.action] : [call.action, call.rowId])), [['RemoveRecord', 3], ['AddRecord']]);
   assert.ok(!w.tables.ACL.email.includes(BOB_EMAIL));
 
   const chu = world();
-  const second = await prepare(chu, CHU, draft => { nominate(draft, 'relais@x.fr'); toggleResponsable(draft, ANA_EMAIL); });
+  const second = await prepare(chu, CHU, draft => { nominate(draft, 'relais@x.example'); toggleResponsable(draft, ANA_EMAIL); });
   await save(chu, second.plan);
   assert.deepEqual(writes(chu).map(call => [call.action, call.rowId, call.values]), [
     ['UpdateRecord', 1, { Responsable_de_l_Etablissement: 0 }],
-    ['AddRecord', 4, { email: 'relais@x.fr', Responsable_de_l_Etablissement: CHU }]
+    ['AddRecord', 4, { email: 'relais@x.example', Responsable_de_l_Etablissement: CHU }]
   ]);
   assert.equal(chu.tables.ACL.admin[0], true, 'Ana reste administratrice');
-  assert.equal(chu.tables.ACL.email[0], 'Ana.Martin@CHU-Bordeaux.fr');
+  assert.equal(chu.tables.ACL.email[0], 'Ana.Martin@CHU-Bordeaux.example');
 });
 
 test('saveEtablissement never touches the rows of other establishments, even for the same address', async () => {
@@ -212,7 +212,7 @@ test('saveEtablissement never touches the rows of other establishments, even for
   w.tables.ACL.email.push(BOB_EMAIL);
   w.tables.ACL.Responsable_de_l_Etablissement.push(5);
   w.tables.ACL.admin.push(false);
-  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.fr'); toggleResponsable(draft, BOB_EMAIL); });
+  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.example'); toggleResponsable(draft, BOB_EMAIL); });
   await save(w, plan);
   assert.deepEqual(writes(w).map(call => [call.action, call.rowId]), [['RemoveRecord', 3], ['AddRecord', 5]]);
   assert.equal(w.tables.ACL.Responsable_de_l_Etablissement[w.tables.ACL.id.indexOf(4)], 5, 'Bob reste responsable de l’établissement 5');
@@ -221,38 +221,38 @@ test('saveEtablissement never touches the rows of other establishments, even for
 test('saveEtablissement keeps one responsable at least, judging by the list as it is NOW in Grist', async () => {
   const w = world();
   w.tables.ACL.id.push(4);
-  w.tables.ACL.email.push('carl@x.fr');
+  w.tables.ACL.email.push('carl@x.example');
   w.tables.ACL.Responsable_de_l_Etablissement.push(UBM);
   w.tables.ACL.admin.push(false);
   // La fenêtre montre Bob et Carl ; la personne retire Carl, ce qui laisse Bob.
-  const { plan } = await prepare(w, UBM, draft => { toggleResponsable(draft, 'carl@x.fr'); });
+  const { plan } = await prepare(w, UBM, draft => { toggleResponsable(draft, 'carl@x.example'); });
   // Pendant ce temps, quelqu'un d'autre a retiré Bob : retirer Carl ne laisserait plus personne.
   w.tables.ACL.Responsable_de_l_Etablissement[2] = 0;
   assert.equal((await rejection(save(w, plan))).message, KEEP_ONE);
   assert.deepEqual(writes(w), []);
 
   const crowded = world();
-  const second = await prepare(crowded, UBM, draft => { toggleResponsable(draft, BOB_EMAIL); nominate(draft, 'relais@x.fr'); });
+  const second = await prepare(crowded, UBM, draft => { toggleResponsable(draft, BOB_EMAIL); nominate(draft, 'relais@x.example'); });
   assert.equal((await save(crowded, second.plan)).status, 'saved');
-  assert.deepEqual(crowded.tables.ACL.email.filter((_, index) => crowded.tables.ACL.Responsable_de_l_Etablissement[index] === UBM), ['relais@x.fr']);
+  assert.deepEqual(crowded.tables.ACL.email.filter((_, index) => crowded.tables.ACL.Responsable_de_l_Etablissement[index] === UBM), ['relais@x.example']);
 });
 
 test('saveEtablissement keeps what another responsable added in the meantime, and does not name the same person twice', async () => {
   const w = world();
-  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.fr'); nominate(draft, 'autre@x.fr'); });
+  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.example'); nominate(draft, 'autre@x.example'); });
   // Entre-temps : le même relais est nommé par un autre (écrit avec des majuscules), et une troisième personne aussi.
   w.tables.ACL.id.push(4, 5);
-  w.tables.ACL.email.push('Relais@X.fr', 'troisieme@x.fr');
+  w.tables.ACL.email.push('Relais@X.example', 'troisieme@x.example');
   w.tables.ACL.Responsable_de_l_Etablissement.push(UBM, UBM);
   w.tables.ACL.admin.push(false, false);
   assert.equal((await save(w, plan)).status, 'saved');
-  assert.deepEqual(writes(w).map(call => [call.action, call.values.email]), [['AddRecord', 'autre@x.fr']], 'seul ce qui manque est ajouté');
-  assert.ok(w.tables.ACL.email.includes('troisieme@x.fr'), 'la nomination d’un autre reste');
+  assert.deepEqual(writes(w).map(call => [call.action, call.values.email]), [['AddRecord', 'autre@x.example']], 'seul ce qui manque est ajouté');
+  assert.ok(w.tables.ACL.email.includes('troisieme@x.example'), 'la nomination d’un autre reste');
 
   const everything = world();
-  const only = await prepare(everything, UBM, draft => { nominate(draft, 'relais@x.fr'); });
+  const only = await prepare(everything, UBM, draft => { nominate(draft, 'relais@x.example'); });
   everything.tables.ACL.id.push(4);
-  everything.tables.ACL.email.push('relais@x.fr');
+  everything.tables.ACL.email.push('relais@x.example');
   everything.tables.ACL.Responsable_de_l_Etablissement.push(UBM);
   everything.tables.ACL.admin.push(false);
   assert.match((await rejection(save(everything, only.plan))).message, /déjà dans la fiche de l’établissement/);
@@ -261,7 +261,7 @@ test('saveEtablissement keeps what another responsable added in the meantime, an
 
 test('saveEtablissement refuses to change responsables when the ACL table cannot be read, and writes nothing', async () => {
   const w = world();
-  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.fr'); });
+  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.example'); });
   const blind = createFakeGrist({ tables: w.tables, failTables: ['ACL'] });
   const error = await rejection(saveEtablissement(blind.docApi, plan, { log: quiet }));
   assert.match(error.message, /La liste des responsables n’a pas pu être relue/);
@@ -270,14 +270,14 @@ test('saveEtablissement refuses to change responsables when the ACL table cannot
 
 test('saveEtablissement writes the establishment and its responsables in ONE atomic action', async () => {
   const w = world();
-  const { plan } = await prepare(w, UBM, draft => { draft.name = 'UBM neuve'; nominate(draft, 'relais@x.fr'); });
+  const { plan } = await prepare(w, UBM, draft => { draft.name = 'UBM neuve'; nominate(draft, 'relais@x.example'); });
   let batches = 0;
   const docApi = { ...w.docApi, applyUserActions: actions => { batches += 1; return w.docApi.applyUserActions(actions); } };
   await saveEtablissement(docApi, plan, { log: quiet });
   assert.equal(batches, 1);
 
   const denied = world({ denyWrites: ['ACL'] });
-  const second = await prepare(denied, UBM, draft => { draft.name = 'UBM neuve'; nominate(draft, 'relais@x.fr'); });
+  const second = await prepare(denied, UBM, draft => { draft.name = 'UBM neuve'; nominate(draft, 'relais@x.example'); });
   const error = await rejection(save(denied, second.plan));
   assert.match(error.message, /Grist a refusé la modification/);
   assert.equal(etab(denied, UBM).nom_complet, 'Université Bordeaux Montaigne', 'le nom n’a pas été écrit non plus');
@@ -355,7 +355,7 @@ test('saveEtablissement also names the visibility and the logo when Grist did no
 
 test('saveEtablissement notices a responsable change Grist silently dropped', async () => {
   const w = world();
-  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.fr'); });
+  const { plan } = await prepare(w, UBM, draft => { nominate(draft, 'relais@x.example'); });
   const forgetful = { ...w.docApi, applyUserActions: async actions => {
     const answer = await w.docApi.applyUserActions(actions);
     w.tables.ACL.Responsable_de_l_Etablissement[w.tables.ACL.id.length - 1] = 0;
@@ -439,10 +439,10 @@ test('saveEtablissement re-reads after a slow upload: a fiche changed meanwhile 
 test('saveEtablissement checks the responsables again after a slow upload, and names the file left behind', async () => {
   const w = world();
   w.tables.ACL.id.push(4);
-  w.tables.ACL.email.push('carl@x.fr');
+  w.tables.ACL.email.push('carl@x.example');
   w.tables.ACL.Responsable_de_l_Etablissement.push(UBM);
   w.tables.ACL.admin.push(false);
-  const { plan } = await prepare(w, UBM, draft => { draft.logo = { action: 'replace', file: FILE }; toggleResponsable(draft, 'carl@x.fr'); }, { file: FILE });
+  const { plan } = await prepare(w, UBM, draft => { draft.logo = { action: 'replace', file: FILE }; toggleResponsable(draft, 'carl@x.example'); }, { file: FILE });
   const vanish = async () => { w.tables.ACL.Responsable_de_l_Etablissement[2] = 0; return 78; };
   const error = await rejection(save(w, plan, vanish));
   assert.equal(error.message, KEEP_ONE);
@@ -470,9 +470,9 @@ test('saveEtablissement points at the setup step when the logo column does not e
 
 test('savePlanOf keeps, for each touched field, the value the sheet showed, and nothing for the others', () => {
   const row = { id: 3, nom_complet: 'A', ok_pour_apparaitre: true, logo: ['L', 4] };
-  const plan = savePlanOf(row, { name: { avant: 'A', apres: 'B' }, responsables: { ajout: ['x@y.fr'], retrait: [] } }, { responsable: true });
+  const plan = savePlanOf(row, { name: { avant: 'A', apres: 'B' }, responsables: { ajout: ['x@y.example'], retrait: [] } }, { responsable: true });
   assert.deepEqual(plan, {
-    etablissementId: 3, responsable: true, champs: { name: { avant: 'A', apres: 'B' }, responsables: { ajout: ['x@y.fr'], retrait: [] } },
+    etablissementId: 3, responsable: true, champs: { name: { avant: 'A', apres: 'B' }, responsables: { ajout: ['x@y.example'], retrait: [] } },
     base: { name: 'A' }, file: null
   });
   assert.equal(savePlanOf(row, {}).responsable, false, 'responsable doit être demandé explicitement');

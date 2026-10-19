@@ -176,15 +176,17 @@ Sans dépendance, un fichier de tests par module :
   groupe (Compétences par domaine, Tâches par action) : groupe, case, flèche,
   nombres, éléments visibles, et le parcours au clavier (`assertKeyboardWalk`).
 - `tests/support/fiction.mjs` — le contrôle que le jeu de données d'un test ne contient que des
-  coordonnées inventées (`assertFictionalContacts`).
+  coordonnées inventées (`assertFictionalContacts`), et le repérage, dans un texte quelconque, d'une
+  adresse ou d'un numéro qui pourrait être réel (`realLookingCoordinates`).
 - `tests/support/logs.mjs` — une console muette ou relue (`quiet`, `logged`) pour les tests qui
   passent un `log` aux fonctions du widget.
 - `tests/support/multipart.mjs` — la lecture d'un fichier envoyé en `multipart/form-data`
   (`readMultipartFile`), commune aux faux serveurs de pièces jointes, au serveur REST des
   tests et au serveur de démonstration.
 - `tests/support/widget-sources.mjs` — le code du widget tel que les tests de garde le lisent
-  (`WIDGET_SOURCES` : les modules à la racine, `withoutComments` : sans leurs commentaires), pour
-  `tests/docs.test.mjs` et `tests/csp.test.mjs`.
+  (`WIDGET_SOURCES` : les modules à la racine, `withoutComments` : sans leurs commentaires) et tous les
+  textes du dépôt sauf le journal des versions (`REPOSITORY_TEXTS`), pour `tests/docs.test.mjs`,
+  `tests/csp.test.mjs` et `tests/fiction.test.mjs`.
 - `tests/support-helpers.test.mjs` — les aides ci-dessus refusent ce qu'elles doivent refuser :
   chaque cas leur donne une page volontairement fautive (un bouton sans nom, un élément qui
   sort de la fenêtre ou de la carte, une tabulation qui s'échappe, le jeton dans la console, un
@@ -233,6 +235,12 @@ Sans dépendance, un fichier de tests par module :
   widget) ; ni script, ni gestionnaire d'événement, ni formulaire en ligne dans la page, ni script, cadre,
   formulaire, gestionnaire ou minuterie à texte fabriqués par le code ; et `docs/securite.md` qui recopie la
   politique mot pour mot. Sans navigateur.
+- `tests/fiction.test.mjs` — aucune coordonnée qui pourrait être celle d'une vraie personne (1.29.2) : le jeu
+  de données des tests n'a que des adresses `.example` et des numéros des plages que l'ARCEP réserve à la fiction
+  (`05 36 49 xx xx`, `06 39 98 xx xx`) ; le repérage d'une adresse ou d'un numéro réel est essayé sur des
+  exemples écrits de toutes les façons (espaces, points, tirets, `+33`, `0033`, majuscules), dans une expression
+  régulière (points échappés), dans un modèle de texte (`${…}`) ou collé à une lettre ; et aucun texte du dépôt
+  (code, tests, documentation) n'en contient, le journal des versions excepté. Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
 `npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 75
@@ -638,7 +646,7 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 
 - [ ] **Téléphone** : repérer un contact dont le téléphone commence par 0
       dans Grist (la quasi-totalité) → la carte affiche bien le 0 initial,
-      formaté par paires (`05 56 78 90 12`), pas un nombre à 9 chiffres.
+      formaté par paires (`05 36 49 90 12`), pas un nombre à 9 chiffres.
 - [ ] **Rôle PUI** : un contact avec `Role_dans_le_PUI` renseigné affiche
       bien son rôle en petite pastille (à droite de la fonction et de l'e-mail sur
       une carte de 480 px ou plus, sous l'e-mail sur une carte plus étroite), et le menu
@@ -854,7 +862,7 @@ l'e-mail et de l'établissement sont à la section 16.
       intacts ; un seul « Annuler » de Grist défait toute la modification. L'annuaire
       montre la fiche à jour sans rechargement.
 - [ ] Téléphone : colonne numérique, Grist stocke un nombre sans 0 initial et la carte
-      affiche « 05 56 78 90 12 » ; colonne de texte, il stocke « 05 56 78 90 12 ». Vider
+      affiche « 05 36 49 90 12 » ; colonne de texte, il stocke « 05 36 49 90 12 ». Vider
       le champ vide la cellule.
 - [ ] Changement concurrent : ouvrir la relecture, changer la **même** colonne dans
       Grist, puis « Valider » : la fenêtre revient à la relecture avec l'avis « La fiche

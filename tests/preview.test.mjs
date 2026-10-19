@@ -35,8 +35,8 @@ test('diffContacts marks each line of text that changed, and only that line', ()
   assert.deepEqual(name.texts, { name: { before: 'Ana Martin', after: 'Anna Martin' } });
   const role = diffContacts(card(), card({ Fonction: 'Cheffe de service' }));
   assert.deepEqual(role.texts, { fonction: { before: '', after: 'Cheffe de service' } });
-  const phone = diffContacts(card({ numero_de_telephone: 556789012 }), card({ numero_de_telephone: 556789013 }));
-  assert.deepEqual(phone.texts, { tel: { before: '05 56 78 90 12', after: '05 56 78 90 13' } });
+  const phone = diffContacts(card({ numero_de_telephone: 536499012 }), card({ numero_de_telephone: 536499013 }));
+  assert.deepEqual(phone.texts, { tel: { before: '05 36 49 90 12', after: '05 36 49 90 13' } });
   assert.equal(hasMarks(name) && hasMarks(role) && hasMarks(phone), true);
 });
 
@@ -47,10 +47,10 @@ test('diffContacts reads the name as the card shows it: a nameless card is calle
 });
 
 test('diffContacts reads the phone as the card shows it: the same number in two forms is not a change', () => {
-  const sameNumber = diffContacts(card({ numero_de_telephone: 556789012 }), card({ numero_de_telephone: '05 56 78 90 12' }));
+  const sameNumber = diffContacts(card({ numero_de_telephone: 536499012 }), card({ numero_de_telephone: '05 36 49 90 12' }));
   assert.deepEqual(sameNumber.texts, {});
-  const cleared = diffContacts(card({ numero_de_telephone: 556789012 }), card({ numero_de_telephone: null }));
-  assert.deepEqual(cleared.texts, { tel: { before: '05 56 78 90 12', after: '' } });
+  const cleared = diffContacts(card({ numero_de_telephone: 536499012 }), card({ numero_de_telephone: null }));
+  assert.deepEqual(cleared.texts, { tel: { before: '05 36 49 90 12', after: '' } });
   assert.deepEqual(diffContacts(card({ numero_de_telephone: 0 }), card({ numero_de_telephone: '' })).texts, {}, 'vide vaut vide');
 });
 
@@ -95,10 +95,10 @@ test('previewOf gives the card before exactly as the directory shows it', async 
 
 test('previewOf gives the card after with the values that will be written, enriched like the directory', async () => {
   const { referenceMaps, etabFlags, row } = await directory();
-  const values = { Fonction: 'Cheffe de service', numero_de_telephone: 556789013, Role_dans_le_PUI: 0, Competences: ['L', 2, 3] };
+  const values = { Fonction: 'Cheffe de service', numero_de_telephone: 536499013, Role_dans_le_PUI: 0, Competences: ['L', 2, 3] };
   const { before, after, marks } = previewOf(row(1), values, referenceMaps, etabFlags);
   assert.equal(after.Fonction, 'Cheffe de service');
-  assert.equal(after.numero_de_telephone, 556789013);
+  assert.equal(after.numero_de_telephone, 536499013);
   assert.deepEqual(after.labels.competences, ['Hématologie', 'Pharmacovigilance']);
   assert.deepEqual(after.labels.role, []);
   assert.deepEqual(after.labels.macro, ['Cancérologie', 'Pharmacie'], 'les domaines suivent les compétences');
@@ -108,7 +108,7 @@ test('previewOf gives the card after with the values that will be written, enric
   assert.deepEqual(marks, {
     texts: {
       fonction: { before: 'Pharmacienne', after: 'Cheffe de service' },
-      tel: { before: '05 56 78 90 12', after: '05 56 78 90 13' }
+      tel: { before: '05 36 49 90 12', after: '05 36 49 90 13' }
     },
     tags: {
       competences: { added: ['Pharmacovigilance'], removed: ['Oncologie'] },
@@ -131,7 +131,7 @@ test('previewOf marks a name that changes, and the establishment badge follows t
 
 test('previewOf marks nothing when the values written are the ones the card already has', async () => {
   const { referenceMaps, etabFlags, row } = await directory();
-  const { marks } = previewOf(row(1), { Fonction: 'Pharmacienne', Competences: ['L', 2, 1], numero_de_telephone: 556789012 }, referenceMaps, etabFlags);
+  const { marks } = previewOf(row(1), { Fonction: 'Pharmacienne', Competences: ['L', 2, 1], numero_de_telephone: 536499012 }, referenceMaps, etabFlags);
   assert.deepEqual(marks, { texts: {}, tags: {} });
   assert.equal(hasMarks(marks), false);
 });
@@ -157,26 +157,26 @@ test('previewOf does not change the row it is given', async () => {
 });
 
 test('diffContacts marks a new e-mail address and a new établissement, as lines of text', () => {
-  const before = card({ email: 'ana@chu.fr', etablissement_label: 'CHU' });
-  assert.deepEqual(diffContacts(before, card({ email: 'ana.martin@chu.fr', etablissement_label: 'CHU' })).texts,
-    { email: { before: 'ana@chu.fr', after: 'ana.martin@chu.fr' } });
-  assert.deepEqual(diffContacts(before, card({ email: 'ana@chu.fr', etablissement_label: 'UBM' })).texts,
+  const before = card({ email: 'ana@chu.example', etablissement_label: 'CHU' });
+  assert.deepEqual(diffContacts(before, card({ email: 'ana.martin@chu.example', etablissement_label: 'CHU' })).texts,
+    { email: { before: 'ana@chu.example', after: 'ana.martin@chu.example' } });
+  assert.deepEqual(diffContacts(before, card({ email: 'ana@chu.example', etablissement_label: 'UBM' })).texts,
     { etab: { before: 'CHU', after: 'UBM' } });
-  assert.deepEqual(diffContacts(card(), card({ email: 'ana@chu.fr' })).texts, { email: { before: '', after: 'ana@chu.fr' } }, 'une adresse ajoutée');
-  assert.equal(hasMarks(diffContacts(before, card({ email: 'ana@chu.fr', etablissement_label: 'UBM' }))), true);
+  assert.deepEqual(diffContacts(card(), card({ email: 'ana@chu.example' })).texts, { email: { before: '', after: 'ana@chu.example' } }, 'une adresse ajoutée');
+  assert.equal(hasMarks(diffContacts(before, card({ email: 'ana@chu.example', etablissement_label: 'UBM' }))), true);
   assert.equal(hasMarks(diffContacts(before, before)), false);
 });
 
 test('previewOf shows the card after with the new address and the flags of the new établissement', async () => {
   const { referenceMaps, etabFlags, row } = await directory();
-  const preview = previewOf(row(2), { email: 'nouveau@chu-bordeaux.fr', Etablissement: 1 }, referenceMaps, etabFlags); // Bob, de l'UBM au CHU
+  const preview = previewOf(row(2), { email: 'nouveau@chu-bordeaux.example', Etablissement: 1 }, referenceMaps, etabFlags); // Bob, de l'UBM au CHU
   assert.equal(preview.before.etablissement_label, 'UBM');
   assert.equal(preview.after.etablissement_label, 'CHU');
   assert.deepEqual([preview.before.etablissement_fondateur, preview.after.etablissement_fondateur], [false, true]);
-  assert.equal(preview.after.email, 'nouveau@chu-bordeaux.fr');
+  assert.equal(preview.after.email, 'nouveau@chu-bordeaux.example');
   assert.deepEqual(preview.marks.texts, {
     etab: { before: 'UBM', after: 'CHU' },
-    email: { before: 'bob@u-bordeaux-montaigne.fr', after: 'nouveau@chu-bordeaux.fr' }
+    email: { before: 'bob@u-bordeaux-montaigne.example', after: 'nouveau@chu-bordeaux.example' }
   });
 });
 

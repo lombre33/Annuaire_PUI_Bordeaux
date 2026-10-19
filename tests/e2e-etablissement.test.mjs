@@ -105,7 +105,7 @@ test('personne d’autre n’a de bouton d’établissement : ni une personne sa
     ['un administrateur sans établissement, même en mode admin', { user: ADMIN_EMAIL, adminMode: true }],
     ['un compte anonyme', { user: null }],
     ['un compte Lecteur', { user: ANA_EMAIL, readOnly: true }],
-    ['une adresse inconnue de l’annuaire et d’ACL', { user: 'inconnu@exemple.fr' }]
+    ['une adresse inconnue de l’annuaire et d’ACL', { user: 'inconnu@exemple.example' }]
   ];
   for (const [who, { adminMode, ...options }] of cases) {
     await withWidget({ tables: world(), ...options }, async ({ page, logs }) => {
@@ -171,7 +171,7 @@ test('un établissement masqué n’a plus de carte, donc plus de bouton sous un
   }));
 
 test('une responsable qui n’a pas de fiche dans l’annuaire a quand même le raccourci vers son établissement', { skip }, () =>
-  withWidget({ tables: world(tables => { tables.BDD.email[0] = 'autre.adresse@exemple.fr'; }), user: ANA_EMAIL }, async ({ page }) => {
+  withWidget({ tables: world(tables => { tables.BDD.email[0] = 'autre.adresse@exemple.example'; }), user: ANA_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
     await shortcut(page).waitFor();
     assert.match(await page.locator('#accountBar .account-name').textContent(), /Administrateur/);
@@ -401,22 +401,22 @@ test('le message de visibilité s’accorde au nombre de fiches et ne parle de �
 test('on nomme un responsable par son adresse, la ligne est ajoutée à ACL sans toucher au droit d’administrateur', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await openFromBar(page);
-    await dlg(page).locator('.es-add input').fill('  Claire.Moreau@CHU-Bordeaux.fr ');
+    await dlg(page).locator('.es-add input').fill('  Claire.Moreau@CHU-Bordeaux.example ');
     await press(page, 'Nommer').click();
     assert.equal(await rows(page).count(), 2);
-    const added = rowFor(page, 'claire.moreau@chu-bordeaux.fr');
+    const added = rowFor(page, 'claire.moreau@chu-bordeaux.example');
     assert.equal(await added.getAttribute('data-state'), 'added');
     assert.equal(await added.locator('.es-resp-name').textContent(), 'Adresse sans fiche dans l’annuaireajouté');
-    assert.equal(await added.getByRole('button').getAttribute('aria-label'), 'Retirer claire.moreau@chu-bordeaux.fr');
+    assert.equal(await added.getByRole('button').getAttribute('aria-label'), 'Retirer claire.moreau@chu-bordeaux.example');
     assert.equal(await dlg(page).locator('.es-add input').inputValue(), '', 'le champ est vidé');
     assert.equal(await summary(page), '1 modification : responsables');
     await save(page).click();
     await closed(page);
     assert.deepEqual(await writes(page), [
-      { action: 'AddRecord', table: 'ACL', values: { email: 'claire.moreau@chu-bordeaux.fr', Responsable_de_l_Etablissement: 1 }, ok: true }
+      { action: 'AddRecord', table: 'ACL', values: { email: 'claire.moreau@chu-bordeaux.example', Responsable_de_l_Etablissement: 1 }, ok: true }
     ]);
     const acl = await tableOf(page, 'ACL');
-    assert.equal(acl.admin[aclRowOf(acl, 'claire.moreau@chu-bordeaux.fr')], null, 'la nouvelle ligne ne donne aucun droit d’administrateur');
+    assert.equal(acl.admin[aclRowOf(acl, 'claire.moreau@chu-bordeaux.example')], null, 'la nouvelle ligne ne donne aucun droit d’administrateur');
     assert.equal(acl.admin[0], true, 'Ana reste administratrice');
     await shortcut(page).click();
     await nameInput(page).waitFor();
@@ -442,7 +442,7 @@ test('on nomme une personne de l’établissement depuis la liste, son nom s’a
     await dlg(page).locator('.es-add select').selectOption({ label: `${HOSTILE_FIRST_NAME} Hostile` });
     assert.equal(await dlg(page).locator('.es-add input').isDisabled(), true, 'la liste et l’adresse ne se cumulent pas');
     await press(page, 'Nommer').click();
-    const added = rowFor(page, 'hostile@chu-bordeaux.fr');
+    const added = rowFor(page, 'hostile@chu-bordeaux.example');
     assert.equal(await added.locator('.es-resp-name').textContent(), `${HOSTILE_FIRST_NAME} Hostileajouté`);
     assert.equal(await added.locator('.avatar').textContent(), '<H');
     assert.equal(await dlg(page).locator('img[src="x"]').count(), 0, 'aucune balise n’est née du prénom');
@@ -453,7 +453,7 @@ test('on nomme une personne de l’établissement depuis la liste, son nom s’a
   }));
 
 test('la liste des personnes à nommer a sa recherche : elle ne garde que les noms qui répondent, et la personne choisie y reste', { skip }, () =>
-  withWidget({ tables: world(tables => { tables.BDD.email[9] = 'hugo.bernard@chu-bordeaux.fr'; }), user: ANA_EMAIL }, async ({ page, logs }) => {
+  withWidget({ tables: world(tables => { tables.BDD.email[9] = 'hugo.bernard@chu-bordeaux.example'; }), user: ANA_EMAIL }, async ({ page, logs }) => {
     await openFromBar(page);
     const pick = dlg(page).locator('.es-add select');
     const options = () => pick.locator('option').allTextContents();
@@ -467,17 +467,17 @@ test('la liste des personnes à nommer a sa recherche : elle ne garde que les no
     await search.fill('zzz');
     assert.deepEqual(await options(), ['Choisir une personne', 'Hugo Bernard'], 'la personne choisie reste, quoi qu’on cherche ensuite');
     await search.fill('');
-    assert.equal(await pick.inputValue(), 'hugo.bernard@chu-bordeaux.fr');
+    assert.equal(await pick.inputValue(), 'hugo.bernard@chu-bordeaux.example');
     assert.equal(await pick.locator('option').count(), 3);
 
     await press(page, 'Nommer').click();
-    assert.equal(await rowFor(page, 'hugo.bernard@chu-bordeaux.fr').locator('.es-resp-name').textContent(), 'Hugo Bernardajouté');
+    assert.equal(await rowFor(page, 'hugo.bernard@chu-bordeaux.example').locator('.es-resp-name').textContent(), 'Hugo Bernardajouté');
     assert.equal(await search.inputValue(), '', 'la recherche est vidée avec la liste');
     await search.fill('zzz');
     assert.deepEqual(await options(), ['Aucun résultat']);
 
     // Une adresse saisie remplace la liste : la recherche s’éteint avec elle.
-    await dlg(page).locator('.es-add input').fill('autre@exemple.fr');
+    await dlg(page).locator('.es-add input').fill('autre@exemple.example');
     assert.equal(await search.isDisabled(), true);
     assert.equal(await pick.isDisabled(), true);
     await dlg(page).locator('.es-add input').fill('');
@@ -500,7 +500,7 @@ test('nommer sans rien choisir, avec une adresse invalide ou une personne déjà
     await press(page, 'Nommer').click();
     assert.equal(await problem.textContent(), 'Cette personne est déjà responsable.');
     assert.equal(await rows(page).count(), 1, 'rien n’a été ajouté');
-    await input.fill('suivante@exemple.fr');
+    await input.fill('suivante@exemple.example');
     await input.press('Enter');
     assert.equal(await rows(page).count(), 2, 'la touche Entrée nomme aussi');
     assert.equal(await problem.isHidden(), true, 'le message disparaît dès qu’une adresse est acceptée');
@@ -518,9 +518,9 @@ test('retirer puis rétablir un responsable, ou retirer une adresse qu’on vien
     assert.equal(await own.getByRole('button').getAttribute('aria-label'), 'Rétablir Ana Martin');
     await own.getByRole('button', { name: 'Rétablir Ana Martin' }).click();
     assert.equal(await own.getAttribute('data-state'), 'kept');
-    await dlg(page).locator('.es-add input').fill('provisoire@exemple.fr');
+    await dlg(page).locator('.es-add input').fill('provisoire@exemple.example');
     await press(page, 'Nommer').click();
-    await rowFor(page, 'provisoire@exemple.fr').getByRole('button').click();
+    await rowFor(page, 'provisoire@exemple.example').getByRole('button').click();
     assert.equal(await rows(page).count(), 1);
     assert.equal(await summary(page), 'Aucune modification');
     assert.equal(await save(page).isDisabled(), true);
@@ -536,7 +536,7 @@ test('un établissement garde toujours un responsable : retirer le dernier est r
     assert.equal(await minimum.textContent(), 'Un établissement doit garder au moins un responsable.');
     assert.equal(await summary(page), 'Gardez au moins un responsable');
     assert.equal(await save(page).isDisabled(), true);
-    await dlg(page).locator('.es-add input').fill('relais@exemple.fr');
+    await dlg(page).locator('.es-add input').fill('relais@exemple.example');
     await press(page, 'Nommer').click();
     assert.equal(await minimum.isHidden(), true, 'un autre responsable suffit');
     assert.equal(await save(page).isEnabled(), true);
@@ -548,7 +548,7 @@ test('se retirer soi-même prévient qu’on perdra l’accès, puis les boutons
     await openFromBar(page);
     const warning = dlg(page).locator('#etabSelfNote');
     assert.equal(await warning.isHidden(), true);
-    await dlg(page).locator('.es-add input').fill('relais@exemple.fr');
+    await dlg(page).locator('.es-add input').fill('relais@exemple.example');
     await press(page, 'Nommer').click();
     await rowFor(page, ANA_EMAIL).getByRole('button').click();
     assert.equal(await warning.isVisible(), true);
@@ -557,7 +557,7 @@ test('se retirer soi-même prévient qu’on perdra l’accès, puis les boutons
     await closed(page);
     assert.deepEqual(await writes(page), [
       { action: 'UpdateRecord', table: 'ACL', rowId: 1, values: { Responsable_de_l_Etablissement: 0 }, ok: true },
-      { action: 'AddRecord', table: 'ACL', values: { email: 'relais@exemple.fr', Responsable_de_l_Etablissement: 1 }, ok: true }
+      { action: 'AddRecord', table: 'ACL', values: { email: 'relais@exemple.example', Responsable_de_l_Etablissement: 1 }, ok: true }
     ]);
     const acl = await tableOf(page, 'ACL');
     assert.equal(acl.admin[0], true, 'la ligne d’Ana est gardée : elle reste administratrice');
@@ -571,17 +571,17 @@ test('se retirer soi-même prévient qu’on perdra l’accès, puis les boutons
 test('retirer un responsable ordinaire supprime sa ligne d’ACL', { skip }, () =>
   withWidget({ tables: world(), user: BOB_EMAIL }, async ({ page }) => {
     await openFromBar(page);
-    await dlg(page).locator('.es-add input').fill('relais@exemple.fr');
+    await dlg(page).locator('.es-add input').fill('relais@exemple.example');
     await press(page, 'Nommer').click();
     await rowFor(page, BOB_EMAIL).getByRole('button').click();
     await save(page).click();
     await closed(page);
     assert.deepEqual(await writes(page), [
       { action: 'RemoveRecord', table: 'ACL', rowId: 3, values: {}, ok: true },
-      { action: 'AddRecord', table: 'ACL', values: { email: 'relais@exemple.fr', Responsable_de_l_Etablissement: 2 }, ok: true }
+      { action: 'AddRecord', table: 'ACL', values: { email: 'relais@exemple.example', Responsable_de_l_Etablissement: 2 }, ok: true }
     ]);
     const acl = await tableOf(page, 'ACL');
-    assert.deepEqual(acl.email.slice().sort(), [ADMIN_EMAIL, 'Ana.Martin@CHU-Bordeaux.fr', 'relais@exemple.fr'].sort(), 'la ligne de Bob a disparu');
+    assert.deepEqual(acl.email.slice().sort(), [ADMIN_EMAIL, 'Ana.Martin@CHU-Bordeaux.example', 'relais@exemple.example'].sort(), 'la ligne de Bob a disparu');
   }));
 
 // ===== Le logo =====
@@ -847,7 +847,7 @@ test('un refus de Grist (règle d’accès) ne laisse rien à moitié écrit : n
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await openFromBar(page);
     await nameInput(page).fill('Nom refusé');
-    await dlg(page).locator('.es-add input').fill('relais@exemple.fr');
+    await dlg(page).locator('.es-add input').fill('relais@exemple.example');
     await press(page, 'Nommer').click();
     await page.evaluate(() => { window.__denyWrites = ['ACL']; });
     await save(page).click();
@@ -910,23 +910,23 @@ test('si quelqu’un d’autre a déjà fait le même changement, il n’y a plu
 test('une liste de responsables modifiée ailleurs est reprise : ce qu’un autre a nommé reste', { skip }, () =>
   withWidget({ tables: world(), user: BOB_EMAIL }, async ({ page }) => {
     await openFromBar(page);
-    await dlg(page).locator('.es-add input').fill('moi@exemple.fr');
+    await dlg(page).locator('.es-add input').fill('moi@exemple.example');
     await press(page, 'Nommer').click();
     await page.evaluate(() => {
       const acl = window.__tables.ACL;
       acl.id.push(10);
-      acl.email.push('autre.responsable@exemple.fr');
+      acl.email.push('autre.responsable@exemple.example');
       acl.Responsable_de_l_Etablissement.push(2);
       acl.admin.push(false);
     });
     await save(page).click();
     await closed(page);
     assert.deepEqual(await writes(page), [
-      { action: 'AddRecord', table: 'ACL', values: { email: 'moi@exemple.fr', Responsable_de_l_Etablissement: 2 }, ok: true }
+      { action: 'AddRecord', table: 'ACL', values: { email: 'moi@exemple.example', Responsable_de_l_Etablissement: 2 }, ok: true }
     ], 'seule la nomination faite dans la fenêtre est écrite : la ligne d’un autre n’est pas touchée');
     const acl = await tableOf(page, 'ACL');
     const names = acl.email.filter((_, index) => acl.Responsable_de_l_Etablissement[index] === 2).sort();
-    assert.deepEqual(names, [BOB_EMAIL, 'autre.responsable@exemple.fr', 'moi@exemple.fr'].sort());
+    assert.deepEqual(names, [BOB_EMAIL, 'autre.responsable@exemple.example', 'moi@exemple.example'].sort());
   }));
 
 // ===== Fenêtre : clavier, focus, abandon =====

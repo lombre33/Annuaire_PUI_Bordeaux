@@ -180,9 +180,9 @@ test('the number of a task and the number of an action are read by two rules tha
 });
 
 test('formatPhone restores the French leading 0 lost by Grist\'s Numeric column type', () => {
-  assert.equal(formatPhone(556789012), '05 56 78 90 12');
-  assert.equal(formatPhone('556789012'), '05 56 78 90 12');
-  assert.equal(formatPhone('0556789012'), '05 56 78 90 12', 'un numéro à 10 chiffres déjà complet reste correct');
+  assert.equal(formatPhone(536499012), '05 36 49 90 12');
+  assert.equal(formatPhone('536499012'), '05 36 49 90 12');
+  assert.equal(formatPhone('0536499012'), '05 36 49 90 12', 'un numéro à 10 chiffres déjà complet reste correct');
   assert.equal(formatPhone(0), '', '0 = case non renseignée, comme partout ailleurs dans le code (cf. safeValues)');
   assert.equal(formatPhone(null), '');
   assert.equal(formatPhone(undefined), '');
@@ -342,11 +342,11 @@ test('labelMapFromRows ignores rows without an id', () => {
 });
 
 test('mailtoHref builds a link for a plain address and refuses anything that could add recipients or parameters', () => {
-  assert.equal(mailtoHref('ana.martin@chu-bordeaux.fr'), 'mailto:ana.martin@chu-bordeaux.fr');
-  assert.equal(mailtoHref('  ana+pui@chu.fr  '), 'mailto:ana+pui@chu.fr', 'espaces autour retirés, + conservé');
-  assert.equal(mailtoHref("o'brien@chu.fr"), "mailto:o'brien@chu.fr");
-  ['a@b.fr?cc=x@y.fr', 'a@b.fr,c@d.fr', 'a@b.fr;c@d.fr', 'a@b.fr&bcc=x@y.fr', 'a@b.fr#x', 'a b@c.fr',
-    'pas-une-adresse', '@b.fr', 'a@', '', null, undefined].forEach(value => {
+  assert.equal(mailtoHref('ana.martin@chu-bordeaux.example'), 'mailto:ana.martin@chu-bordeaux.example');
+  assert.equal(mailtoHref('  ana+pui@chu.example  '), 'mailto:ana+pui@chu.example', 'espaces autour retirés, + conservé');
+  assert.equal(mailtoHref("o'brien@chu.example"), "mailto:o'brien@chu.example");
+  ['a@b.example?cc=x@y.example', 'a@b.example,c@d.example', 'a@b.example;c@d.example', 'a@b.example&bcc=x@y.example', 'a@b.example#x', 'a b@c.example',
+    'pas-une-adresse', '@b.example', 'a@', '', null, undefined].forEach(value => {
     assert.equal(mailtoHref(value), '', `${value} ne doit pas devenir un lien`);
   });
 });
@@ -401,10 +401,10 @@ test('displayName writes "Prénom Nom" as the card does, trims, and falls back t
 });
 
 test('shownEmail gives the address a person chose to show (email_affiche) in place of the account address, and falls back to it', () => {
-  assert.equal(shownEmail({ email: 'ana@chu.fr', email_affiche: 'contact@chu.fr' }), 'contact@chu.fr');
-  assert.equal(shownEmail({ email: 'ana@chu.fr', email_affiche: '' }), 'ana@chu.fr');
-  assert.equal(shownEmail({ email: 'ana@chu.fr', email_affiche: '   ' }), 'ana@chu.fr', 'des espaces ne sont pas une adresse');
-  assert.equal(shownEmail({ email: 'ana@chu.fr', email_affiche: null }), 'ana@chu.fr');
-  assert.equal(shownEmail({ email: 'ana@chu.fr' }), 'ana@chu.fr', 'sans la colonne facultative');
+  assert.equal(shownEmail({ email: 'ana@chu.example', email_affiche: 'contact@chu.example' }), 'contact@chu.example');
+  assert.equal(shownEmail({ email: 'ana@chu.example', email_affiche: '' }), 'ana@chu.example');
+  assert.equal(shownEmail({ email: 'ana@chu.example', email_affiche: '   ' }), 'ana@chu.example', 'des espaces ne sont pas une adresse');
+  assert.equal(shownEmail({ email: 'ana@chu.example', email_affiche: null }), 'ana@chu.example');
+  assert.equal(shownEmail({ email: 'ana@chu.example' }), 'ana@chu.example', 'sans la colonne facultative');
   assert.equal(shownEmail({}), '');
 });

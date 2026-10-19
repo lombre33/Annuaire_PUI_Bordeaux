@@ -7,8 +7,8 @@ export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
 }
 
-// Adresse e-mail comparée sans casse ni espaces autour : « Ana.Martin@CHU.fr » et
-// « ana.martin@chu.fr » désignent la même personne.
+// Adresse e-mail comparée sans casse ni espaces autour : « Ana.Martin@CHU.example » et
+// « ana.martin@chu.example » désignent la même personne.
 export function normalizeEmail(value) {
   return text(value).toLowerCase();
 }
@@ -79,7 +79,7 @@ function isBlank(value) {
   return value === null || value === undefined || value === '' || value === 0;
 }
 
-// numero_de_telephone est Numeric dans Grist, qui perd le 0 initial (556789012).
+// numero_de_telephone est Numeric dans Grist, qui perd le 0 initial (536499012).
 // On le rétablit ; un format inattendu est renvoyé tel quel plutôt que déformé.
 export function formatPhone(value) {
   if (isBlank(value)) return '';
