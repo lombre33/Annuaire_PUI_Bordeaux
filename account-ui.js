@@ -8,41 +8,42 @@ import { fillAvatar } from './avatar-ui.js';
 
 const noop = () => {};
 
-// `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
-// personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
-// par le bouton « Modifier mon profil », `onCreate` par « Créer ma fiche » (un compte qui n'a pas
-// de fiche). `onEtab` : appelé par le bouton « Mon établissement ».
-// `onAdminMode` : appelé par le bouton « Mode admin ». `attachments` (attachments.js) : de quoi
-// montrer la photo de profil de la personne à la place de ses initiales.
-export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noop, onEtab = noop, onAdminMode = noop, attachments = null }) {
+// Les éléments du bandeau dans index.html (#accountBar).
+function accountParts(root) {
   const part = selector => root.querySelector(selector);
-  const avatar = part('.account-avatar');
-  const name = part('.account-name');
-  const detail = part('.account-detail');
-  const switchButton = part('.presence-switch');
-  const createButton = part('.account-create');
-  const editButton = part('.account-edit');
-  const etabButton = part('.account-etab');
-  const adminButton = part('.account-admin');
-  const actions = part('.account-actions');
-  const status = part('.account-status');
+  return {
+    avatar: part('.account-avatar'),
+    name: part('.account-name'),
+    detail: part('.account-detail'),
+    switchButton: part('.presence-switch'),
+    createButton: part('.account-create'),
+    editButton: part('.account-edit'),
+    etabButton: part('.account-etab'),
+    adminButton: part('.account-admin'),
+    actions: part('.account-actions'),
+    status: part('.account-status')
+  };
+}
 
-  // L'avatar n'est refait que si les initiales ou la photo changent : la rafraîchir à chaque lecture
-  // de Grist la ferait clignoter, et une photo qui ne se charge pas serait redemandée à chaque fois.
-  let shownAvatar = '';
-  function paintAvatar({ initials, photo = 0 }) {
+// L'avatar n'est refait que si les initiales ou la photo changent : la rafraîchir à chaque lecture
+// de Grist la ferait clignoter, et une photo qui ne se charge pas serait redemandée à chaque fois.
+function avatarPainter(avatar, attachments) {
+  let shown = '';
+  return ({ initials, photo = 0 }) => {
     const key = `${initials}|${photo}`;
-    if (key === shownAvatar) return;
-    shownAvatar = key;
+    if (key === shown) return;
+    shown = key;
     fillAvatar(avatar, { initials, photo, attachments });
-  }
+  };
+}
 
-  // Dans l'en-tête compact, l'interrupteur et « Modifier mon profil » occupent la deuxième
-  // rangée ; « Mode admin », sinon « Mon établissement », prend le coin de la première, à droite du
-  // nom. Le second de ces deux boutons, s'ils sont là tous deux, passe sur une troisième rangée.
-  // Sans interrupteur (un compte qui n'a pas de fiche), les boutons se rangent sur la deuxième
-  // rangée. La feuille de style lit `data-corner` et `no-switch` pour placer le nom et les boutons.
-  const placeButtons = () => {
+// Dans l'en-tête compact, l'interrupteur et « Modifier mon profil » occupent la deuxième
+// rangée ; « Mode admin », sinon « Mon établissement », prend le coin de la première, à droite du
+// nom. Le second de ces deux boutons, s'ils sont là tous deux, passe sur une troisième rangée.
+// Sans interrupteur (un compte qui n'a pas de fiche), les boutons se rangent sur la deuxième
+// rangée. La feuille de style lit `data-corner` et `no-switch` pour placer le nom et les boutons.
+function buttonPlacer(root, { switchButton, adminButton, etabButton, createButton, editButton, actions }) {
+  return () => {
     const withSwitch = !switchButton.hidden;
     const corner = !withSwitch ? '' : !adminButton.hidden ? 'admin' : !etabButton.hidden ? 'etab' : '';
     if (corner) root.dataset.corner = corner;
@@ -52,16 +53,50 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
     // ligne ou de la grille coûte un écart (audit UI/UX, U46).
     actions.hidden = createButton.hidden && editButton.hidden && etabButton.hidden && adminButton.hidden;
   };
+}
 
-  // Message passager sous le bandeau ('' l'efface) ; `tone` : 'info', 'error' pour un échec, ou
-  // 'done' (invisible, voir announce). Un nouveau message remplace le précédent et son délai.
+// Message passager sous le bandeau. `setStatus(message, tone)` : '' l'efface ; `tone` : 'info', 'error' pour un échec, ou
+// 'done' (invisible, voir announce). Un nouveau message remplace le précédent et son délai.
+function statusLine(status) {
   let announceTimer = 0;
-  function setStatus(message, tone = 'info') {
+  const setStatus = (message, tone = 'info') => {
     clearTimeout(announceTimer);
     status.textContent = message;
     status.dataset.tone = tone;
     status.classList.toggle('sr-only', tone === 'done');
-  }
+  };
+  // Le résultat d'une écriture réussie, pour les lecteurs d'écran : la région d'état le
+  // lit, mais il reste invisible, car l'écran dit déjà la même chose (le texte du bandeau
+  // change et l'interrupteur bascule). Il s'efface seul, ou dès le message suivant.
+  const announce = message => {
+    setStatus(message, 'done');
+    announceTimer = setTimeout(() => setStatus(''), PRESENCE_ANNOUNCE_MS);
+  };
+  return { setStatus, announce };
+}
+
+// Rend le focus au bouton quand la fenêtre qu'il a ouverte se ferme ; faux quand le bouton n'est pas là.
+const focusIfShown = target => () => {
+  if (target.hidden) return false;
+  target.focus();
+  return true;
+};
+
+// `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
+// personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
+// par le bouton « Modifier mon profil », `onCreate` par « Créer ma fiche » (un compte qui n'a pas
+// de fiche). `onEtab` : appelé par le bouton « Mon établissement ».
+// `onAdminMode` : appelé par le bouton « Mode admin ». `attachments` (attachments.js) : de quoi
+// montrer la photo de profil de la personne à la place de ses initiales.
+export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noop, onEtab = noop, onAdminMode = noop, attachments = null }) {
+  const parts = accountParts(root);
+  const { name, detail, switchButton, createButton, editButton, etabButton, adminButton } = parts;
+  const paintAvatar = avatarPainter(parts.avatar, attachments);
+  const placeButtons = buttonPlacer(root, parts);
+  const { setStatus, announce } = statusLine(parts.status);
+  const focusEdit = focusIfShown(editButton);
+  const focusCreate = focusIfShown(createButton);
+  const focusEtab = focusIfShown(etabButton);
 
   // Pendant une écriture le bouton est « hors service » (`aria-disabled`) sans être désactivé :
   // un bouton désactivé perd le focus, et le clavier repartirait du haut de la page.
@@ -109,29 +144,11 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
         : 'Mode admin : modifier la fiche de n\'importe quelle personne';
     },
 
-    // Rend le focus au bouton « Modifier mon profil » quand la fenêtre qu'il a ouverte se ferme ;
-    // faux quand le bouton n'est pas là.
-    focusEdit() {
-      if (editButton.hidden) return false;
-      editButton.focus();
-      return true;
-    },
-
-    // Rend le focus à « Créer ma fiche » quand la fenêtre se ferme sans que la fiche soit créée ;
-    // faux quand le bouton n'est pas là.
-    focusCreate() {
-      if (createButton.hidden) return false;
-      createButton.focus();
-      return true;
-    },
-
-    // Rend le focus au bouton « Mon établissement » quand la fenêtre qu'il a ouverte se ferme ;
-    // faux quand le bouton n'est pas là.
-    focusEtab() {
-      if (etabButton.hidden) return false;
-      etabButton.focus();
-      return true;
-    },
+    // Le focus revient au bouton « Modifier mon profil », « Créer ma fiche » (quand la fenêtre se ferme sans que la
+    // fiche soit créée) ou « Mon établissement » quand la fenêtre qu'il a ouverte se ferme.
+    focusEdit,
+    focusCreate,
+    focusEtab,
 
     // Pendant une écriture l'interrupteur est gelé : un deuxième clic ne doit pas
     // partir avant que le premier ait abouti. Il garde le focus (voir plus haut).
@@ -142,13 +159,6 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
     },
 
     setStatus,
-
-    // Le résultat d'une écriture réussie, pour les lecteurs d'écran : la région d'état le
-    // lit, mais il reste invisible, car l'écran dit déjà la même chose (le texte du bandeau
-    // change et l'interrupteur bascule). Il s'efface seul, ou dès le message suivant.
-    announce(message) {
-      setStatus(message, 'done');
-      announceTimer = setTimeout(() => setStatus(''), PRESENCE_ANNOUNCE_MS);
-    }
+    announce
   };
 }
