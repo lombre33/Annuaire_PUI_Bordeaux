@@ -320,7 +320,7 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 3. **Le dépôt dans une organisation GitHub** avec deux propriétaires au moins. GitHub le recommande : avec un seul propriétaire injoignable, les projets de l'organisation peuvent devenir inaccessibles. Un dépôt personnel n'a qu'un propriétaire ; ses collaborateurs peuvent pousser du code, mais ni supprimer le dépôt, ni changer sa visibilité, ni inviter d'autres personnes. Le transfert change l'adresse de GitHub Pages : le faire une fois, à un moment choisi, corriger l'adresse dans chaque page Grist, puis faire le [contrôle](#contrôle-après-un-changement-de-données). La piste proposée est un GitHub DIESE ([hébergement et risques à ce jour](#hébergement-et-risques-à-ce-jour)). À défaut d'organisation, GitHub permet de désigner un **successeur** du compte personnel (réglages du compte, « Successor settings »).
 4. **Des sauvegardes hors de Grist.** Grist garde lui-même des instantanés du document (d'après sa documentation : horaires pendant environ un jour, mensuels pendant plus d'un an, à vérifier sur l'instance utilisée), mais ils disparaissent avec le document s'il est supprimé définitivement. Télécharger régulièrement le document (fichier `.grist`, qui ne contient pas la liste des personnes avec qui il est partagé : la noter à part) et ses pièces jointes éventuelles (les logos et, depuis la 1.19.0, les photos de profil), puis les ranger dans un espace à accès restreint, jamais dans le dépôt public. Une sauvegarde contient des données personnelles : prévoir sa durée de conservation et sa destruction.
 5. **Une copie du code** ailleurs que sur le compte d'origine (un clone ou un fork sur un autre compte ou une autre forge) : supprimer un compte supprime ses dépôts, pas les copies faites ailleurs.
-6. **Une licence.** Le dépôt n'en déclare aucune : par défaut, tous les droits sont réservés, et la reprise du code par d'autres suppose l'accord de son propriétaire. À décider par le propriétaire du dépôt.
+6. **Une licence.** Le dépôt est sous licence GNU GPL version 3 ou ultérieure (fichier [`LICENSE`](../LICENSE)) : la reprise du code ne suppose pas l'accord de son propriétaire, et ce que l'on redistribue reste sous la même licence. Si le dépôt change de compte ou d'organisation, le fichier `LICENSE` suit le code.
 7. **Une fiche de continuité** (ci-dessous), tenue à jour et rangée hors du dépôt public, parce qu'elle contient des noms et des adresses.
 
 ### Fiche de continuité
@@ -393,7 +393,7 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 
 Le dépôt est public et le widget est une page statique, sans compilation : tant que le dépôt (ou une copie) existe, une autre personne peut le reprendre.
 
-1. **Récupérer le code** : `git clone https://github.com/lombre33/Annuaire_PUI_Bordeaux.git`, ou une copie de secours. Sans licence, la reprise suppose l'accord du propriétaire.
+1. **Récupérer le code** : `git clone https://github.com/lombre33/Annuaire_PUI_Bordeaux.git`, ou une copie de secours. La licence GNU GPL version 3 ([`LICENSE`](../LICENSE)) permet cette reprise sans demander l'accord du propriétaire.
 2. **Vérifier qu'il fonctionne** : `node --test` (Node 22.7 ou plus), puis `node docs/demo/serveur-demo.mjs` pour le voir sans Grist ([README](../README.md#essayer-sans-grist)).
 3. **Le publier** : copier `index.html`, `style.css`, `dialogs.css` et les fichiers `.js` de la racine ([Organisation du code](developpeurs.md#organisation-du-code)) sur un hébergement de pages statiques en HTTPS, ou activer GitHub Pages sur la copie.
 4. **Pointer Grist vers la nouvelle adresse** : dans chaque page du document, ouvrir les options du widget et remplacer l'adresse dans « Enter Custom URL ». L'accès complet est à accorder de nouveau si Grist le demande.
@@ -455,7 +455,6 @@ Non engagées ; à décider par le propriétaire du dépôt.
 - Essayer les règles d'accès proposées ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 4) dans un vrai document Grist, avec un compte ordinaire et un administrateur ([`TESTING.md`](../TESTING.md), section 13), puis corriger la documentation si le comportement diffère.
 - Rattraper les étiquettes de version manquantes : seule `v1.3.1` existe aujourd'hui, alors que l'étape 4 de « Publier » demande d'étiqueter chaque version.
 - Protéger la branche `main` (voir [sécurité](securite.md#recommandations)) et activer les mises à jour automatiques des actions GitHub (Dependabot).
-- Ajouter une licence : le dépôt est public et n'en déclare aucune ; par défaut, tous les droits sont réservés.
 - Paginer ou charger progressivement les cartes si l'annuaire grossit beaucoup.
 - Compléter le [lexique du PUI](utilisateurs.md#lexique-du-pui) : Instances, Actions, Communautés, Tâches, Rôle PUI et périmètre attendent une définition.
-- Déplacer le dépôt dans une organisation GitHub à deux propriétaires au moins (piste proposée : un GitHub DIESE), et choisir une licence (voir [Continuité](#continuité--départs-et-absence-dadministrateur)).
+- Déplacer le dépôt dans une organisation GitHub à deux propriétaires au moins (piste proposée : un GitHub DIESE ; voir [Continuité](#continuité--départs-et-absence-dadministrateur)).

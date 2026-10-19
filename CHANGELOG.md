@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.28.4 — Licence GNU GPL v3 et politique de sécurité du dépôt
+
+Antoine a choisi la licence le 19 octobre 2026 (« licences GNU GPL »). Aucun changement de code : seul le numéro de version bouge.
+
+- **Le dépôt a une licence** : GNU GPL version 3 ou toute version ultérieure (`LICENSE`, texte officiel inchangé ; copyright © 2026 lombre33, comme proposé à Antoine). C'était le seul bloquant du module GWaudit (E-LIC-01). La reprise du code
+  par d'autres ne suppose plus l'accord du propriétaire ; une version modifiée qu'on redistribue reste sous la même licence. « Ou ultérieure » est le choix par défaut que recommande la Free Software Foundation : pour « version 3 uniquement »,
+  il suffit de changer la phrase du README. Les logos des financeurs (`assets/`) appartiennent à leurs titulaires et ne sont pas couverts.
+- **`SECURITY.md`** à la racine : où signaler un problème de sécurité (signalement privé de GitHub s'il est activé, sinon le propriétaire du dépôt), sans issue publique, et renvoi vers `docs/securite.md`. Aucune adresse personnelle n'y figure.
+- **Documentation** : le README déclare la licence et liste `LICENSE` et `SECURITY.md` ; `docs/maintenance.md` ne dit plus que le dépôt n'en a aucune (continuité, reprise sans le créateur, pistes d'amélioration).
+- **Test** : `tests/license.test.mjs` vérifie que `LICENSE` est le texte officiel de la GPL v3, que le README la déclare, que `SECURITY.md` existe et renvoie à la documentation.
+
 ## 1.28.3 — Audit exhaustif, lot 1 : un libellé « constructor » ne casse plus rien, le gris des textes secondaires passe 4,5:1, le groupe de filtres a un rôle
 
 Premier lot de l'audit exhaustif relancé le 19 octobre 2026 sur la 1.28.2 (lecture du code, puis le module GWaudit d'Antoine). Rien ne change pour les personnes, sauf un gris un peu plus foncé.
