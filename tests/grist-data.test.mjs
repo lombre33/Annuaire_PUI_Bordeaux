@@ -1,9 +1,9 @@
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   safeValues, tableToRows, text, pickLabel, refId, refLabel, isEmptyReference, normalize, normalizeForSearch,
   compareLabels, compareContacts,
-  formatPhone, createRequestSequencer, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
+  formatPhone, createRequestSequencer, debounce, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
   labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, describeVisibility, displayName, taskActionNumber, actionNumber, shownEmail,
   loadDirectory
 } from '../grist-data.js';
@@ -34,6 +34,20 @@ test('normalize() folds case and strips accents for resilient label matching', (
   assert.equal(normalize('Référent qualité'), 'referent qualite');
   assert.equal(normalize('  Pharmacie Clinique  '), 'pharmacie clinique');
   assert.equal(normalize(null), '');
+});
+
+// L'ancienne définition, sans mémoire : ce que normalize() doit continuer à rendre pour tout texte.
+const normalizeAfresh = value => text(value).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('fr-FR');
+
+test('normalize() rend le même résultat qu\'en le recalculant, au premier appel comme aux suivants, y compris une fois sa mémoire pleine', () => {
+  const samples = ['Oncologie', 'École', 'Référent qualité', '  Pharmacie Clinique  ', 'ÉLODIE', 'Çà et là', 'œuvre', null, undefined, 7, '', 'Straße'];
+  const check = label => samples.forEach(sample => assert.equal(normalize(sample), normalizeAfresh(sample), `${label} : ${JSON.stringify(sample)}`));
+  check('premier appel');
+  check('appel suivant');
+  // Une mémoire qui grossirait sans fin (une recherche tapée lettre à lettre, des saisies libres) : elle se vide à sa limite et
+  // les résultats restent justes avant, pendant et après.
+  for (let i = 0; i < 25000; i += 1) assert.equal(normalize(`Libellé Éphémère ${i}`), `libelle ephemere ${i}`);
+  check('après le remplissage de la mémoire');
 });
 
 test('normalizeForSearch() makes the usual spellings of a name equal: œ, apostrophes, hyphens, dots, spaces', () => {
@@ -190,6 +204,33 @@ test('createRequestSequencer only recognizes the most recently started request a
   const second = sequencer.next();
   assert.equal(sequencer.isLatest(first), false, 'une requête plus ancienne ne doit plus être "latest" une fois une nouvelle démarrée');
   assert.equal(sequencer.isLatest(second), true);
+});
+
+test('debounce() laisse passer le premier appel tout de suite, puis regroupe une rafale en un seul appel avec les derniers arguments', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const seen = [];
+    const run = debounce(value => seen.push(value), 250);
+    run('chargement');
+    assert.deepEqual(seen, ['chargement'], 'le premier appel part sans attendre');
+
+    run('édition 1');
+    mock.timers.tick(100);
+    run('édition 2');
+    mock.timers.tick(100);
+    run('édition 3');
+    mock.timers.tick(249);
+    assert.deepEqual(seen, ['chargement'], 'rien tant que 250 ms ne se sont pas écoulées depuis le dernier appel');
+    mock.timers.tick(1);
+    assert.deepEqual(seen, ['chargement', 'édition 3'], 'la rafale n\'en fait qu\'un, avec le dernier appel');
+
+    run('édition 4');
+    assert.deepEqual(seen, ['chargement', 'édition 3'], 'les appels suivants attendent aussi : le « premier » n\'a lieu qu\'une fois');
+    mock.timers.tick(250);
+    assert.deepEqual(seen, ['chargement', 'édition 3', 'édition 4']);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test('referenceMapsEqual compares reference-table content regardless of key order', () => {
