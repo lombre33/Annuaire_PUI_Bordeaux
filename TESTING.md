@@ -22,23 +22,28 @@ Sans dépendance, un fichier de tests par module :
   `pickLabel`, `labelMapFromRows`, `groupLabelMap`, `taskActionNumber`, `actionNumber`,
   `refId`, `refLabel`, `isEmptyReference`,
   `resolveListItem`, `createRequestSequencer`,
-  `referenceMapsEqual`, `mailtoHref`.
+  `referenceMapsEqual`, `mailtoHref` et `shownEmail` (l'adresse montrée sur la carte : `email_affiche`,
+  sinon celle du compte).
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
   catégories liste dont compétences, domaines, tâches et actions, libellés sans doublon, anciennes
   colonnes ignorées, indicateurs) et `labelsOf`.
 - `tests/etablissements.test.mjs` — `etablissementFlagsFromRows` (dont les
   doublons), `etablissementFlags` (par identifiant de ligne, repli sur le
-  libellé), `isEtablissementEligible`, `filterVisibleEstablishments` (le menu Établissement offre ce que les cartes
+  libellé, jamais une propriété d'`Object`), `isEtablissementEligible`, `filterVisibleEstablishments` (le menu Établissement offre ce que les cartes
   peuvent montrer, selon les interrupteurs).
 - `tests/filters.test.mjs` — `filterContacts` (dont la recherche « prénom nom », mot par
   mot et dans n'importe quel ordre, et ses écritures tolérées), `pruneStaleFilters`,
-  `computeFilterCounts` (dont les compteurs des domaines et des actions) et le menu
+  `computeFilterCounts` (dont les compteurs des domaines et des actions, et un libellé qui porte le nom d'une
+  propriété d'objet : « constructor », « __proto__ ») et le menu
   rangé par groupe, domaine ou action : `menuGroups`, `groupState`, `toggleGroup`,
   `selectionCount`.
 - `tests/load-directory.test.mjs` — `loadDirectory()` avec un faux `docApi`
-  (une lecture par table, cartes triées par nom, aucune ancienne table lue, libellé corrigé
-  prioritaire, tables indispensables illisibles, table de référence illisible,
-  colonnes obligatoires, facultatives ou introuvables, annuaire vide expliqué,
+  (une lecture par table, cartes triées par nom, aucune ancienne table lue ni table `Financeurs`,
+  libellé corrigé seul (une ligne qui n'en a pas disparaît, sauf dans une table qui n'en remplit
+  encore aucun ; plusieurs lignes brutes de même libellé corrigé : une seule entrée du filtre),
+  tables indispensables illisibles, table de référence illisible,
+  colonnes obligatoires, facultatives (`perimetre`, que le widget ne lit plus) ou introuvables,
+  annuaire vide expliqué,
   doublons d'acronymes, domaines des compétences, tâches rangées par action
   d'après leur numéro : formats de libellé, repli « Sans action », menu à plat,
   lectures en panne).
@@ -49,23 +54,33 @@ Sans dépendance, un fichier de tests par module :
 - `tests/identity.test.mjs` — `readIdentity` avec un faux document Grist (adresse
   lue sur la ligne de la sonde, administrateur d'après `ACL`, établissements dont la
   personne est responsable d'après la colonne `Responsable_de`, compte Lecteur,
-  table-sonde absente, formule muette, écriture refusée, lecture en panne, ligne de
-  sonde toujours retirée, personnes simultanées, aucune adresse dans la console),
-  `responsableIds` et `isReadOnlyAddress`.
+  table-sonde absente puis créée par le widget avec ses trois colonnes et leurs formules de
+  déclenchement (1.20.0), création refusée, table numérotée retirée quand une autre personne
+  l'a créée au même instant, formule muette, écriture refusée, lecture en panne, ligne de
+  sonde supprimée avant de répondre (suppression attendue, retentée une fois, jamais attendue
+  sans fin, dite dans la console avec la raison de Grist ; anciennes lignes laissées à la même
+  adresse supprimées, jamais celles des autres), règle d'accès la plus stricte, personnes
+  simultanées, aucune adresse dans la console), `responsableIds` et `isReadOnlyAddress`.
 - `tests/people.test.mjs` — l'index des lignes de `BDD` par adresse et par
   identifiant (`findByEmail`, `findById`, doublons, colonne `email` absente) et `describeVisibility` : le
   verdict « apparaît ou non, et pourquoi » concorde avec `buildContacts`, ligne par
   ligne.
 - `tests/presence.test.mjs` — `describePresence` (les messages dits à la
   personne), `describeUnknownAccount` (adresse absente de `BDD`, administrateur sans
-  fiche, colonne `email` manquante), `describeHiddenFiche` (les avis de la relecture),
-  `setPresence` (une écriture atomique, seule la case de la personne, plusieurs lignes,
-  refus de Grist) et `explainWriteError`.
+  fiche, colonne `email` manquante), `describeHiddenFiche` (les avis de la relecture, dont celui
+  d'une fiche en cours de création), `describeCreated` (dit si la fiche qui vient d'être créée
+  apparaît, et pourquoi elle n'apparaît pas), `setPresence` (une écriture atomique, seule la case
+  de la personne, plusieurs lignes, refus de Grist) et `explainWriteError`.
 - `tests/profile.test.mjs` — `rightsFor` (qui peut modifier quelle fiche, fermé par
   défaut, le droit d'administrateur seulement avec le mode admin allumé),
-  `profileFormModel` et `draftOf` (dont l'e-mail et l'établissement d'un administrateur),
+  `profileFormModel` et `draftOf` (dont l'e-mail et l'établissement d'un administrateur, l'e-mail
+  affiché `email_affiche` offert à tout le monde, et le formulaire d'une fiche en création :
+  `blankFiche`, l'établissement à choisir parmi les fondateurs et les partenaires, un nom et un
+  établissement réclamés une fois le formulaire commencé, jamais l'e-mail du compte, pas de
+  photo même avec une colonne `Avatar`),
   `diffProfile` (textes nettoyés et refusés, téléphone français, e-mail refusé s'il est mal
-  formé, trop long, vidé ou pris par une autre fiche, établissement jamais vidé ni inconnu,
+  formé, trop long, vidé ou pris par une autre fiche, adresse affichée facultative et dont seule
+  la forme est vérifiée, établissement jamais vidé ni inconnu,
   références, listes en ajouts et retraits, photo remplacée ou retirée), `rebaseChanges` (ramener
   les changements sur la fiche actuelle) et `describeChanges`. La photo n'est proposée que si `BDD`
   a une colonne `Avatar`.
@@ -77,7 +92,11 @@ Sans dépendance, un fichier de tests par module :
   défaut pour l'e-mail et l'établissement, refus de Grist, aucune adresse ni valeur dans la
   console ; pour une photo : envoi après les vérifications et avant l'écriture, nouvelle
   relecture après l'envoi, `Avatar` écrit dans la même action, fichier resté sans servir,
-  aucun envoi pour un retrait) et `unsavedLabels`.
+  aucun envoi pour un retrait), `prepareCreation` (la carte « Ma fiche » telle qu'elle apparaîtra,
+  rien d'écrit), `createProfile` (une seule action `AddRecord` sur `BDD` : l'adresse du compte en
+  minuscules, ce qui a été rempli et `Accepte_apparaitre` comme un choix, jamais `perimetre` ; rien
+  d'écrit quand une fiche porte déjà l'adresse, quand le brouillon est incomplet ou quand Grist
+  refuse) et `unsavedLabels` (aussi pour le choix d'apparaître d'une fiche créée).
 - `tests/preview.test.mjs` — `diffContacts`, `previewOf` et `withAvatarChange` : ce qui change
   entre la carte avant et la carte après, la photo comprise.
 - `tests/schema.test.mjs` — `readColumnTypes` (type des colonnes de `BDD`, repli).
@@ -101,6 +120,11 @@ Sans dépendance, un fichier de tests par module :
   jamais gardé, adresse refusée hors https, requête sans cookie ni adresse de page, délai,
   statuts 401, 403, 413 et autres, réponse illisible, ni jeton ni adresse dans la
   console, consigne de l'appelant (celle du logo, celle de la photo).
+- `tests/save-upload.test.mjs` — `uploadThenRecheck` (1.28.5), le temps commun à l'enregistrement d'un
+  profil et d'une fiche d'établissement quand un fichier est remplacé : l'envoi d'abord, la relecture
+  ensuite ; l'échec de l'envoi devient l'erreur de l'appelant (la phrase d'un `UploadError` telle
+  quelle, sinon une phrase de repli et la cause dans la console) ; l'identifiant du fichier resté dans
+  Grist quand la relecture refuse l'écriture. Sans navigateur.
 - `tests/image-prep.test.mjs` — `megabytes`, `checkImageFile`, `fitWithin`, `squareCrop` et les refus de
   `prepareImage` avant lecture : formats, poids et fichier vide refusés, plus grand côté ramené
   à 480 px au plus, SVG agrandi ; pour une photo, carré découpé au centre sans agrandir, 256 px au plus,
@@ -115,8 +139,9 @@ Sans dépendance, un fichier de tests par module :
   table `Financeurs`).
 - `tests/support/fake-grist.js` — le faux document Grist commun aux tests Node et
   au test navigateur : lectures, `applyUserActions` atomique (ajout, modification,
-  suppression), formules déclenchées de la sonde, pannes, écritures refusées (par
-  table ou par ligne).
+  suppression, `AddTable` et `RemoveTable` : l'identifiant d'une table déjà prise est
+  numéroté, comme le fait Grist), formules déclenchées de la sonde, pannes, écritures
+  refusées (par table ou par ligne).
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : serveur
   statique, Chromium, faux Grist injecté dans la page, console des pages relue sans
   qu'une lecture interrompue par la fermeture de la page fasse échouer le fichier.
@@ -130,6 +155,13 @@ Sans dépendance, un fichier de tests par module :
   fictifs que la démonstration), un compte des téléchargements et des jetons employés, et la
   réception des fichiers envoyés (logo d'un établissement, photo de profil) avec leurs refus, leur
   coupure et leur réponse sans en-têtes d'autorisation entre sites.
+- `tests/support/grist-rest-server.mjs` — un vrai serveur HTTP qui joue l'API REST de Grist pour l'envoi
+  d'un fichier, dans l'ordre des intergiciels de Grist (en-tête `X-Requested-With` exigé d'une requête qui
+  écrit avec un jeton, puis CORS) : Chromium y applique lui-même le partage de ressources entre sites
+  (`tests/e2e-upload-cors.test.mjs`).
+- `tests/support/task-role-tables.mjs` — le document du rôle dans une tâche (`withTaskRoles` : `Taches_role`
+  sur les lignes brutes, plusieurs lignes de même libellé corrigé), pour `tests/task-roles.test.mjs` et
+  `tests/e2e-task-roles.test.mjs`.
 - `tests/support/contrast.mjs` — le rapport de contraste WCAG (`contrastRatio`, `parseColor`) à
   partir des couleurs calculées par le navigateur, pour les tests d'accessibilité.
 - `tests/support/card-metrics.mjs` — la taille du texte et des cibles des cartes sur la page rendue
@@ -144,6 +176,9 @@ Sans dépendance, un fichier de tests par module :
   démonstration, phrases du guide utilisateur, schéma des imports, préfixes de la console et
   affirmations de la page de sécurité qui doivent suivre le code (méthodes de l'API Grist, une
   seule requête réseau et ses protections, aucun stockage). Sans navigateur.
+- `tests/license.test.mjs` — la licence : `LICENSE` est le texte officiel de la GNU GPL version 3
+  (empreinte vérifiée), le README la déclare et renvoie vers `LICENSE`, `SECURITY.md` dit où
+  signaler un problème sans issue publique ni adresse personnelle. Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
 `npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 75
@@ -152,11 +187,12 @@ scénarios dans un vrai navigateur sur les données de `tests/fixtures.mjs`
 par nom (même quand Grist envoie les lignes dans le désordre), interrupteurs
 Fondateurs/Partenaires (dont la liste du menu Établissement, qui les suit), recherche (« prénom nom » dans les deux sens, noms composés, tirets,
 apostrophe, œ), attente de la frappe (une seule mise à jour pour quatre lettres tapées d'un coup,
-champ vidé sans attendre, « Réinitialiser » qui annule l'attente), filtres et compteurs, menu Compétences rangé par
+champ vidé sans attendre, « Réinitialiser » qui annule l'attente), filtres et compteurs (dont le filtre Rôle PUI), menu Compétences rangé par
 domaine (case de domaine, détail replié, case partielle, recherche à deux niveaux,
 ouverture réordonnée, badge, accessibilité), texte HTML affiché
 sans injection, lien mailto, pannes de lecture (bandeau, cartes conservées), et le
-bandeau « Ma présence » (personne identifiée ou non, compte Lecteur, interrupteur,
+bandeau « Ma présence » (personne identifiée ou non, table-sonde absente puis créée par le
+widget, ou création refusée, compte Lecteur, interrupteur,
 double clic, focus gardé pendant et après l'écriture, réussite annoncée puis effacée,
 écriture refusée, personne sans fiche, qui voit alors une mention sans interrupteur), et le
 banc d'essai lui-même (une lecture de la console interrompue par la
@@ -173,12 +209,13 @@ carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numé
 et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
 les tâches par action.
 
-`tests/e2e-task-roles.test.mjs` y ajoute 4 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
+`tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
 (au-dessus, dans le cadre, refermée en la quittant), au clavier (Échap, cartes redessinées) et, sur un écran
-tactile émulé, le rôle sous le nom de la tâche sans bulle.
+tactile émulé, le rôle sous le nom de la tâche sans bulle ; une tâche qui s'appelle « constructor » s'écrit
+comme les autres, sans rôle ni erreur.
 
-`tests/e2e-profile.test.mjs` y ajoute 63 scénarios sur la modification d'une fiche : qui
+`tests/e2e-profile.test.mjs` y ajoute 68 scénarios sur la modification et la création d'une fiche : qui
 voit un bouton « Modifier » (personne ordinaire, administrateur avec ou sans mode admin,
 compte Lecteur, anonyme, adresse inconnue, doublon), le formulaire et ses refus, la
 relecture (carte avant et carte après, ce qui change repéré, rien d'écrit), l'écriture
@@ -190,9 +227,12 @@ texte, un refus de Grist, un changement concurrent, une fiche supprimée, le dou
 Échap, un prénom piégé, le focus, la tabulation dans la fenêtre, le bouton « Modifier »
 rangé sous la fonction, le bandeau « Ma présence » qui ne se chevauche à aucune largeur, dont le
 texte garde 200px de 320 à 840px (sept comptes, un mot sans coupure, le bloc des boutons vide caché)
-et l'affichage de 280 à 360px.
+et l'affichage de 280 à 360px. Cinq d'entre eux sont ceux de « Créer ma fiche » (une personne sans fiche
+remplit la fenêtre, relit une seule carte et publie : une seule ligne ajoutée à `BDD`, ni périmètre ni photo ;
+la case « Apparaître dans l'annuaire » décochée), de la liste déroulante des établissements (recherche en
+direct, flèches, Entrée, Échap, écran tactile) et de l'e-mail affiché (`email_affiche`).
 
-`tests/e2e-etablissement.test.mjs` y ajoute 49 scénarios sur la fiche d'un établissement :
+`tests/e2e-etablissement.test.mjs` y ajoute 50 scénarios sur la fiche d'un établissement :
 qui voit « ✎ Modifier » sous un logo et « Mon établissement » (responsable, administrateur non
 responsable, compte Lecteur, anonyme, plusieurs établissements, établissement masqué, bouton forcé à
 la main), le contenu de
@@ -230,25 +270,48 @@ tactile émulé), taille du texte des cartes (12px au moins à toute largeur, so
 mise en page de référence à partir de 1400px. Les barres de défilement y sont
 visibles (15px de moins), le cas le plus serré.
 
-`tests/branding-e2e.test.mjs` y ajoute 29 scénarios sur l'habillage, avec des logos servis par
+`tests/branding-e2e.test.mjs` y ajoute 35 scénarios sur l'habillage, avec des logos servis par
 `tests/support/fake-attachments.mjs` : logo seul sur les cartes, pastille texte quand il manque,
-clic et clavier, jeton demandé une seule fois et en lecture seule, financeurs, bandeau des
-fondateurs dans l'ordre, rond « France 2030 », jeton refusé ou méthode absente, fichier
-supprimé ou illisible, aucune trace du jeton dans la console, relecture d'une fiche.
-`tests/branding-layout.test.mjs` y ajoute 13 scénarios sur la mise en page de l'habillage, de
-320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case,
-bandeau du bas qui se replie, rien qui dépasse du cadre.
-`tests/accessibility.test.mjs` y ajoute 9 scénarios (et 5 tests sans navigateur : les rapports de
+clic et clavier, jeton demandé une seule fois et en lecture seule, financeurs (deux images fixes : une
+table `Financeurs` restée dans le document ne change rien), bandeau des fondateurs dans l'ordre, rond
+« France 2030 », jeton refusé ou méthode absente, fichier supprimé ou illisible, lecture des pixels sur une
+adresse à part qui ne décide jamais de l'affichage (un Grist qui refuse CORS ou ne répond pas laisse les
+logos s'afficher), console qui dit la version et ce que Grist donne des logos, avec le remède quand il les
+refuse (1.28.2), aucune trace du jeton dans la console, relecture d'une fiche.
+`tests/branding-layout.test.mjs` y ajoute 19 scénarios sur la mise en page de l'habillage, de
+320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case et à la même
+surface visuelle (marges transparentes retirées), rôle PUI à droite de la ligne de l'e-mail, bandeau du
+bas qui se replie, rien qui dépasse du cadre.
+
+`tests/logos-preload-e2e.test.mjs` y ajoute 8 scénarios sur le chargement des logos, avec un Grist
+capricieux servi par `tests/support/fake-attachments.mjs` (réponses retenues puis libérées, première demande
+annulée ou sans réponse) : l'annuaire redessiné pendant que Grist tarde ne retire aucune image de logo en
+cours de chargement et chaque logo n'est demandé qu'une fois (1.28.1), un logo dont la première demande est
+perdue s'affiche quand même, une image muette laisse la place au sigle après huit secondes, un fichier
+supprimé n'est pas redemandé sans fin, la ligne `[LOGOS] Bilan` de la console (information, ou
+avertissement qui compte les refus) et la version écrite en bas de la page.
+
+`tests/e2e-upload-cors.test.mjs` y ajoute 2 scénarios sur l'envoi d'une photo à un vrai serveur HTTP d'une
+autre origine (`tests/support/grist-rest-server.mjs`), dans l'ordre des intergiciels de Grist et avec le CORS
+que Chromium applique lui-même : l'envoi aboutit avec l'en-tête `X-Requested-With` (1.21.5) ; sans lui, la même
+requête échoue comme la panne signalée le 13 octobre 2026 (401 sans en-têtes CORS, donc une simple panne de
+réseau pour la page).
+`tests/accessibility.test.mjs` y ajoute 11 scénarios (et 8 tests sans navigateur : les rapports de
 contraste de référence, une garde sur les feuilles de style qui refuse tout `outline: 0` ou
 `outline: none` non justifié, le contraste de chaque couleur de catégorie et du lien e-mail, et celui de la
-piste et du curseur de l'interrupteur de présence) sur le clavier, le lecteur d'écran et les couleurs : le
+piste et du curseur de l'interrupteur de présence, et la case à cocher dessinée par la feuille de style :
+thème clair imposé, fond blanc, bordure à 3:1, le gris des textes secondaires à 4,5:1 sur chacun des fonds clairs où
+il se pose, et une garde sur `index.html` : aucun `aria-label` sur un élément sans rôle) sur le clavier, le lecteur d'écran et les couleurs : le
 champ de recherche nommé par son rôle, aucun contrôle sans nom dans l'arbre d'accessibilité (page au repos,
 menu ouvert), le parcours complet à la tabulation (page, puis menu ouvert) où chaque arrêt change de capture
 avec et sans focus, avec un anneau plein de 2 px au moins et de 3:1 au moins, les pastilles, les titres de
 groupe et le lien e-mail d'une carte mesurés sur la page rendue (4,5:1 au moins), la piste et le curseur
 de l'interrupteur (3:1 au moins, en contraste forcé et sans transition quand on réduit les animations), et,
 sur la carte de la personne connectée, « Votre fiche » et les boutons « Modifier » (le sien et celui de son
-établissement) à 12px, ces boutons à 24px de haut et le lien e-mail à l'écart d'eux.
+établissement) à 12px, ces boutons à 24px de haut et le lien e-mail à l'écart d'eux. Sur la page rendue, une case de filtre
+vide reste blanche à bordure visible même avec le thème sombre du téléphone et prend le violet une fois
+cochée, et ce qu'on tape dans la recherche (comme son texte d'invite) reste lisible quand le navigateur
+passe en sombre (Firefox mobile, 1.21.2 et 1.21.3).
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -256,7 +319,10 @@ Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 Grist). Le test garantit que le vrai
 `main.js`/`render.js` réagissent correctement à ces encodages et à ces pannes ;
 il ne garantit pas que Grist envoie toujours ces formes — d'où le protocole
-manuel ci-dessous, à jouer dans un vrai document avant déploiement.
+manuel ci-dessous, à jouer dans un vrai document avant déploiement. Ce que Grist accepte d'écrire ou de
+lire ne l'est pas davantage : la ligne d'une fiche créée par une personne ordinaire et la table-sonde que
+crée le widget (sections 11 et 19), la colonne `Taches_role` (section 20), l'envoi d'un logo ou d'une
+photo (sections 17 et 18) et l'affichage des logos (section 14).
 
 Si vous ajoutez une fonction à `grist-data.js` ou `filters.js` : ajoutez son
 test dans le fichier de `tests/` qui correspond à son rôle (liste ci-dessus).
@@ -348,6 +414,14 @@ Instances, Établissement, Rôle PUI) :
       options correspondantes restent visibles dans la liste ; ça ne coche
       ni ne décoche rien.
 - [ ] Cliquer en dehors du menu → il se ferme.
+
+Spécifique **Établissement** (1.27.3) :
+
+- [ ] Le menu ne liste que les établissements validés (`ok_pour_apparaitre`), fondateurs ou partenaires, dont
+      l'interrupteur est allumé : par défaut les fondateurs seuls ; allumer Partenaires ajoute les
+      partenaires, éteindre Fondateurs retire les fondateurs. Un établissement « autres » ou non validé n'y
+      figure jamais. Une coche dont l'option disparaît (on éteint l'interrupteur) est retirée, et la grille
+      suit.
 
 Spécifique **Compétences** (et toutes les catégories issues d'une table de
 référence) :
@@ -569,12 +643,15 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 
 ## 11. Ma présence (1.11.0)
 
-Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde`, case
-`admin`). À jouer sur une **copie** du document, console du navigateur ouverte.
+Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde`, que le widget crée
+lui-même depuis la 1.20.0 quand elle manque, case `admin`). À jouer sur une **copie** du document,
+console du navigateur ouverte.
 
-- [ ] Sans la table `Annuaire_Sonde` : aucun bandeau « Ma présence », l'annuaire
-      s'affiche comme avant, la console dit `[IDENTITE] table « Annuaire_Sonde »
-      introuvable`.
+- [ ] Sans la table `Annuaire_Sonde` : depuis la 1.20.0, le widget la crée lui-même quand le compte qui
+      l'ouvre peut modifier la structure du document (section 19, « La table-sonde créée par le widget »).
+      Si Grist le refuse à ce compte : aucun bandeau « Ma présence », l'annuaire s'affiche comme avant,
+      la console dit `[IDENTITE] table « Annuaire_Sonde » introuvable, et Grist n'a pas permis de la créer :
+      … (voir GRIST_SETUP.md)`, et rien n'est écrit.
 - [ ] Avec la table, un compte qui peut modifier le document et dont l'adresse est
       dans `BDD.email` : le bandeau apparaît à droite de l'en-tête avec son nom et
       sa situation ; la console dit `[IDENTITE] personne identifiée (administrateur :
@@ -593,9 +670,16 @@ Réglages d'abord : `GRIST_SETUP.md` (colonne de données, table `Annuaire_Sonde
       bouton « Modifier » sont là, la table reste vide. Depuis la console d'un compte ordinaire,
       modifier une ligne d'`Annuaire_Sonde` (en créer une, puis changer son `Email`) est refusé, et lire
       la ligne d'un autre compte ne renvoie rien.
+- [ ] **La ligne de la sonde est supprimée avant que le bandeau s'affiche (1.21.7).** Les deux règles
+      posées : la table est déjà vide quand le bandeau apparaît. Retirer à ce compte le droit de
+      **supprimer** (règle 1) puis recharger : la personne est identifiée quand même, la console dit
+      `[IDENTITE] la ligne N de Annuaire_Sonde n'a pas pu être supprimée : …` avec la raison de Grist
+      (jamais une adresse) et la table garde la ligne. Remettre le droit puis recharger : la ligne laissée
+      plus tôt à l'adresse de ce compte est supprimée aussi (`ancienne(s) ligne(s) … supprimées`), jamais
+      celle d'un autre compte.
 - [ ] Compte connecté dont l'adresse n'est pas dans `BDD` : un bandeau « Compte
-      absent de l'annuaire » sans interrupteur ; la console l'explique sans citer
-      d'adresse.
+      absent de l'annuaire » sans interrupteur, avec un seul bouton « Créer ma fiche » (section 19) ;
+      la console l'explique sans citer d'adresse.
 - [ ] Règle d'accès qui refuse la modification de `BDD` pour ce compte : l'interrupteur
       affiche « Grist a refusé la modification… » et reste dans son état réel.
 - [ ] Deux comptes dans deux navigateurs, widgets ouverts en même temps : chacun voit
@@ -661,9 +745,10 @@ l'e-mail et de l'établissement sont à la section 16.
       avec la mention « Votre fiche », et « Modifier mon profil » dans le bandeau. Aucune
       autre carte n'a de bouton, et il n'y a pas de bouton « Mode admin ».
 - [ ] Administrateur, mode admin éteint : exactement comme une personne ordinaire.
-- [ ] Compte Lecteur, document sans `Annuaire_Sonde` : ni bandeau ni bouton. Compte dont
-      l'adresse ne figure pas dans `BDD` : un bandeau « Compte absent de l'annuaire » sans
-      interrupteur de présence ni bouton « Modifier ».
+- [ ] Compte Lecteur, ou document dont la table `Annuaire_Sonde` manque et que le widget ne peut pas créer
+      (section 19) : ni bandeau ni bouton. Compte dont l'adresse ne figure pas dans `BDD` : un bandeau
+      « Compte absent de l'annuaire » sans interrupteur de présence ni bouton « Modifier », mais avec le
+      bouton « Créer ma fiche » (section 19).
 - [ ] Ouvrir sa fiche : un bloc d'identité (initiales, nom, e-mail, et à droite le logo de
       l'établissement, ou sa pastille s'il n'a pas de logo) et la
       phrase « Verrouillé : l’e-mail et l’établissement sont liés à votre compte… » ; les
@@ -858,7 +943,8 @@ sur une copie du document.
       bouton « Mode admin », sans interrupteur de présence.
 - [ ] Modifier la fiche d'une autre personne : le titre est « Modifier la fiche de … », une
       phrase rappelle le mode admin, et les champs **E-mail** et **Établissement** sont
-      modifiables (l'établissement parmi les noms complets). Sur sa propre fiche ils restent
+      modifiables (l'établissement dans une liste déroulante à recherche, par son sigle, parmi les
+      fondateurs et les partenaires). Sur sa propre fiche ils restent
       verrouillés.
 - [ ] Changer l'e-mail pour une adresse que porte une autre fiche : « Cette adresse est déjà
       utilisée par … » (le nom si cette personne est visible dans l'annuaire, « une autre
@@ -1022,7 +1108,8 @@ l'onglet Réseau.
 **Sans la colonne**
 
 - [ ] Document **sans** colonne `Avatar` : les cartes montrent les initiales, le formulaire « Modifier mon profil »
-      n'a pas de carte « Photo de profil », aucune erreur ni ligne `[LOGOS]` dans la console.
+      n'a pas de carte « Photo de profil », aucune erreur ni avertissement `[LOGOS]` dans la console (les
+      lignes d'information `Version …` et `Bilan : …` y sont normales).
 
 **Affichage** (colonne ajoutée)
 
@@ -1030,7 +1117,7 @@ l'onglet Réseau.
       recharger le widget : leurs cartes montrent la photo **à la place des initiales** (dans un rond) ; les autres
       cartes gardent leurs initiales. Onglet Réseau : une demande par photo, à une adresse de la forme
       `…/attachments/<numéro>/download?auth=…`, réponse 200 de type image ; les photos de cartes hors écran ne sont
-      demandées qu'à l'approche (défilement). Aucune ligne `[LOGOS]` dans la console.
+      demandées qu'à l'approche (défilement). Aucun avertissement `[LOGOS]` dans la console.
 - [ ] Un clic sur la photo d'une carte l'**agrandit**, avec le nom, la fonction et l'établissement en légende. La croix,
       un clic sur la photo ou à côté, et Échap la ferment ; le focus revient sur la photo de la carte.
 - [ ] Avec le compte de l'une de ces personnes : sa photo remplace ses initiales dans le bandeau « Ma présence » et
@@ -1109,3 +1196,187 @@ l'onglet Réseau.
       des boutons sur un cadre étroit), la photo agrandie tient dans l'écran, rien ne dépasse.
 - [ ] Comparaison à la maquette v5 : ouvrir la maquette (écrans de la photo de profil) et le widget côte à côte à la
       même largeur (1280 px, puis 390 px). Les écarts voulus sont dans le CHANGELOG (1.19.0).
+
+## 19. Créer ma fiche, e-mail affiché et table-sonde (1.18.0, 1.20.0)
+
+Réglages d'abord : `GRIST_SETUP.md`, étape 1 (la colonne `email_affiche`, facultative, et les colonnes que le
+widget écrit : des colonnes de données), étape 2 (la table `Annuaire_Sonde`, que le widget crée au besoin) et
+étape 4 (la règle d'accès qui laisse une personne **ajouter** à `BDD` la ligne qui porte son adresse). À jouer sur
+une **copie** du document, avec la console et l'onglet Réseau du navigateur ouverts (F12), avec :
+
+- un compte **ordinaire** (ni administrateur ni responsable d'établissement) dont l'adresse ne figure dans
+  **aucune** fiche de `BDD` ;
+- un compte **administrateur** (case `admin` d'`ACL`) sans fiche dans `BDD` ;
+- un compte ordinaire **avec** une fiche et un compte **Lecteur** ;
+- un compte **propriétaire** du document, pour la table-sonde.
+
+**Ce protocole est le seul contrôle de la création d'une fiche par une personne ordinaire et de la création de la
+table-sonde par le widget : les tests automatiques simulent la réponse de Grist.** Quatre points ne peuvent être
+constatés que dans un vrai document : (1) que la règle d'accès de l'étape 4 laisse une personne ordinaire
+**ajouter** à `BDD` la ligne qui porte son adresse (`newRec.email == user.Email`), et seulement celle-là, (2) qu'elle
+laisse aussi écrire `email_affiche`, (3) que Grist **accepte** l'`AddTable` du widget (colonnes de données à formule
+de déclenchement) pour le compte qui ouvre l'annuaire le premier, et que ces formules se calculent bien à la création
+d'une ligne, (4) que l'adresse que le widget écrit **en minuscules** est celle que la règle attend. Si l'un échoue,
+relever le message du widget, la ligne de la console, la requête et son code de réponse dans l'onglet Réseau.
+
+**Entrée et droits**
+
+- [ ] Compte ordinaire sans fiche : le bandeau « Ma présence » est intitulé « Compte absent de l'annuaire » et porte
+      **seulement** un bouton « Créer ma fiche » (ni interrupteur de présence, ni « Modifier mon profil »). La
+      console dit `[IDENTITE] Aucune ligne de BDD ne porte l'adresse de la personne connectée…`, sans aucune
+      adresse. Administrateur sans fiche : « Administrateur », avec « Mode admin » et « Créer ma fiche ».
+- [ ] Une personne qui a déjà une fiche, un compte Lecteur et un compte que l'annuaire ne reconnaît pas : pas de
+      bouton « Créer ma fiche ». `BDD` sans colonne `email` : pas de bouton, le bandeau dit « Fiche introuvable » et
+      la console `BDD n'a pas de colonne « email »…`.
+
+**La fenêtre**
+
+- [ ] « Créer ma fiche » ouvre la fenêtre « Créer ma fiche » (la même que « Modifier mon profil ») : « Vous relisez
+      votre fiche avant de la publier : elle est ajoutée tout de suite, sans validation. » ; l'**adresse du compte**
+      dans le bloc d'identité, sans champ pour la saisir, avec « L’adresse e-mail est celle de votre compte. Une fois
+      la fiche créée, seul un administrateur peut changer l’établissement. » ; le pied dit « Aucun champ rempli »
+      et « Relire ma fiche » est grisé. **Rien** n'est écrit à l'ouverture (onglet Réseau, `BDD`).
+- [ ] **Établissement** : une liste déroulante (« Choisir… » tant que rien n'est choisi) qui propose les
+      établissements **fondateurs et partenaires** par leur sigle, jamais une structure « autres » ; sa recherche,
+      en haut du panneau, ne garde en direct que ce qui répond. Au clavier, Entrée ou ↓ l'ouvre, ↓ et ↑ parcourent,
+      Entrée choisit, Échap ne ferme que le panneau (pas la fenêtre). Sur un téléphone, le panneau s'ouvre sans
+      ouvrir le clavier et chaque valeur se touche sans viser.
+- [ ] Pas de carte « Photo de profil », même quand `BDD` a une colonne `Avatar` : la photo s'ajoute ensuite, depuis
+      « Modifier mon profil » (section 18).
+- [ ] La case **« Apparaître dans l’annuaire »** est cochée d'avance, avec sa phrase (« Décochée, votre fiche est
+      créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page. ») ; elle ne compte pas
+      parmi les champs remplis.
+- [ ] Un formulaire que personne n'a commencé ne réclame rien. Dès qu'un champ est rempli, le pied dit « Indiquez au
+      moins un prénom ou un nom » puis « Choisissez votre établissement » (aussi sous le champ), et « Relire ma
+      fiche » reste grisé jusqu'à ce que les deux soient réglés.
+
+**E-mail affiché** (colonne `email_affiche`)
+
+- [ ] **Sans** la colonne : ni « Créer ma fiche » ni « Modifier mon profil » n'ont le champ « E-mail affiché », la carte
+      montre `email`. **Avec** : le champ est entre la fonction et le téléphone, pour tout le monde (aussi pour un
+      administrateur qui modifie la fiche d'une autre personne), avec sa phrase « Facultatif : l’adresse montrée sur
+      la carte. Laissée vide, la carte montre l’adresse du compte. »
+- [ ] Remplir « E-mail affiché » (par exemple `Contact@Etablissement.example`) puis valider : la relecture repère le
+      changement d'adresse ; dans Grist, **seule** la colonne `email_affiche` a changé, **en minuscules** ; la carte
+      et son lien `mailto:` montrent cette adresse ; `email` (l'identité) est intact ; la personne garde « Votre
+      fiche » et « Modifier » (l'annuaire la reconnaît toujours par l'adresse de son compte).
+- [ ] Vider le champ puis valider : `email_affiche` est vide dans Grist, la carte revient à l'adresse du compte.
+- [ ] Une adresse mal formée, qui commence par `=`, `+`, `-` ou `@`, de plus de 200 caractères ou sur plusieurs
+      lignes : refusée sous le champ, « Corrigez l’adresse e-mail » au pied, « Relire » grisé. Une adresse que montre
+      déjà une autre fiche : acceptée.
+- [ ] Règles d'accès : un compte ordinaire ne peut pas écrire `email_affiche` sur la fiche d'un autre (console,
+      contexte de l'iframe du widget). Si la règle ne l'autorise pas sur **sa** fiche, « Grist a refusé la
+      modification… » et rien n'est écrit.
+
+**Relire et publier**
+
+- [ ] « Relire ma fiche » : « Relire avant de publier », **une seule carte** (« Ma fiche », telle qu'elle apparaîtra,
+      sans carte « Avant »), puis « Ce qui sera enregistré » ; aucun avis quand rien ne retient la fiche. Avec la
+      case décochée, le titre est « Relire avant de créer » et l'avis dit « Votre fiche est masquée de l’annuaire :
+      vous n’avez pas accepté d’apparaître… » ; avec un établissement qui n'a pas validé sa présence, « Votre
+      établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire. ». « Retour » garde les
+      saisies et le choix de la case ; « Annuler » n'écrit rien.
+- [ ] **« Publier ma fiche »** (case cochée) : dans Grist, **une seule ligne ajoutée** à `BDD` (un seul « Annuler » de
+      Grist la retire) : `email` = l'adresse du compte **en minuscules**, `Etablissement` = le choix,
+      `Accepte_apparaitre` coché, et les champs remplis ; ni `perimetre` ni `Avatar`, et aucune autre table touchée.
+      La fenêtre se ferme, le message « Votre fiche est publiée : elle apparaît dans l’annuaire. » s'affiche, la carte
+      arrive dans la grille **sans recharger la page** (établissement validé, fondateur ou partenaire), le bandeau
+      montre l'interrupteur (allumé) et « Modifier mon profil », il n'y a plus de bouton « Créer ma fiche » et le
+      focus revient sur « Modifier mon profil ».
+- [ ] Case **décochée** : le dernier bouton est « Créer ma fiche » ; la ligne est écrite avec `Accepte_apparaitre`
+      **décoché** ; le message dit « Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur
+      « Apparaître dans l'annuaire ». », aucune carte, l'interrupteur du bandeau reste éteint ; l'allumer fait
+      apparaître la carte.
+- [ ] Établissement qui n'a pas validé sa présence (`ok_pour_apparaitre` faux) : la ligne est créée ; le message
+      « Votre fiche est publiée, mais elle reste masquée de l’annuaire … Contactez un administrateur. » dit
+      pourquoi ; la carte apparaît quand l'établissement valide (recharger le widget).
+
+**Refus, conflits, pannes**
+
+- [ ] **Sans la règle d'ajout sur `BDD`** (étape 4), ou avec une règle qui l'interdit à ce compte : « Grist a refusé la
+      création : vos droits ne permettent pas d'ajouter une fiche. Contactez un administrateur. » en haut de la fenêtre,
+      qui reste ouverte avec le brouillon ; **rien** n'est écrit. La règle posée, « Publier ma fiche » réussit sans
+      refaire la saisie. Depuis la console (contexte de l'iframe du widget), ajouter une ligne qui porte l'adresse
+      d'une **autre** personne, `grist.docApi.applyUserActions([['AddRecord', 'BDD', null, {email: '<autre adresse>'}]])`,
+      est refusé ; celle qui porte la sienne est acceptée.
+- [ ] Si l'adresse de votre compte Grist s'écrit avec des majuscules : **noter** si la règle accepte quand même la
+      création (le widget écrit `email` en minuscules ; la condition `rec.email == user.Email` ne les ignore pas,
+      `GRIST_SETUP.md`, étape 4).
+- [ ] Deux onglets : ouvrir la fenêtre dans l'un, créer la fiche dans l'autre, puis valider le premier : « Une fiche
+      porte déjà votre adresse : rien n'a été créé. Rechargez la page pour la retrouver. » ; `BDD` ne porte qu'**une**
+      ligne à cette adresse ; une fois la page rechargée, « Modifier mon profil » ouvre cette fiche.
+- [ ] Une colonne de la fiche que Grist ne garde pas (colonne qui recalcule la valeur) : la fiche est créée, la
+      fenêtre reste ouverte sur « Fiche créée » (« Votre fiche est dans l’annuaire Grist. ») avec la réserve et la liste
+      « Ce qui a été enregistré » ; « Fermer » la ferme, sans message de confirmation.
+- [ ] Échap avec des saisies : un premier appui avertit, un second ferme sans rien écrire ; pendant l'envoi, Échap ne
+      ferme pas. Double clic sur « Publier ma fiche » : **une** ligne.
+- [ ] Console : aucune adresse ni valeur de la fiche dans les lignes écrites par le widget ; un échec écrit
+      `[PROFIL] création impossible : …` (ou `[PROFIL] lecture de BDD impossible : …`).
+
+**Après la création**
+
+- [ ] « Modifier mon profil » ouvre la fiche créée : l'adresse et l'établissement sont verrouillés, la carte « Photo de
+      profil » est là si `Avatar` existe, et l'interrupteur « Ma présence » décoche puis recoche `Accepte_apparaitre`.
+- [ ] Un administrateur, mode admin allumé, peut changer l'établissement de la fiche créée (même liste déroulante à
+      recherche, sigles des fondateurs et des partenaires).
+
+**La table-sonde créée par le widget** (1.20.0 ; avec un compte propriétaire, la table `Annuaire_Sonde` supprimée de la
+copie, ainsi que ses deux règles d'accès, à reposer à la fin)
+
+- [ ] Au premier chargement, le widget crée la table : la console dit `[IDENTITE] table « Annuaire_Sonde » absente :
+      créée (GRIST_SETUP.md, étape 2).` puis `[IDENTITE] personne identifiée (…)`. Dans les données brutes, la table a
+      trois colonnes, `Email` (Texte), `Admin` (Case à cocher) et `Responsable_de` (Texte), des colonnes de **données**
+      dont la **formule de déclenchement** (`user.Email`, puis la recherche dans `ACL`) ne s'applique qu'aux nouveaux
+      enregistrements ; elle est vide et le bandeau « Ma présence » est là. **Noter** ce que Grist en fait (le panneau
+      « Colonne » de chaque colonne, la valeur d'`Email` d'une ligne ajoutée à la main) : c'est ce que les tests ne
+      peuvent pas dire.
+- [ ] Recharger, puis rouvrir avec un autre compte : plus de création (la console ne dit plus « créée »), aucune table
+      `Annuaire_Sonde2`, colonnes et formules **intactes** (changer une formule puis recharger : elle est respectée).
+- [ ] Table absente et compte qui ne peut pas modifier la structure du document (règle d'accès, ou « Voir en tant que »
+      un compte à qui elle est refusée) : la console dit `[IDENTITE] table « Annuaire_Sonde » introuvable, et Grist n'a
+      pas permis de la créer : … (voir GRIST_SETUP.md)`, aucun bandeau, l'annuaire s'affiche comme avant, rien n'est
+      écrit. Un compte Lecteur n'essaie rien.
+- [ ] Deux comptes qui ouvrent l'annuaire au même instant sur un document sans la table (à défaut, plusieurs ouvertures
+      de suite) : il ne reste qu'**une** table `Annuaire_Sonde`, jamais de `Annuaire_Sonde2` ; la console du second dit
+      « déjà créée par une autre personne ».
+- [ ] Reposer ensuite les **deux règles d'accès** de la sonde (`GRIST_SETUP.md`, étape 4) et rejouer les points de la
+      section 11.
+
+**Clavier, lecteur d'écran, mise en page**
+
+- [ ] Tout se fait au clavier : « Créer ma fiche », les champs, la liste déroulante, la case, « Relire ma fiche »,
+      « Publier ma fiche ». Un anneau de focus visible à chaque arrêt ; à la fermeture, le focus revient sur « Modifier
+      mon profil » (le bouton « Créer ma fiche » a disparu).
+- [ ] Lecteur d'écran (au moins une fois) : la case est lue « Apparaître dans l’annuaire » puis sa phrase, la liste
+      déroulante est annoncée par son nom, « Choisissez votre établissement. » est lu avec son champ, le message de fin
+      est annoncé une seule fois.
+- [ ] En réduisant la section du widget de 1280 à 320 px : la fenêtre tient dans l'écran, la liste déroulante s'ouvre
+      sans dépasser, la case reste visible, le bouton « Créer ma fiche » du bandeau ne chevauche rien, rien ne déborde.
+- [ ] Comparaison à la maquette v5 : ouvrir la maquette et le widget côte à côte à la même largeur (1280 px, puis
+      390 px). Les écarts voulus sont dans le CHANGELOG (1.18.0, 1.25.0 et 1.28.0).
+
+## 20. Rôle dans une tâche (1.26.0)
+
+Réglages d'abord : aucun, si la table `Taches` a sa colonne `Taches_role` (facultative : sans elle, aucun rôle ne
+s'affiche et rien n'est signalé). À jouer sur une **copie** du document, avec un compte dont les cartes portent des
+tâches. **Ce protocole est le seul contrôle de la lecture de `Taches_role` dans un vrai Grist : les tests
+automatiques simulent `fetchTable`.** Le rôle se retrouve par les identifiants de lignes que Grist envoie pour
+`BDD.Taches` (une liste `['L', 12, 15]`) ; si Grist les envoyait déjà résolus en texte, aucun rôle ne s'afficherait
+(comportement prévu, mais à constater ici).
+
+- [ ] **Les lignes brutes, pas le libellé corrigé.** Deux lignes brutes de `Taches` ont le même libellé corrigé (donc une
+      seule étiquette sur les cartes) et des `Taches_role` différents (« Pilote », « Contributeur »). Une personne qui
+      les porte toutes les deux voit l'étiquette dire les deux (« Rôles : Pilote, Contributeur »), sans doublon ;
+      une autre personne qui n'a que l'une de ces lignes ne voit que **son** rôle, jamais celui d'une ligne voisine qui
+      partage l'étiquette.
+- [ ] Souris : survoler l'étiquette d'une tâche qui a un rôle ouvre une bulle « Rôle : Pilote » au-dessus de
+      l'étiquette, entière dans le cadre ; la quitter la ferme ; un clic sur l'étiquette filtre toujours sur la tâche.
+- [ ] Clavier : Tab jusqu'à l'étiquette ouvre la même bulle ; Échap la ferme (sans fermer autre chose). Lecteur
+      d'écran (au moins une fois) : le rôle est lu avec la tâche.
+- [ ] Téléphone (écran tactile, ou émulation) : pas de bulle ; le rôle est écrit sous le nom de la tâche, dans
+      l'étiquette.
+- [ ] Rôle vide, colonne `Taches_role` renommée ou absente, ligne sans libellé corrigé (jamais affichée) : l'étiquette
+      est inchangée, ni bulle ni message, et la console ne dit rien.
+- [ ] La carte « Après » de la relecture d'une modification de fiche ne montre pas le rôle (il ne s'y modifie pas) ;
+      enregistrer une fiche ne change aucune ligne de `Taches` : `Taches_role` est intact dans Grist.
+- [ ] Changer un rôle dans Grist : recharger le widget pour le voir.

@@ -29,7 +29,12 @@
 //                                            visibilité, responsables) s'enregistre en mémoire ; un
 //                                            nouveau logo est reçu par ce serveur (POST sur
 //                                            /__pieces-jointes/attachments) et servi ensuite comme les autres
-//   ?photos                                  ajoute la colonne Avatar (pièces jointes) à BDD et donne une
+//   http://127.0.0.1:8080/?connecte=nouvelle.personne@exemple.example
+//                                            une adresse qui ne figure dans aucune fiche : le bandeau dit
+//                                            « Compte absent de l'annuaire » et propose « Créer ma fiche »
+//                                            (choix de l'établissement, relecture, « Publier ma fiche ») : la
+//                                            fiche est ajoutée en mémoire et sa carte apparaît tout de suite
+//   ?photos                                ajoute la colonne Avatar (pièces jointes) à BDD et donne une
 //                                            photo de profil à six personnes : sur leurs cartes, la
 //                                            photo remplace les initiales et s'agrandit au clic. Dans
 //                                            « ✎ Modifier mon profil », la carte « Photo de profil »
