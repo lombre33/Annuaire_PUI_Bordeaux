@@ -1256,7 +1256,7 @@ relever le message du widget, la ligne de la console, la requête et son code de
       montre `email`. **Avec** : le champ est entre la fonction et le téléphone, pour tout le monde (aussi pour un
       administrateur qui modifie la fiche d'une autre personne), avec sa phrase « Facultatif : l’adresse montrée sur
       la carte. Laissée vide, la carte montre l’adresse du compte. »
-- [ ] Remplir « E-mail affiché » (par exemple `Contact@Etablissement.fr`) puis valider : la relecture repère le
+- [ ] Remplir « E-mail affiché » (par exemple `Contact@Etablissement.example`) puis valider : la relecture repère le
       changement d'adresse ; dans Grist, **seule** la colonne `email_affiche` a changé, **en minuscules** ; la carte
       et son lien `mailto:` montrent cette adresse ; `email` (l'identité) est intact ; la personne garde « Votre
       fiche » et « Modifier » (l'annuaire la reconnaît toujours par l'adresse de son compte).
