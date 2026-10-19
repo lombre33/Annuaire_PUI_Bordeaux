@@ -141,3 +141,22 @@ test('le menu Établissement propose un établissement exactement quand ses cont
   });
   assert.equal(contacts.length, 3, 'des huit statuts, trois peuvent s\'afficher (validé et fondateur ou partenaire)');
 });
+
+test('etablissementFlags never takes a property of Object for the flags of an establishment', () => {
+  const rows = tableToRows({
+    id: [1, 2],
+    acronyme: ['__proto__', 'CHU'],
+    nom_complet: ['Établissement au nom étrange', 'CHU de Bordeaux'],
+    fondateur: [true, true],
+    partenaire: [false, false],
+    autres: [false, false],
+    ok_pour_apparaitre: [true, true]
+  });
+  const flags = etablissementFlagsFromRows(rows);
+  assert.deepEqual(etablissementFlags({ Etablissement: '__proto__' }, flags), { fondateur: true, partenaire: false, ok_pour_apparaitre: true },
+    'un libellé « __proto__ » est un libellé comme un autre');
+  assert.equal(etablissementFlags({ Etablissement: 'constructor' }, flags), null, 'aucune ligne ne porte ce libellé');
+  assert.equal(etablissementFlags({ Etablissement: 'toString' }, flags), null);
+  assert.equal(Object.getPrototypeOf(flags.byLabel), Object.prototype, 'un objet ordinaire, comme avant');
+  assert.equal(flags.byLabel.CHU.fondateur, true);
+});

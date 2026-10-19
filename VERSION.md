@@ -1,4 +1,4 @@
-# Version 1.28.2 — Logos : la console dit pourquoi Grist les refuse (règles d'accès) et comment y remédier, la documentation aussi (voir CHANGELOG.md)
+# Version 1.28.3 — Audit exhaustif, lot 1 : un libellé « constructor » ne casse plus rien, le gris des textes secondaires passe 4,5:1, le groupe de filtres a un rôle (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en

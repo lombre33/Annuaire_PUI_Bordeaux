@@ -114,3 +114,15 @@ test('sur un écran tactile, sans survol, le rôle s\'écrit sous le nom de la t
     assert.equal(await tip(page).isHidden(), true);
     assert.equal(await taskOf(page, 'Gina').locator('.tag-note').count(), 0);
   }));
+
+test('une tâche qui porte le nom d\'une propriété d\'objet (« constructor ») s\'écrit comme les autres, sans rôle ni erreur', { skip }, () => {
+  const copy = tables();
+  copy.Taches.Taches_corrige[3] = 'constructor'; // la tâche de Gina, qui n\'a pas de rôle
+  return withWidget({ tables: copy }, async ({ page, logs }) => {
+    await waitForCards(page, 4);
+    assert.equal(await taskOf(page, 'Gina').textContent(), 'constructor');
+    assert.equal(await taskOf(page, 'Gina').locator('.tag-note').count(), 0, 'pas de rôle : pas de note');
+    assert.equal(await taskOf(page, 'Ana').locator('.tag-note').textContent(), 'Rôle : Pilote', 'les autres cartes gardent leur rôle');
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  });
+});
