@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { EtablissementSaveError, readEtablissement, saveEtablissement, savePlanOf } from '../etablissement-save.js';
 import { KEEP_ONE, diffEtablissement, draftOfEtablissement, nominate, toggleResponsable } from '../etablissement.js';
 import { createFakeGrist } from './support/fake-grist.js';
+import { logged, quiet } from './support/logs.mjs';
 import { sampleTables, withBranding, withIdentity, ADMIN_EMAIL, ANA_EMAIL, BOB_EMAIL } from './fixtures.mjs';
 
 // ===== etablissement-save : relire, vérifier, écrire la fiche d'un établissement =====
@@ -10,13 +11,6 @@ import { sampleTables, withBranding, withIdentity, ADMIN_EMAIL, ANA_EMAIL, BOB_E
 const CHU = 1; // fondateur, logo 11, responsable : Ana (ligne d'ACL 1, aussi administratrice)
 const UBM = 2; // partenaire, logo 12, responsable : Bob (ligne d'ACL 3)
 const FILE = { blob: 'image', name: 'logo.png' };
-
-const logged = () => {
-  const lines = { info: [], warn: [], error: [] };
-  const log = Object.fromEntries(Object.keys(lines).map(level => [level, (...args) => lines[level].push(args.map(String).join(' '))]));
-  return { lines, log };
-};
-const quiet = { info() {}, warn() {}, error() {} };
 
 function world(options = {}) {
   const tables = options.tables ?? withIdentity(withBranding(sampleTables()));

@@ -4,11 +4,10 @@ import { diffContacts, hasMarks, previewOf, withAvatarChange } from '../preview.
 import { TAG_GROUPS } from '../constants.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
+import { quiet } from './support/logs.mjs';
 import { sampleTables } from './fixtures.mjs';
 
 // ===== preview : la carte « avant », la carte « après » et ce qui les distingue =====
-
-const quiet = { info() {}, warn() {}, error() {} };
 
 // Le document d'exemple chargé comme le fait le widget : les cartes de l'annuaire, les
 // libellés de référence et les indicateurs d'établissement.

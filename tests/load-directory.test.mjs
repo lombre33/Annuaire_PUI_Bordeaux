@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { loadDirectory, DirectoryLoadError } from '../grist-data.js';
 import { FILTERS } from '../constants.js';
 import { computeFilterCounts, createEmptyFilterState, filterContacts, menuGroups } from '../filters.js';
-import { sampleTables, withoutOptionalColumns, withTaskActions, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME } from './fixtures.mjs';
+import {
+  sampleTables, unrankableTaskTables, withDuplicateCHU, withoutOptionalColumns, withTaskActions, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME
+} from './fixtures.mjs';
 
 // ===== loadDirectory : lecture de Grist → contacts affichables =====
 
@@ -28,19 +30,6 @@ function recordingLog() {
 }
 
 const load = (tables, options = {}) => loadDirectory(fakeDocApi(tables, options.docApi), { log: recordingLog(), ...options.load });
-
-// Ajoute à Etablissements une 2e ligne « CHU » validée à l'inverse de la première.
-function withDuplicateCHU(tables) {
-  const copy = structuredClone(tables);
-  copy.Etablissements.id.push(6);
-  copy.Etablissements.acronyme.push('CHU');
-  copy.Etablissements.nom_complet.push('CHU (doublon)');
-  copy.Etablissements.fondateur.push(true);
-  copy.Etablissements.partenaire.push(false);
-  copy.Etablissements.autres.push(false);
-  copy.Etablissements.ok_pour_apparaitre.push(false);
-  return copy;
-}
 
 test('loadDirectory returns the displayable contacts, each with its Etablissement label, and reads every table exactly once', async () => {
   const docApi = fakeDocApi(sampleTables());
@@ -481,15 +470,7 @@ test('loadDirectory takes the first row when two actions carry the same number, 
 });
 
 test('loadDirectory keeps the tasks flat when no task is tied to an action, without banner and with the reason in the console', async () => {
-  const noNumberedAction = withTaskActions();
-  noNumberedAction.Actions.Actions = ['Vaccination', 'Audit'];
-  const noNumberedTask = withTaskActions();
-  noNumberedTask.Taches.Taches = ['Relecture', 'Rappel vaccinal', 'Inspection', 'Veille'];
-  noNumberedTask.Taches.Taches_corrige = ['', '', '', ''];
-  const noMatching = withTaskActions();
-  noMatching.Taches.Taches = ['7.1 Relecture', '7.2 Rappel', '8.1 Inspection', '8.2 Veille'];
-  noMatching.Taches.Taches_corrige = ['', '', '', ''];
-  const cases = { 'aucune action numérotée': noNumberedAction, 'aucune tâche numérotée': noNumberedTask, 'aucun numéro en commun': noMatching, 'données de départ': sampleTables() };
+  const cases = { ...unrankableTaskTables(), 'données de départ': sampleTables() };
   for (const [name, tables] of Object.entries(cases)) {
     const log = recordingLog();
     const { referenceMaps, issues, contacts } = await loadDirectory(fakeDocApi(tables), { log });

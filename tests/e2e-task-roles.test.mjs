@@ -11,10 +11,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { withTaskRoles } from './support/task-role-tables.mjs';
-import { skip, waitForCards, withWidget } from './support/browser.mjs';
+import { gridCard, skip, waitForCards, withWidget } from './support/browser.mjs';
 
-const cardOf = (page, name) => page.locator('.contact-card').filter({ has: page.locator('.name', { hasText: name }) });
-const taskOf = (page, name) => cardOf(page, name).locator('.tag-taches');
+const taskOf = (page, name) => gridCard(page, name).locator('.tag-taches');
 const tip = page => page.locator('.tag-tip');
 const tipShown = page => page.waitForFunction(() => !document.querySelector('.tag-tip').hidden);
 const tipGone = page => page.waitForFunction(() => document.querySelector('.tag-tip').hidden);
@@ -40,7 +39,7 @@ test('une étiquette de tâche écrit le rôle de la personne, lu sur ses propre
     assert.equal(await taskOf(page, 'Gina').textContent(), '2.1 Inspection', 'l\'étiquette d\'une tâche sans rôle ne change pas');
     assert.equal(await taskOf(page, 'Gina').evaluate(tag => tag.classList.contains('has-note')), false);
     // Un lecteur d'écran lit le rôle avec la tâche ; à l'écran il reste hors de vue (une case de 1 px) tant qu'on ne survole pas.
-    assert.equal(await cardOf(page, 'Ana').getByRole('button', { name: '1.1 Relecture Rôle : Pilote' }).count(), 1);
+    assert.equal(await gridCard(page, 'Ana').getByRole('button', { name: '1.1 Relecture Rôle : Pilote' }).count(), 1);
     const note = await geometry(taskOf(page, 'Ana').locator('.tag-note'));
     assert.ok(note.width <= 1 && note.height <= 1, 'la note n\'est pas visible à l\'écran');
     assert.equal(await tip(page).count(), 1);

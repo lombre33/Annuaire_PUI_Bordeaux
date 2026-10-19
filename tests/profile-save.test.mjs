@@ -6,17 +6,11 @@ import {
 import { profileFormModel, draftOf, blankFiche } from '../profile.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
+import { logged, quiet } from './support/logs.mjs';
 import { UploadError } from '../upload.js';
-import { sampleTables, withAvatars, withIdentity, withSchema, withShownEmail, ANA_EMAIL, NEW_EMAIL } from './fixtures.mjs';
+import { withAvatars, withIdentity, withSchema, withShownEmail, ANA_EMAIL, NEW_EMAIL } from './fixtures.mjs';
 
 // ===== profile-save : relire, vérifier, écrire une fiche modifiée =====
-
-const logged = () => {
-  const lines = { info: [], warn: [], error: [] };
-  const log = Object.fromEntries(Object.keys(lines).map(level => [level, (...args) => lines[level].push(args.map(String).join(' '))]));
-  return { lines, log };
-};
-const quiet = { info() {}, warn() {}, error() {} };
 
 // Un document complet (identité, métadonnées), vu par une personne. `fail(['BDD'])`
 // rend ensuite illisibles les tables nommées : l'annuaire est déjà chargé, c'est la

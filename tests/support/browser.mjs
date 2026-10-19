@@ -1,149 +1,37 @@
-// Outils communs des tests navigateur (tests/e2e*.test.mjs) : un serveur statique pour
-// le vrai index.html, Chromium (Playwright) et l'API Grist simulée qui sert les
-// données de tests/fixtures.mjs. Chaque fichier de test importe ce module : il lance
-// son propre navigateur.
+// Outils communs des tests navigateur (tests/e2e*.test.mjs) : le harnais de tests/support/harness.mjs (un serveur statique pour
+// le vrai index.html, Chromium (Playwright) et l'API Grist simulée qui sert les données de tests/fixtures.mjs) et les attentes que
+// ces tests partagent. Chaque fichier de test importe ce module : il lance son propre navigateur.
 //
 // Optionnel : nécessite Playwright (npm install --no-save playwright puis
 // npx playwright install chromium). Sans lui ces tests sont ignorés et
 // `node --test` reste vert. CHROMIUM_PATH désigne un Chromium déjà installé.
 
-import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { sampleTables } from '../fixtures.mjs';
-import { routeAttachments } from './fake-attachments.mjs';
+import { createHarness } from './harness.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
-const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
-
-// Remplace grist-plugin-api.js : le faux document que partagent les tests Node
-// (tests/support/fake-grist.js, `export` retiré), branché sur des variables que le
-// test pose avant le chargement et peut modifier ensuite (relues à chaque appel) :
-// __tables, __failTables, __user (la personne connectée), __denyWrites (tables dont
-// l'écriture est refusée), __denyRows (lignes protégées), __delay, __accessToken (la
-// réponse de getAccessToken), __withoutMethods (méthodes que cette version de Grist n'a
-// pas). __triggerRecords rejoue un onRecords (édition Grist) ; __fake.calls liste les
-// actions envoyées à Grist, __fake.tokenRequests les demandes de jeton.
-const FAKE_GRIST = fs.readFileSync(path.join(ROOT, 'tests/support/fake-grist.js'), 'utf8').replace(/^export /gm, '');
-const GRIST_MOCK = `${FAKE_GRIST}
-window.__fake = createFakeGrist({
-  tables: () => window.__tables,
-  failTables: () => window.__failTables,
-  user: () => window.__user,
-  denyWrites: () => window.__denyWrites,
-  denyRows: () => window.__denyRows,
-  delay: () => window.__delay,
-  accessToken: () => window.__accessToken
-});
-(window.__withoutMethods || []).forEach(name => { delete window.__fake.docApi[name]; });
-window.grist = {
-  ready(options) { window.__gristReady = options; },
-  onRecords(callback) { window.__triggerRecords = callback; setTimeout(callback, 0); },
-  docApi: window.__fake.docApi
-};`;
-
-async function startBrowser() {
-  try {
-    const { chromium } = await import('playwright');
-    return await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
-  } catch {
-    return null;
-  }
-}
-
-function startStaticServer() {
-  const server = http.createServer((request, response) => {
-    const file = path.join(ROOT, decodeURIComponent(new URL(request.url, 'http://x').pathname));
-    if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
-    response.end(fs.readFileSync(file));
-  });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const browser = await startBrowser();
-const server = browser ? await startStaticServer() : null;
-const baseUrl = server ? `http://127.0.0.1:${server.address().port}` : '';
-export const skip = browser ? false : 'Playwright/Chromium indisponible (voir TESTING.md)';
-
-// En CI (REQUIRE_E2E=1), un navigateur absent est un échec, pas un « tout vert »
-// sur des tests ignorés.
-if (!browser && process.env.REQUIRE_E2E) {
-  test('le navigateur de test est disponible', () => assert.fail('Playwright/Chromium introuvable alors que REQUIRE_E2E est défini'));
-}
-
-after(async () => {
-  await browser?.close();
-  server?.close();
-});
-
-// `user` : l'adresse de la personne connectée (null : compte anonyme) ; `readOnly` :
-// le cadre d'un compte Lecteur (?readonly=true) ; `denyRows` : { table: [identifiants] }.
-// Les logos sont des pièces jointes : `files` (tests/support/fake-attachments.mjs) compte les
-// fichiers qui ont été téléchargés et les jetons employés ; `accessToken` est la réponse de
-// getAccessToken (null : Grist refuse), `withoutMethods` les méthodes de docApi qu'une
-// vieille version de Grist n'a pas ; `downloadCors` faux ou 'hang', un Grist qui ne donne pas les pièces jointes
-// en CORS (refus, ou pas de réponse), donc qui ne laisse pas lire les pixels d'un logo ; `downloadHold` : aucun fichier ne part avant
-// `files.release()` ; `downloadFirst` : 'abort' ou 'hang', la première demande de chaque fichier échoue ou n'a jamais de réponse (les
-// suivantes passent) ; `initScript` : un script (texte) exécuté dans la page avant tout autre ; `contextOptions` : les options du
-// contexte Playwright (un écran tactile, sans survol : { hasTouch: true, isMobile: true }).
-export async function openWidget({
-  tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false,
-  accessToken, withoutMethods = [], downloadCors = true, downloadHold = false, downloadFirst = null, initScript = null,
-  contextOptions = {}
-} = {}) {
-  const context = await browser.newContext(contextOptions);
-  // Hermétique : seuls le serveur local, l'API Grist simulée et ses pièces jointes répondent.
-  await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
-  await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));
-  const files = await routeAttachments(context);
-  files.download.cors = downloadCors;
-  files.download.hold = downloadHold;
-  files.download.first = downloadFirst;
-  const page = await context.newPage();
-  const logs = { errors: [], warnings: [], infos: [] };
-  page.on('pageerror', error => logs.errors.push(error.message));
-  page.on('console', message => {
-    // text() réduit un objet à « JSHandle@object » : on relit les arguments. Un message du
-    // navigateur lui-même (un fichier introuvable) n'en a pas : on garde son texte.
-    const readable = async () => (await Promise.all(message.args().map(arg => arg.jsonValue())))
-      .map(value => (typeof value === 'string' ? value : JSON.stringify(value))).join(' ') || message.text();
-    // La lecture est en vol quand le test se termine et ferme la page, surtout quand plusieurs
-    // fichiers de test tournent ensemble : elle échoue alors (« Target page, context or browser
-    // has been closed ») et, sans personne pour l'attendre, Node fait échouer tout le fichier.
-    // Le crochet vide évite ce rejet non traité ; un test qui relit la console voit toujours
-    // l'erreur, puisque la promesse gardée dans `logs` reste rejetée.
-    const keep = list => { const line = readable(); line.catch(() => {}); list.push(line); };
-    if (message.type() === 'error') keep(logs.errors);
-    if (message.type() === 'warning') keep(logs.warnings);
-    if (message.type() === 'info') keep(logs.infos);
-  });
-  await page.addInitScript(values => {
-    window.__tables = values.tables;
-    window.__failTables = values.failTables;
-    window.__user = values.user;
-    window.__denyWrites = values.denyWrites;
-    window.__denyRows = values.denyRows;
-    window.__delay = values.delay;
-    window.__accessToken = values.accessToken;
-    window.__withoutMethods = values.withoutMethods;
-  }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, delay, accessToken, withoutMethods });
-  if (initScript) await page.addInitScript(initScript);
-  await page.goto(`${baseUrl}/index.html${readOnly ? '?readonly=true' : ''}`);
-  return { page, context, logs, files };
-}
+// openWidget(options) : voir tests/support/harness.mjs.
+export const { skip, openWidget, withWidget } = await createHarness();
 
 // Rejoue un onRecords (comme une édition dans Grist) et attend la fin du debounce.
 export async function reload(page) {
   await page.evaluate(() => window.__triggerRecords());
 }
+
+// Attend qu'une condition (asynchrone) devienne vraie, 5 s au plus ; sinon le test échoue avec `message`.
+export async function until(condition, message) {
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    if (await condition()) return;
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  assert.fail(message);
+}
+
+// Le focus revient à l'élément voulu (sélecteur CSS) : l'événement « close » d'une fenêtre qui le rend est envoyé après qu'elle a
+// cessé d'être ouverte, d'où l'attente.
+export const focusReturnsTo = (page, selector) => page.waitForFunction(
+  wanted => document.activeElement?.matches(wanted), selector, { timeout: 3000 }
+);
 
 export const cardCount = page => page.locator('.contact-card').count();
 export const waitForCards = (page, count) =>
@@ -153,14 +41,38 @@ export const waitForBanner = (page, visible = true) =>
 export const cardNames = page => page.locator('.contact-card .name').allTextContents();
 export const resultCount = page => page.locator('#resultCount').textContent();
 export const bannerText = page => page.locator('#statusBanner').textContent();
+export const toast = page => page.locator('#toast');
+// La carte d'une personne dans la grille de l'annuaire (le nom suffit à la trouver).
+export const gridCard = (page, name) => page.locator('#cardsGrid .contact-card').filter({ has: page.locator('.name', { hasText: name }) });
+// Ouvre sa propre fiche par le bouton du bandeau « Ma présence » (`cards` : les cartes que l'annuaire montre d'abord).
+export async function openOwn(page, cards = 4) {
+  await waitForCards(page, cards);
+  const button = page.locator('#accountBar .account-edit');
+  await button.waitFor();
+  await button.click();
+  await page.locator('#profileDialog').waitFor();
+}
+// Les boutons « Modifier » apparaissent quand l'identité est lue : on les attend.
+export const waitForEditButtons = (page, count) => page.waitForFunction(
+  expected => document.querySelectorAll('#cardsGrid .card-actions:not([hidden]) .card-edit').length === expected, count
+);
 
-export async function withWidget(options, run) {
-  const widget = await openWidget(options);
-  try {
-    await run(widget);
-  } finally {
-    await widget.context.close();
-  }
+// Le widget a lu l'identité de la personne connectée : sa sonde (la ligne qu'il ajoute à la table Annuaire_Sonde) s'est retirée.
+export const probeRemoved = page => page.waitForFunction(
+  () => window.__fake.calls.some(call => call.table === 'Annuaire_Sonde' && call.action === 'RemoveRecord')
+);
+
+// Ce que le faux Grist a reçu : les actions envoyées pour BDD (écrites ou refusées), une cellule de BDD telle qu'elle est maintenant,
+// les demandes de jeton d'accès.
+export const bddCalls = page => page.evaluate(() => window.__fake.calls.filter(call => call.table === 'BDD'));
+export const bddCell = (page, column, index = 0) => page.evaluate(([name, at]) => window.__tables.BDD[name][at], [column, index]);
+export const tokenRequests = page => page.evaluate(() => window.__fake.tokenRequests);
+
+// Ni le jeton d'accès ni l'adresse du document ne s'écrivent dans la console de la page (`logs` : ceux du harnais).
+export async function assertNoSecretLogged(logs, label) {
+  const logged = (await Promise.all([...logs.warnings, ...logs.errors])).join('\n');
+  assert.ok(!logged.includes('fake-token'), `${label} : le jeton n'est jamais écrit dans la console`);
+  assert.ok(!logged.includes('docs.getgrist.com/api/docs/fake-doc'), `${label} : ni l'adresse du document`);
 }
 
 // Le pied d'une fenêtre (`.dlg-foot`) : le résumé n'impose aucune largeur, il partage la ligne des

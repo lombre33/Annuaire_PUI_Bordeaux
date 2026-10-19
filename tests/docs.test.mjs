@@ -38,6 +38,7 @@ import { readEtablissement, savePlanOf, saveEtablissement } from '../etablisseme
 import { checkImageFile } from '../image-prep.js';
 import { tablesFictives, CARTES_ATTENDUES, PERSONNES_AVEC_PHOTO, PERSONNES_DEMO } from '../docs/demo/donnees-fictives.mjs';
 import { NOMBRE_VISAGES, PREMIER_PORTRAIT, portraitFictif } from '../docs/demo/portraits-fictifs.mjs';
+import { assertFictionalContacts } from './support/fiction.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -169,13 +170,18 @@ function fakeDocApi(tables) {
   };
 }
 
+// Les cartes que les captures du guide annoncent : celles des établissements fondateurs, puis avec les partenaires.
+function assertCartesAnnoncees(contacts) {
+  const displayed = scope => filterContacts(contacts, createEmptyFilterState(), '', scope).length;
+  assert.equal(displayed({ fondateur: true, partenaire: false }), CARTES_ATTENDUES.fondateurs);
+  assert.equal(displayed({ fondateur: true, partenaire: true }), CARTES_ATTENDUES.fondateursEtPartenaires);
+}
+
 test('le jeu de données fictif est lu sans incident par le vrai loadDirectory() et donne les cartes annoncées', async () => {
   const { contacts, issues } = await loadDirectory(fakeDocApi(tablesFictives()), { log: SILENT_LOG });
   assert.deepEqual(issues, [],
     'Le widget signale un problème sur le jeu fictif : la structure Grist a-t-elle changé ? Adaptez docs/demo/donnees-fictives.mjs.');
-  const displayed = scope => filterContacts(contacts, createEmptyFilterState(), '', scope).length;
-  assert.equal(displayed({ fondateur: true, partenaire: false }), CARTES_ATTENDUES.fondateurs);
-  assert.equal(displayed({ fondateur: true, partenaire: true }), CARTES_ATTENDUES.fondateursEtPartenaires);
+  assertCartesAnnoncees(contacts);
   // Le guide cite le compteur de la capture d'ensemble : il doit rester celui du jeu fictif.
   assert.ok(read('docs/utilisateurs.md').includes(`« ${CARTES_ATTENDUES.fondateurs} contacts »`),
     `docs/utilisateurs.md doit citer « ${CARTES_ATTENDUES.fondateurs} contacts » (capture apercu.png) : régénérez les captures et le guide.`);
@@ -191,9 +197,7 @@ test('le jeu de données fictif avec photos (?photos) ajoute la colonne Avatar e
   assert.equal(type, 'Attachments', 'La colonne Avatar de la démonstration est une colonne « Pièces jointes », comme dans Grist.');
   const { contacts, issues } = await loadDirectory(fakeDocApi(tables), { log: SILENT_LOG });
   assert.deepEqual(issues, [], 'Le widget signale un problème sur le jeu fictif avec photos.');
-  const displayed = scope => filterContacts(contacts, createEmptyFilterState(), '', scope).length;
-  assert.equal(displayed({ fondateur: true, partenaire: false }), CARTES_ATTENDUES.fondateurs);
-  assert.equal(displayed({ fondateur: true, partenaire: true }), CARTES_ATTENDUES.fondateursEtPartenaires);
+  assertCartesAnnoncees(contacts);
 
   // Les personnes qui ont une photo sont celles que les captures annoncent, et chaque photo est un dessin inventé.
   const withPhoto = contacts.filter(contact => avatarIdOf(contact.Avatar) > 0);
@@ -205,19 +209,7 @@ test('le jeu de données fictif avec photos (?photos) ajoute la colonne Avatar e
   assert.ok(PERSONNES_AVEC_PHOTO.length < NOMBRE_VISAGES, 'Il faut un visage libre pour la photo que les captures choisissent (capturer.mjs).');
 });
 
-test('le jeu de données fictif ne contient que des coordonnées fictives', () => {
-  const tables = tablesFictives();
-  const emails = JSON.stringify(tables).match(/[\w.+-]+@[\w.-]+/g) ?? [];
-  assert.ok(emails.length > 0, 'Aucune adresse trouvée : ce test ne vérifie plus rien.');
-  assert.deepEqual(emails.filter(email => !email.endsWith('.example')), [],
-    'Adresses hors du domaine réservé .example (RFC 2606) : jamais de vraie adresse dans le dépôt.');
-
-  // Numeric dans Grist : le 0 initial est perdu, 0 = non renseigné.
-  const phones = tables.BDD.numero_de_telephone.filter(Boolean).map(value => String(value).padStart(10, '0'));
-  assert.ok(phones.length > 0, 'Aucun numéro trouvé : ce test ne vérifie plus rien.');
-  assert.deepEqual(phones.filter(phone => !/^0(?:53649|63998)\d{4}$/.test(phone)), [],
-    'Numéros hors des plages réservées à la fiction, 05 36 49 xx xx et 06 39 98 xx xx (ARCEP, décision n° 2018-0881).');
-});
+test('le jeu de données fictif ne contient que des coordonnées fictives', () => assertFictionalContacts(tablesFictives()));
 
 // ===== 4. Serveur de démonstration =====
 

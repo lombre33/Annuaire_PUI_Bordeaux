@@ -24,6 +24,7 @@
 
 import { FAKE_ATTACHMENTS_URL } from './fake-grist.js';
 import { visageSvg } from '../../docs/demo/portraits-fictifs.mjs';
+import { readMultipartFile } from './multipart.mjs';
 
 export const FIRST_UPLOAD_ID = 2000;
 export const MISSING_FILE = 999;
@@ -64,26 +65,6 @@ const portraitSvg = id => visageSvg(id - PORTRAIT_FIRST);
 
 const ORIGIN = new URL(FAKE_ATTACHMENTS_URL).origin;
 const PATH = new URL(FAKE_ATTACHMENTS_URL).pathname;
-
-// Le fichier d'un envoi multipart : { field, fileName, contentType, bytes }. Les octets sont lus en
-// latin1 pour que la position dans le texte soit celle dans le fichier.
-function readUpload(request) {
-  const boundary = /boundary=(.+)$/.exec(request.headers()['content-type'] ?? '')?.[1];
-  const body = request.postDataBuffer();
-  if (!boundary || !body) return null;
-  const text = body.toString('latin1');
-  const start = text.indexOf(`--${boundary}`);
-  const headerEnd = text.indexOf('\r\n\r\n', start);
-  const end = text.indexOf(`\r\n--${boundary}`, headerEnd + 4);
-  if (start < 0 || headerEnd < 0 || end < 0) return null;
-  const head = text.slice(start, headerEnd);
-  return {
-    field: /name="([^"]*)"/.exec(head)?.[1] ?? '',
-    fileName: /filename="([^"]*)"/.exec(head)?.[1] ?? '',
-    contentType: /content-type:\s*([^\r\n]+)/i.exec(head)?.[1] ?? '',
-    bytes: body.subarray(headerEnd + 4, end)
-  };
-}
 
 // Répond aux téléchargements et aux envois de pièces jointes d'un contexte Playwright. Renvoie :
 //   hits      le nombre de téléchargements demandés par fichier
@@ -146,7 +127,7 @@ export async function routeAttachments(context) {
   await context.route(url => url.origin === ORIGIN && url.pathname === `${PATH}/attachments`, async route => {
     const request = route.request();
     const { mode, cors: allowed, delay } = record.upload;
-    const sent = readUpload(request);
+    const sent = readMultipartFile(request.postDataBuffer(), request.headers()['content-type']);
     const headers = cors;
     const entry = {
       token: new URL(request.url()).searchParams.get('auth'),

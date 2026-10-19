@@ -94,38 +94,39 @@ test('compareLabels puts numbers in numeric order: « 1.2 » before « 1.10 », 
   assert.deepEqual(['b', 'A', 'é', 'e'].sort(compareLabels), ['A', 'b', 'e', 'é'], 'sans nombre, l\'ordre alphabétique français ne change pas');
 });
 
+// `read` (taskActionNumber ou actionNumber) lit dans chaque libellé de `pairs` [libellé, numéro] le numéro attendu, et rien (null)
+// dans chaque libellé de `labels`.
+const readsNumbers = (read, pairs) => pairs.forEach(([label, number]) => assert.equal(read(label), number, label));
+const readsNothing = (read, labels) => labels.forEach(label => assert.equal(read(label), null, JSON.stringify(label)));
+
 // Aucune colonne ne relie une tâche à son action : le numéro avant le point du libellé de la
 // tâche (« 1.3 Animer le réseau ») est celui de son action, que la table Actions numérote
 // (« Action 1: Gouvernance »).
 test('taskActionNumber reads the action of a task before the dot of its number', () => {
-  const numbers = [
+  readsNumbers(taskActionNumber, [
     ['1.3 Animer le réseau', 1], ['1.3', 1], ['  1.3 - Animer', 1], ['1.3. Animer', 1], ['5.4 Veille', 5], ['12.5 Veille', 12],
     ['01.3 Animer', 1], ['1 . 3 Animer', 1], ['2.10 Clôture', 2], ['3.2.1 Détail', 3], ['0.1 Coordination', 0],
     ['T1.3 Animer', 1], ['t 1.3 Animer', 1], ['Tâche 1.3 : Animer', 1], ['TACHE 4.2', 4], ['Tâche n° 2.1', 2], ['N°3.2 Animer', 3]
-  ];
-  numbers.forEach(([label, number]) => assert.equal(taskActionNumber(label), number, label));
+  ]);
 });
 
 test('taskActionNumber finds no action in a label that does not start with a number of the form 1.3', () => {
-  ['Veille', '', '   ', null, undefined, 0, '2 formations', '12 réunions par an', '2024 Bilan', '1 3 Suivi', '1. Gouvernance', '1', '1.', '.3',
-    '1,3 Animer', 'Version 2.0', 'Tests 1.3', 'Tâches 1.3', 'Animer le réseau (1.3)', 'Action 1: Gouvernance'
-  ].forEach(label => assert.equal(taskActionNumber(label), null, JSON.stringify(label)));
+  readsNothing(taskActionNumber, ['Veille', '', '   ', null, undefined, 0, '2 formations', '12 réunions par an', '2024 Bilan', '1 3 Suivi', '1. Gouvernance',
+    '1', '1.', '.3', '1,3 Animer', 'Version 2.0', 'Tests 1.3', 'Tâches 1.3', 'Animer le réseau (1.3)', 'Action 1: Gouvernance']);
 });
 
 test('actionNumber reads the number an action starts with: « Action 1: », « Action n° 1 », « A1 », « 1. », « 1 - »', () => {
-  const numbers = [
+  readsNumbers(actionNumber, [
     ['Action 1: Gouvernance', 1], ['Action 1 : Gouvernance', 1], ['Action 1:Gouvernance', 1], ['Action 1', 1], ['action 2 - Pilotage', 2],
     ['ACTION 10: Évaluation', 10], ['  Action 3: Veille', 3], ['Action n° 4', 4], ['Action n°5', 5], ['A6 Veille', 6], ['A 7 Veille', 7],
     ['8. Gouvernance', 8], ['9 - Pilotage', 9], ['10) Évaluation', 10], ['11', 11], ['Action 012: x', 12],
     ['Action 0: Coordination', 0]
-  ];
-  numbers.forEach(([label, number]) => assert.equal(actionNumber(label), number, label));
+  ]);
 });
 
 test('actionNumber finds no number in a label that has none, or whose number is the one of a task', () => {
-  ['Gouvernance', 'Audit', 'Action', 'Actions 3', 'Axe 1', '', null, undefined, '1.3 Animer', 'Action 1.3', 'Action 12.5', 'Action 1,5 M€',
-    'Ancienne action 2', 'Vaccination 2030'
-  ].forEach(label => assert.equal(actionNumber(label), null, JSON.stringify(label)));
+  readsNothing(actionNumber, ['Gouvernance', 'Audit', 'Action', 'Actions 3', 'Axe 1', '', null, undefined, '1.3 Animer', 'Action 1.3', 'Action 12.5',
+    'Action 1,5 M€', 'Ancienne action 2', 'Vaccination 2030']);
 });
 
 // Les actions d'Antoine portent un préfixe entre crochets (« [ PUI ] Action 1: … ») : sans lui, aucune action n'était

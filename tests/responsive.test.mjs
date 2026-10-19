@@ -17,139 +17,25 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md). Sans lui
 // les scénarios navigateur sont ignorés et `node --test` reste vert.
 
-import { test, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { crowdedTables, crowdedTablesByAction } from './fixtures-responsive.mjs';
 import { measureCards } from './support/card-metrics.mjs';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
-const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
-
-// Remplace grist-plugin-api.js (même simulateur que e2e.test.mjs).
-const GRIST_MOCK = `
-window.grist = {
-  ready() {},
-  onRecords(callback) { window.__triggerRecords = callback; setTimeout(callback, 0); },
-  docApi: {
-    async fetchTable(name) {
-      if (window.__failTables.includes(name)) throw new Error('Grist indisponible : ' + name);
-      if (!window.__tables[name]) throw new Error('Table inconnue : ' + name);
-      return JSON.parse(JSON.stringify(window.__tables[name]));
-    }
-  }
-};`;
-
-// Largeurs de cadre testées : un téléphone étroit, les largeurs courantes, et de part
-// et d'autre de chaque seuil de style.css.
-const WIDTHS = [320, 360, 414, 599, 600, 768, 839, 840, 1024, 1279, 1280, 1399, 1400, 1480, 1920];
-const HEIGHT = 900;
-
-async function startBrowser() {
-  try {
-    const { chromium } = await import('playwright');
-    // Playwright masque les barres de défilement ; dans Grist elles retirent 15px à la
-    // largeur utile, c'est le cas le plus serré : on les garde.
-    return await chromium.launch({
-      executablePath: process.env.CHROMIUM_PATH || undefined,
-      ignoreDefaultArgs: ['--hide-scrollbars']
-    });
-  } catch {
-    return null;
-  }
-}
-
-function startStaticServer() {
-  const server = http.createServer((request, response) => {
-    const file = path.join(ROOT, decodeURIComponent(new URL(request.url, 'http://x').pathname));
-    if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
-    response.end(fs.readFileSync(file));
-  });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
+import { assertFictionalContacts } from './support/fiction.mjs';
+import {
+  WIDTHS, assertBadgeInCorner, assertNameBesideAvatar, assertNoHorizontalOverflow, atEachWidth, cardGeometry, layoutWidgets,
+  measureNamesAgainstBadges, resize, skip
+} from './support/layout.mjs';
 
 // Le jeu de données ne contient que des coordonnées inventées (règle de docs/securite.md),
 // comme celui de docs/demo : ce contrôle n'a pas besoin du navigateur.
-test('le jeu de données de la mise en page ne contient que des coordonnées fictives', () => {
-  const tables = crowdedTables();
-  const emails = JSON.stringify(tables).match(/[\w.+-]+@[\w.-]+/g) ?? [];
-  assert.ok(emails.length > 0, 'Aucune adresse trouvée : ce test ne vérifie plus rien.');
-  assert.deepEqual(emails.filter(email => !email.endsWith('.example')), [], 'Adresses hors du domaine réservé .example (RFC 2606).');
-  // Numérique dans Grist : le 0 initial est perdu, 0 = non renseigné.
-  const phones = tables.BDD.numero_de_telephone.filter(Boolean).map(value => String(value).padStart(10, '0'));
-  assert.ok(phones.length > 0, 'Aucun numéro trouvé : ce test ne vérifie plus rien.');
-  assert.deepEqual(phones.filter(phone => !/^0(?:53649|63998)\d{4}$/.test(phone)), [],
-    'Numéros hors des plages réservées à la fiction, 05 36 49 xx xx et 06 39 98 xx xx (ARCEP, décision n° 2018-0881).');
+test('le jeu de données de la mise en page ne contient que des coordonnées fictives', () => assertFictionalContacts(crowdedTables()));
+
+const { withWidget } = layoutWidgets({
+  tables: crowdedTables,
+  ready: page => page.waitForFunction(() =>
+    document.querySelectorAll('.contact-card').length > 0 || !document.getElementById('statusBanner').hidden)
 });
-
-const browser = await startBrowser();
-const server = browser ? await startStaticServer() : null;
-const baseUrl = server ? `http://127.0.0.1:${server.address().port}` : '';
-const skip = browser ? false : 'Playwright/Chromium indisponible (voir TESTING.md)';
-
-// En CI (REQUIRE_E2E=1), un navigateur absent est un échec, pas un « tout vert »
-// sur des tests ignorés.
-if (!browser && process.env.REQUIRE_E2E) {
-  test('le navigateur de test de la mise en page est disponible', () =>
-    assert.fail('Playwright/Chromium introuvable alors que REQUIRE_E2E est défini'));
-}
-
-after(async () => {
-  await browser?.close();
-  server?.close();
-});
-
-async function openWidget({ width = 1480, touch = false, tables = crowdedTables(), failTables = [] } = {}) {
-  // Un écran tactile (pointer: coarse) : c'est ce qui déclenche les règles « doigt ».
-  const context = await browser.newContext({
-    viewport: { width, height: HEIGHT },
-    ...(touch ? { hasTouch: true, isMobile: true } : {})
-  });
-  // Hermétique : seul le serveur local et l'API Grist simulée répondent.
-  await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
-  await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));
-  const page = await context.newPage();
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(({ tables, failTables }) => {
-    window.__tables = tables;
-    window.__failTables = failTables;
-  }, { tables, failTables });
-  await page.goto(`${baseUrl}/index.html`);
-  await page.waitForFunction(() =>
-    document.querySelectorAll('.contact-card').length > 0 || !document.getElementById('statusBanner').hidden);
-  return { page, context, errors };
-}
-
-async function withWidget(options, run) {
-  const widget = await openWidget(options);
-  try {
-    await run(widget);
-    assert.deepEqual(widget.errors, [], 'aucune erreur JavaScript dans la page');
-  } finally {
-    await widget.context.close();
-  }
-}
-
-// Redimensionne le cadre, comme quand on élargit ou resserre le panneau dans Grist.
-const resize = (page, width) => page.setViewportSize({ width, height: HEIGHT });
-
-// Pour chaque largeur de la liste, le même contrôle sur la même page : une erreur
-// nomme la largeur fautive.
-async function atEachWidth(page, widths, check) {
-  for (const width of widths) {
-    await resize(page, width);
-    await check(width);
-  }
-}
 
 // Fermer les menus ouverts : le widget les referme au clic dans le document.
 const closeMenus = page => page.evaluate(() =>
@@ -159,21 +45,7 @@ const closeMenus = page => page.evaluate(() =>
 
 test('aucun défilement horizontal, du téléphone (320px) au grand écran (1920px)', { skip }, () =>
   withWidget({}, async ({ page }) => {
-    await atEachWidth(page, WIDTHS, async width => {
-      const { client, scroll, outside } = await page.evaluate(() => {
-        const client = document.documentElement.clientWidth;
-        const outside = [...document.querySelectorAll('body *')]
-          .filter(element => element.getClientRects().length > 0)
-          .filter(element => {
-            const { left, right } = element.getBoundingClientRect();
-            return right > client + 0.5 || left < -0.5;
-          })
-          .map(element => `${element.tagName.toLowerCase()}.${element.className}`);
-        return { client, scroll: document.documentElement.scrollWidth, outside: outside.slice(0, 5) };
-      });
-      assert.ok(scroll <= client, `à ${width}px, la page déborde de ${scroll - client}px`);
-      assert.deepEqual(outside, [], `à ${width}px, des éléments sortent du cadre`);
-    });
+    await atEachWidth(page, WIDTHS, width => assertNoHorizontalOverflow(page, width));
   }));
 
 test('le texte des cartes reste dans sa carte, même sans point de coupure (nom, e-mail)', { skip }, () =>
@@ -204,22 +76,7 @@ test('le texte des cartes reste dans sa carte, même sans point de coupure (nom,
 test('le nom ne passe jamais sous le badge de l\'établissement et tient sur deux lignes au plus', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await atEachWidth(page, [320, 360, 600, 768, 840, 1024, 1280, 1480], async width => {
-      const { checked, overlapping, tooTall } = await page.evaluate(() => {
-        let checked = 0;
-        const overlapping = [];
-        const tooTall = [];
-        document.querySelectorAll('.contact-card').forEach(card => {
-          const nameElement = card.querySelector('.name');
-          const name = nameElement.getBoundingClientRect();
-          // Deux lignes font au plus 2,7 fois le corps du texte ; trois lignes, plus de 3,3 fois.
-          if (name.height > 2.7 * parseFloat(getComputedStyle(nameElement).fontSize)) tooTall.push(nameElement.textContent);
-          const badge = card.querySelector('.etablissement-tag.visible');
-          if (!badge) return;
-          checked++;
-          if (name.right > badge.getBoundingClientRect().left + 0.5) overlapping.push(nameElement.textContent);
-        });
-        return { checked, overlapping, tooTall };
-      });
+      const { checked, overlapping, tooTall } = await measureNamesAgainstBadges(page);
       assert.ok(checked > 0, 'des cartes portent un badge établissement');
       assert.deepEqual(overlapping, [], `à ${width}px, le badge recouvre le nom`);
       assert.deepEqual(tooTall, [], `à ${width}px, un nom s'étend sur plus de deux lignes`);
@@ -429,14 +286,19 @@ async function expandedMenuReport(filter) {
   });
 }
 
+// Un menu tout déplié ne défile pas sur le côté et rien n'en sort à droite.
+function assertMenuFits(report, width) {
+  assert.ok(report.scrollWidth <= report.clientWidth, `à ${width}px, le menu défile horizontalement (${report.scrollWidth}px pour ${report.clientWidth}px)`);
+  assert.deepEqual(report.outside, [], `à ${width}px, des éléments du menu sortent à droite`);
+}
+
 test('le menu Compétences, tout déplié, tient dans son cadre étroit : libellés longs à la ligne, nombres et boutons dans le menu', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await atEachWidth(page, [280, 320, 360, 414, 768], async width => {
       const report = await expandedMenuReport(await openedSkills(page));
       assert.equal(report.groups, 9, 'neuf domaines');
       assert.equal(report.shownItems, 13, 'toutes les compétences, une fois dépliées');
-      assert.ok(report.scrollWidth <= report.clientWidth, `à ${width}px, le menu défile horizontalement (${report.scrollWidth}px pour ${report.clientWidth}px)`);
-      assert.deepEqual(report.outside, [], `à ${width}px, des éléments du menu sortent à droite`);
+      assertMenuFits(report, width);
       await closeMenus(page);
     });
   }));
@@ -447,8 +309,7 @@ test('le menu Tâches, rangé par action et tout déplié, tient dans son cadre 
       const report = await expandedMenuReport(await openedMenu(page, 'taches'));
       assert.equal(report.groups, 7, 'six actions et « Sans action »');
       assert.equal(report.shownItems, 12, 'toutes les tâches, une fois dépliées');
-      assert.ok(report.scrollWidth <= report.clientWidth, `à ${width}px, le menu défile horizontalement (${report.scrollWidth}px pour ${report.clientWidth}px)`);
-      assert.deepEqual(report.outside, [], `à ${width}px, des éléments du menu sortent à droite`);
+      assertMenuFits(report, width);
       await closeMenus(page);
     });
   }));
@@ -696,45 +557,17 @@ function compactTables() {
   return tables;
 }
 
-// Position du badge dans le coin de la carte, et du nom (avec la fonction) en face de l'avatar.
-const cardGeometry = page => page.evaluate(() => {
-  const cards = [...document.querySelectorAll('.contact-card')];
-  const centerY = element => {
-    const { top, bottom } = element.getBoundingClientRect();
-    return (top + bottom) / 2;
-  };
-  const first = cards[0]; // sans fonction (compactTables)
-  const second = cards[1]; // avec une fonction sur une ligne
-  const box = first.getBoundingClientRect();
-  const badge = first.querySelector('.etablissement-tag.visible').getBoundingClientRect();
-  const nameAndFunction = card => {
-    const name = card.querySelector('.name').getBoundingClientRect();
-    const role = card.querySelector('.fonction').getBoundingClientRect();
-    return (name.top + role.bottom) / 2 - centerY(card.querySelector('.avatar'));
-  };
-  return {
-    columns: new Set(cards.map(card => Math.round(card.getBoundingClientRect().left))).size,
-    badgeFromRight: box.right - badge.right,
-    badgeFromTop: badge.top - box.top,
-    nameVsAvatar: centerY(first.querySelector('.name')) - centerY(first.querySelector('.avatar')),
-    nameAndFunctionVsAvatar: nameAndFunction(second)
-  };
-});
-
 test('à 1480px : trois colonnes, badge établissement dans le coin haut droit, nom centré sur l\'avatar', { skip }, () =>
   withWidget({ width: 1480, tables: compactTables() }, async ({ page }) => {
     const card = await cardGeometry(page);
     assert.equal(card.columns, 3);
-    assert.ok(card.badgeFromRight >= 9 && card.badgeFromRight <= 13, `badge à ${card.badgeFromRight}px du bord droit`);
-    assert.ok(card.badgeFromTop >= 12 && card.badgeFromTop <= 16, `badge à ${card.badgeFromTop}px du haut`);
-    assert.ok(Math.abs(card.nameVsAvatar) <= 2, `nom décalé de ${card.nameVsAvatar}px par rapport à l'avatar`);
-    assert.ok(Math.abs(card.nameAndFunctionVsAvatar) <= 3, `nom et fonction décalés de ${card.nameAndFunctionVsAvatar}px par rapport à l'avatar`);
+    assertBadgeInCorner(card, 'badge');
+    assertNameBesideAvatar(card);
   }));
 
 test('sur téléphone, le nom reste centré sur l\'avatar et le badge dans le coin de la carte', { skip }, () =>
   withWidget({ width: 360, tables: compactTables() }, async ({ page }) => {
     const card = await cardGeometry(page);
-    assert.ok(card.badgeFromRight >= 9 && card.badgeFromRight <= 13, `badge à ${card.badgeFromRight}px du bord droit`);
-    assert.ok(card.badgeFromTop >= 12 && card.badgeFromTop <= 16, `badge à ${card.badgeFromTop}px du haut`);
-    assert.ok(Math.abs(card.nameAndFunctionVsAvatar) <= 3, `nom et fonction décalés de ${card.nameAndFunctionVsAvatar}px par rapport à l'avatar`);
+    assertBadgeInCorner(card, 'badge');
+    assertNameBesideAvatar(card, { alone: false });
   }));

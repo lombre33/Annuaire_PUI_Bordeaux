@@ -13,74 +13,18 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md). Sans lui les
 // scénarios navigateur sont ignorés et `node --test` reste vert.
 
-import { test, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { crowdedTables, crowdedBranding, crowdedIdentity } from './fixtures-responsive.mjs';
-import { routeAttachments, TALL_FILE, WIDE_FILE, UNSIZED_FILE } from './support/fake-attachments.mjs';
+import { TALL_FILE, WIDE_FILE, UNSIZED_FILE } from './support/fake-attachments.mjs';
+import {
+  WIDTHS, assertBadgeInCorner, assertNameBesideAvatar, assertNoHorizontalOverflow, atEachWidth, cardGeometry, layoutWidgets,
+  measureNamesAgainstBadges, skip
+} from './support/layout.mjs';
 import { BAND_LOGO, CARD_LOGO } from '../constants.js';
 import { logoSize } from '../branding.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
-const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
-
-const FAKE_GRIST = fs.readFileSync(path.join(ROOT, 'tests/support/fake-grist.js'), 'utf8').replace(/^export /gm, '');
-const GRIST_MOCK = `${FAKE_GRIST}
-window.__fake = createFakeGrist({ tables: () => window.__tables, user: () => window.__user });
-window.grist = {
-  ready() {},
-  onRecords(callback) { window.__triggerRecords = callback; setTimeout(callback, 0); },
-  docApi: window.__fake.docApi
-};`;
-
-const WIDTHS = [320, 360, 414, 599, 600, 768, 839, 840, 1024, 1279, 1280, 1399, 1400, 1480, 1920];
-const HEIGHT = 900;
 const ACRONYMS = crowdedTables().Etablissements.acronyme; // l'ordre du bandeau : celui de la table
-
-async function startBrowser() {
-  try {
-    const { chromium } = await import('playwright');
-    // Les barres de défilement retirent 15px à la largeur utile dans Grist : on les garde.
-    return await chromium.launch({
-      executablePath: process.env.CHROMIUM_PATH || undefined,
-      ignoreDefaultArgs: ['--hide-scrollbars']
-    });
-  } catch {
-    return null;
-  }
-}
-
-function startStaticServer() {
-  const server = http.createServer((request, response) => {
-    const file = path.join(ROOT, decodeURIComponent(new URL(request.url, 'http://x').pathname));
-    if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
-    response.end(fs.readFileSync(file));
-  });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const browser = await startBrowser();
-const server = browser ? await startStaticServer() : null;
-const baseUrl = server ? `http://127.0.0.1:${server.address().port}` : '';
-const skip = browser ? false : 'Playwright/Chromium indisponible (voir TESTING.md)';
-
-if (!browser && process.env.REQUIRE_E2E) {
-  test('le navigateur de test de la mise en page de l\'habillage est disponible', () =>
-    assert.fail('Playwright/Chromium introuvable alors que REQUIRE_E2E est défini'));
-}
-
-after(async () => {
-  await browser?.close();
-  server?.close();
-});
 
 // Attend que tous les logos soient affichés : ceux des cartes ne se chargent qu'en
 // approchant de l'écran, on les demande tous pour que la mise en page soit complète.
@@ -94,43 +38,14 @@ async function settle(page) {
   });
 }
 
-async function openWidget({ width = 1480, touch = false, tables = crowdedBranding(), user = null, waitLogos = true } = {}) {
-  const context = await browser.newContext({
-    viewport: { width, height: HEIGHT },
-    ...(touch ? { hasTouch: true, isMobile: true } : {})
-  });
-  await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
-  await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));
-  await routeAttachments(context);
-  const page = await context.newPage();
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(value => { window.__tables = value.tables; window.__user = value.user; }, { tables, user: user && { email: user } });
-  await page.goto(`${baseUrl}/index.html`);
-  await page.waitForFunction(() => document.querySelectorAll('.contact-card').length > 0);
-  if (user) await page.waitForFunction(() => !document.getElementById('accountBar').hidden);
-  if (waitLogos) await settle(page);
-  return { page, context, errors };
-}
-
-async function withWidget(options, run) {
-  const widget = await openWidget(options);
-  try {
-    await run(widget);
-    assert.deepEqual(widget.errors, [], 'aucune erreur JavaScript dans la page');
-  } finally {
-    await widget.context.close();
+const { withWidget } = layoutWidgets({
+  tables: crowdedBranding,
+  ready: async (page, { user = null, waitLogos = true }) => {
+    await page.waitForFunction(() => document.querySelectorAll('.contact-card').length > 0);
+    if (user) await page.waitForFunction(() => !document.getElementById('accountBar').hidden);
+    if (waitLogos) await settle(page);
   }
-}
-
-const resize = (page, width) => page.setViewportSize({ width, height: HEIGHT });
-
-async function atEachWidth(page, widths, check) {
-  for (const width of widths) {
-    await resize(page, width);
-    await check(width);
-  }
-}
+});
 
 // Les rectangles { left, right, top, bottom, width, height } des éléments d'un sélecteur.
 const rects = (page, selector) => page.locator(selector).evaluateAll(elements => elements.map(element => {
@@ -152,21 +67,7 @@ const centerY = box => (box.top + box.bottom) / 2;
 
 test('avec les logos, aucun défilement horizontal du téléphone (320px) au grand écran (1920px)', { skip }, () =>
   withWidget({}, async ({ page }) => {
-    await atEachWidth(page, WIDTHS, async width => {
-      const { client, scroll, outside } = await page.evaluate(() => {
-        const client = document.documentElement.clientWidth;
-        const outside = [...document.querySelectorAll('body *')]
-          .filter(element => element.getClientRects().length > 0)
-          .filter(element => {
-            const { left, right } = element.getBoundingClientRect();
-            return right > client + 0.5 || left < -0.5;
-          })
-          .map(element => `${element.tagName.toLowerCase()}.${element.className}`);
-        return { client, scroll: document.documentElement.scrollWidth, outside: outside.slice(0, 5) };
-      });
-      assert.ok(scroll <= client, `à ${width}px, la page déborde de ${scroll - client}px`);
-      assert.deepEqual(outside, [], `à ${width}px, des éléments sortent du cadre`);
-    });
+    await atEachWidth(page, WIDTHS, width => assertNoHorizontalOverflow(page, width));
   }));
 
 // ===== En-tête : titre, compteur, financeurs =====
@@ -280,44 +181,15 @@ function compactBranding() {
   return tables;
 }
 
-const cardGeometry = page => page.evaluate(() => {
-  const cards = [...document.querySelectorAll('.contact-card')];
-  const centerOf = element => {
-    const { top, bottom } = element.getBoundingClientRect();
-    return (top + bottom) / 2;
-  };
-  const first = cards[0];
-  const second = cards[1];
-  const box = first.getBoundingClientRect();
-  const badge = first.querySelector('.etablissement-tag.visible').getBoundingClientRect();
-  const image = first.querySelector('.etablissement-tag img').getBoundingClientRect();
-  const nameAndFunction = card => {
-    const name = card.querySelector('.name').getBoundingClientRect();
-    const role = card.querySelector('.fonction').getBoundingClientRect();
-    return (name.top + role.bottom) / 2 - centerOf(card.querySelector('.avatar'));
-  };
-  return {
-    columns: new Set(cards.map(card => Math.round(card.getBoundingClientRect().left))).size,
-    badgeFromRight: box.right - badge.right,
-    badgeFromTop: badge.top - box.top,
-    imageFromBadgeRight: badge.right - image.right,
-    image: { width: image.width, height: image.height },
-    nameVsAvatar: centerOf(first.querySelector('.name')) - centerOf(first.querySelector('.avatar')),
-    nameAndFunctionVsAvatar: nameAndFunction(second)
-  };
-});
-
 test('à 1480px avec logos : trois colonnes, logo dans le coin haut droit comme la pastille, nom centré sur l\'avatar', { skip }, () =>
   withWidget({ width: 1480, tables: compactBranding() }, async ({ page }) => {
-    const card = await cardGeometry(page);
+    const card = await cardGeometry(page, { logo: true });
     assert.equal(card.columns, 3);
-    assert.ok(card.badgeFromRight >= 9 && card.badgeFromRight <= 13, `logo à ${card.badgeFromRight}px du bord droit`);
-    assert.ok(card.badgeFromTop >= 12 && card.badgeFromTop <= 16, `logo à ${card.badgeFromTop}px du haut`);
+    assertBadgeInCorner(card, 'logo');
     assert.ok(card.imageFromBadgeRight >= 0 && card.imageFromBadgeRight <= 6, `l'image est calée à droite de son cadre (${card.imageFromBadgeRight}px)`);
     assert.ok(card.image.width <= 240.5 && card.image.height <= 64.5, `le logo fait ${Math.round(card.image.width)}x${Math.round(card.image.height)}px`);
     assert.ok(card.image.height >= 14, `le logo reste lisible (${Math.round(card.image.height)}px de haut)`);
-    assert.ok(Math.abs(card.nameVsAvatar) <= 2, `nom décalé de ${card.nameVsAvatar}px par rapport à l'avatar`);
-    assert.ok(Math.abs(card.nameAndFunctionVsAvatar) <= 3, `nom et fonction décalés de ${card.nameAndFunctionVsAvatar}px par rapport à l'avatar`);
+    assertNameBesideAvatar(card);
   }));
 
 // Les logos ont des formes différentes (de 1,2 à 6 fois plus larges que hauts dans ces fichiers) : sur une carte,
@@ -437,42 +309,15 @@ test('logos des cartes : les marges transparentes sont retirées, et les logos o
 
 test('sur téléphone avec logos, le nom reste centré sur l\'avatar et le logo dans le coin de la carte', { skip }, () =>
   withWidget({ width: 360, tables: compactBranding() }, async ({ page }) => {
-    const card = await cardGeometry(page);
-    assert.ok(card.badgeFromRight >= 9 && card.badgeFromRight <= 13, `logo à ${card.badgeFromRight}px du bord droit`);
-    assert.ok(card.badgeFromTop >= 12 && card.badgeFromTop <= 16, `logo à ${card.badgeFromTop}px du haut`);
-    assert.ok(Math.abs(card.nameAndFunctionVsAvatar) <= 3, `nom et fonction décalés de ${card.nameAndFunctionVsAvatar}px par rapport à l'avatar`);
+    const card = await cardGeometry(page, { logo: true });
+    assertBadgeInCorner(card, 'logo');
+    assertNameBesideAvatar(card, { alone: false });
   }));
 
 test('le nom et la fonction ne passent jamais sous le logo de l\'établissement, le nom tient sur deux lignes au plus', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await atEachWidth(page, [320, 360, 600, 768, 840, 1024, 1280, 1480], async width => {
-      const { checked, withLogo, overlapping, tooTall, outside } = await page.evaluate(() => {
-        let checked = 0;
-        let withLogo = 0;
-        const overlapping = [];
-        const tooTall = [];
-        const outside = [];
-        document.querySelectorAll('.contact-card').forEach(card => {
-          const nameElement = card.querySelector('.name');
-          const name = nameElement.getBoundingClientRect();
-          if (name.height > 2.7 * parseFloat(getComputedStyle(nameElement).fontSize)) tooTall.push(nameElement.textContent);
-          const badge = card.querySelector('.etablissement-tag.visible');
-          if (!badge) return;
-          checked++;
-          if (badge.classList.contains('has-logo')) withLogo++;
-          const box = badge.getBoundingClientRect();
-          if (name.right > box.left + 0.5) overlapping.push(nameElement.textContent);
-          // La fonction, elle, ne passe pas sous le logo non plus.
-          const role = card.querySelector('.fonction');
-          if (role.getClientRects().length > 0 && role.getBoundingClientRect().right > box.left + 0.5
-              && role.getBoundingClientRect().top < box.bottom - 0.5) overlapping.push(role.textContent);
-          const image = badge.querySelector('img')?.getBoundingClientRect();
-          if (image && (image.left < box.left - 0.5 || image.right > box.right + 0.5 || image.top < box.top - 0.5 || image.bottom > box.bottom + 0.5)) {
-            outside.push(nameElement.textContent);
-          }
-        });
-        return { checked, withLogo, overlapping, tooTall, outside };
-      });
+      const { checked, withLogo, overlapping, tooTall, outside } = await measureNamesAgainstBadges(page, { logo: true });
       assert.ok(checked > 0 && withLogo === checked, `à ${width}px, toutes les cartes affichent un logo (${withLogo}/${checked})`);
       assert.deepEqual(overlapping, [], `à ${width}px, le logo recouvre le nom`);
       assert.deepEqual(tooTall, [], `à ${width}px, un nom s'étend sur plus de deux lignes`);

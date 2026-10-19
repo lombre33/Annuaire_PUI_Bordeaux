@@ -90,6 +90,20 @@ const nomsDesRubriques = (page, cle) => filtre(page, cle).locator('.group-head .
 // Ce que le menu montre vraiment : une ligne repliée ou masquée n'a plus de boîte à l'écran.
 const visibles = (page, cle, selecteur) => filtre(page, cle).locator(selecteur).evaluateAll(lignes =>
   lignes.filter(ligne => ligne.getClientRects().length > 0).map(ligne => ligne.dataset.value));
+// Ouvre le menu `cle`, y coche en entier le groupe `entier`, déplie le groupe `partiel` pour n'y cocher que `element`, attend `cartes`
+// cartes, puis rouvre le menu : ce qui est coché passe devant. Rend le menu, le groupe `partiel` et les noms des groupes, dans l'ordre.
+async function cocherUnGroupeEtUnElement(page, cle, { entier, partiel, element, cartes }) {
+  const menu = filtre(page, cle);
+  await menu.locator('.filter-button').click();
+  await rubrique(page, cle, entier).locator('.group-option input').check();
+  const detail = rubrique(page, cle, partiel);
+  await detail.locator('.group-toggle').click();
+  await detail.locator('.filter-option', { hasText: element }).locator('input').check();
+  await attendreCartes(page, cartes);
+  await page.mouse.click(5, 5);
+  await menu.locator('.filter-button').click();
+  return { menu, detail, noms: await nomsDesRubriques(page, cle) };
+}
 
 // ===== Modifier une fiche =====
 
@@ -392,20 +406,13 @@ const SCENES = [
     fichier: 'filtre-competences.png', zone: jusquAu('.filter.open .filter-menu'),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
-      const menu = filtre(page, 'competences');
-      await menu.locator('.filter-button').click();
-      await rubrique(page, 'competences', 'Recherche clinique').locator('.group-option input').check();
-      const sante = rubrique(page, 'competences', 'Santé numérique et données');
-      await sante.locator('.group-toggle').click();
-      await sante.locator('.filter-option', { hasText: 'Open science' }).locator('input').check();
-      await attendreCartes(page, 3);
-      await page.mouse.click(5, 5);
-      await menu.locator('.filter-button').click();
-      const noms = await nomsDesRubriques(page, 'competences');
+      const { menu, detail, noms } = await cocherUnGroupeEtUnElement(page, 'competences', {
+        entier: 'Recherche clinique', partiel: 'Santé numérique et données', element: 'Open science', cartes: 3
+      });
       exiger(noms[0] === 'Recherche clinique' && noms[1] === 'Santé numérique et données',
         `les domaines cochés ne passent pas devant : ${noms.join(', ')}`);
       exiger(await rubrique(page, 'competences', 'Recherche clinique').getAttribute('data-state') === 'all', '« Recherche clinique » n\'est pas coché en entier');
-      exiger(await rubrique(page, 'competences', 'Santé numérique et données').getAttribute('data-state') === 'some', '« Santé numérique et données » n\'est pas coché en partie');
+      exiger(await detail.getAttribute('data-state') === 'some', '« Santé numérique et données » n\'est pas coché en partie');
       exiger((await visibles(page, 'competences', '.filter-option')).join() === 'Open science,Intelligence artificielle,Santé numérique',
         'le détail du domaine partiel n\'est pas déplié, la compétence cochée en tête');
       exiger(await menu.locator('.filter-count').textContent() === '2', 'le bouton ne compte pas un domaine et une compétence');
@@ -431,21 +438,14 @@ const SCENES = [
     fichier: 'filtre-taches.png', zone: jusquAu('.filter.open .filter-menu'),
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
-      const menu = filtre(page, 'taches');
-      await menu.locator('.filter-button').click();
-      await rubrique(page, 'taches', 'Action 2: Maturation de projets').locator('.group-option input').check();
-      const valorisation = rubrique(page, 'taches', 'Action 1: Valorisation de la recherche');
-      await valorisation.locator('.group-toggle').click();
-      await valorisation.locator('.filter-option', { hasText: '1.1 Animation de réseau' }).locator('input').check();
-      await attendreCartes(page, 9);
-      await page.mouse.click(5, 5);
-      await menu.locator('.filter-button').click();
-      const noms = await nomsDesRubriques(page, 'taches');
+      const { menu, detail, noms } = await cocherUnGroupeEtUnElement(page, 'taches', {
+        entier: 'Action 2: Maturation de projets', partiel: 'Action 1: Valorisation de la recherche', element: '1.1 Animation de réseau', cartes: 9
+      });
       exiger(noms.join() === 'Action 1: Valorisation de la recherche,Action 2: Maturation de projets,'
         + 'Action 3: Formation à l\'innovation,Action 4: Veille et propriété intellectuelle,Sans action',
         `les actions cochées ne passent pas devant, « Sans action » n'est pas en dernier : ${noms.join(', ')}`);
       exiger(await rubrique(page, 'taches', 'Action 2: Maturation de projets').getAttribute('data-state') === 'all', 'l\'action 2 n\'est pas cochée en entier');
-      exiger(await valorisation.getAttribute('data-state') === 'some', 'l\'action 1 n\'est pas cochée en partie');
+      exiger(await detail.getAttribute('data-state') === 'some', 'l\'action 1 n\'est pas cochée en partie');
       exiger((await visibles(page, 'taches', '.filter-option')).join() === '1.1 Animation de réseau,1.2 Organisation d\'événements',
         'le détail de l\'action partielle n\'est pas déplié, la tâche cochée en tête');
       exiger(await menu.locator('.filter-count').textContent() === '2', 'le bouton ne compte pas une action et une tâche');

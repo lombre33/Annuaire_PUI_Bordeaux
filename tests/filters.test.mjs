@@ -7,6 +7,27 @@ import {
   menuGroups, groupState, toggleGroup, selectionCount
 } from '../filters.js';
 
+const names = contacts => contacts.map(contact => contact.nom);
+
+// Les noms des contacts que garde le filtre `key` une fois la valeur `value` cochée.
+function keptBy(contacts, key, value) {
+  const activeFilters = createEmptyFilterState();
+  activeFilters[key].add(value);
+  return names(filterContacts(contacts, activeFilters, ''));
+}
+
+// Cocher un groupe du menu `filter` (un domaine, une action) garde exactement les contacts qui ont au moins une valeur dans ce
+// groupe (`contact.labels[filter.grouping]`), ni plus ni moins ; `what` complète le message (« de ce domaine »).
+function assertTickingKeepsTheGroup(contacts, filter, groups, what) {
+  groups.forEach(group => {
+    const activeFilters = createEmptyFilterState();
+    toggleGroup(activeFilters[filter.key], group.values);
+    assert.deepEqual(names(filterContacts(contacts, activeFilters, '')),
+      names(contacts.filter(contact => contact.labels[filter.grouping].includes(group.label))),
+      `cocher « ${group.label} » donne les contacts de ${what}, ni plus ni moins`);
+  });
+}
+
 test('filterContacts applies the free-text search on nom/prenom', () => {
   const contacts = [
     { nom: 'Dupont', prenom: 'Alice' },
@@ -121,11 +142,7 @@ test('filterContacts applies a category filter (etablissement) via the uniform l
     { nom: 'A', labels: { etablissement: ['CHU'] } },
     { nom: 'B', labels: { etablissement: ['Clinique'] } }
   ];
-  const activeFilters = createEmptyFilterState();
-  activeFilters.etablissement.add('CHU');
-  const result = filterContacts(contacts, activeFilters, '');
-  assert.equal(result.length, 1);
-  assert.equal(result[0].nom, 'A');
+  assert.deepEqual(keptBy(contacts, 'etablissement', 'CHU'), ['A']);
 });
 
 test('filterContacts applies a tag-list filter (e.g. instances)', () => {
@@ -133,11 +150,7 @@ test('filterContacts applies a tag-list filter (e.g. instances)', () => {
     { nom: 'A', labels: { instances: ['CME'] } },
     { nom: 'B', labels: { instances: ['COVIRIS'] } }
   ];
-  const activeFilters = createEmptyFilterState();
-  activeFilters.instances.add('CME');
-  const result = filterContacts(contacts, activeFilters, '');
-  assert.equal(result.length, 1);
-  assert.equal(result[0].nom, 'A');
+  assert.deepEqual(keptBy(contacts, 'instances', 'CME'), ['A']);
 });
 
 test('filterContacts applies the Rôle PUI filter, counts its options and drops a role that no longer exists', () => {
@@ -165,11 +178,7 @@ test('filterContacts matches a category filter regardless of case/accent differe
     { nom: 'A', labels: { competences: ['oncologie'] } },
     { nom: 'B', labels: { competences: ['Autre'] } }
   ];
-  const activeFilters = createEmptyFilterState();
-  activeFilters.competences.add('Oncologie');
-  const result = filterContacts(contacts, activeFilters, '');
-  assert.equal(result.length, 1);
-  assert.equal(result[0].nom, 'A');
+  assert.deepEqual(keptBy(contacts, 'competences', 'Oncologie'), ['A']);
 });
 
 test('pruneStaleFilters drops a selected label that no longer exists in its reference table (e.g. renamed in Grist)', () => {
@@ -263,7 +272,6 @@ test('computeFilterCounts counts a label that is the name of an object property 
 // toutes ses compétences. Le filtre ne connaît que des compétences.
 
 const competencesFilter = FILTERS.find(filter => filter.key === 'competences');
-const names = contacts => contacts.map(contact => contact.nom);
 
 // Les libellés d'une table Competences : id → libellé, id → domaine (le repli « Autres »
 // est déjà posé, comme le fait loadDirectory).
@@ -289,13 +297,7 @@ test('ticking a domain keeps the contacts with at least one skill in it, exactly
   const groups = menuGroups(competencesFilter, SKILLS);
   assert.deepEqual(groups.map(group => group.label), ['Cancérologie', 'Pharmacie', 'Autres']);
 
-  groups.forEach(group => {
-    const activeFilters = createEmptyFilterState();
-    toggleGroup(activeFilters.competences, group.values);
-    assert.deepEqual(names(filterContacts(contacts, activeFilters, '')),
-      names(contacts.filter(contact => contact.labels.macro.includes(group.label))),
-      `cocher « ${group.label} » donne les contacts de ce domaine, ni plus ni moins`);
-  });
+  assertTickingKeepsTheGroup(contacts, competencesFilter, groups, 'ce domaine');
   assert.deepEqual(names(contacts.filter(contact => contact.labels.macro.length === 0)), ['D'], 'sans compétence, aucun domaine : la personne n\'est dans aucun groupe');
 });
 
@@ -515,13 +517,7 @@ test('ticking an action keeps the contacts with at least one task in it', () => 
   const groups = menuGroups(tachesFilter, TASKS);
   assert.deepEqual(groups.map(group => group.label), [VACCINATION, AUDIT, 'Sans action']);
 
-  groups.forEach(group => {
-    const activeFilters = createEmptyFilterState();
-    toggleGroup(activeFilters.taches, group.values);
-    assert.deepEqual(names(filterContacts(contacts, activeFilters, '')),
-      names(contacts.filter(contact => contact.labels.macroTaches.includes(group.label))),
-      `cocher « ${group.label} » donne les contacts de cette action, ni plus ni moins`);
-  });
+  assertTickingKeepsTheGroup(contacts, tachesFilter, groups, 'cette action');
   assert.deepEqual(names(contacts.filter(contact => contact.labels.macroTaches.length === 0)), ['D'], 'sans tâche, aucune action');
 });
 
