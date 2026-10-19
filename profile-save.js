@@ -18,6 +18,7 @@ import { classifyWriteError } from './presence.js';
 import { describeChanges, diffProfile, rebaseChanges } from './profile.js';
 import { previewOf, withAvatarChange } from './preview.js';
 import { readColumnTypes } from './schema.js';
+import { uploadThenRecheck } from './save-upload.js';
 
 // Erreur dont le message est une phrase française destinée à la personne ; l'erreur
 // d'origine reste dans `cause` et dans la console.
@@ -39,42 +40,54 @@ function phoneIsNumeric(columnTypes, row) {
   return typeof row.numero_de_telephone !== 'string';
 }
 
+// Ce que chaque sorte de champ écrit dans la ligne de BDD. Un écrivain reçoit le champ, son changement (ramené sur la
+// fiche), la fiche telle qu'elle est maintenant et le type des colonnes, et renvoie { value } (la cellule à écrire),
+// { error } ou {} (rien à écrire). Les listes sont le cas par défaut.
+
+// La photo s'écrit après son envoi à Grist (saveProfile) : son identifiant n'existe pas encore.
+function writeImage(field, change, row, columnTypes) {
+  const type = columnTypes[field.key];
+  return type && type !== 'Attachments' ? { error: `${field.label} : la colonne ${field.key} n'est pas une colonne de pièces jointes` } : {};
+}
+
+const writeText = (field, change) => ({ value: change.apres });
+
+function writePhone(field, change, row, columnTypes) {
+  const numeric = phoneIsNumeric(columnTypes, row);
+  if (change.apres === '') return { value: numeric ? null : '' };
+  return { value: numeric ? Number(change.apres) : formatPhone(change.apres) };
+}
+
+const writeReference = (field, change) => ({ value: change.apres.id });
+
+// Une liste se calcule sur les valeurs ACTUELLES de la fiche.
+function writeList(field, change, row) {
+  const current = safeValues(row[field.key]);
+  if (current.some(item => !Number.isSafeInteger(item))) {
+    return { error: `${field.label} : la fiche contient des valeurs que le widget ne sait pas modifier, à corriger dans Grist` };
+  }
+  // Une entrée qui réunit plusieurs lignes de la table liée (`ids`) se retire de toutes, et ne
+  // s'ajoute pas si la fiche en porte déjà une.
+  const rowsOf = entry => entry.ids || [entry.id];
+  const removed = new Set(change.retrait.flatMap(rowsOf));
+  const kept = current.filter(id => !removed.has(id));
+  const added = change.ajout.filter(entry => !rowsOf(entry).some(id => kept.includes(id))).map(entry => entry.id);
+  return { value: ['L', ...kept, ...added] };
+}
+
+const WRITERS = { image: writeImage, text: writeText, email: writeText, phone: writePhone, reference: writeReference };
+
 // Les valeurs à écrire dans la ligne de BDD pour appliquer `champs` (la forme de
 // diffProfile, ramenée sur la fiche par rebaseChanges) : { values } ou { error }.
-// Une liste se calcule sur les valeurs ACTUELLES de la fiche.
 export function buildRowUpdate(champs, row, columnTypes = {}) {
   const values = {};
   for (const field of PROFILE_FIELDS) {
     const change = champs[field.key];
     if (!change) continue;
     if (!(field.key in row)) return { error: `${field.label} : la colonne ${field.key} n'existe pas dans ${MAIN_TABLE}` };
-    if (field.kind === 'image') {
-      // La photo s'écrit après son envoi à Grist (saveProfile) : son identifiant n'existe pas encore.
-      const type = columnTypes[field.key];
-      if (type && type !== 'Attachments') return { error: `${field.label} : la colonne ${field.key} n'est pas une colonne de pièces jointes` };
-      continue;
-    }
-    if (field.kind === 'text' || field.kind === 'email') {
-      values[field.key] = change.apres;
-    } else if (field.kind === 'phone') {
-      const numeric = phoneIsNumeric(columnTypes, row);
-      if (change.apres === '') values[field.key] = numeric ? null : '';
-      else values[field.key] = numeric ? Number(change.apres) : formatPhone(change.apres);
-    } else if (field.kind === 'reference') {
-      values[field.key] = change.apres.id;
-    } else {
-      const current = safeValues(row[field.key]);
-      if (current.some(item => !Number.isSafeInteger(item))) {
-        return { error: `${field.label} : la fiche contient des valeurs que le widget ne sait pas modifier, à corriger dans Grist` };
-      }
-      // Une entrée qui réunit plusieurs lignes de la table liée (`ids`) se retire de toutes, et ne
-      // s'ajoute pas si la fiche en porte déjà une.
-      const rowsOf = entry => entry.ids || [entry.id];
-      const removed = new Set(change.retrait.flatMap(rowsOf));
-      const kept = current.filter(id => !removed.has(id));
-      const added = change.ajout.filter(entry => !rowsOf(entry).some(id => kept.includes(id))).map(entry => entry.id);
-      values[field.key] = ['L', ...kept, ...added];
-    }
+    const written = (WRITERS[field.kind] ?? writeList)(field, change, row, columnTypes);
+    if (written.error) return { error: written.error };
+    if ('value' in written) values[field.key] = written.value;
   }
   const touchesName = 'nom' in values || 'prenom' in values;
   if (touchesName && !text(values.nom ?? row.nom) && !text(values.prenom ?? row.prenom)) {
@@ -194,14 +207,9 @@ export function unsavedLabels(review, saved, referenceMaps, { attachmentId = nul
   return labels;
 }
 
-// Écrit les changements d'une relecture (prepareReview). Renvoie { status: 'saved', values,
-// attachmentId } ou { status: 'changed', row, leftover } : la fiche a changé dans Grist depuis la
-// relecture, rien n'a été écrit et `row` est son état actuel. Lève une ProfileSaveError.
-// `upload(file)` envoie la nouvelle photo à Grist et renvoie l'identifiant de la pièce jointe
-// (upload.js) ; il n'est appelé que si la photo est remplacée, et APRÈS les vérifications. Une photo
-// envoyée mais pas utilisée (la fiche a changé, ou l'écriture est refusée) reste dans les pièces
-// jointes du document : `leftover` en donne l'identifiant.
-export async function saveProfile(docApi, review, { upload, log = console } = {}) {
+// Ce que saveProfile vérifie avant de toucher à Grist : { keys, replacing } (les colonnes touchées, et si la photo est
+// remplacée). Lève une ProfileSaveError.
+function checkSaveable(review, upload) {
   const keys = Object.keys(review.champs);
   if (keys.length === 0) throw new ProfileSaveError('Aucun changement à enregistrer.');
   // Fermé par défaut : l'e-mail et l'établissement ne s'écrivent que pour un administrateur.
@@ -210,35 +218,48 @@ export async function saveProfile(docApi, review, { upload, log = console } = {}
   }
   const replacing = review.champs.Avatar?.action === 'replace';
   if (replacing && (!review.file || typeof upload !== 'function')) throw new ProfileSaveError(FAILURES.noFile);
+  return { keys, replacing };
+}
 
-  // La fiche telle qu'elle est maintenant : { row } si elle est comme à la relecture, { changed: row }
-  // si quelqu'un l'a modifiée depuis. Lève une ProfileSaveError (adresse prise entre-temps).
-  const inspect = async () => {
-    const { row, rows } = await readFiche(docApi, review.rowId, log);
-    if (signatureOf(row, keys) !== review.signature) return { changed: row };
-    if (review.champs.email && emailTakenBy(rows, review.rowId)(review.champs.email.apres)) throw new ProfileSaveError(FAILURES.emailTaken);
-    return { row };
-  };
+// La fiche telle qu'elle est maintenant : { row } si elle est comme à la relecture, { changed: row } si quelqu'un
+// l'a modifiée depuis. Lève une ProfileSaveError (adresse prise entre-temps).
+async function inspectFiche(docApi, review, keys, log) {
+  const { row, rows } = await readFiche(docApi, review.rowId, log);
+  if (signatureOf(row, keys) !== review.signature) return { changed: row };
+  if (review.champs.email && emailTakenBy(rows, review.rowId)(review.champs.email.apres)) throw new ProfileSaveError(FAILURES.emailTaken);
+  return { row };
+}
+
+// Écrit `values` dans la ligne de la relecture, en une seule action Grist. Lève une ProfileSaveError.
+async function writeFiche(docApi, review, values, attachmentId, log) {
+  try {
+    await docApi.applyUserActions([['UpdateRecord', MAIN_TABLE, review.rowId, values]]);
+  } catch (error) {
+    log.error('[PROFIL] écriture impossible :', error);
+    throw new ProfileSaveError(FAILURES[classifyWriteError(error)], error, { leftover: attachmentId });
+  }
+}
+
+// Écrit les changements d'une relecture (prepareReview). Renvoie { status: 'saved', values,
+// attachmentId } ou { status: 'changed', row, leftover } : la fiche a changé dans Grist depuis la
+// relecture, rien n'a été écrit et `row` est son état actuel. Lève une ProfileSaveError.
+// `upload(file)` envoie la nouvelle photo à Grist et renvoie l'identifiant de la pièce jointe
+// (upload.js) ; il n'est appelé que si la photo est remplacée, et APRÈS les vérifications. Une photo
+// envoyée mais pas utilisée (la fiche a changé, ou l'écriture est refusée) reste dans les pièces
+// jointes du document : `leftover` en donne l'identifiant.
+export async function saveProfile(docApi, review, { upload, log = console } = {}) {
+  const { keys, replacing } = checkSaveable(review, upload);
+  const inspect = () => inspectFiche(docApi, review, keys, log);
 
   let current = await inspect();
   if (current.changed) return { status: 'changed', row: current.changed };
 
   let attachmentId = null;
   if (replacing) {
-    try {
-      attachmentId = await upload(review.file);
-    } catch (error) {
-      if (error?.name === 'UploadError') throw new ProfileSaveError(error.message, error);
-      log.error('[PROFIL] envoi de la photo impossible :', error);
-      throw new ProfileSaveError(FAILURES.other, error);
-    }
     // L'envoi prend du temps : la fiche a pu bouger, on relit avant d'écrire.
-    try {
-      current = await inspect();
-    } catch (error) {
-      if (error instanceof ProfileSaveError) error.leftover = attachmentId;
-      throw error;
-    }
+    ({ attachmentId, state: current } = await uploadThenRecheck(review.file, {
+      upload, recheck: inspect, ErrorClass: ProfileSaveError, fallback: FAILURES.other, consoleLine: '[PROFIL] envoi de la photo impossible :', log
+    }));
     if (current.changed) return { status: 'changed', row: current.changed, leftover: attachmentId };
   }
 
@@ -247,12 +268,7 @@ export async function saveProfile(docApi, review, { upload, log = console } = {}
   const values = { ...built.values };
   if (replacing) values.Avatar = ['L', attachmentId];
   else if (review.champs.Avatar) values.Avatar = ['L'];
-  try {
-    await docApi.applyUserActions([['UpdateRecord', MAIN_TABLE, review.rowId, values]]);
-  } catch (error) {
-    log.error('[PROFIL] écriture impossible :', error);
-    throw new ProfileSaveError(FAILURES[classifyWriteError(error)], error, { leftover: attachmentId });
-  }
+  await writeFiche(docApi, review, values, attachmentId, log);
   return { status: 'saved', values, attachmentId };
 }
 

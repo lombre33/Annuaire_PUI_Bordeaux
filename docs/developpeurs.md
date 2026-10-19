@@ -109,6 +109,7 @@ flowchart TD
         preview["preview.js<br/>cartes avant et après"]
         schema["schema.js<br/>type des colonnes"]
         profileui["profile-ui.js<br/>la fenêtre"]
+        saveupload["save-upload.js<br/>envoi puis relecture"]
         changes["changes-ui.js<br/>liste des changements"]
         dom["dom.js<br/>el(), button(), notice(), searchField(), dropdown()"]
     end
@@ -165,6 +166,7 @@ flowchart TD
     save --> profile
     save --> preview
     save --> schema
+    save --> saveupload
     preview --> data
     preview --> constants
     schema --> data
@@ -185,6 +187,7 @@ flowchart TD
     etabsave --> constants
     etabsave --> presence
     etabsave --> etablissement
+    etabsave --> saveupload
     etabui --> constants
     etabui --> dom
     etabui --> etablissement
@@ -216,6 +219,7 @@ Une flèche signifie « importe » ; tous les `import` des fichiers à la racine
 | `etablissement-save.js` | Relire puis écrire la fiche d'un établissement : `readEtablissement()` lit la ligne d'`Etablissements` et la liste des responsables d'`ACL`, `savePlanOf()` prépare l'enregistrement et `saveEtablissement()` l'exécute : le fichier du logo d'abord (par `upload`), puis **une seule action atomique** (`UpdateRecord` de l'établissement et actions sur `ACL`), seulement si la personne est responsable et si le nom, la visibilité et le logo n'ont pas changé dans Grist depuis l'ouverture ; il relit enfin tout pour dire ce que Grist n'a pas gardé |
 | `etablissement-ui.js` | La fenêtre « Fiche de l’établissement » (`createEtablissementDialog()`) : choix de l'établissement s'il y en a plusieurs, logo, sigle et statut en lecture seule, nom, visibilité, responsables, enregistrement direct. DOM seulement |
 | `upload.js` | `uploadAttachment()` : envoie un fichier (l'image d'un logo, la photo d'une personne) dans les pièces jointes du document, avec un jeton en écriture demandé pour l'envoi et jamais gardé ; la consigne qui termine les messages d'échec (`hint`) est celle de l'appelant : déposer le logo à la main dans Grist, ou prévenir un administrateur pour une photo. **La seule requête réseau du code** (voir [sécurité](securite.md#lenvoi-dun-fichier-et-le-jeton-en-écriture)) |
+| `save-upload.js` | `uploadThenRecheck()` : le temps commun à `saveProfile()` et à `saveEtablissement()` quand une photo ou un logo est remplacé : envoyer le fichier (par l'`upload` que l'appelant donne), puis relire l'état de la fiche avant d'écrire, parce que l'envoi prend du temps. L'échec de l'envoi devient l'erreur de l'appelant (la phrase d'un `UploadError` telle quelle, sinon une phrase de repli et la cause dans la console) ; une relecture refusée porte l'identifiant du fichier envoyé qui ne servira pas (`leftover`). Ni DOM, ni Grist, ni réseau |
 | `image-prep.js` | `prepareImage(fichier, règles)` : lit l'image choisie, la redessine dans un canvas et la ré-encode selon `IMAGE_RULES`, pour qu'une image envoyée ne contienne ni script ni métadonnées : un logo (`IMAGE_RULES.logo`) tient dans 480 px et devient un PNG ; une photo de profil (`IMAGE_RULES.avatar`) est recadrée en carré au centre (`squareCrop()`), ramenée à 256 px au plus (sans être agrandie), posée sur fond blanc et devient un JPEG. `checkImageFile()` refuse avant toute lecture un format, un poids ou un fichier vide inacceptables, et `megabytes()` écrit un poids à la française. Le seul module de logique (voir les règles de répartition plus bas) qui touche au DOM : un canvas qui n'est jamais ajouté à la page |
 | `branding.js` | L'habillage, sans DOM ni Grist : `buildBranding()` (les fondateurs du bandeau du bas, les financeurs, le rond, le logo de chaque établissement), `logoForContact()` (le logo d'une carte) et `logoSize()` (la taille d'un logo d'après ses proportions) |
 | `attachments.js` | Les pièces jointes de Grist : `attachmentIds()` lit une cellule « Pièces jointes » (`avatarIdOf()`, celle de la photo de profil : le premier fichier, 0 sans photo), `createAttachments()` détient le jeton d'accès en lecture seule (`getAccessToken`) et donne l'adresse de chaque fichier ; il parle à Grist par le `docApi` qu'on lui passe, sans toucher au DOM. `readTokenInfo()`, qui vérifie la réponse de `getAccessToken`, est aussi employée par `upload.js` |
@@ -227,7 +231,7 @@ Une flèche signifie « importe » ; tous les `import` des fichiers à la racine
 
 Règles de répartition, à respecter pour que les tests restent possibles sans navigateur :
 
-1. `constants.js`, `grist-data.js`, `filters.js`, `identity.js`, `presence.js`, `profile.js`, `profile-save.js`, `preview.js`, `schema.js`, `branding.js`, `attachments.js`, `etablissement.js`, `etablissement-save.js` et `upload.js` n'utilisent jamais le DOM (`avatar-ui.js` est du DOM seulement). `image-prep.js` n'en touche que ce qu'il lui faut pour décoder une image (un canvas hors de la page).
+1. `constants.js`, `grist-data.js`, `filters.js`, `identity.js`, `presence.js`, `profile.js`, `profile-save.js`, `preview.js`, `schema.js`, `branding.js`, `attachments.js`, `etablissement.js`, `etablissement-save.js`, `save-upload.js` et `upload.js` n'utilisent jamais le DOM (`avatar-ui.js` est du DOM seulement). `image-prep.js` n'en touche que ce qu'il lui faut pour décoder une image (un canvas hors de la page).
 2. Seules `loadDirectory()` et `readColumnTypes()` (lectures), `createAttachments()` (il demande un jeton), `readIdentity()`, `setPresence()`, les fonctions de `profile-save.js` (`prepareReview()` lit, `saveProfile()` écrit), celles d'`etablissement-save.js` (`readEtablissement()` lit, `saveEtablissement()` écrit) et `uploadAttachment()` (qui demande un jeton en écriture et envoie le fichier) parlent à Grist, par le `docApi` qu'on leur passe : les tests leur fournissent un faux `docApi` (`tests/support/fake-grist.js`). `profile.js`, `preview.js` et `etablissement.js` ne l'utilisent jamais.
 3. `render.js` ne contient aucune règle métier : il reçoit des contacts déjà filtrés et des fonctions de rappel (`onToggle`, et `onToggleGroup` pour la case d'un domaine ou d'une action). Ce qu'il sait d'un menu rangé par groupe (les groupes, l'état d'une case de domaine ou d'action, le chiffre du bouton) vient des fonctions pures de `filters.js`, d'où la flèche `render.js` → `filters.js` du schéma.
 
@@ -880,6 +884,7 @@ npx playwright install chromium         # ou CHROMIUM_PATH=/chemin/vers/chromium
 | `tests/etablissement.test.mjs` | `etablissementRightsFor()` (fermé par défaut, un administrateur n'est pas responsable pour autant), `etablissementOf()`, `responsablesOf()`, `peopleOfEtablissement()`, le brouillon (`nominate()`, `toggleResponsable()`, `rebaseDraft()`), `diffEtablissement()` et les phrases (`summaryOf()`, `visibilityWarning()`) |
 | `tests/etablissement-save.test.mjs` | `readEtablissement()` et `saveEtablissement()` avec le faux Grist : droit exigé, une seule action atomique, conflit nom / visibilité / logo, ligne d'`ACL` d'administrateur conservée, adresse reprise ou créée, au moins un responsable (aussi sur la liste relue), envoi puis relecture, refus de Grist, fichier orphelin, vérification après écriture, aucune adresse dans la console |
 | `tests/upload.test.mjs` | `uploadAttachment()` : jeton en écriture demandé à chaque envoi et jamais gardé, adresse refusée hors https, en-tête `X-Requested-With` envoyé, requête sans cookie ni adresse de page, délai, statuts 401, 403, 413 et autres, réponse illisible, ni jeton ni adresse dans la console, consigne de l'appelant (celle du logo, celle de la photo) |
+| `tests/save-upload.test.mjs` | `uploadThenRecheck()` : l'envoi d'abord et la relecture ensuite, la phrase d'un `UploadError` rendue telle quelle sans rien écrire dans la console, la phrase de repli et la cause dans la console pour toute autre erreur, l'identifiant du fichier resté dans Grist quand la relecture refuse l'enregistrement, une erreur imprévue qui passe sans identifiant |
 | `tests/e2e-upload-cors.test.mjs` | L'envoi d'une photo depuis la page du widget (une autre origine que Grist) à un vrai serveur HTTP (`tests/support/grist-rest-server.mjs`) qui reprend l'ordre des intergiciels de Grist, CORS appliqué par Chromium : l'envoi aboutit avec l'en-tête `X-Requested-With`, et la requête sans lui échoue comme la panne signalée le 13 octobre 2026 (401 sans en-têtes CORS, donc `TypeError`) |
 | `tests/image-prep.test.mjs` | `megabytes()`, `checkImageFile()`, `fitWithin()` (plus grand côté ramené à 480 px au plus, SVG agrandi), `squareCrop()` (carré découpé au centre, jamais agrandi) et les refus de `prepareImage()` avant toute lecture (formats, poids, fichier vide) ; pour une photo, les règles de `IMAGE_RULES.avatar` (carré de 256 px au plus, JPEG, 2 Mo au plus, SVG refusé) ; le dessin lui-même et le PNG ou le JPEG produit s'essaient dans Chromium (`tests/e2e-etablissement.test.mjs` pour un logo, `tests/e2e-avatar.test.mjs` pour une photo) |
 | `tests/avatar-ui.test.mjs` | `photoSource()` : l'identifiant d'une pièce jointe de Grist ou une adresse `blob:` fabriquée par le navigateur sont les seules sources d'une photo ; toute autre adresse (web, `data:`, `javascript:`, chemin relatif), tout autre type et toute forme vide donnent « pas de photo » |

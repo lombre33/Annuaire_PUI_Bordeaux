@@ -253,6 +253,90 @@ function sameSet(a, b) {
   return a.length === b.length && a.every(item => b.includes(item));
 }
 
+// Chaque sorte de champ se compare à sa façon. Un comparateur reçoit le champ, ce que le brouillon dit de lui, la
+// fiche et { referenceMaps, emailTaken }, et renvoie `null` (rien ne change), { change } (ce qui change, dans la forme
+// que `champs` garde) ou { fault } (pourquoi la saisie est refusée, en une phrase qui s'affiche sous le champ).
+
+// Un texte qui change : rien s'il revient à ce qu'il était une fois nettoyé.
+const textChange = (before, after) => (after === before ? null : { change: { avant: before, apres: after } });
+
+// La photo : l'identifiant actuel (ou 0 sans photo) ne change rien ; 0 la retire ; un objet préparé par image-prep.js la
+// remplace (le fichier part à l'enregistrement, voir profile-save.js).
+function diffImage(field, input, row) {
+  const before = avatarIdOf(row[field.key]);
+  if (input === before) return null;
+  if (input === 0) return { change: { action: 'remove', avant: before } };
+  if (isPreparedImage(input)) return { change: { action: 'replace', avant: before } };
+  return { fault: 'Valeur illisible.' };
+}
+
+function diffEmail(field, input, row, { emailTaken }) {
+  const before = text(row[field.key]);
+  if (String(input ?? '') === before) return null; // laissée telle quelle : pas un changement
+  const after = cleanText(input).toLowerCase();
+  const fault = field.optional ? shownEmailFault(after) : emailFault(after, before, emailTaken);
+  return fault ? { fault } : textChange(before, after);
+}
+
+function diffText(field, input, row) {
+  const before = text(row[field.key]);
+  if (String(input ?? '') === before) return null; // laissé tel quel : pas un changement, même si le texte n'est pas « propre »
+  const after = cleanText(input);
+  const fault = textFault(after);
+  return fault ? { fault: `${sentence(fault)}.` } : textChange(before, after);
+}
+
+function diffPhone(field, input, row) {
+  const shown = formatPhone(row[field.key]);
+  if (String(input ?? '') === shown) return null; // laissé tel quel, même s'il n'est pas à la française
+  const typed = cleanText(input);
+  const after = typed === '' ? '' : frenchPhoneDigits(typed);
+  if (after === null) return { fault: 'Un numéro français compte 10 chiffres, par exemple 05 56 78 90 12.' };
+  return textChange(frenchPhoneDigits(shown) || '', after);
+}
+
+// Un brouillon d'un autre type que prévu est une erreur, jamais « aucune valeur » : une saisie illisible ne doit pas
+// retirer un rôle ou vider une liste.
+function diffReference(field, input, row, { referenceMaps }) {
+  if (!Number.isSafeInteger(input) || input < 0) return { fault: 'Valeur illisible.' };
+  const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps);
+  const before = refId(row[field.key]) || 0;
+  if (input !== 0 && !options.some(option => option.id === input)) return { fault: 'Valeur inconnue.' };
+  if (input === 0 && field.required && before !== 0) return { fault: 'Une valeur est requise.' };
+  if (input === before) return null;
+  return { change: { avant: { id: before, label: labelOf(options, before) }, apres: { id: input, label: labelOf(options, input) } } };
+}
+
+// Une liste : seules les valeurs que le formulaire montre peuvent être retirées ou ajoutées ; les autres (ligne sans
+// libellé…) restent telles quelles.
+function diffList(field, input, row, { referenceMaps }) {
+  if (!Array.isArray(input) || !input.every(Number.isSafeInteger)) return { fault: 'Valeur illisible.' };
+  const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: true });
+  const entryOf = entryOfRow(options);
+  if (input.some(id => !entryOf.has(id))) return { fault: 'Valeur inconnue.' };
+  const wanted = [...new Set(input.map(id => entryOf.get(id)))];
+  const current = knownIds(row[field.key], options);
+  if (sameSet(current, wanted)) return null;
+  return {
+    change: {
+      ajout: wanted.filter(id => !current.includes(id)).map(id => listEntry(options, id)),
+      retrait: current.filter(id => !wanted.includes(id)).map(id => listEntry(options, id))
+    }
+  };
+}
+
+// Les listes sont le cas par défaut.
+const DIFFERS = { image: diffImage, email: diffEmail, text: diffText, phone: diffPhone, reference: diffReference };
+
+// Une fiche garde un prénom ou un nom : une fiche qu'on crée le réclame sous les deux champs, une fiche qu'on modifie
+// sous celui qu'on vient de vider.
+function checkName(champs, row, started, errors, fieldErrors) {
+  const name = field => (champs[field] ? champs[field].apres : text(row[field]));
+  if (!(started || 'nom' in champs || 'prenom' in champs) || name('nom') || name('prenom')) return;
+  errors.push(NAME_REQUIRED);
+  ['prenom', 'nom'].filter(key => started || key in champs).forEach(key => { fieldErrors[key] = NAME_REQUIRED; });
+}
+
 // Compare le brouillon de la personne à sa fiche. `draft` : { colonne → valeur } ;
 // une colonne absente n'est pas touchée. Un texte et un numéro sont des chaînes,
 // une référence est un identifiant entier (0 : aucune), une liste un tableau
@@ -278,107 +362,56 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, creating
   };
 
   const fields = fieldsFor(admin, creating);
-  fields.forEach(field => {
-    if (!(field.key in draft) || !(field.key in row)) return;
-    const input = draft[field.key];
-
-    // La photo : l'identifiant actuel (ou 0 sans photo) ne change rien ; 0 la retire ; un objet
-    // préparé par image-prep.js la remplace (le fichier part à l'enregistrement, voir profile-save.js).
-    if (field.kind === 'image') {
-      const before = avatarIdOf(row[field.key]);
-      if (input === before || (input === 0 && before === 0)) return;
-      if (input === 0) champs[field.key] = { action: 'remove', avant: before };
-      else if (isPreparedImage(input)) champs[field.key] = { action: 'replace', avant: before };
-      else fail(field, 'Valeur illisible.');
-      return;
-    }
-
-    if (field.kind === 'email') {
-      const before = text(row[field.key]);
-      if (String(input ?? '') === before) return; // laissée telle quelle : pas un changement
-      const after = cleanText(input).toLowerCase();
-      const fault = field.optional ? shownEmailFault(after) : emailFault(after, before, emailTaken);
-      if (fault) fail(field, fault);
-      else if (after !== before) champs[field.key] = { avant: before, apres: after };
-      return;
-    }
-
-    if (field.kind === 'text') {
-      const before = text(row[field.key]);
-      if (String(input ?? '') === before) return; // laissé tel quel : pas un changement, même si le texte n'est pas « propre »
-      const after = cleanText(input);
-      const fault = textFault(after);
-      if (fault) fail(field, `${sentence(fault)}.`);
-      else if (after !== before) champs[field.key] = { avant: before, apres: after };
-      return;
-    }
-
-    if (field.kind === 'phone') {
-      const shown = formatPhone(row[field.key]);
-      if (String(input ?? '') === shown) return; // laissé tel quel, même s'il n'est pas à la française
-      const typed = cleanText(input);
-      const before = frenchPhoneDigits(shown) || '';
-      const after = typed === '' ? '' : frenchPhoneDigits(typed);
-      if (after === null) fail(field, 'Un numéro français compte 10 chiffres, par exemple 05 56 78 90 12.');
-      else if (after !== before) champs[field.key] = { avant: before, apres: after };
-      return;
-    }
-
-    const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: field.kind === 'list' });
-
-    // Un brouillon d'un autre type que prévu est une erreur, jamais « aucune valeur » :
-    // une saisie illisible ne doit pas retirer un rôle ou vider une liste.
-    if (field.kind === 'reference') {
-      if (!Number.isSafeInteger(input) || input < 0) {
-        fail(field, 'Valeur illisible.');
-        return;
-      }
-      const before = refId(row[field.key]) || 0;
-      const after = input;
-      if (after !== 0 && !options.some(option => option.id === after)) {
-        fail(field, 'Valeur inconnue.');
-      } else if (after === 0 && field.required && before !== 0) {
-        fail(field, 'Une valeur est requise.');
-      } else if (after !== before) {
-        champs[field.key] = {
-          avant: { id: before, label: labelOf(options, before) },
-          apres: { id: after, label: labelOf(options, after) }
-        };
-      }
-      return;
-    }
-
-    // Liste : seules les valeurs que le formulaire montre peuvent être retirées ou
-    // ajoutées ; les autres (ligne sans libellé…) restent telles quelles.
-    if (!Array.isArray(input) || !input.every(Number.isSafeInteger)) {
-      fail(field, 'Valeur illisible.');
-      return;
-    }
-    const entryOf = entryOfRow(options);
-    if (input.some(id => !entryOf.has(id))) {
-      fail(field, 'Valeur inconnue.');
-      return;
-    }
-    const wanted = [...new Set(input.map(id => entryOf.get(id)))];
-    const current = knownIds(row[field.key], options);
-    if (sameSet(current, wanted)) return;
-    champs[field.key] = {
-      ajout: wanted.filter(id => !current.includes(id)).map(id => listEntry(options, id)),
-      retrait: current.filter(id => !wanted.includes(id)).map(id => listEntry(options, id))
-    };
+  fields.filter(field => field.key in draft && field.key in row).forEach(field => {
+    const diff = (DIFFERS[field.kind] ?? diffList)(field, draft[field.key], row, { referenceMaps, emailTaken });
+    if (diff?.fault) fail(field, diff.fault);
+    else if (diff?.change) champs[field.key] = diff.change;
   });
 
   // Une fiche qu'on crée ne se juge qu'une fois commencée : le formulaire vide ne réclame rien.
   const started = creating && Object.keys(champs).length > 0;
-  const name = field => (champs[field] ? champs[field].apres : text(row[field]));
-  if ((started || 'nom' in champs || 'prenom' in champs) && !name('nom') && !name('prenom')) {
-    errors.push(NAME_REQUIRED);
-    ['prenom', 'nom'].filter(key => started || key in champs).forEach(key => { fieldErrors[key] = NAME_REQUIRED; });
-  }
+  checkName(champs, row, started, errors, fieldErrors);
   const etablissement = fields.find(field => field.key === 'Etablissement');
   if (started && etablissement && 'Etablissement' in row && !champs.Etablissement) fail(etablissement, ETABLISSEMENT_REQUIRED);
   return { champs, errors, fieldErrors };
 }
+
+// Chaque sorte de champ se ramène à sa façon. Un rebaseur reçoit le champ, son changement, la fiche telle qu'elle est
+// maintenant et les libellés, et renvoie `null` (la fiche a déjà la valeur voulue) ou { change, moved } : `moved` dit que la
+// valeur a changé dans Grist depuis l'ouverture du formulaire.
+
+const rebaseValue = (current, change) => (current === change.apres
+  ? null
+  : { change: { avant: current, apres: change.apres }, moved: current !== change.avant });
+
+// La photo : retirer une photo déjà absente ne change rien ; sinon l'action reste, calculée à partir de la photo actuelle.
+function rebaseImage(field, change, row) {
+  const current = avatarIdOf(row[field.key]);
+  if (change.action === 'remove' && current === 0) return null;
+  return { change: { action: change.action, avant: current }, moved: current !== change.avant };
+}
+
+const rebaseText = (field, change, row) => rebaseValue(text(row[field.key]), change);
+
+const rebasePhone = (field, change, row) => rebaseValue(frenchPhoneDigits(formatPhone(row[field.key])) || '', change);
+
+function rebaseReference(field, change, row, referenceMaps) {
+  const current = refId(row[field.key]) || 0;
+  if (current === change.apres.id) return null;
+  const labels = referenceMaps[labelsKey(field, referenceMaps)] || {};
+  return { change: { avant: { id: current, label: labels[String(current)] || '' }, apres: change.apres }, moved: current !== change.avant.id };
+}
+
+// Une liste garde ses ajouts et ses retraits, moins ceux qui sont déjà faits : ils s'appliquent à n'importe quel état.
+function rebaseList(field, change, row) {
+  const present = new Set(safeValues(row[field.key]).filter(Number.isSafeInteger));
+  const there = entry => (entry.ids || [entry.id]).some(id => present.has(id));
+  const ajout = change.ajout.filter(entry => !there(entry));
+  const retrait = change.retrait.filter(there);
+  return ajout.length + retrait.length > 0 ? { change: { ajout, retrait }, moved: false } : null;
+}
+
+const REBASERS = { image: rebaseImage, email: rebaseText, text: rebaseText, phone: rebasePhone, reference: rebaseReference };
 
 // Ramène les changements (calculés sur la fiche telle que le formulaire l'a montrée)
 // sur la fiche telle qu'elle est maintenant dans Grist : { champs, moved }.
@@ -395,48 +428,10 @@ export function rebaseChanges(champs, row, referenceMaps, { admin = false, creat
   const rebased = {};
   const moved = [];
   fieldsFor(admin, creating).filter(field => champs[field.key]).forEach(field => {
-    const change = champs[field.key];
-
-    // La photo : retirer une photo déjà absente ne change rien ; sinon l'action reste, calculée à
-    // partir de la photo actuelle. Une photo changée dans Grist depuis l'ouverture est signalée.
-    if (field.kind === 'image') {
-      const current = avatarIdOf(row[field.key]);
-      if (change.action === 'remove' && current === 0) return;
-      if (current !== change.avant) moved.push(field.label);
-      rebased[field.key] = { action: change.action, avant: current };
-      return;
-    }
-
-    if (field.kind === 'text' || field.kind === 'email') {
-      const current = text(row[field.key]);
-      if (current === change.apres) return;
-      if (current !== change.avant) moved.push(field.label);
-      rebased[field.key] = { avant: current, apres: change.apres };
-      return;
-    }
-
-    if (field.kind === 'phone') {
-      const current = frenchPhoneDigits(formatPhone(row[field.key])) || '';
-      if (current === change.apres) return;
-      if (current !== change.avant) moved.push(field.label);
-      rebased[field.key] = { avant: current, apres: change.apres };
-      return;
-    }
-
-    if (field.kind === 'reference') {
-      const current = refId(row[field.key]) || 0;
-      if (current === change.apres.id) return;
-      if (current !== change.avant.id) moved.push(field.label);
-      const labels = referenceMaps[labelsKey(field, referenceMaps)] || {};
-      rebased[field.key] = { avant: { id: current, label: labels[String(current)] || '' }, apres: change.apres };
-      return;
-    }
-
-    const present = new Set(safeValues(row[field.key]).filter(Number.isSafeInteger));
-    const there = entry => (entry.ids || [entry.id]).some(id => present.has(id));
-    const ajout = change.ajout.filter(entry => !there(entry));
-    const retrait = change.retrait.filter(there);
-    if (ajout.length + retrait.length > 0) rebased[field.key] = { ajout, retrait };
+    const result = (REBASERS[field.kind] ?? rebaseList)(field, champs[field.key], row, referenceMaps);
+    if (!result) return;
+    rebased[field.key] = result.change;
+    if (result.moved) moved.push(field.label);
   });
   return { champs: rebased, moved };
 }

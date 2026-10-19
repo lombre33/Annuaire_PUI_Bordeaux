@@ -83,42 +83,48 @@ function loadImage(url) {
   });
 }
 
-// Lit le fichier, le redessine et renvoie { blob, name, width, height } : une image prête à envoyer
-// (le format et le nom viennent de `rules`). Lève une ImageError. `doc` ne change que dans les tests.
-export async function prepareImage(file, rules = IMAGE_RULES.logo, { doc } = {}) {
-  const fault = checkImageFile(file, rules);
-  if (fault) throw new ImageError(fault);
-
+// Lit et décode le fichier : l'image, si ses dimensions sont lisibles et raisonnables. Lève une ImageError.
+async function decode(file) {
   let image;
   try {
     image = await loadImage(await readAsDataUrl(file));
   } catch (error) {
     throw new ImageError(FAILURES.unreadable, error);
   }
-  const sourceWidth = image.naturalWidth;
-  const sourceHeight = image.naturalHeight;
-  if (!(sourceWidth > 0 && sourceHeight > 0)) throw new ImageError(FAILURES.noSize);
-  if (sourceWidth * sourceHeight > MAX_PIXELS) throw new ImageError(FAILURES.huge);
+  if (!(image.naturalWidth > 0 && image.naturalHeight > 0)) throw new ImageError(FAILURES.noSize);
+  if (image.naturalWidth * image.naturalHeight > MAX_PIXELS) throw new ImageError(FAILURES.huge);
+  return image;
+}
 
-  const output = rules.output ?? 'image/png';
-  const crop = rules.square ? squareCrop(sourceWidth, sourceHeight, rules.maxSide) : null;
+// Redessine l'image à la taille voulue dans un canvas : { canvas, width, height }. Lève une ImageError.
+function draw(image, file, rules, doc) {
+  const crop = rules.square ? squareCrop(image.naturalWidth, image.naturalHeight, rules.maxSide) : null;
   const { width, height } = crop
     ? { width: crop.size, height: crop.size }
-    : fitWithin(sourceWidth, sourceHeight, rules.maxSide, { upscale: file.type === 'image/svg+xml' });
+    : fitWithin(image.naturalWidth, image.naturalHeight, rules.maxSide, { upscale: file.type === 'image/svg+xml' });
   const canvas = (doc ?? document).createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d');
   if (!context) throw new ImageError(FAILURES.unreadable);
-  if (output === 'image/jpeg') {
+  if (rules.output === 'image/jpeg') {
     // Un JPEG n'a pas de transparence : un fond noir remplacerait celle d'un PNG ou d'un WebP.
     context.fillStyle = '#fff';
     context.fillRect(0, 0, width, height);
   }
   if (crop) context.drawImage(image, crop.x, crop.y, crop.side, crop.side, 0, 0, width, height);
   else context.drawImage(image, 0, 0, width, height);
+  return { canvas, width, height };
+}
 
-  const blob = await new Promise(resolve => canvas.toBlob(resolve, output, rules.quality));
+// Lit le fichier, le redessine et renvoie { blob, name, width, height } : une image prête à envoyer
+// (le format et le nom viennent de `rules`). Lève une ImageError. `doc` ne change que dans les tests.
+export async function prepareImage(file, rules = IMAGE_RULES.logo, { doc } = {}) {
+  const fault = checkImageFile(file, rules);
+  if (fault) throw new ImageError(fault);
+
+  const { canvas, width, height } = draw(await decode(file), file, rules, doc);
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, rules.output ?? 'image/png', rules.quality));
   if (!blob) throw new ImageError(FAILURES.unreadable);
   if (blob.size > rules.maxBytes) {
     throw new ImageError(`Une fois redessinée, cette image pèse ${megabytes(blob.size)} : choisissez-en une plus simple, de ${megabytes(rules.maxBytes)} au plus.`);

@@ -67,29 +67,30 @@ function trusted(baseUrl) {
   return protocol === 'https:' || (protocol === 'http:' && LOCAL_HOSTS.includes(hostname));
 }
 
-// `file` : { blob, name }. Renvoie l'identifiant de la pièce jointe créée. Lève une UploadError.
-// `hint` : la phrase qui dit quoi faire quand l'envoi échoue (celle du logo par défaut). `fetchImpl`
-// et `timeout` ne changent que dans les tests.
-export async function uploadAttachment(docApi, file, { hint = BY_HAND, fetchImpl = globalThis.fetch, timeout = TIMEOUT_MS, log = console } = {}) {
-  const FAILURES = failuresFor(hint);
+// Le jeton d'écriture et l'adresse d'envoi que Grist donne : { token, baseUrl }. Lève une UploadError.
+async function writeAccess(docApi, failures, log) {
   let raw;
   try {
     raw = await docApi.getAccessToken({ readOnly: false });
   } catch (error) {
     log.warn('[ENVOI] Jeton d\'écriture refusé par Grist :', error?.message || error);
-    throw new UploadError(FAILURES.token, error);
+    throw new UploadError(failures.token, error);
   }
   const info = readTokenInfo(raw);
-  if (!info) throw new UploadError(FAILURES.token);
-  if (!trusted(info.baseUrl)) throw new UploadError(FAILURES.address);
+  if (!info) throw new UploadError(failures.token);
+  if (!trusted(info.baseUrl)) throw new UploadError(failures.address);
+  return info;
+}
 
+// Envoie le fichier à Grist et renvoie sa réponse, quelle qu'elle soit. Lève une UploadError si la requête
+// n'aboutit pas (réseau, délai).
+async function post(info, file, { fetchImpl, timeout }, failures, log) {
   const form = new FormData();
   form.append('upload', file.blob, file.name);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
-  let response;
   try {
-    response = await fetchImpl(`${info.baseUrl}/attachments?auth=${encodeURIComponent(info.token)}`, {
+    return await fetchImpl(`${info.baseUrl}/attachments?auth=${encodeURIComponent(info.token)}`, {
       method: 'POST',
       body: form,
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -99,24 +100,38 @@ export async function uploadAttachment(docApi, file, { hint = BY_HAND, fetchImpl
     });
   } catch (error) {
     log.warn('[ENVOI] Requête d\'envoi impossible :', error?.name === 'AbortError' ? 'délai dépassé' : (error?.name || 'erreur'));
-    throw new UploadError(error?.name === 'AbortError' ? FAILURES.timeout : FAILURES.network, error);
+    throw new UploadError(error?.name === 'AbortError' ? failures.timeout : failures.network, error);
   } finally {
     clearTimeout(timer);
   }
+}
 
+// L'identifiant de la pièce jointe que la réponse de Grist annonce. Lève une UploadError si Grist refuse le fichier ou
+// ne confirme pas l'envoi.
+async function attachmentIdOf(response, failures, log) {
   if (!response.ok) {
     log.warn(`[ENVOI] Grist a répondu ${response.status} à l'envoi du fichier.`);
-    if (response.status === 401 || response.status === 403) throw new UploadError(FAILURES.denied);
-    if (response.status === 413) throw new UploadError(FAILURES.tooLarge);
-    throw new UploadError(FAILURES.failedWith(response.status));
+    if (response.status === 401 || response.status === 403) throw new UploadError(failures.denied);
+    if (response.status === 413) throw new UploadError(failures.tooLarge);
+    throw new UploadError(failures.failedWith(response.status));
   }
   let ids;
   try {
     ids = await response.json();
   } catch (error) {
-    throw new UploadError(FAILURES.response, error);
+    throw new UploadError(failures.response, error);
   }
   const id = Array.isArray(ids) ? ids[0] : null;
-  if (!Number.isSafeInteger(id) || id <= 0) throw new UploadError(FAILURES.response);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new UploadError(failures.response);
   return id;
+}
+
+// `file` : { blob, name }. Renvoie l'identifiant de la pièce jointe créée. Lève une UploadError.
+// `hint` : la phrase qui dit quoi faire quand l'envoi échoue (celle du logo par défaut). `fetchImpl`
+// et `timeout` ne changent que dans les tests.
+export async function uploadAttachment(docApi, file, { hint = BY_HAND, fetchImpl = globalThis.fetch, timeout = TIMEOUT_MS, log = console } = {}) {
+  const failures = failuresFor(hint);
+  const info = await writeAccess(docApi, failures, log);
+  const response = await post(info, file, { fetchImpl, timeout }, failures, log);
+  return attachmentIdOf(response, failures, log);
 }
