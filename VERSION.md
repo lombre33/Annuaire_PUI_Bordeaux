@@ -1,4 +1,4 @@
-# Version 1.28.7 — Audit exhaustif, lot 4 : la fenêtre de modification d'une fiche est découpée en modules, sans rien changer pour les personnes (voir CHANGELOG.md)
+# Version 1.28.8 — Audit exhaustif, lot 5 : la fenêtre « Fiche de l'établissement » est découpée en deux modules, sans rien changer pour les personnes (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en

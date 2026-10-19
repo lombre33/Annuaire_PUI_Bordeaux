@@ -101,6 +101,7 @@ flowchart TD
         etablissement["etablissement.js<br/>droits, brouillon, changements"]
         etabsave["etablissement-save.js<br/>relire, écrire"]
         etabui["etablissement-ui.js<br/>la fenêtre"]
+        etabform["etablissement-form.js<br/>le formulaire"]
         upload["upload.js<br/>envoi d'un fichier"]
         imageprep["image-prep.js<br/>redessiner l'image"]
     end
@@ -200,10 +201,14 @@ flowchart TD
     etabsave --> presence
     etabsave --> etablissement
     etabsave --> saveupload
-    etabui --> constants
     etabui --> dom
+    etabui --> dialogshell
     etabui --> etablissement
-    etabui --> imageprep
+    etabui --> etabform
+    etabform --> constants
+    etabform --> dom
+    etabform --> etablissement
+    etabform --> imageprep
     imageprep --> constants
     upload --> attachments
 ```
@@ -232,7 +237,8 @@ Une flèche signifie « importe » ; tous les `import` des fichiers à la racine
 | `changes-ui.js` | `renderChangeList()` : la liste des changements, titrée « Ce qui va changer » sous le formulaire, « Détail des changements » à la relecture et « Ce qui a changé » à la confirmation ; la ligne « Photo de profil » montre la photo actuelle et la nouvelle en miniatures (`photoValues()`). DOM seulement |
 | `etablissement.js` | La fiche d'un établissement, sans DOM ni Grist : `etablissementRightsFor()` (qui peut modifier quel établissement : ceux que la sonde dit être les siens, fermé par défaut), `etablissementOf()` et `responsablesOf()` (ce que la fenêtre montre d'une ligne d'`Etablissements` et d'`ACL`), `peopleOfEtablissement()` (les personnes visibles qu'on peut nommer, et combien de fiches un établissement masqué ferait disparaître), `draftOfEtablissement()`, `toggleResponsable()`, `nominate()` et `rebaseDraft()` (le brouillon), `diffEtablissement()` (le delta : ce que la personne a changé, et pourquoi une saisie serait refusée), `summaryOf()` et `visibilityWarning()` (les phrases) |
 | `etablissement-save.js` | Relire puis écrire la fiche d'un établissement : `readEtablissement()` lit la ligne d'`Etablissements` et la liste des responsables d'`ACL`, `savePlanOf()` prépare l'enregistrement et `saveEtablissement()` l'exécute : le fichier du logo d'abord (par `upload`), puis **une seule action atomique** (`UpdateRecord` de l'établissement et actions sur `ACL`), seulement si la personne est responsable et si le nom, la visibilité et le logo n'ont pas changé dans Grist depuis l'ouverture ; il relit enfin tout pour dire ce que Grist n'a pas gardé |
-| `etablissement-ui.js` | La fenêtre « Fiche de l’établissement » (`createEtablissementDialog()`) : choix de l'établissement s'il y en a plusieurs, logo, sigle et statut en lecture seule, nom, visibilité, responsables, enregistrement direct. DOM seulement |
+| `etablissement-ui.js` | La fenêtre « Fiche de l’établissement » (`createEtablissementDialog()`) : tient l'état de la session (`ctx` : l'étape, la fiche lue dans Grist, le brouillon, ce qu'il change) et enchaîne les étapes, le choix de l'établissement s'il y en a plusieurs, la lecture de la fiche, le formulaire, l'enregistrement direct, puis la fermeture avec un message de confirmation ou l'écran « Fiche enregistrée » quand il reste une réserve à lire. DOM seulement |
+| `etablissement-form.js` | Le formulaire de cette fenêtre : le logo (l'aperçu, « Ajouter » ou « Remplacer le logo », « Retirer le logo », et l'image que `prepareImage()` prépare avant tout envoi), le sigle et le statut en lecture seule, le nom, la case de visibilité dans l'annuaire, la liste des responsables (retirer, rétablir, nommer une personne de l'établissement ou une adresse), et `refreshForm()`, qui remet à jour à chaque saisie les erreurs, les avertissements, le résumé du pied et le bouton « Enregistrer ». DOM seulement |
 | `upload.js` | `uploadAttachment()` : envoie un fichier (l'image d'un logo, la photo d'une personne) dans les pièces jointes du document, avec un jeton en écriture demandé pour l'envoi et jamais gardé ; la consigne qui termine les messages d'échec (`hint`) est celle de l'appelant : déposer le logo à la main dans Grist, ou prévenir un administrateur pour une photo. **La seule requête réseau du code** (voir [sécurité](securite.md#lenvoi-dun-fichier-et-le-jeton-en-écriture)) |
 | `save-upload.js` | `uploadThenRecheck()` : le temps commun à `saveProfile()` et à `saveEtablissement()` quand une photo ou un logo est remplacé : envoyer le fichier (par l'`upload` que l'appelant donne), puis relire l'état de la fiche avant d'écrire, parce que l'envoi prend du temps. L'échec de l'envoi devient l'erreur de l'appelant (la phrase d'un `UploadError` telle quelle, sinon une phrase de repli et la cause dans la console) ; une relecture refusée porte l'identifiant du fichier envoyé qui ne servira pas (`leftover`). Ni DOM, ni Grist, ni réseau |
 | `image-prep.js` | `prepareImage(fichier, règles)` : lit l'image choisie, la redessine dans un canvas et la ré-encode selon `IMAGE_RULES`, pour qu'une image envoyée ne contienne ni script ni métadonnées : un logo (`IMAGE_RULES.logo`) tient dans 480 px et devient un PNG ; une photo de profil (`IMAGE_RULES.avatar`) est recadrée en carré au centre (`squareCrop()`), ramenée à 256 px au plus (sans être agrandie), posée sur fond blanc et devient un JPEG. `checkImageFile()` refuse avant toute lecture un format, un poids ou un fichier vide inacceptables, `megabytes()` écrit un poids à la française et `imageFaultMessage()` donne la phrase à montrer pour une image qui n'a pas pu être préparée (celle d'une `ImageError`, sinon « illisible » et la cause dans la console). Le seul module de logique (voir les règles de répartition plus bas) qui touche au DOM : un canvas qui n'est jamais ajouté à la page |
@@ -252,7 +258,7 @@ Règles de répartition, à respecter pour que les tests restent possibles sans 
 
 4. `filters.js` n'a pas d'effet de bord : `pruneStaleFilters()` renvoie un nouvel état au lieu de modifier son argument.
 5. `branding-ui.js`, `avatar-ui.js` et `render.js` ne contiennent aucune règle sur ce qu'on montre : `branding.js` l'a décidé, ou l'appelant (pour une photo : la fiche a-t-elle une photo, laquelle). Les images ne sont jamais construites avec du HTML (`textContent` et propriétés du DOM seulement), et une photo ne fait jamais charger une adresse extérieure (`photoSource()` n'accepte que l'identifiant d'une pièce jointe de Grist ou une adresse `blob:`).
-6. Seul `main.js` détient l'état de l'application (`state`). Les fenêtres de modification ne gardent que l'état de leur propre session (étape, brouillon), jeté à leur fermeture ; `profile-ui.js`, `profile-form.js`, `profile-review.js`, `dialog-shell.js`, `etablissement-ui.js`, `changes-ui.js` et `dom.js` ne contiennent aucune règle métier : `main.js` leur donne ce que les autres modules ont calculé (dont `renderAvatar` et `renderThumb`, qui leur montrent une photo sans qu'elles connaissent `avatar-ui.js` ni le jeton), et `profile-form.js` n'appelle que les règles de `profile.js`, de `grist-data.js` et d'`image-prep.js`, `etablissement-ui.js` que celles d'`etablissement.js` et d'`image-prep.js` (flèches du schéma).
+6. Seul `main.js` détient l'état de l'application (`state`). Les fenêtres de modification ne gardent que l'état de leur propre session (étape, brouillon), jeté à leur fermeture ; `profile-ui.js`, `profile-form.js`, `profile-review.js`, `dialog-shell.js`, `etablissement-ui.js`, `etablissement-form.js`, `changes-ui.js` et `dom.js` ne contiennent aucune règle métier : `main.js` leur donne ce que les autres modules ont calculé (dont `renderAvatar` et `renderThumb`, qui leur montrent une photo sans qu'elles connaissent `avatar-ui.js` ni le jeton), et `profile-form.js` n'appelle que les règles de `profile.js`, de `grist-data.js` et d'`image-prep.js`, `etablissement-form.js` que celles d'`etablissement.js` et d'`image-prep.js` (flèches du schéma).
 
 ## Chargement des données
 
@@ -770,7 +776,7 @@ Depuis la 1.19.0, les mêmes mécanismes servent aux photos de profil (la colonn
 - **Les initiales d'abord.** `fillAvatar()` écrit toujours les initiales, puis ajoute la photo par-dessus : la classe `has-photo` ne cache les initiales qu'une fois l'image chargée. Une cellule vide, un fichier supprimé (404), un contenu qui n'est pas une image, une colonne `Avatar` absente ou un jeton refusé laissent donc les initiales, sans cadre cassé ni bouton mort ; la photo d'une carte qui échoue redevient un simple rond d'initiales que les lecteurs d'écran ignorent.
 - **Agrandir au clic.** Sur une carte de l'annuaire, la photo est un `button.avatar-zoom` qui porte l'identifiant du fichier, le nom et la légende (la fonction et l'établissement) en `data-*` ; le seul écouteur de `main.js` qui sert aussi aux boutons « Modifier » ouvre alors `#photoDialog` par `createPhotoViewer().open()`. Sur une carte de relecture, dans une fenêtre ou dans le bandeau, l'avatar est un simple rond ; les miniatures du récapitulatif des changements (`createThumb()`) sont, elles, des boutons qui agrandissent la photo.
 - **Une photo qu'on vient de choisir** n'est pas encore dans Grist : elle est montrée par son adresse locale (`blob:`), la seule autre forme de photo acceptée. `photoSource()` refuse tout le reste, adresse extérieure comprise : une photo ne peut jamais faire charger une adresse que Grist n'a pas donnée.
-- **Où une photo se montre.** Sur les cartes (`render.js`), dans le bandeau « Ma présence » (`account-ui.js`), dans le bloc d'identité de la fenêtre de modification, dans les cartes de relecture et les miniatures du détail des changements (`profile-form.js`, `profile-review.js`, `changes-ui.js`), et dans la liste des responsables de la fiche d'un établissement (`etablissement-ui.js`), pour les personnes que l'annuaire montre : une personne dont la fiche est masquée n'y a pas de photo non plus.
+- **Où une photo se montre.** Sur les cartes (`render.js`), dans le bandeau « Ma présence » (`account-ui.js`), dans le bloc d'identité de la fenêtre de modification, dans les cartes de relecture et les miniatures du détail des changements (`profile-form.js`, `profile-review.js`, `changes-ui.js`), et dans la liste des responsables de la fiche d'un établissement (`etablissement-form.js`), pour les personnes que l'annuaire montre : une personne dont la fiche est masquée n'y a pas de photo non plus.
 - **Le lecteur de l'identifiant.** `avatarIdOf()` lit le premier fichier de la cellule et renvoie 0 pour une cellule vide, mal formée ou qui ne contient pas un entier positif.
 
 ### Tests de l'habillage
