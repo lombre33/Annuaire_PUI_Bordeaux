@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.28.9 — Audit exhaustif, lot 6 : le cadre commun des fenêtres est allégé, sans rien changer pour les personnes
+
+Sixième lot de l'audit exhaustif du 19 octobre 2026. Rien ne change pour les personnes : le comportement est identique, ce que les contrôles ci-dessous établissent.
+
+- **`createDialogShell` (94 lignes) est allégée** : la règle d'Échap (le premier appui prévient, le second ferme, rien ne ferme pendant l'enregistrement) devient `escapeGuard`, une fonction à part qui garde l'avertissement du pied.
+- **Une duplication de moins : `dialogApi()`** (`dialog-shell.js`). Ce que `main.js` tient d'une fenêtre de modification (l'ouvrir, la fermer, savoir si elle est ouverte, la vider à sa fermeture puis rendre le focus à l'endroit d'où elle a été ouverte) était écrit à l'identique à la fin de `profile-ui.js` et de `etablissement-ui.js` (19 lignes) ; les deux fenêtres l'appellent maintenant.
+- **Comment on sait que rien n'a changé.** (1) Les 103 instantanés du DOM, du focus et du défilement des deux fenêtres (ceux des lots 4 et 5, plus deux nouveaux : un Échap pressé après une modification prévient de nouveau au lieu de fermer) sont identiques à ceux de la 1.28.2. (2) Huit fautes glissées exprès dans le cadre commun (l'avertissement d'Échap oublié ou resté affiché, le rappel de fermeture, le vidage de la fenêtre, le test des modifications non enregistrées…) : six sont repérées ; deux ne changent rien d'observable, car la croix est déjà grisée pendant l'enregistrement (son clic n'est donc jamais reçu) et le premier Échap de l'enregistrement est déjà arrêté par l'événement « cancel » du navigateur.
+- **Documentation** : `docs/developpeurs.md` cite `dialogApi()`.
+
 ## 1.28.8 — Audit exhaustif, lot 5 : la fenêtre « Fiche de l'établissement » est découpée en deux modules, sans rien changer pour les personnes
 
 Cinquième lot de l'audit exhaustif du 19 octobre 2026. Rien ne change pour les personnes : le comportement est identique, ce que les contrôles ci-dessous établissent.

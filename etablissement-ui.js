@@ -8,7 +8,7 @@
 // aux fenêtres (titre, pied, Échap) dans dialog-shell.js.
 
 import { button, el, notice } from './dom.js';
-import { createDialogShell } from './dialog-shell.js';
+import { createDialogShell, dialogApi } from './dialog-shell.js';
 import { draftOfEtablissement, rebaseDraft } from './etablissement.js';
 import { buildForm, forgetPreview, paintLogo, paintResponsables, refreshForm } from './etablissement-form.js';
 
@@ -268,21 +268,5 @@ function reset(ctx) {
 //   onClose     (facultatif) appelé quand la fenêtre est fermée : rend le focus à l'endroit d'où elle
 //               a été ouverte
 export function createEtablissementDialog(dialog) {
-  const ctx = createContext(dialog);
-
-  dialog.addEventListener('close', () => {
-    const closed = ctx.session;
-    reset(ctx);
-    closed?.onClose?.();
-  });
-
-  return {
-    isOpen: () => dialog.open,
-
-    open: next => open(ctx, next),
-
-    close() {
-      if (dialog.open) dialog.close();
-    }
-  };
+  return dialogApi(dialog, createContext(dialog), { open, reset });
 }
