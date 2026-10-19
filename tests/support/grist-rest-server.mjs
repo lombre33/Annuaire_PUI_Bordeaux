@@ -17,26 +17,15 @@
 // Il garde chaque requête reçue (`requests`), avec ce qu'il a répondu.
 
 import http from 'node:http';
+import { readMultipartFile } from './multipart.mjs';
 
 export const FIRST_ID = 2001;
 const DOC_PATH = '/api/docs/fake-doc';
 
 // Le fichier d'un envoi multipart : { field, fileName, contentType, size }.
 function readFile(body, contentType) {
-  const boundary = /boundary=(.+)$/.exec(contentType ?? '')?.[1];
-  if (!boundary) return null;
-  const text = body.toString('latin1');
-  const start = text.indexOf(`--${boundary}`);
-  const headerEnd = text.indexOf('\r\n\r\n', start);
-  const end = text.indexOf(`\r\n--${boundary}`, headerEnd + 4);
-  if (start < 0 || headerEnd < 0 || end < 0) return null;
-  const head = text.slice(start, headerEnd);
-  return {
-    field: /name="([^"]*)"/.exec(head)?.[1] ?? '',
-    fileName: /filename="([^"]*)"/.exec(head)?.[1] ?? '',
-    contentType: /content-type:\s*([^\r\n]+)/i.exec(head)?.[1] ?? '',
-    size: end - (headerEnd + 4)
-  };
+  const file = readMultipartFile(body, contentType);
+  return file && { field: file.field, fileName: file.fileName, contentType: file.contentType, size: file.bytes.length };
 }
 
 export async function startGristRest({ token = 'test-jeton-rest' } = {}) {

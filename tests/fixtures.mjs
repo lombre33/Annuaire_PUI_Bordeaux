@@ -97,6 +97,19 @@ export function withoutOptionalColumns(tables) {
   return copy;
 }
 
+// Le document avec une ligne de plus dans Etablissements : `row` donne sa valeur à chaque colonne (id, acronyme, …).
+export function withEtablissement(tables, row) {
+  const copy = structuredClone(tables);
+  Object.entries(row).forEach(([column, value]) => copy.Etablissements[column].push(value));
+  return copy;
+}
+
+// Le document avec, dans Etablissements, une 2e ligne « CHU » non validée (la première l'est) : deux établissements portent le
+// même acronyme, et aucune personne n'est rattachée à la seconde.
+export const withDuplicateCHU = tables => withEtablissement(tables, {
+  id: 6, acronyme: 'CHU', nom_complet: 'CHU (doublon)', fondateur: true, partenaire: false, autres: false, ok_pour_apparaitre: false
+});
+
 // Les tâches rangées par action : le numéro avant le point du libellé d'une tâche est celui
 // de son action, que la table Actions porte dans son libellé. Les deux actions de la base de
 // départ sont numérotées, et quatre tâches sont portées par BDD.Taches. Avec ces données
@@ -118,6 +131,20 @@ export function withTaskActions(tables = sampleTables()) {
   const tasksOf = { 1: ['L', 1, 3], 2: ['L', 3], 9: ['L', 2], 10: ['L', 4] };
   copy.BDD.Taches = copy.BDD.id.map(id => tasksOf[id] || ['L']);
   return copy;
+}
+
+// Les trois façons de ne rien pouvoir ranger par action : aucune action numérotée, aucune tâche numérotée, aucun numéro en commun
+// entre les tâches et les actions. Le menu des tâches reste alors à plat.
+export function unrankableTaskTables() {
+  const noNumberedAction = withTaskActions();
+  noNumberedAction.Actions.Actions = ['Vaccination', 'Audit'];
+  const noNumberedTask = withTaskActions();
+  noNumberedTask.Taches.Taches = ['Relecture', 'Rappel vaccinal', 'Inspection', 'Veille'];
+  noNumberedTask.Taches.Taches_corrige = ['', '', '', ''];
+  const noCommonNumber = withTaskActions();
+  noCommonNumber.Taches.Taches = ['7.1 Relecture', '7.2 Rappel vaccinal', '8.1 Inspection', '8.2 Veille'];
+  noCommonNumber.Taches.Taches_corrige = ['', '', '', ''];
+  return { 'aucune action numérotée': noNumberedAction, 'aucune tâche numérotée': noNumberedTask, 'aucun numéro en commun': noCommonNumber };
 }
 
 // Adresses de personnes de l'exemple. Ana figure dans BDD et dans ACL (administratrice et

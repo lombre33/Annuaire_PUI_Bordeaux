@@ -9,7 +9,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withBranding, withIdentity, ANA_EMAIL, BOB_EMAIL, ADMIN_EMAIL, IRIS_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
-import { assertFooterWraps, skip, waitForCards, withWidget } from './support/browser.mjs';
+import {
+  assertFooterWraps, assertNoSecretLogged, focusReturnsTo, skip, tokenRequests, toast, until, waitForCards, waitForEditButtons, withWidget
+} from './support/browser.mjs';
+import { dialogPage } from './support/dialog-page.mjs';
 import { FIRST_UPLOAD_ID } from './support/fake-attachments.mjs';
 
 // ===== Outils =====
@@ -26,29 +29,15 @@ function world(edit = () => {}) {
 // Ana n'administre pas : elle ne fait que la fiche du CHU.
 const memberAna = tables => { tables.ACL.admin[0] = false; };
 
-const dlg = page => page.locator('#etabDialog');
+const { dialog: dlg, press, summary, alert, alertText, isOpen, closed } = dialogPage('etabDialog', 'etabTitle');
 const shortcut = page => page.locator('#accountBar .account-etab');
 const cardButtons = page => page.locator('#cardsGrid .etab-edit');
 const field = (page, selector) => dlg(page).locator(selector);
 const nameInput = page => page.locator('#etabName');
 const visibleBox = page => page.locator('#etabVisible');
-const press = (page, name) => dlg(page).getByRole('button', { name, exact: true });
 const save = page => press(page, 'Enregistrer');
-const summary = page => dlg(page).locator('.dlg-summary').textContent();
-const alertText = page => dlg(page).locator('.dlg-alert').textContent();
-const toast = page => page.locator('#toast');
-const isOpen = page => page.evaluate(() => document.getElementById('etabDialog').open);
-// « Fermée » veut dire aussi que l'événement « close » est passé : Chromium l'envoie à l'image suivante, pas dans la tâche qui ferme
-// la fenêtre, et c'est lui qui la vide. Un test rapide qui la rouvre aussitôt la verrait vidée par cet événement en retard.
-const closed = page => page.waitForFunction(() => {
-  const dialog = document.getElementById('etabDialog');
-  return !dialog.open && dialog.querySelector('.dlg-body').childElementCount === 0;
-});
 const rows = page => dlg(page).locator('.es-resp');
 const rowFor = (page, email) => dlg(page).locator(`.es-resp[data-mail="${email}"]`);
-const focusReturnsTo = (page, selector) => page.waitForFunction(
-  wanted => document.activeElement?.matches(wanted), selector, { timeout: 3000 }
-);
 
 // Les actions que le widget a envoyées à Grist pour Etablissements et ACL (écrites ou refusées).
 // Le numéro d'une ligne ajoutée est celui que le faux Grist invente (il réutilise un numéro libéré) :
@@ -59,12 +48,7 @@ const writes = page => page.evaluate(() => window.__fake.calls
     ? { action, table, values, ok }
     : { action, table, rowId, values, ok })));
 const tableOf = (page, name) => page.evaluate(table => structuredClone(window.__tables[table]), name);
-const tokenRequests = page => page.evaluate(() => window.__fake.tokenRequests);
 const aclRowOf = (acl, email) => acl.email.indexOf(email);
-// Les boutons « Modifier » de l'édition d'une fiche (mode admin) sont posés quand l'identité est lue.
-const waitForEditButtons = (page, count) => page.waitForFunction(
-  expected => document.querySelectorAll('#cardsGrid .card-actions:not([hidden]) .card-edit').length === expected, count
-);
 
 // Ouvre la fenêtre par le raccourci du bandeau et attend la fin de la lecture de la fiche.
 async function openFromBar(page, cards = 4) {
@@ -94,15 +78,6 @@ const chooseFile = (page, file) => page.locator('#etabLogoFile').setInputFiles(f
 const png = async (page, options) => ({ name: 'mon-logo-prive.png', mimeType: 'image/png', buffer: await image(page, options) });
 const dimensionsOf = bytes => ({ width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) });
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-async function until(condition, message) {
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    if (await condition()) return;
-    await new Promise(resolve => setTimeout(resolve, 25));
-  }
-  assert.fail(message);
-}
 
 // ===== Où sont les boutons =====
 
@@ -806,7 +781,7 @@ test('un envoi que Grist refuse ou qui échoue laisse la fenêtre ouverte, la sa
       await chooseFile(page, await png(page));
       await nameInput(page).fill('Nom en attente');
       await save(page).click();
-      await dlg(page).locator('.dlg-alert [role="alert"]').waitFor();
+      await alert(page).waitFor();
       assert.match(await alertText(page), expected, mode);
       assert.equal(await isOpen(page), true, mode);
       assert.equal(await nameInput(page).inputValue(), 'Nom en attente', 'la saisie est gardée');
@@ -815,9 +790,7 @@ test('un envoi que Grist refuse ou qui échoue laisse la fenêtre ouverte, la sa
       assert.equal(await save(page).textContent(), 'Enregistrer');
       assert.deepEqual(await writes(page), [], `${mode} : rien n’est écrit, pas même le nom`);
       assert.equal(files.uploads.length, 1);
-      const logged = (await Promise.all([...logs.warnings, ...logs.errors])).join('\n');
-      assert.ok(!logged.includes('fake-token'), `${mode} : le jeton n’est jamais écrit dans la console`);
-      assert.ok(!logged.includes('docs.getgrist.com/api/docs/fake-doc'), `${mode} : ni l’adresse du document`);
+      await assertNoSecretLogged(logs, mode);
       files.upload.mode = 'ok';
       await save(page).click();
       await closed(page);
@@ -833,7 +806,7 @@ test('un serveur de pièces jointes sans en-têtes CORS fait échouer l’envoi 
     await openFromBar(page);
     await chooseFile(page, await png(page));
     await save(page).click();
-    await dlg(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await alert(page).waitFor();
     assert.match(await alertText(page), /le navigateur n’a pas pu joindre le serveur, ou l’a refusé\. Déposez le fichier directement dans Grist \(voir GRIST_SETUP\.md\)/);
     assert.equal(files.uploads[0].id, FIRST_UPLOAD_ID, 'le serveur a pourtant gardé le fichier : le widget ne peut pas le savoir');
     assert.deepEqual(await writes(page), [], 'et rien n’est écrit dans le document');
@@ -849,7 +822,7 @@ test('un jeton d’écriture refusé par Grist arrête l’enregistrement sans r
       window.__fake.docApi.getAccessToken = request => (request?.readOnly === false ? Promise.reject(new Error('Access token refused')) : original(request));
     });
     await save(page).click();
-    await dlg(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await alert(page).waitFor();
     assert.match(await alertText(page), /Grist n’a pas donné au widget l’autorisation d’envoyer un fichier/);
     assert.equal(files.uploads.length, 0);
     assert.deepEqual(await writes(page), []);
@@ -861,7 +834,7 @@ test('si l’envoi réussit mais que Grist refuse ensuite l’écriture, la phra
     await chooseFile(page, await png(page));
     await page.evaluate(() => { window.__denyWrites = ['Etablissements']; });
     await save(page).click();
-    await dlg(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await alert(page).waitFor();
     const message = await alertText(page);
     assert.match(message, /Grist a refusé la modification : vos droits ne permettent pas/);
     assert.match(message, /Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir\./);
@@ -878,13 +851,13 @@ test('un refus de Grist (règle d’accès) ne laisse rien à moitié écrit : n
     await press(page, 'Nommer').click();
     await page.evaluate(() => { window.__denyWrites = ['ACL']; });
     await save(page).click();
-    await dlg(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await alert(page).waitFor();
     assert.match(await alertText(page), /Grist a refusé la modification : vos droits ne permettent pas de changer cet établissement ou la liste de ses responsables\. Contactez un administrateur\./);
     assert.equal(await isOpen(page), true);
     assert.equal(await nameInput(page).inputValue(), 'Nom refusé');
     assert.equal((await tableOf(page, 'Etablissements')).nom_complet[0], 'CHU de Bordeaux');
     assert.equal((await tableOf(page, 'ACL')).id.length, 3);
-    assert.equal(await dlg(page).locator('.dlg-alert [role="alert"]').getAttribute('role'), 'alert');
+    assert.equal(await alert(page).getAttribute('role'), 'alert');
   }));
 
 test('une colonne à formule refusée par Grist est expliquée avec la marche à suivre', { skip }, () =>
@@ -895,7 +868,7 @@ test('une colonne à formule refusée par Grist est expliquée avec la marche à
       window.__fake.docApi.applyUserActions = async () => { throw new Error('Cannot modify formula column ok_pour_apparaitre'); };
     });
     await save(page).click();
-    await dlg(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await alert(page).waitFor();
     assert.match(await alertText(page), /colonne à formule : elle ne peut pas être modifiée depuis le widget\. Voir GRIST_SETUP\.md\./);
   }));
 
@@ -929,7 +902,7 @@ test('si quelqu’un d’autre a déjà fait le même changement, il n’y a plu
     await visibleBox(page).uncheck();
     await page.evaluate(() => { window.__tables.Etablissements.ok_pour_apparaitre[0] = false; });
     await save(page).click();
-    await dlg(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await alert(page).waitFor();
     assert.match(await alertText(page), /Ces modifications sont déjà dans la fiche de l’établissement : il n’y a rien à enregistrer/);
     assert.deepEqual(await writes(page), []);
   }));

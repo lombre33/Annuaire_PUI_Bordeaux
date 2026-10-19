@@ -17,9 +17,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { withTaskActions, withIdentity, ANA_EMAIL } from './fixtures.mjs';
-import { skip, reload, waitForCards, cardNames, withWidget } from './support/browser.mjs';
-import { groupedMenu, optionCounts } from './support/grouped-menu.mjs';
+import { unrankableTaskTables, withTaskActions, withIdentity, ANA_EMAIL } from './fixtures.mjs';
+import { skip, reload, waitForCards, cardNames, gridCard, openOwn, withWidget } from './support/browser.mjs';
+import { assertKeyboardWalk, groupedMenu, optionCounts } from './support/grouped-menu.mjs';
 
 const tasks = groupedMenu('taches');
 const skills = groupedMenu('competences');
@@ -41,7 +41,6 @@ const COUNTS = { [VACCINATION]: '2', [AUDIT]: '1', [NONE]: '1' };
 
 // Les cartes sont triées par nom de famille (Bergonié, Bernard, Durand, Martin) : une carte se
 // retrouve par le nom qu'elle affiche, pas par sa place.
-const cardOf = (page, name) => page.locator('.contact-card').filter({ has: page.locator('.name', { hasText: name }) });
 
 // Les lignes que le widget écrit dans la console : le texte seulement.
 const consoleLines = async logs => (await Promise.all([...logs.warnings, ...logs.infos]));
@@ -198,7 +197,7 @@ test('les nombres des actions tiennent compte de l\'interrupteur Partenaires et 
 
     // Le menu ouvert recouvrirait la carte de Bob, la première depuis que les cartes sont triées par nom.
     await page.mouse.click(5, 5);
-    await cardOf(page, BOB).locator('.etablissement-tag').click(); // Établissement : UBM
+    await gridCard(page, BOB).locator('.etablissement-tag').click(); // Établissement : UBM
     await waitForCards(page, 1);
     assert.deepEqual(await tasks.groupCounts(page), { [VACCINATION]: '0', [AUDIT]: '1', [NONE]: '0' }, 'un autre filtre s\'applique aux actions');
   }));
@@ -330,23 +329,7 @@ test('quand une action est complète et que Grist renomme une action, le menu es
 
 // ===== Sans numéro, le menu reste à plat =====
 
-const FLAT_TASKS = [INSPECTION, RAPPEL, RELECTURE, VEILLE].sort((a, b) => a.localeCompare(b, 'fr-FR', { numeric: true }));
-
-// Les trois façons de ne rien pouvoir ranger : aucune action numérotée, aucune tâche numérotée,
-// aucun numéro en commun.
-function unrankableTables() {
-  const unnumberedActions = withTaskActions();
-  unnumberedActions.Actions.Actions = ['Vaccination', 'Audit'];
-  const unnumberedTasks = withTaskActions();
-  unnumberedTasks.Taches.Taches = ['Relecture', 'Rappel vaccinal', 'Inspection', 'Veille'];
-  unnumberedTasks.Taches.Taches_corrige = ['', '', '', ''];
-  const noCommonNumber = withTaskActions();
-  noCommonNumber.Taches.Taches = ['7.1 Relecture', '7.2 Rappel vaccinal', '8.1 Inspection', '8.2 Veille'];
-  noCommonNumber.Taches.Taches_corrige = ['', '', '', ''];
-  return { 'aucune action numérotée': unnumberedActions, 'aucune tâche numérotée': unnumberedTasks, 'aucun numéro en commun': noCommonNumber };
-}
-
-for (const [name, tables] of Object.entries(unrankableTables())) {
+for (const [name, tables] of Object.entries(unrankableTaskTables())) {
   test(`${name} : le menu Tâches reste à plat, sans bandeau ni texte d'action, et la console dit pourquoi`, { skip }, () =>
     withWidget({ tables }, async ({ page, logs }) => {
       await waitForCards(page, 4);
@@ -404,7 +387,7 @@ test('le rangement des tâches ne change rien d\'autre : mêmes cartes, mêmes t
   withWidget({ tables: withTaskActions() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     assert.equal(await page.locator('#statusBanner').isHidden(), true);
-    const tagsByGroup = await cardOf(page, ANA).locator('.tag-group').evaluateAll(groups =>
+    const tagsByGroup = await gridCard(page, ANA).locator('.tag-group').evaluateAll(groups =>
       groups.map(group => [group.querySelector('.tag-group-title').textContent,
         [...group.querySelectorAll('.tag')].map(tag => tag.textContent)]));
     assert.deepEqual(tagsByGroup.filter(([title]) => title === 'Tâches'), [['Tâches', [RELECTURE, INSPECTION]]],
@@ -446,22 +429,7 @@ test('les menus Tâches et Compétences sont indépendants : un seul ouvert à l
 test('le menu Tâches reste utilisable au clavier : cases et boutons atteignables, état de dépli annoncé', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
-    await tasks.filter(page).locator('.filter-button').focus();
-    await page.keyboard.press('Enter'); // ouvre le menu
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.className), 'filter-search-input');
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.closest('.filter-group')?.dataset.value), VACCINATION);
-    await page.keyboard.press('Space'); // la case de l'action
-    await waitForCards(page, 2);
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.className), 'group-toggle', 'puis le bouton de dépli');
-    await page.keyboard.press('Enter');
-    assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-expanded')), 'true');
-    assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), `Détail de ${VACCINATION}`);
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.closest('.filter-option')?.dataset.value), RELECTURE, 'les tâches dépliées suivent');
-    assert.equal(await page.evaluate(() => document.activeElement.checked), true);
+    await assertKeyboardWalk(page, tasks, { group: VACCINATION, cardsAfterTick: 2, firstItem: RELECTURE });
   }));
 
 // Les lignes de l'instantané d'accessibilité (`- checkbox "Nom" [états]`) dont le rôle exige un
@@ -488,15 +456,6 @@ test('le menu Tâches ouvert n\'a aucun contrôle sans nom : recherche, case d\'
 
 // ===== Le formulaire de profil range aussi les tâches par action =====
 
-// Ana n'administre pas : elle ne modifie que sa fiche, par le bandeau « Ma présence ».
-async function openOwnProfile(page) {
-  await waitForCards(page, 4);
-  const button = page.locator('#accountBar .account-edit');
-  await button.waitFor();
-  await button.click();
-  await page.locator('#profileDialog').waitFor();
-}
-
 const profilePicker = (page, label) => page.locator('#profileDialog .grp')
   .filter({ has: page.locator('.grp-title', { hasText: new RegExp(`^${label}$`) }) });
 
@@ -504,7 +463,7 @@ test('le formulaire de profil range les tâches par action, comme le menu, et la
   const tables = withIdentity(withTaskActions());
   tables.ACL.admin[0] = false;
   return withWidget({ tables, user: ANA_EMAIL }, async ({ page }) => {
-    await openOwnProfile(page);
+    await openOwn(page);
     assert.deepEqual(await profilePicker(page, 'Tâches').locator('.subgrp-title').allTextContents(), [VACCINATION, AUDIT, NONE]);
     const pressed = await profilePicker(page, 'Tâches').locator('.pick').evaluateAll(chips =>
       chips.map(chip => [chip.textContent, chip.getAttribute('aria-pressed')]));
@@ -518,7 +477,7 @@ test('le formulaire de profil garde les tâches à plat quand aucune n\'est ratt
   const tables = withIdentity();
   tables.ACL.admin[0] = false;
   return withWidget({ tables, user: ANA_EMAIL }, async ({ page }) => {
-    await openOwnProfile(page);
+    await openOwn(page);
     assert.equal(await profilePicker(page, 'Tâches').locator('.subgrp').count(), 0);
     assert.deepEqual(await profilePicker(page, 'Tâches').locator('.pick').allTextContents(), ['Relecture']);
   });

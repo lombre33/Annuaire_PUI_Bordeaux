@@ -10,7 +10,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sampleTables, withAvatars, withBranding, withIdentity, withSchema, ANA_EMAIL, IRIS_EMAIL, NEW_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
-import { reload, skip, waitForCards, withWidget } from './support/browser.mjs';
+import {
+  assertNoSecretLogged, bddCalls, bddCell, focusReturnsTo, gridCard, openOwn, reload, skip, tokenRequests, toast, until, waitForCards,
+  waitForEditButtons, withWidget
+} from './support/browser.mjs';
+import { FITS, assertTabStaysInDialog, dialogFit, profileDialogPage, spillOf, unnamedControls } from './support/dialog-page.mjs';
 import { FIRST_UPLOAD_ID, MISSING_FILE } from './support/fake-attachments.mjs';
 
 // ===== Outils =====
@@ -26,46 +30,15 @@ function world({ admin = false, schema = true, edit = () => {} } = {}) {
 }
 
 const HOSTILE = `${HOSTILE_FIRST_NAME} Hostile`;
-const gridCard = (page, name) => page.locator('#cardsGrid .contact-card').filter({ has: page.locator('.name', { hasText: name }) });
 const avatarOf = (page, name) => gridCard(page, name).locator('.avatar');
-const dialog = page => page.locator('#profileDialog');
+const { dialog, heading, headingIs, press, summary, notices, alert, alertText, isOpen, closed, column, review } = profileDialogPage();
 const viewer = page => page.locator('#photoDialog');
-const press = (page, name) => dialog(page).getByRole('button', { name, exact: true });
-const heading = page => page.locator('#profileTitle');
-const headingIs = (page, expected) => page.waitForFunction(value => document.getElementById('profileTitle').textContent === value, expected);
-// « Fermée » veut dire aussi que l'événement « close » est passé : Chromium l'envoie à l'image suivante, pas dans la tâche qui ferme
-// la fenêtre, et c'est lui qui la vide. Un test rapide qui la rouvre aussitôt la verrait vidée par cet événement en retard.
-const closed = page => page.waitForFunction(() => {
-  const dialog = document.getElementById('profileDialog');
-  return !dialog.open && dialog.querySelector('.dlg-body').childElementCount === 0;
-});
 const viewerClosed = page => page.waitForFunction(() => {
   const dialog = document.getElementById('photoDialog');
   return !dialog.open && dialog.querySelector('.photo-stage').childElementCount === 0;
 });
-const summary = page => dialog(page).locator('.dlg-summary').textContent();
-const notices = page => dialog(page).locator('.notice');
-const alertText = page => dialog(page).locator('.dlg-alert [role="alert"]').textContent();
-const toast = page => page.locator('#toast');
-const column = (page, tone) => dialog(page).locator(`.rv-col-${tone}`);
 const photoField = page => dialog(page).locator('.photo-field');
 const photoError = page => dialog(page).locator('#profilePhotoError');
-const activeIs = (page, selector) => page.waitForFunction(wanted => document.activeElement?.matches(wanted), selector, { timeout: 3000 });
-const bddCalls = page => page.evaluate(() => window.__fake.calls.filter(call => call.table === 'BDD'));
-const bddCell = (page, columnName, index = 0) => page.evaluate(([name, at]) => window.__tables.BDD[name][at], [columnName, index]);
-const tokenRequests = page => page.evaluate(() => window.__fake.tokenRequests);
-const waitForEditButtons = (page, count) => page.waitForFunction(
-  expected => document.querySelectorAll('#cardsGrid .card-actions:not([hidden]) .card-edit').length === expected, count
-);
-
-async function until(condition, message) {
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    if (await condition()) return;
-    await new Promise(resolve => setTimeout(resolve, 25));
-  }
-  assert.fail(message);
-}
 
 // Une avatar montre sa photo : la classe qui cache les initiales, et une image chargée (pas un cadre vide).
 const showsPhoto = locator => locator.evaluate(node => node.classList.contains('has-photo') && node.querySelector('img')?.naturalWidth > 0);
@@ -74,18 +47,23 @@ const waitForPhoto = async (locator, message = 'la photo se charge') => until(()
 // Un avatar de la grille avec le numéro de sa pièce jointe : « …/attachments/501/download?auth=… ».
 const isAttachment = (src, id) => new RegExp(`/attachments/${id}/download\\?auth=`).test(src ?? '');
 
-async function openOwn(page, cards = 4) {
-  await waitForCards(page, cards);
-  const button = page.locator('#accountBar .account-edit');
-  await button.waitFor();
-  await button.click();
-  await dialog(page).waitFor();
+// Sa propre fiche, avec le champ de la photo.
+async function openOwnWithPhoto(page, cards = 4) {
+  await openOwn(page, cards);
   await photoField(page).waitFor();
 }
 
-async function review(page) {
-  await press(page, 'Relire mes modifications').click();
-  await headingIs(page, 'Relire avant de valider');
+// Ouvre sa fiche, choisit une photo et passe à la relecture.
+async function reviewNewPhoto(page) {
+  await openOwnWithPhoto(page);
+  await pickPhoto(page);
+  await review(page);
+}
+
+// Valide la relecture et attend le message d'échec de l'enregistrement.
+async function validateUntilAlert(page) {
+  await press(page, 'Valider').click();
+  await alert(page).waitFor();
 }
 
 // Allume le mode admin et ouvre la fiche d'une autre personne.
@@ -121,6 +99,11 @@ const chooseFile = (page, file) => page.locator('#profilePhotoFile').setInputFil
 const photoFile = async (page, options = {}) => ({
   name: 'ma-photo-privee.png', mimeType: options.type ?? 'image/png', buffer: await bands(page, options)
 });
+// Choisit une photo (300 px de côté, sauf autre mesure) et attend que son aperçu soit là.
+async function pickPhoto(page, size = { width: 300, height: 300 }) {
+  await chooseFile(page, await photoFile(page, size));
+  await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
+}
 
 // Le côté d'un JPEG, lu dans son premier marqueur « début de trame ».
 function jpegSize(bytes) {
@@ -284,7 +267,7 @@ test('un clic sur la photo d\'une carte l\'agrandit avec le nom, la fonction et 
     // Échap, la croix, un clic sur la photo et un clic à côté ferment la fenêtre et rendent le focus au rond.
     await page.keyboard.press('Escape');
     await viewerClosed(page);
-    await activeIs(page, '.contact-card .avatar-zoom');
+    await focusReturnsTo(page, '.contact-card .avatar-zoom');
     assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Agrandir la photo de Ana Martin');
     assert.equal(await viewer(page).locator('.photo-stage').evaluate(node => node.childElementCount), 0, 'l\'image est retirée à la fermeture');
 
@@ -315,7 +298,7 @@ test('la photo s\'agrandit aussi au clavier, par Entrée et par Espace', { skip 
     await waitForPhoto(ana);
     for (const key of ['Enter', 'Space']) {
       await ana.focus();
-      await activeIs(page, '.avatar-zoom');
+      await focusReturnsTo(page, '.avatar-zoom');
       await page.keyboard.press(key);
       await viewer(page).locator('img.photo-img').waitFor();
       assert.equal(await viewer(page).evaluate(node => node.open), true, key);
@@ -367,7 +350,7 @@ test('la fenêtre d\'agrandissement dit quand la photo ne peut pas être chargé
 
 test('le formulaire offre la photo en premier : la photo actuelle, deux boutons, l\'aide, et rien n\'est écrit à l\'ouverture', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files, logs }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     assert.deepEqual(await dialog(page).locator('.dlg-body > *').evaluateAll(nodes => nodes.map(node => node.className.split(' ')[0]).filter(Boolean).slice(0, 3)),
       ['dlg-alert', 'ident', 'photo-field'], 'la photo vient juste après l\'identité, avant les champs');
     const field = photoField(page);
@@ -409,7 +392,7 @@ test('une personne sans photo voit « Ajouter une photo » et pas de bouton pour
 
 test('une photo choisie est recadrée au centre en carré, redessinée en JPEG de 256 px, relue avant / après, envoyée puis écrite en une seule action', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files, logs }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     await waitForPhoto(photoField(page).locator('.photo-preview .avatar'));
     await chooseFile(page, await photoFile(page, { width: 600, height: 400 }));
     const preview = photoField(page).locator('.photo-preview .avatar');
@@ -449,7 +432,7 @@ test('une photo choisie est recadrée au centre en carré, redessinée en JPEG d
     assert.equal(await viewer(page).locator('#photoCaption small').textContent(), 'Nouvelle photo');
     await page.keyboard.press('Escape');
     await viewerClosed(page);
-    assert.equal(await dialog(page).evaluate(node => node.open), true, 'la relecture reste ouverte');
+    assert.equal(await isOpen(page), true, 'la relecture reste ouverte');
     assert.equal(await heading(page).textContent(), 'Relire avant de valider');
 
     await press(page, 'Valider').click();
@@ -488,7 +471,7 @@ test('une photo choisie est recadrée au centre en carré, redessinée en JPEG d
     assert.ok(files.hits[FIRST_UPLOAD_ID] > 0);
 
     // La fenêtre rouverte part de la photo enregistrée.
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     const reopened = photoField(page).locator('.photo-preview .avatar');
     await waitForPhoto(reopened);
     assert.ok(isAttachment(await photoSrc(reopened), FIRST_UPLOAD_ID));
@@ -500,7 +483,7 @@ test('une photo choisie est recadrée au centre en carré, redessinée en JPEG d
 
 test('une photo de téléphone est remise à l\'endroit, sans ses métadonnées : l\'orientation est appliquée et la position GPS ne part pas', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     // 600 x 400 de bandes verticales, marquées « à tourner d'un quart de tour » : à l'écran, 400 x 600 de bandes horizontales.
     const jpeg = withExif(await bands(page, { width: 600, height: 400, type: 'image/jpeg' }), 6);
     assert.ok(jpeg.toString('latin1').includes('GPS 44.8378N'));
@@ -519,7 +502,7 @@ test('une photo de téléphone est remise à l\'endroit, sans ses métadonnées 
 
 test('un JPG et un WebP sont acceptés comme un PNG, et une photo plus petite que 256 px garde sa taille', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     const sizes = [];
     for (const [type, name, width, height] of [['image/jpeg', 'a.jpg', 1000, 500], ['image/webp', 'b.webp', 300, 300], ['image/png', 'c.png', 120, 80]]) {
       await chooseFile(page, { name, mimeType: type, buffer: await bands(page, { width, height, type }) });
@@ -531,14 +514,14 @@ test('un JPG et un WebP sont acceptés comme un PNG, et une photo plus petite qu
       const upload = files.uploads.at(-1);
       assert.equal(upload.contentType, 'image/jpeg', `${type} est ré-encodé en JPEG`);
       sizes.push(jpegSize(upload.bytes));
-      await openOwn(page);
+      await openOwnWithPhoto(page);
     }
     assert.deepEqual(sizes, [{ width: 256, height: 256 }, { width: 256, height: 256 }, { width: 80, height: 80 }]);
   }));
 
 test('un PNG transparent est posé sur du blanc : jamais de fond noir derrière un JPEG', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     const transparent = await page.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = 100;
@@ -571,7 +554,7 @@ test('un PNG transparent est posé sur du blanc : jamais de fond noir derrière 
 
 test('un fichier refusé avant l\'envoi (format, poids, contenu illisible) ne change rien et dit pourquoi ; un bon fichier efface le message', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     const error = photoError(page);
     const expectError = async (file, message, label) => {
       await chooseFile(page, file);
@@ -597,8 +580,7 @@ test('un fichier refusé avant l\'envoi (format, poids, contenu illisible) ne ch
     assert.equal(files.uploads.length, 0);
     assert.deepEqual(await bddCalls(page), []);
 
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
+    await pickPhoto(page);
     assert.equal(await error.isHidden(), true, 'un bon fichier efface le message');
     assert.equal(await summary(page), '1 champ modifié');
     // Un mauvais fichier ensuite garde la photo déjà choisie.
@@ -610,7 +592,7 @@ test('un fichier refusé avant l\'envoi (format, poids, contenu illisible) ne ch
 
 test('pendant que l\'image se prépare, les boutons de la photo et « Relire » attendent, sans perdre le focus du clavier', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     // L'écoute du sélecteur de fichier est branchée bien avant l'appui : une touche, plus rapide qu'un clic
     // (qui attend d'abord que le bouton soit prêt), peut arriver avant que le navigateur intercepte la
     // boîte, et l'événement est alors perdu (dans la suite complète, près d'une fois sur deux).
@@ -644,7 +626,7 @@ test('pendant que l\'image se prépare, les boutons de la photo et « Relire » 
     assert.equal(seen.at(-1).status, '');
     assert.equal(await photoField(page).locator('.photo-status').getAttribute('role'), 'status');
     // Le focus est resté sur le bouton, qui n'a jamais été « disabled ».
-    await activeIs(page, '.photo-actions .btn');
+    await focusReturnsTo(page, '.photo-actions .btn');
     assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Changer la photo');
     assert.equal(await press(page, 'Relire mes modifications').isEnabled(), true);
   }));
@@ -659,7 +641,7 @@ const preparing = page => until(async () => (await photoField(page).locator('.ph
 
 test('pendant que l\'image se prépare, un second choix, le retrait et « Relire » ne font rien', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     // Une autre modification d'abord : « Relire » est actif avant la photo, et c'est la photo qui l'éteint.
     await dialog(page).locator('#profile-Fonction').fill('Cheffe de service');
     assert.equal(await press(page, 'Relire mes modifications').isEnabled(), true);
@@ -694,7 +676,7 @@ test('pendant que l\'image se prépare, un second choix, le retrait et « Relire
 
 test('fermer la fenêtre pendant la préparation abandonne la photo : aucune erreur, et la fenêtre rouverte repart de la fiche', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     await slowImages(page, 1200);
     await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
     await preparing(page);
@@ -703,7 +685,7 @@ test('fermer la fenêtre pendant la préparation abandonne la photo : aucune err
     // L'image abandonnée finit de se préparer : elle ne doit plus rien toucher.
     await page.waitForTimeout(1800);
     assert.deepEqual(await Promise.all(logs.errors), [], 'rien n\'est resté en route : aucune erreur');
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     assert.equal(await photoField(page).locator('img[src^="blob:"]').count(), 0, 'la photo abandonnée ne revient pas');
     assert.equal(await summary(page), 'Aucune modification');
     assert.equal(await photoField(page).locator('.photo-status').textContent(), '');
@@ -711,7 +693,7 @@ test('fermer la fenêtre pendant la préparation abandonne la photo : aucune err
 
 test('sans jeton de lecture, la photo ne se montre pas mais se retire : la miniature de la photo actuelle dit qu\'elle est illisible', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL, accessToken: null }, async ({ page, logs }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     assert.equal(await photoField(page).locator('.photo-preview .avatar').textContent(), 'AM', 'les initiales, faute de photo à montrer');
     assert.equal(await photoField(page).locator('.photo-preview img').count(), 0);
     await photoField(page).getByRole('button', { name: 'Retirer la photo', exact: true }).click();
@@ -744,7 +726,7 @@ test('sans miniatures, la ligne « Photo de profil » d\'une liste de changement
 
 test('« Retirer la photo » rend les initiales, se relit en rouge, n\'envoie rien et écrit une cellule vide', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files, logs }) => {
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     const field = photoField(page);
     await waitForPhoto(field.locator('.photo-preview .avatar'));
     await field.getByRole('button', { name: 'Retirer la photo', exact: true }).focus();
@@ -753,7 +735,7 @@ test('« Retirer la photo » rend les initiales, se relit en rouge, n\'envoie ri
     assert.equal(await field.locator('.photo-preview img').count(), 0);
     assert.equal(await field.getByRole('button', { name: 'Ajouter une photo', exact: true }).isVisible(), true);
     assert.equal(await field.getByRole('button', { name: 'Retirer la photo', exact: true }).isHidden(), true);
-    await activeIs(page, '.photo-actions .btn');
+    await focusReturnsTo(page, '.photo-actions .btn');
     assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Ajouter une photo', 'le focus passe au bouton qui reste');
     assert.equal(await summary(page), '1 champ modifié');
     const row = dialog(page).locator('.recap .diff-row');
@@ -784,8 +766,7 @@ test('« Retirer la photo » rend les initiales, se relit en rouge, n\'envoie ri
 test('choisir une photo puis la retirer revient à ne rien changer pour qui n\'en avait pas', { skip }, async () => {
   await withWidget({ tables: world({ admin: true }), user: ANA_EMAIL }, async ({ page }) => {
     await openOfOther(page, 'Hugo Bernard');
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
+    await pickPhoto(page);
     const blob = await photoSrc(photoField(page).locator('.photo-preview .avatar'));
     assert.equal(await summary(page), '1 champ modifié');
     await photoField(page).getByRole('button', { name: 'Retirer la photo', exact: true }).click();
@@ -800,8 +781,7 @@ test('choisir une photo puis la retirer revient à ne rien changer pour qui n\'e
 test('une administratrice ajoute une première photo à la fiche de quelqu\'un d\'autre : pastille « photo ajoutée », seule cette ligne est écrite', { skip }, () =>
   withWidget({ tables: world({ admin: true }), user: ANA_EMAIL }, async ({ page, files }) => {
     await openOfOther(page, 'Hugo Bernard');
-    await chooseFile(page, await photoFile(page, { width: 400, height: 800 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
+    await pickPhoto(page, { width: 400, height: 800 });
     const row = dialog(page).locator('.recap .diff-row');
     assert.equal(await row.locator('.none').first().textContent(), 'aucune photo');
     assert.equal(await row.locator('.thumb').count(), 1);
@@ -858,23 +838,17 @@ test('un envoi que Grist refuse ou qui échoue laisse la relecture ouverte, la p
   for (const [mode, expected] of FAILED_UPLOADS) {
     await withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files, logs }) => {
       files.upload.mode = mode;
-      await openOwn(page);
-      await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-      await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
-      await review(page);
-      await press(page, 'Valider').click();
-      await dialog(page).locator('.dlg-alert [role="alert"]').waitFor();
+      await reviewNewPhoto(page);
+      await validateUntilAlert(page);
       assert.match(await alertText(page), expected, mode);
-      assert.equal(await dialog(page).evaluate(node => node.open), true, mode);
+      assert.equal(await isOpen(page), true, mode);
       assert.equal(await heading(page).textContent(), 'Relire avant de valider', mode);
       assert.equal(await press(page, 'Valider').isEnabled(), true, 'on peut réessayer');
       assert.equal(await press(page, 'Valider').textContent(), 'Valider');
       assert.deepEqual(await bddCalls(page), [], `${mode} : rien n'est écrit`);
       assert.equal(files.uploads.length, 1);
       assert.doesNotMatch(await alertText(page), /fichier de la nouvelle photo, déjà envoyé/, `${mode} : rien n'est resté dans Grist`);
-      const logged = (await Promise.all([...logs.warnings, ...logs.errors])).join('\n');
-      assert.ok(!logged.includes('fake-token'), `${mode} : le jeton n'est jamais écrit dans la console`);
-      assert.ok(!logged.includes('docs.getgrist.com/api/docs/fake-doc'), `${mode} : ni l'adresse du document`);
+      await assertNoSecretLogged(logs, mode);
 
       files.upload.mode = 'ok';
       await press(page, 'Valider').click();
@@ -888,12 +862,8 @@ test('un envoi que Grist refuse ou qui échoue laisse la relecture ouverte, la p
 test('un serveur de pièces jointes sans en-têtes CORS fait échouer l\'envoi proprement, avec le conseil de la photo', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
     files.upload.cors = false;
-    await openOwn(page);
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
-    await review(page);
-    await press(page, 'Valider').click();
-    await dialog(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await reviewNewPhoto(page);
+    await validateUntilAlert(page);
     const message = await alertText(page);
     assert.match(message, /le navigateur n’a pas pu joindre le serveur, ou l’a refusé\. Contactez un administrateur si le problème persiste\./);
     assert.doesNotMatch(message, /GRIST_SETUP/, 'le conseil du logo (déposer le fichier dans Grist) ne vaut pas pour une photo');
@@ -902,16 +872,12 @@ test('un serveur de pièces jointes sans en-têtes CORS fait échouer l\'envoi p
 
 test('un jeton d\'écriture refusé par Grist arrête l\'enregistrement sans rien envoyer', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
-    await openOwn(page);
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
-    await review(page);
+    await reviewNewPhoto(page);
     await page.evaluate(() => {
       const original = window.__fake.docApi.getAccessToken;
       window.__fake.docApi.getAccessToken = request => (request?.readOnly === false ? Promise.reject(new Error('Access token refused')) : original(request));
     });
-    await press(page, 'Valider').click();
-    await dialog(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await validateUntilAlert(page);
     assert.match(await alertText(page), /Grist n’a pas donné au widget l’autorisation d’envoyer un fichier\. Contactez un administrateur si le problème persiste\./);
     assert.equal(files.uploads.length, 0);
     assert.deepEqual(await bddCalls(page), []);
@@ -919,13 +885,9 @@ test('un jeton d\'écriture refusé par Grist arrête l\'enregistrement sans rie
 
 test('si l\'envoi réussit mais que Grist refuse ensuite l\'écriture, la phrase dit où est resté le fichier', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
-    await openOwn(page);
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
-    await review(page);
+    await reviewNewPhoto(page);
     await page.evaluate(() => { window.__denyWrites = ['BDD']; });
-    await press(page, 'Valider').click();
-    await dialog(page).locator('.dlg-alert [role="alert"]').waitFor();
+    await validateUntilAlert(page);
     const message = await alertText(page);
     assert.match(message, /Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche/);
     assert.match(message, /Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir\./);
@@ -937,10 +899,7 @@ test('si l\'envoi réussit mais que Grist refuse ensuite l\'écriture, la phrase
 test('si la fiche change pendant l\'envoi de la photo, rien n\'est écrit : la relecture montre la fiche d\'aujourd\'hui et dit où est le fichier', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
     files.upload.delay = 500;
-    await openOwn(page);
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
-    await review(page);
+    await reviewNewPhoto(page);
     await waitForPhoto(column(page, 'before').locator('.contact-card .avatar'));
     await press(page, 'Valider').click();
     await until(() => files.uploads.length === 1, 'l\'envoi a commencé');
@@ -966,9 +925,8 @@ test('si la fiche change pendant l\'envoi de la photo, rien n\'est écrit : la r
 
 test('si la photo a changé dans Grist avant la relecture, la fenêtre le dit', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
-    await openOwn(page);
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
+    await openOwnWithPhoto(page);
+    await pickPhoto(page);
     await page.evaluate(() => { window.__tables.BDD.Avatar[0] = ['L', 502]; });
     await review(page);
     assert.match(await notices(page).first().textContent(), /ont changé dans Grist depuis l'ouverture de la fenêtre : Photo de profil\./);
@@ -978,19 +936,18 @@ test('si la photo a changé dans Grist avant la relecture, la fenêtre le dit', 
 
 test('abandonner une photo choisie : Échap prévient puis ferme, l\'image est libérée et la fenêtre rouverte repart de la photo de Grist', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, files }) => {
-    await openOwn(page);
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
+    await openOwnWithPhoto(page);
+    await pickPhoto(page);
     const blob = await photoSrc(photoField(page).locator('.photo-preview .avatar'));
     await page.keyboard.press('Escape');
-    assert.equal(await dialog(page).evaluate(node => node.open), true, 'le premier appui prévient');
+    assert.equal(await isOpen(page), true, 'le premier appui prévient');
     assert.equal(await dialog(page).locator('.dlg-hint').isVisible(), true);
     await page.keyboard.press('Escape');
     await closed(page);
     await until(async () => (await page.evaluate(url => fetch(url).then(() => 'chargée', () => 'libérée'), blob)) === 'libérée', 'l\'image abandonnée est libérée');
     assert.equal(files.uploads.length, 0);
     assert.deepEqual(await bddCalls(page), []);
-    await openOwn(page);
+    await openOwnWithPhoto(page);
     assert.equal(await summary(page), 'Aucune modification');
     assert.ok(isAttachment(await photoSrc(photoField(page).locator('.photo-preview .avatar')), 501));
   }));
@@ -1018,23 +975,9 @@ for (const width of [280, 320, 390]) {
   test(`dans un cadre de ${width} px, le formulaire, la relecture et la fenêtre d'agrandissement tiennent dans l'écran`, { skip }, () =>
     withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
       await page.setViewportSize({ width, height: 700 });
-      await openOwn(page);
-      const fits = selector => page.evaluate(wanted => {
-        const dialogBox = document.querySelector(wanted);
-        const box = dialogBox.getBoundingClientRect();
-        const outside = [...dialogBox.querySelectorAll('*')].filter(node => {
-          const at = node.getBoundingClientRect();
-          return at.width > 0 && !node.closest('.sr-only') && (at.right > box.right + 0.5 || at.left < box.left - 0.5);
-        }).map(node => `${node.tagName}.${String(node.className).slice(0, 30)}`);
-        return {
-          inside: box.left >= 0 && box.right <= window.innerWidth + 0.5 && box.bottom <= window.innerHeight + 0.5,
-          pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
-          outside
-        };
-      }, selector);
-      const FITS = { inside: true, pageOverflow: 0, outside: [] };
+      await openOwnWithPhoto(page);
       await waitForPhoto(photoField(page).locator('.photo-preview .avatar'));
-      assert.deepEqual(await fits('#profileDialog'), FITS, 'formulaire');
+      assert.deepEqual(await dialogFit(page, '#profileDialog'), FITS, 'formulaire');
       const preview = await photoField(page).locator('.photo-preview .avatar').boundingBox();
       const actions = await photoField(page).locator('.photo-actions').boundingBox();
       assert.ok(actions.y >= preview.y + preview.height - 1 || actions.x >= preview.x + preview.width - 1, 'les boutons ne passent pas sous la photo');
@@ -1043,25 +986,17 @@ for (const width of [280, 320, 390]) {
         assert.ok(button.height >= 32, `${name} : une cible assez haute (${button.height} px)`);
       }
 
-      await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-      await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
+      await pickPhoto(page);
       await review(page);
       await waitForPhoto(column(page, 'after').locator('.contact-card .avatar'));
-      assert.deepEqual(await fits('#profileDialog'), FITS, 'relecture');
-      const spill = await column(page, 'after').locator('.contact-card').evaluate(card => {
-        const frame = card.getBoundingClientRect();
-        return [...card.querySelectorAll('*')].filter(node => {
-          const at = node.getBoundingClientRect();
-          return at.width > 0 && (at.right > frame.right + 0.5 || at.left < frame.left - 0.5);
-        }).map(node => node.className || node.tagName);
-      });
-      assert.deepEqual(spill, [], 'rien ne sort de la carte « Après » : ni l\'anneau ni la pastille');
+      assert.deepEqual(await dialogFit(page, '#profileDialog'), FITS, 'relecture');
+      assert.deepEqual(await spillOf(column(page, 'after').locator('.contact-card')), [], 'rien ne sort de la carte « Après » : ni l\'anneau ni la pastille');
       const validate = await press(page, 'Valider').boundingBox();
       assert.ok(validate.y + validate.height <= 700 + 0.5, '« Valider » est visible');
 
       await dialog(page).getByRole('button', { name: 'Agrandir : Nouvelle photo' }).click();
       await viewer(page).locator('img.photo-img.loaded').waitFor();
-      assert.deepEqual(await fits('#photoDialog'), FITS, 'photo agrandie');
+      assert.deepEqual(await dialogFit(page, '#photoDialog'), FITS, 'photo agrandie');
       const hugs = await page.evaluate(() => {
         const box = document.querySelector('#photoDialog').getBoundingClientRect();
         const parts = ['.photo-stage', '.photo-cap'].map(part => document.querySelector(`#photoDialog ${part}`).getBoundingClientRect().height);
@@ -1081,24 +1016,13 @@ for (const width of [280, 320, 390]) {
 
 test('chaque contrôle de la photo a un nom, et le focus ne sort jamais de la fenêtre modale', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
-    await openOwn(page);
-    await chooseFile(page, await photoFile(page, { width: 300, height: 300 }));
-    await photoField(page).locator('.photo-preview img[src^="blob:"]').waitFor();
-    const unnamed = await dialog(page).locator('input, select, button').evaluateAll(controls => controls
-      .filter(control => !(control.labels?.length || control.getAttribute('aria-label') || control.textContent.trim()))
-      .map(control => control.outerHTML.slice(0, 80)));
-    assert.deepEqual(unnamed, []);
+    await openOwnWithPhoto(page);
+    await pickPhoto(page);
+    assert.deepEqual(await unnamedControls(dialog(page)), []);
     // Le fichier n'a pas d'étiquette visible mais porte l'aide et le message d'erreur.
     assert.equal(await page.locator('#profilePhotoHelp').count(), 1);
     assert.equal(await page.locator('#profilePhotoError').count(), 1);
-    for (let step = 0; step < 30; step += 1) {
-      await page.keyboard.press('Tab');
-      const where = await page.evaluate(() => {
-        const active = document.activeElement;
-        return document.getElementById('profileDialog').contains(active) ? 'fenêtre' : active === document.body ? 'body' : active.outerHTML.slice(0, 60);
-      });
-      assert.ok(['fenêtre', 'body'].includes(where), `le focus est tombé sur ${where} à la tabulation ${step + 1}`);
-    }
+    await assertTabStaysInDialog(page, 'profileDialog', 30);
     // Les photos de la grille sont des boutons nommés ; les ronds d'initiales sont ignorés des lecteurs d'écran.
     await closeAll(page);
     const unnamedCards = await page.locator('#cardsGrid button.avatar').evaluateAll(buttons => buttons
@@ -1108,7 +1032,7 @@ test('chaque contrôle de la photo a un nom, et le focus ne sort jamais de la fe
   }));
 
 async function closeAll(page) {
-  if (await dialog(page).evaluate(node => node.open)) {
+  if (await isOpen(page)) {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await closed(page);

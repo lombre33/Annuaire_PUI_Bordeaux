@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { brandingSummary, buildBranding, logoForContact, logoSize, inkBounds, hasInk } from '../branding.js';
 import { BAND_LOGO } from '../constants.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
-import { sampleTables, withBranding } from './fixtures.mjs';
+import { sampleTables, withBranding, withEtablissement } from './fixtures.mjs';
 
 // ===== buildBranding : logos des cartes et bandeau des fondateurs =====
 
@@ -107,16 +107,10 @@ test('logoForContact answers the establishment without a logo, and nothing for a
 });
 
 test('with two establishments of the same label, the one that has a logo serves the cards resolved by label', () => {
-  const tables = withBranding();
-  tables.Etablissements.id.push(6);
-  tables.Etablissements.acronyme.push('CHU');
-  tables.Etablissements.nom_complet.push('CHU (doublon)');
-  tables.Etablissements.fondateur.push(true);
-  tables.Etablissements.partenaire.push(false);
-  tables.Etablissements.autres.push(false);
-  tables.Etablissements.ok_pour_apparaitre.push(true);
-  tables.Etablissements.logo.push(null);
-  tables.Etablissements.ordre_bandeau.push(0);
+  const tables = withEtablissement(withBranding(), {
+    id: 6, acronyme: 'CHU', nom_complet: 'CHU (doublon)', fondateur: true, partenaire: false, autres: false, ok_pour_apparaitre: true,
+    logo: null, ordre_bandeau: 0
+  });
   const branding = brandingOf(tables);
   assert.equal(logoForContact(branding, { Etablissement: 'CHU' }).logo, 11);
   assert.equal(logoForContact(branding, { Etablissement: 6 }).logo, null, 'par identifiant, chaque ligne garde le sien');

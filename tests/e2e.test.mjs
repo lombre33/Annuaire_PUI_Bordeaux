@@ -14,12 +14,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  sampleTables, withoutOptionalColumns, withIdentity, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL, ADMIN_EMAIL
+  sampleTables, withDuplicateCHU, withoutOptionalColumns, withIdentity, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL
 } from './fixtures.mjs';
 import {
-  skip, reload, cardCount, waitForCards, waitForBanner, cardNames, resultCount, bannerText, withWidget, openWidget
+  skip, reload, cardCount, probeRemoved, waitForCards, waitForBanner, cardNames, resultCount, bannerText, withWidget, openWidget
 } from './support/browser.mjs';
-import { groupedMenu, optionCounts } from './support/grouped-menu.mjs';
+import { assertKeyboardWalk, groupedMenu, optionCounts } from './support/grouped-menu.mjs';
 import { SEARCH_DELAY_MS } from '../constants.js';
 
 // La carte d'une personne, retrouvée par son nom affiché : les cartes sont triées par nom de
@@ -709,22 +709,7 @@ test('sans colonne Macro_competences : le bandeau le dit, le menu Compétences r
 test('le menu Compétences reste utilisable au clavier : cases et boutons atteignables, état de dépli annoncé', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    await skillsFilter(page).locator('.filter-button').focus();
-    await page.keyboard.press('Enter'); // ouvre le menu
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.className), 'filter-search-input');
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.closest('.filter-group')?.dataset.value), 'Cancérologie');
-    await page.keyboard.press('Space'); // la case du domaine
-    await waitForCards(page, 1);
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.className), 'group-toggle', 'puis le bouton de dépli');
-    await page.keyboard.press('Enter');
-    assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-expanded')), 'true');
-    assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Détail de Cancérologie');
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.closest('.filter-option')?.dataset.value), 'Hématologie', 'les compétences dépliées suivent');
-    assert.equal(await page.evaluate(() => document.activeElement.checked), true);
+    await assertKeyboardWalk(page, skills, { group: 'Cancérologie', cardsAfterTick: 1, firstItem: 'Hématologie' });
   }));
 
 test('chaque option de menu affiche le nombre de cartes qu\'elle donnerait', { skip }, () =>
@@ -833,15 +818,7 @@ test('table de référence illisible : données partielles signalées, filtres e
   }));
 
 test('acronymes en double : chaque contact garde le statut de sa propre ligne d\'Etablissements, sans bandeau', { skip }, () => {
-  const tables = sampleTables();
-  // Deuxième ligne « CHU » non validée, mais aucun contact n'y est rattaché.
-  tables.Etablissements.id.push(6);
-  tables.Etablissements.acronyme.push('CHU');
-  tables.Etablissements.nom_complet.push('CHU (doublon)');
-  tables.Etablissements.fondateur.push(true);
-  tables.Etablissements.partenaire.push(false);
-  tables.Etablissements.autres.push(false);
-  tables.Etablissements.ok_pour_apparaitre.push(false);
+  const tables = withDuplicateCHU(sampleTables());
   return withWidget({ tables }, async ({ page }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await cardNames(page), DEFAULT_CARD_NAMES);
@@ -910,6 +887,7 @@ const waitForAccountBar = (page, visible = true) =>
   page.waitForFunction(expected => !document.getElementById('accountBar').hidden === expected, visible);
 const isSwitchOn = async page => (await presenceSwitch(page).getAttribute('aria-checked')) === 'true';
 const accountMessage = page => page.locator('#accountBar .account-detail').textContent();
+const accountName = page => page.locator('#accountBar .account-name').textContent();
 const accountStatus = page => page.locator('#accountBar .account-status').textContent();
 // Le message est-il à l'écran ? Réduit à un pixel et rogné (.sr-only), il n'est que lu par les
 // lecteurs d'écran. Le rognage compte : une erreur garde ses marges et sa bordure, donc une boîte
@@ -928,7 +906,7 @@ test('sans table-sonde (Annuaire_Sonde) le widget la crée au chargement et iden
   withWidget({ user: ANA_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await waitForAccountBar(page);
-    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    await probeRemoved(page);
     assert.deepEqual((await grist(page)).map(call => [call.action, call.table]),
       [['AddTable', 'Annuaire_Sonde'], ['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
     assert.deepEqual(await page.evaluate(() => window.__tables.Annuaire_Sonde), { id: [], Email: [], Admin: [], Responsable_de: [] });
@@ -960,7 +938,7 @@ test('une personne identifiée qui apparaît voit son nom, sa situation et l\'in
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await waitForAccountBar(page);
-    assert.equal(await accountBar(page).locator('.account-name').textContent(), 'Ana Martin');
+    assert.equal(await accountName(page), 'Ana Martin');
     assert.equal(await accountBar(page).locator('.account-avatar').textContent(), 'AM');
     assert.equal(await accountMessage(page), 'Vous apparaissez dans l\'annuaire.');
     assert.equal(await isSwitchOn(page), true);
@@ -972,7 +950,7 @@ test('une personne identifiée qui apparaît voit son nom, sa situation et l\'in
 test('l\'identification laisse le document propre : la ligne de la sonde est retirée, rien d\'autre n\'est écrit', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForAccountBar(page);
-    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    await probeRemoved(page);
     assert.deepEqual((await grist(page)).map(call => [call.action, call.table]),
       [['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
     assert.deepEqual(await page.evaluate(() => window.__tables.Annuaire_Sonde.id), []);
@@ -1133,11 +1111,11 @@ test('écriture réussie mais annuaire impossible à relire : le bandeau le dit,
 test('une personne identifiée sans fiche dans BDD voit une mention sans interrupteur, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
   withWidget({ tables: withIdentity(), user: 'inconnu@example.fr' }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    await probeRemoved(page);
     await accountBar(page).waitFor();
-    assert.equal(await accountBar(page).locator('.account-name').textContent(), 'Compte absent de l\'annuaire');
+    assert.equal(await accountName(page), 'Compte absent de l\'annuaire');
     assert.equal(await accountBar(page).locator('.account-avatar').textContent(), '?');
-    assert.equal(await accountBar(page).locator('.account-detail').textContent(),
+    assert.equal(await accountMessage(page),
       'Connecté avec inconnu@example.fr : cette adresse ne figure pas dans l\'annuaire, il n\'y a donc pas de fiche à modifier.');
     assert.equal(await presenceSwitch(page).isHidden(), true, 'aucune fiche, aucun choix de présence');
     assert.equal(await accountBar(page).locator('.account-edit').isHidden(), true);
@@ -1152,10 +1130,10 @@ test('BDD sans colonne email : le bandeau accuse la configuration, la console l\
   delete tables.BDD.email;
   return withWidget({ tables, user: BOB_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    await probeRemoved(page);
     await accountBar(page).waitFor();
-    assert.equal(await accountBar(page).locator('.account-name').textContent(), 'Fiche introuvable');
-    assert.equal(await accountBar(page).locator('.account-detail').textContent(),
+    assert.equal(await accountName(page), 'Fiche introuvable');
+    assert.equal(await accountMessage(page),
       'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.');
     assert.equal(await presenceSwitch(page).isHidden(), true);
     assert.ok((await identityLogs(logs)).some(line => line.includes('colonne « email »')));
@@ -1182,7 +1160,7 @@ test('une personne qui a accepté mais reste masquée en apprend la raison', { s
 test('le nom d\'une personne s\'affiche en texte brut dans le bandeau (aucune injection)', { skip }, () =>
   withWidget({ tables: withIdentity(), user: 'hostile@chu-bordeaux.fr' }, async ({ page }) => {
     await waitForAccountBar(page);
-    assert.equal(await accountBar(page).locator('.account-name').textContent(), `${HOSTILE_FIRST_NAME} Hostile`);
+    assert.equal(await accountName(page), `${HOSTILE_FIRST_NAME} Hostile`);
     assert.equal(await accountBar(page).locator('img').count(), 0);
     assert.equal(await page.evaluate(() => window.__xss), undefined);
   }));
@@ -1190,7 +1168,7 @@ test('le nom d\'une personne s\'affiche en texte brut dans le bandeau (aucune in
 test('une panne de la table-sonde n\'empêche jamais l\'annuaire de s\'afficher', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL, failTables: ['Annuaire_Sonde'] }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    await page.waitForFunction(() => window.__fake.calls.some(call => call.action === 'RemoveRecord'));
+    await probeRemoved(page);
     assert.equal(await accountBar(page).isHidden(), true);
     assert.equal(await page.locator('#statusBanner').isHidden(), true, 'pas de bandeau d\'erreur pour une identité introuvable');
     assert.deepEqual(await Promise.all(logs.errors), []);

@@ -3,11 +3,10 @@ import assert from 'node:assert/strict';
 import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, explainWriteError, PresenceError } from '../presence.js';
 import { loadDirectory } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
+import { quiet } from './support/logs.mjs';
 import { sampleTables, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 
 // ===== presence : ce qu'on dit à la personne, et l'écriture de son choix =====
-
-const quiet = { info() {}, warn() {}, error() {} };
 
 async function setup(tables = sampleTables(), options = {}) {
   const fake = createFakeGrist({ tables, ...options });

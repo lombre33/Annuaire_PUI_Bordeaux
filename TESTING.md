@@ -143,12 +143,35 @@ Sans dépendance, un fichier de tests par module :
   suppression, `AddTable` et `RemoveTable` : l'identifiant d'une table déjà prise est
   numéroté, comme le fait Grist), formules déclenchées de la sonde, pannes, écritures
   refusées (par table ou par ligne).
-- `tests/support/browser.mjs` — l'outillage des tests navigateur : serveur
-  statique, Chromium, faux Grist injecté dans la page, console des pages relue sans
-  qu'une lecture interrompue par la fermeture de la page fasse échouer le fichier.
+- `tests/support/harness.mjs` — le navigateur et le serveur des tests navigateur : serveur
+  statique pour le vrai `index.html`, Chromium, faux Grist injecté dans la page, console des
+  pages relue sans qu'une lecture interrompue par la fermeture de la page fasse échouer le
+  fichier. Chaque fichier de test en lance sa propre instance (`createHarness()`).
+- `tests/support/browser.mjs` — l'outillage des tests navigateur : ce harnais, et les attentes
+  que ces tests partagent (cartes, bandeau, message, focus rendu, sa propre fiche ouverte,
+  actions envoyées à `BDD`, ni jeton ni adresse du document dans la console, pied d'une
+  fenêtre sur une ou deux lignes).
+- `tests/support/layout.mjs` — le même harnais avec les barres de défilement (dans Grist elles
+  retirent 15 px de large), les largeurs testées et les mesures de cartes de
+  `tests/responsive.test.mjs` et `tests/branding-layout.test.mjs`.
+- `tests/support/dialog-page.mjs` — les repères des fenêtres de modification d'une fiche et
+  d'un établissement (titre, résumé, avis, ouverte ou fermée), la tabulation qui reste dans la
+  fenêtre, les contrôles sans nom et la mise en page (`dialogFit`), pour
+  `tests/e2e-profile.test.mjs`, `tests/e2e-avatar.test.mjs` et `tests/e2e-etablissement.test.mjs`.
 - `tests/support/grouped-menu.mjs` — les aides communes aux tests des menus rangés par
   groupe (Compétences par domaine, Tâches par action) : groupe, case, flèche,
-  nombres, éléments visibles.
+  nombres, éléments visibles, et le parcours au clavier (`assertKeyboardWalk`).
+- `tests/support/fiction.mjs` — le contrôle que le jeu de données d'un test ne contient que des
+  coordonnées inventées (`assertFictionalContacts`).
+- `tests/support/logs.mjs` — une console muette ou relue (`quiet`, `logged`) pour les tests qui
+  passent un `log` aux fonctions du widget.
+- `tests/support/multipart.mjs` — la lecture d'un fichier envoyé en `multipart/form-data`
+  (`readMultipartFile`), commune aux faux serveurs de pièces jointes, au serveur REST des
+  tests et au serveur de démonstration.
+- `tests/support-helpers.test.mjs` — les aides ci-dessus refusent ce qu'elles doivent refuser :
+  chaque cas leur donne une page volontairement fautive (un bouton sans nom, un élément qui
+  sort de la fenêtre ou de la carte, une tabulation qui s'échappe, le jeton dans la console, un
+  mauvais parcours au clavier) et attend leur refus.
 - `tests/support/fake-attachments.mjs` — les pièces jointes du faux Grist pour les tests
   navigateur : des logos dessinés à la demande (proportions variées, un logo très haut,
   une bannière très large, un SVG sans dimensions), un fichier supprimé (404), un

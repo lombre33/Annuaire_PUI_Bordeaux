@@ -69,7 +69,8 @@
 // logos-fictifs.mjs et de portraits-fictifs.mjs à la place de Grist, à condition de recevoir le jeton.
 // Il reçoit aussi les fichiers qu'un responsable d'établissement (un logo) ou une personne (sa photo)
 // envoie (POST /__pieces-jointes/attachments?auth=…, comme l'API REST de Grist) : le fichier est gardé
-// en mémoire, reçoit l'identifiant suivant et se télécharge ensuite comme les autres.
+// en mémoire, reçoit l'identifiant suivant et se télécharge ensuite comme les autres (l'envoi est lu comme le font les
+// faux serveurs de pièces jointes des tests : tests/support/multipart.mjs).
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -78,6 +79,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tablesFictives } from './donnees-fictives.mjs';
 import { pieceJointe } from './logos-fictifs.mjs';
 import { portraitFictif } from './portraits-fictifs.mjs';
+import { readMultipartFile } from '../../tests/support/multipart.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const URL_SIMULATEUR = '/__grist-simule.js';
@@ -159,15 +161,8 @@ function pageAvecSimulateur(avecPhotos) {
 
 // Le premier fichier d'un envoi multipart : { type, octets }, ou null s'il n'y en a pas.
 function fichierEnvoye(requete, corps) {
-  const limite = /boundary=(.+)$/.exec(requete.headers['content-type'] ?? '')?.[1];
-  if (!limite) return null;
-  const texte = corps.toString('latin1'); // un octet = un caractère : les positions valent pour les octets
-  const debut = texte.indexOf(`--${limite}`);
-  const finEntete = texte.indexOf('\r\n\r\n', debut);
-  const fin = texte.indexOf(`\r\n--${limite}`, finEntete + 4);
-  if (debut < 0 || finEntete < 0 || fin < 0) return null;
-  const type = /content-type:\s*([^\r\n]+)/i.exec(texte.slice(debut, finEntete))?.[1] ?? 'application/octet-stream';
-  return { type, octets: corps.subarray(finEntete + 4, fin) };
+  const fichier = readMultipartFile(corps, requete.headers['content-type']);
+  return fichier && { type: fichier.contentType || 'application/octet-stream', octets: fichier.bytes };
 }
 
 // `tables` : les données servies ; `tablesAvecPhotos` : celles que sert ?photos (la colonne Avatar de BDD).
