@@ -39,7 +39,7 @@ function readFile(body, contentType) {
   };
 }
 
-export async function startGristRest({ token = 'jeton-rest' } = {}) {
+export async function startGristRest({ token = 'test-jeton-rest' } = {}) {
   const requests = [];
   let nextId = FIRST_ID;
 

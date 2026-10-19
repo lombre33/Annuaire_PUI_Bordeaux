@@ -97,14 +97,15 @@ export function computeFilterCounts(contacts, activeFilters, searchTerm, scope) 
   const counts = {};
   FILTERS.forEach(filter => {
     const keys = filter.grouping ? [filter.key, filter.grouping] : [filter.key];
-    const tallies = Object.fromEntries(keys.map(key => [key, {}]));
+    const tallies = new Map(keys.map(key => [key, new Map()])); // des Map : un libellé peut être « constructor »
     filterContacts(contacts, activeFilters, searchTerm, scope, filter.key).forEach(contact => {
       keys.forEach(key => labelsOf(contact, key).forEach(label => {
+        const tally = tallies.get(key);
         const normalized = normalize(label);
-        tallies[key][normalized] = (tallies[key][normalized] || 0) + 1;
+        tally.set(normalized, (tally.get(normalized) ?? 0) + 1);
       }));
     });
-    Object.assign(counts, tallies);
+    tallies.forEach((tally, key) => { counts[key] = Object.fromEntries(tally); });
   });
   return counts;
 }

@@ -154,15 +154,15 @@ test('uploadAttachment tells a network failure, a CORS refusal and a timeout apa
 
 test('uploadAttachment never writes the token or the address to the console', async () => {
   const log = recordingLog();
-  const fake = createFakeGrist({ accessToken: { token: 'jeton-secret-123', baseUrl: FAKE_ATTACHMENTS_URL, ttlMsecs: 1000 } });
-  for (const answer of [status(500), status(403), () => { throw new TypeError('Failed to fetch https://docs.getgrist.com/x?auth=jeton-secret-123'); }]) {
+  const fake = createFakeGrist({ accessToken: { token: 'test-jeton-a-ne-jamais-afficher', baseUrl: FAKE_ATTACHMENTS_URL, ttlMsecs: 1000 } });
+  for (const answer of [status(500), status(403), () => { throw new TypeError('Failed to fetch https://docs.getgrist.com/x?auth=test-jeton-a-ne-jamais-afficher'); }]) {
     await rejection(uploadAttachment(fake.docApi, FILE, { fetchImpl: answering(answer).fetchImpl, log }));
   }
   const refused = createFakeGrist({ accessToken: null });
   await rejection(uploadAttachment(refused.docApi, FILE, { fetchImpl: answering(ok([1])).fetchImpl, log }));
   assert.ok(log.lines.length > 0);
   const everything = log.lines.join('\n');
-  assert.ok(!everything.includes('jeton-secret-123'), 'le jeton ne passe jamais dans la console');
+  assert.ok(!everything.includes('test-jeton-a-ne-jamais-afficher'), 'le jeton ne passe jamais dans la console');
   assert.ok(!everything.includes('docs.getgrist.com'), 'ni l’adresse du document');
 });
 

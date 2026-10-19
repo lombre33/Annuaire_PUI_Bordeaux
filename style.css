@@ -4,7 +4,7 @@
      le thème sombre du téléphone. */
   color-scheme: light;
   --ink: #172033;
-  --muted: #68738a;
+  --muted: #636e85; /* le gris des textes secondaires : 4,7:1 au moins sur nos fonds clairs, 4,5:1 exigés (WCAG 1.4.3) */
   --line: #e4e8f0;
   --paper: #fff;
   --wash: #f4f6fb;

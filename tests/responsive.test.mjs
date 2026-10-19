@@ -538,8 +538,9 @@ test('écran tactile : cibles d\'au moins 28px, champs à 16px (iOS zoomerait en
   }));
 
 test('le survol colore filtre, option de menu et interrupteur à la souris, et ne reste pas collé au tactile', { skip }, async () => {
+  // `muted` : la couleur que `--muted` donne au texte, celle du bouton au repos (sans la recopier ici : elle se règle dans style.css).
   const colorsAfterHover = async options => {
-    let colors;
+    let result;
     await withWidget(options, async ({ page }) => {
       const style = (locator, property) => locator.evaluate((element, name) => getComputedStyle(element)[name], property);
       const button = page.locator('.filter-button').first();
@@ -552,14 +553,23 @@ test('le survol colore filtre, option de menu et interrupteur à la souris, et n
       await closeMenus(page); // le menu ouvert recouvre l'interrupteur
       const scope = page.locator('.scope-btn:not(.active)');
       await scope.hover();
-      colors = { filterBorder, optionBackground, scopeText: await style(scope, 'color') };
+      const muted = await page.evaluate(() => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--muted)';
+        document.body.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      });
+      result = { colors: { filterBorder, optionBackground, scopeText: await style(scope, 'color') }, muted };
     });
-    return colors;
+    return result;
   };
-  assert.deepEqual(await colorsAfterHover({ width: 1480 }),
+  assert.deepEqual((await colorsAfterHover({ width: 1480 })).colors,
     { filterBorder: 'rgb(98, 87, 217)', optionBackground: 'rgb(241, 240, 255)', scopeText: 'rgb(68, 58, 175)' }, 'souris : survol coloré');
-  assert.deepEqual(await colorsAfterHover({ width: 414, touch: true }),
-    { filterBorder: 'rgb(228, 232, 240)', optionBackground: 'rgba(0, 0, 0, 0)', scopeText: 'rgb(104, 115, 138)' }, 'tactile : rien ne reste coloré');
+  const touch = await colorsAfterHover({ width: 414, touch: true });
+  assert.deepEqual(touch.colors,
+    { filterBorder: 'rgb(228, 232, 240)', optionBackground: 'rgba(0, 0, 0, 0)', scopeText: touch.muted }, 'tactile : rien ne reste coloré');
 });
 
 test('le texte des cartes fait 12px à toute largeur, souris ou doigt : seuls le nom et le titre changent sous 600px', { skip }, () =>

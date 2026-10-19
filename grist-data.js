@@ -79,6 +79,12 @@ export function formatPhone(value) {
   return raw;
 }
 
+// La valeur que `object` garde pour `key`, jamais celle qu'il hérite d'Object : un dictionnaire dont les clés sont des
+// libellés (« constructor », « toString »… sont des libellés possibles) ne rend rien pour un libellé qu'il n'a pas.
+export function ownValue(object, key) {
+  return object && Object.hasOwn(object, key) ? object[key] : undefined;
+}
+
 // Grist encode une liste ['L', item1, item2, ...] : une liste vide vaut ['L']
 // (longueur 1). Il faut retirer le marqueur pour savoir si elle contient quelque chose.
 export function safeValues(value) {
@@ -316,7 +322,7 @@ function strictestFlags(a, b) {
 
 export function etablissementFlagsFromRows(rows) {
   const byId = {};
-  const byLabel = {};
+  const byLabel = new Map(); // un libellé peut être « __proto__ » : un objet ordinaire ne le garderait pas
   const conflicts = new Set();
   rows.forEach(row => {
     if (row.id === null || row.id === undefined) return;
@@ -324,14 +330,11 @@ export function etablissementFlagsFromRows(rows) {
     byId[String(row.id)] = flags;
     const label = pickLabel(row, ETABLISSEMENT_LABEL_FIELDS);
     if (!label) return;
-    if (!Object.hasOwn(byLabel, label)) {
-      byLabel[label] = flags;
-      return;
-    }
-    if (FLAG_NAMES.some(name => byLabel[label][name] !== flags[name])) conflicts.add(label);
-    byLabel[label] = strictestFlags(byLabel[label], flags);
+    const known = byLabel.get(label);
+    if (known && FLAG_NAMES.some(name => known[name] !== flags[name])) conflicts.add(label);
+    byLabel.set(label, known ? strictestFlags(known, flags) : flags);
   });
-  return { byId, byLabel, conflicts: [...conflicts] };
+  return { byId, byLabel: Object.fromEntries(byLabel), conflicts: [...conflicts] };
 }
 
 // Indicateurs de l'établissement d'un contact, d'après BDD.Etablissement : par
@@ -343,7 +346,7 @@ export function etablissementFlags(contact, etabFlags) {
   const id = refId(cell);
   if (id) return etabFlags?.byId?.[String(id)] || null;
   const label = typeof cell === 'string' ? text(cell) : '';
-  return (label && etabFlags?.byLabel?.[label]) || null;
+  return (label && ownValue(etabFlags?.byLabel, label)) || null;
 }
 
 // Éligible = établissement validé (ok_pour_apparaitre) ET fondateur ou
