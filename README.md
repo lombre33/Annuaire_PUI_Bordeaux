@@ -135,7 +135,10 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── profile-save.js       Relire puis écrire (ou créer) une fiche, en une seule action Grist
 ├── preview.js            Cartes « avant » et « après » d'une modification
 ├── schema.js             Type des colonnes de BDD, lu dans les métadonnées de Grist
-├── profile-ui.js         Fenêtre de modification ou de création : formulaire, relecture, confirmation
+├── profile-ui.js         Fenêtre de modification ou de création : l'état et l'enchaînement des étapes
+├── profile-form.js       Le formulaire de cette fenêtre : identité, photo, champs, listes, saisie
+├── profile-review.js     Relecture avant/après et écran « Fiche enregistrée » de cette fenêtre
+├── dialog-shell.js       Cadre commun aux deux fenêtres de modification : titre, pied, règle d'Échap
 ├── changes-ui.js         Liste des changements (formulaire, relecture, confirmation)
 ├── etablissement.js      Fiche d'un établissement : droits, brouillon, changements (sans DOM)
 ├── etablissement-save.js Relire puis écrire la fiche d'un établissement et ses responsables, en une seule action Grist

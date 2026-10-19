@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.28.7 — Audit exhaustif, lot 4 : la fenêtre de modification d'une fiche est découpée en modules, sans rien changer pour les personnes
+
+Quatrième lot de l'audit exhaustif du 19 octobre 2026. Rien ne change pour les personnes : le comportement est identique, ce que les contrôles ci-dessous établissent.
+
+- **`createProfileDialog` (715 lignes, dans un fichier de 780) devient quatre modules**, dont aucune fonction ne dépasse une cinquantaine de lignes :
+  - `dialog-shell.js` (nouveau) : ce que les deux fenêtres de modification ont en commun, le titre, le corps, le pied « résumé, avertissement Échap, boutons » et la règle d'Échap. Ce pied était écrit deux fois, dans `profile-ui.js` et dans `etablissement-ui.js` ; la fenêtre de l'établissement l'adoptera au lot suivant ;
+  - `profile-form.js` (nouveau) : le formulaire (identité, photo, champs, listes de pastilles, case « Apparaître dans l'annuaire ») et `refreshForm()` ; `picker` (78 lignes) y est coupée en `makeChip`, `chipGroups` et `pickerSearch` ;
+  - `profile-review.js` (nouveau) : la relecture avant/après et l'écran « Fiche enregistrée » ;
+  - `profile-ui.js` : l'état de la fenêtre et l'enchaînement des étapes (formulaire, relecture, enregistrement), en fonctions de module qui reçoivent cet état (`ctx`) au lieu d'une fermeture de 700 lignes.
+- **Une duplication de moins : `imageFaultMessage()`** (`image-prep.js`). La phrase à montrer quand une image n'a pas pu être préparée (celle d'une `ImageError`, sinon « illisible » et la cause dans la console) était écrite dans la fenêtre du profil et dans celle de l'établissement ; la photo l'utilise dès maintenant, le logo au lot suivant.
+- **Comment on sait que rien n'a changé.** (1) 89 instantanés du DOM, de l'élément qui a le focus, de l'état ouvert des fenêtres et du message de confirmation, pris à chaque étape de la fenêtre de profil (sa fiche, celle d'une autre personne en mode admin, une fiche qu'on crée) : ouverture,
+  fermeture, avertissement d'Échap à chaque étape, relecture et retour, enregistrement en cours (Échap sans effet), confirmation, fiche que Grist n'a pas tout gardée, annuaire qui ne se recharge pas, refus de Grist, fiche changée pendant la relecture, relecture impossible, photo choisie,
+  retirée, illisible, de mauvais format, relue ; ils sont identiques à ceux de la 1.28.2. (2) Sept fautes glissées exprès dans le code neuf (les groupes de pastilles, l'avertissement d'Échap, la croix grisée, la classe de la relecture, les miniatures…) : six sont repérées par ces instantanés ;
+  la septième (l'ordre de deux avis de l'écran « Fiche enregistrée ») ne peut pas se produire, car un annuaire qui ne se recharge pas ne laisse aucune fiche à comparer. (3) Les 211 tests de la fenêtre, du bandeau, de la photo et de l'accessibilité passent ; `tests/image-prep.test.mjs` couvre `imageFaultMessage()` (2 tests de plus).
+- **Documentation** : `docs/developpeurs.md` (le schéma des imports, le tableau des modules, la répartition des règles), le README, `TESTING.md` et `docs/maintenance.md` citent les trois nouveaux modules.
+
 ## 1.28.6 — Audit exhaustif, lot 3 : le bandeau du compte et la liste déroulante sont découpés, sans rien changer pour les personnes
 
 Troisième lot de l'audit exhaustif du 19 octobre 2026. Rien ne change pour les personnes : le comportement est identique, ce que les contrôles ci-dessous établissent.

@@ -125,7 +125,8 @@ Sans dépendance, un fichier de tests par module :
   ensuite ; l'échec de l'envoi devient l'erreur de l'appelant (la phrase d'un `UploadError` telle
   quelle, sinon une phrase de repli et la cause dans la console) ; l'identifiant du fichier resté dans
   Grist quand la relecture refuse l'écriture. Sans navigateur.
-- `tests/image-prep.test.mjs` — `megabytes`, `checkImageFile`, `fitWithin`, `squareCrop` et les refus de
+- `tests/image-prep.test.mjs` — `megabytes`, `imageFaultMessage` (la phrase d'une `ImageError` telle quelle,
+  sinon « illisible » et la cause dans la console), `checkImageFile`, `fitWithin`, `squareCrop` et les refus de
   `prepareImage` avant lecture : formats, poids et fichier vide refusés, plus grand côté ramené
   à 480 px au plus, SVG agrandi ; pour une photo, carré découpé au centre sans agrandir, 256 px au plus,
   JPEG demandé, SVG refusé. Le dessin lui-même et le PNG ou le JPEG produit s'essaient dans Chromium
