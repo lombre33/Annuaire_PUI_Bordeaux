@@ -120,6 +120,11 @@ Sans dépendance, un fichier de tests par module :
   jamais gardé, adresse refusée hors https, requête sans cookie ni adresse de page, délai,
   statuts 401, 403, 413 et autres, réponse illisible, ni jeton ni adresse dans la
   console, consigne de l'appelant (celle du logo, celle de la photo).
+- `tests/save-upload.test.mjs` — `uploadThenRecheck` (1.28.5), le temps commun à l'enregistrement d'un
+  profil et d'une fiche d'établissement quand un fichier est remplacé : l'envoi d'abord, la relecture
+  ensuite ; l'échec de l'envoi devient l'erreur de l'appelant (la phrase d'un `UploadError` telle
+  quelle, sinon une phrase de repli et la cause dans la console) ; l'identifiant du fichier resté dans
+  Grist quand la relecture refuse l'écriture. Sans navigateur.
 - `tests/image-prep.test.mjs` — `megabytes`, `checkImageFile`, `fitWithin`, `squareCrop` et les refus de
   `prepareImage` avant lecture : formats, poids et fichier vide refusés, plus grand côté ramené
   à 480 px au plus, SVG agrandi ; pour une photo, carré découpé au centre sans agrandir, 256 px au plus,

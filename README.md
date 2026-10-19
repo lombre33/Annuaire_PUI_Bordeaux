@@ -142,6 +142,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── etablissement-ui.js   Fenêtre « Fiche de l’établissement »
 ├── image-prep.js         Prépare l'image choisie (logo, photo de profil) : contrôle, redessin, PNG ou JPEG
 ├── upload.js             Envoie un fichier (logo, photo) à Grist : la seule requête réseau du widget
+├── save-upload.js        Envoi d'un fichier puis relecture avant d'écrire (commun aux deux enregistrements)
 ├── branding.js           Habillage : fondateurs, logo de chaque établissement (sans DOM)
 ├── attachments.js        Pièces jointes de Grist : jeton en lecture seule et adresse des logos et des photos
 ├── branding-ui.js        Images des logos, financeurs de l'en-tête, bandeau des fondateurs

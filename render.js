@@ -617,19 +617,10 @@ function markAvatar(avatar, identity, { before, after }) {
   identity.append(note);
 }
 
-// `view` : { rights } pour la grille ('own', 'admin' ou rien), { marks } pour une
-// carte de relecture (voir renderPreviewCard), { logos } de quoi montrer le logo de
-// l'établissement : { attachments, logoFor(contact) } (attachments.js, branding.js) ;
-// sans eux la carte garde la pastille texte et les initiales (une photo de Grist demande aussi
-// `attachments`).
-function buildCard(template, contact, onToggle, view = {}) {
-  const { rights = null, marks = null, logos = null, etabRights = null } = view;
-  const card = template.content.cloneNode(true);
-  const etablissement = logos?.attachments && logos.logoFor?.(contact);
-
-  // Sans photo, les initiales du gabarit ; avec elle, un avatar neuf (photo sous les initiales jusqu'à
-  // son chargement). Dans la grille la photo s'agrandit au clic ; sur une carte de relecture (sans
-  // `onToggle`) rien n'est cliquable.
+// L'avatar de la carte. Sans photo, les initiales du gabarit ; avec elle, un avatar neuf (photo sous les initiales
+// jusqu'à son chargement). Dans la grille la photo s'agrandit au clic ; sur une carte de relecture (sans `onToggle`)
+// rien n'est cliquable.
+function fillAvatar(card, contact, onToggle, { marks, logos, etablissement }) {
   let avatar = card.querySelector('.avatar');
   const photo = photoOf(contact);
   if (photo) {
@@ -643,8 +634,9 @@ function buildCard(template, contact, onToggle, view = {}) {
     avatar.textContent = initials(contact);
   }
   if (marks?.avatar) markAvatar(avatar, card.querySelector('.identity'), marks.avatar);
+}
 
-  const name = card.querySelector('.name');
+function fillName(name, contact, marks) {
   if (marks?.texts.name) {
     // Dans un seul <span> : le nom est une boîte à plusieurs lignes (style.css) qui rangerait
     // sinon le repère, le blanc et la pastille les uns sous les autres.
@@ -654,7 +646,11 @@ function buildCard(template, contact, onToggle, view = {}) {
   } else {
     name.textContent = displayName(contact);
   }
+}
 
+// Les lignes de texte de la carte : fonction, établissement (pastille ou logo), e-mail, téléphone. `marks.texts`
+// repère celles qu'une relecture change.
+function fillTexts(card, contact, onToggle, { marks, logos, etablissement }) {
   const fonction = card.querySelector('.fonction');
   if (marks?.texts.fonction) showTextChange(fonction, marks.texts.fonction);
   else if (contact.Fonction) reveal(fonction, contact.Fonction);
@@ -671,7 +667,21 @@ function buildCard(template, contact, onToggle, view = {}) {
   const phone = formatPhone(contact.numero_de_telephone);
   if (marks?.texts.tel) showTextChange(tel, marks.texts.tel, value => `☎ ${value}`);
   else if (phone) reveal(tel, `☎ ${phone}`);
+}
 
+// `view` : { rights } pour la grille ('own', 'admin' ou rien), { marks } pour une
+// carte de relecture (voir renderPreviewCard), { logos } de quoi montrer le logo de
+// l'établissement : { attachments, logoFor(contact) } (attachments.js, branding.js) ;
+// sans eux la carte garde la pastille texte et les initiales (une photo de Grist demande aussi
+// `attachments`).
+function buildCard(template, contact, onToggle, view = {}) {
+  const { rights = null, marks = null, logos = null, etabRights = null } = view;
+  const card = template.content.cloneNode(true);
+  const shown = { marks, logos, etablissement: logos?.attachments && logos.logoFor?.(contact) };
+
+  fillAvatar(card, contact, onToggle, shown);
+  fillName(card.querySelector('.name'), contact, marks);
+  fillTexts(card, contact, onToggle, shown);
   fillRole(card.querySelector('.details'), contact, onToggle, marks?.tags.role);
   fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags);
   if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);

@@ -1,6 +1,6 @@
 # Maintenance
 
-Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.28.4**.
+Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.28.5**.
 
 Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [documentation développeur](developpeurs.md), [sécurité](securite.md).
 
@@ -48,7 +48,7 @@ Une personne n'est affichée que si **toutes** les conditions suivantes sont vra
 
 Côté écran, les interrupteurs **Fondateurs** et **Partenaires** affinent ensuite l'affichage ([guide utilisateur](utilisateurs.md#fondateurs-et-partenaires)). Le schéma complet des règles est dans la [documentation développeur](developpeurs.md#règles-daffichage).
 
-Six précisions, à jour de la version 1.28.4 :
+Six précisions, à jour de la version 1.28.5 :
 
 - **Le périmètre ne décide plus de rien (1.27.0).** Jusqu'à la 1.26.0, une fiche devait aussi avoir au moins un périmètre (colonne `perimetre` de `BDD`) pour apparaître, et celle qu'une personne venait de créer restait donc masquée tant qu'un administrateur n'avait pas rempli la colonne. Le widget ne lit plus cette colonne : une fiche dont la personne a accepté d'apparaître et dont l'établissement est validé (fondateur ou partenaire) s'affiche, périmètre rempli ou non. La colonne peut rester dans le document, le widget l'ignore.
 - L'établissement vient de la référence `Etablissement`, résolue par identifiant de ligne. L'ancienne colonne calculée `Etablissement2` n'est plus utilisée depuis la 1.8.0, et deux lignes d'`Etablissements` de même acronyme ne se confondent plus.

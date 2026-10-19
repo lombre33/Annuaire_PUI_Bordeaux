@@ -21,6 +21,7 @@ import { ACL_COLUMNS, ACL_TABLE, ETABLISSEMENT_COLUMNS, ETABLISSEMENT_TABLE } fr
 import { KEEP_ONE, etablissementOf, responsablesOf } from './etablissement.js';
 import { isEmptyReference, normalizeEmail, tableToRows } from './grist-data.js';
 import { classifyWriteError } from './presence.js';
+import { uploadThenRecheck } from './save-upload.js';
 
 // Erreur dont le message est une phrase française destinée à la personne ; l'erreur d'origine reste
 // dans `cause` et dans la console. `leftover` : l'identifiant du fichier envoyé qui n'a servi à rien.
@@ -211,6 +212,34 @@ async function unsavedAfter(docApi, plan, attachmentId, log) {
   return unsaved;
 }
 
+// Ce que saveEtablissement vérifie avant de toucher à Grist : le logo est-il remplacé (et donc envoyé). Lève une
+// EtablissementSaveError.
+function checkSaveable(plan, upload) {
+  const { champs } = plan;
+  // Fermé par défaut : sans être responsable de cet établissement, rien ne s'écrit.
+  if (plan.responsable !== true) throw new EtablissementSaveError(FAILURES.notResponsable);
+  if (!FIELDS.some(({ key }) => champs[key]) && !champs.responsables) throw new EtablissementSaveError(FAILURES.nothing);
+  const replacing = champs.logo?.action === 'replace';
+  if (replacing && (!plan.file || typeof upload !== 'function')) throw new EtablissementSaveError(FAILURES.noFile);
+  return replacing;
+}
+
+// Écrit en une seule action Grist la ligne d'Etablissements (`values`) et les lignes d'ACL (`aclActions`). Lève une
+// EtablissementSaveError.
+async function writeEtablissement(docApi, plan, values, aclActions, attachmentId, log) {
+  const actions = [];
+  if (Object.keys(values).length > 0) actions.push(['UpdateRecord', ETABLISSEMENT_TABLE, plan.etablissementId, values]);
+  actions.push(...aclActions);
+  if (actions.length === 0) throw new EtablissementSaveError(FAILURES.already);
+
+  try {
+    await docApi.applyUserActions(actions);
+  } catch (error) {
+    log.error('[FICHE-ETAB] écriture impossible :', error);
+    throw new EtablissementSaveError(FAILURES[classifyWriteError(error)], error, { leftover: attachmentId });
+  }
+}
+
 // Écrit les changements d'une fiche d'établissement (savePlanOf). `upload(file)` envoie le fichier
 // du nouveau logo à Grist et renvoie l'identifiant de la pièce jointe (upload.js) ; il n'est appelé
 // que si le logo est remplacé. Renvoie
@@ -220,47 +249,23 @@ async function unsavedAfter(docApi, plan, attachmentId, log) {
 //                                                la fenêtre, rien n'est écrit ; `state` : son état actuel
 // Lève une EtablissementSaveError.
 export async function saveEtablissement(docApi, plan, { upload, log = console } = {}) {
-  const { champs } = plan;
-  // Fermé par défaut : sans être responsable de cet établissement, rien ne s'écrit.
-  if (plan.responsable !== true) throw new EtablissementSaveError(FAILURES.notResponsable);
-  if (!FIELDS.some(({ key }) => champs[key]) && !champs.responsables) throw new EtablissementSaveError(FAILURES.nothing);
-  const replacing = champs.logo?.action === 'replace';
-  if (replacing && (!plan.file || typeof upload !== 'function')) throw new EtablissementSaveError(FAILURES.noFile);
+  const replacing = checkSaveable(plan, upload);
+  const recheck = async () => evaluate(await readState(docApi, plan.etablissementId, log), plan);
 
-  let evaluated = evaluate(await readState(docApi, plan.etablissementId, log), plan);
+  let evaluated = await recheck();
   if (evaluated.status === 'changed') return evaluated;
 
   let attachmentId = null;
   if (replacing) {
-    try {
-      attachmentId = await upload(plan.file);
-    } catch (error) {
-      if (error?.name === 'UploadError') throw new EtablissementSaveError(error.message, error);
-      log.error('[FICHE-ETAB] envoi du logo impossible :', error);
-      throw new EtablissementSaveError(FAILURES.other, error);
-    }
     // L'envoi prend du temps : la fiche a pu bouger, on relit avant d'écrire.
-    try {
-      evaluated = evaluate(await readState(docApi, plan.etablissementId, log), plan);
-    } catch (error) {
-      if (error instanceof EtablissementSaveError) error.leftover = attachmentId;
-      throw error;
-    }
+    ({ attachmentId, state: evaluated } = await uploadThenRecheck(plan.file, {
+      upload, recheck, ErrorClass: EtablissementSaveError, fallback: FAILURES.other, consoleLine: '[FICHE-ETAB] envoi du logo impossible :', log
+    }));
     if (evaluated.status === 'changed') return { ...evaluated, leftover: attachmentId };
   }
 
   const values = { ...evaluated.values };
   if (replacing) values[ETABLISSEMENT_COLUMNS.logo] = ['L', attachmentId];
-  const actions = [];
-  if (Object.keys(values).length > 0) actions.push(['UpdateRecord', ETABLISSEMENT_TABLE, plan.etablissementId, values]);
-  actions.push(...evaluated.actions);
-  if (actions.length === 0) throw new EtablissementSaveError(FAILURES.already);
-
-  try {
-    await docApi.applyUserActions(actions);
-  } catch (error) {
-    log.error('[FICHE-ETAB] écriture impossible :', error);
-    throw new EtablissementSaveError(FAILURES[classifyWriteError(error)], error, { leftover: attachmentId });
-  }
+  await writeEtablissement(docApi, plan, values, evaluated.actions, attachmentId, log);
   return { status: 'saved', unsaved: await unsavedAfter(docApi, plan, attachmentId, log), attachmentId };
 }
