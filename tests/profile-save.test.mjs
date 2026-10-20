@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ProfileSaveError, buildRowUpdate, signatureOf, readRow, prepareReview, saveProfile, unsavedLabels, prepareCreation, createProfile
+  ProfileSaveError, buildRowUpdate, signatureOf, prepareReview, saveProfile, unsavedLabels, prepareCreation, createProfile
 } from '../profile-save.js';
 import { profileFormModel, draftOf, blankFiche } from '../profile.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
@@ -121,20 +121,6 @@ test('signatureOf changes when a touched cell changes, and only then', async () 
   assert.equal(signatureOf(null, keys), '[null,null]', 'une fiche absente a sa propre signature');
 });
 
-// ===== readRow =====
-
-test('readRow gives the row as Grist holds it now, and says so in French when it is gone or unreadable', async () => {
-  const w = await world();
-  assert.equal((await readRow(w.docApi, 1)).prenom, 'Ana');
-  await assert.rejects(readRow(w.docApi, 404), error => error instanceof ProfileSaveError && /n'existe plus dans Grist/.test(error.message));
-  const { lines, log } = logged();
-  const broken = await world();
-  broken.fail(['BDD']);
-  await assert.rejects(readRow(broken.docApi, 1, { log }), error => error instanceof ProfileSaveError && /n'a pas pu être relue/.test(error.message));
-  assert.equal(lines.error.length, 1);
-  assert.match(lines.error[0], /^\[PROFIL\] lecture de la fiche impossible/);
-});
-
 // ===== prepareReview =====
 
 test('prepareReview builds the card before and after from the fiche as Grist holds it, and writes nothing', async () => {
@@ -220,7 +206,10 @@ test('prepareReview reports a fiche that was deleted, a table it cannot read, an
   const broken = await world();
   const form = broken.form(1);
   broken.fail(['BDD']);
-  await assert.rejects(prepareReview(broken.docApi, form.row, { ...form.draft, Fonction: 'X' }, broken.context), /n'a pas pu être relue/);
+  const { lines, log } = logged();
+  await assert.rejects(prepareReview(broken.docApi, form.row, { ...form.draft, Fonction: 'X' }, { ...broken.context, log }), /n'a pas pu être relue/);
+  assert.equal(lines.error.length, 1);
+  assert.match(lines.error[0], /^\[PROFIL\] lecture de la fiche impossible/);
 
   const missing = await world();
   const opened = missing.form(1);

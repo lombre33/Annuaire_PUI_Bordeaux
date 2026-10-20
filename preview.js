@@ -44,9 +44,6 @@ export function diffContacts(before, after) {
   return { texts, tags };
 }
 
-// Il y a quelque chose à montrer.
-export const hasMarks = marks => Object.keys(marks.texts).length + Object.keys(marks.tags).length + (marks.avatar ? 1 : 0) > 0;
-
 // { before, after, marks } pour la ligne `row` à laquelle on applique `values` (la
 // forme de buildRowUpdate : les cellules telles que Grist les stockera).
 export function previewOf(row, values, referenceMaps, etabFlags) {

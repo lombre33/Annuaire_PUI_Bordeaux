@@ -50,13 +50,12 @@ const PROBE_COLUMNS = [
 // pas même la ligne de la sonde : inutile d'essayer. `search` : la partie de
 // l'adresse après le « ? » (`location.search`).
 export function isReadOnlyAddress(search) {
-  let values = [];
   try {
-    values = new URLSearchParams(search || '').getAll('readonly');
+    const values = new URLSearchParams(search || '').getAll('readonly');
+    return values.length > 0 && values[values.length - 1] === 'true';
   } catch {
     return false;
   }
-  return values.length > 0 && values[values.length - 1] === 'true';
 }
 
 const unavailable = reason => ({ status: 'unavailable', email: '', admin: false, etablissements: [], reason });
