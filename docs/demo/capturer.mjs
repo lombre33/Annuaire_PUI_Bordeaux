@@ -31,6 +31,7 @@ const HAUTEUR_FENETRE_MODIFICATION = 1000; // la fenêtre de modification mesure
 const MARGE_FENETRE = 12; // fond assombri gardé autour de la fenêtre de modification
 const HAUTEUR_FENETRE_RELECTURE = 1250; // la relecture, sans le plafond de 900 px de la fenêtre (voir la scène), mesure environ 1 030 px
 const HAUTEUR_CONFIRMATION = 900; // le message de confirmation est fixé en bas de l'écran : la capture garde l'écran entier
+const HAUTEUR_FENETRE_DEFILEE = 760; // assez haute (560 px au moins) et large pour que la barre d'outils reste en haut, assez basse pour que la page défile
 const HAUTEUR_FENETRE_PHOTO = 1000; // l'agrandissement d'une photo tient dans moins de 700 px : une fenêtre de la hauteur de celle de modification suffit
 const HAUTEUR_FENETRE_LEGENDE = 3600; // la carte de la légende est loin dans la liste (cartes triées par nom, hautes de 520 px) : elle doit tenir dans la fenêtre pour que les repères, fixés à l'écran, la suivent
 
@@ -47,12 +48,14 @@ try {
 // des cadres vides ou à demi transparents (un logo apparaît en fondu). On attend que chaque logo
 // soit chargé et pleinement visible (ou remplacé par le nom de l'établissement quand Grist refuse
 // le fichier), sauf ceux des cartes hors de l'écran, que le navigateur ne charge pas avant d'en
-// approcher (loading="lazy") : au-dessus de l'écran comme au-dessous, si la page a défilé.
+// approcher (loading="lazy") : au-dessus de l'écran comme au-dessous, si la page a défilé. Sauf aussi ceux
+// des cartes que le navigateur ne dessine pas (content-visibility: auto, 1.29.0) : leur fondu ne démarre
+// jamais, et dans une fenêtre basse, assez de cartes sont dans ce cas pour que l'attente n'aboutisse pas.
 const attendreLogos = page =>
   page.waitForFunction(() => [...document.querySelectorAll('img.logo-img')]
     .filter(image => {
       const boite = image.getBoundingClientRect();
-      return image.loading === 'eager' || (boite.bottom > 0 && boite.top < window.innerHeight);
+      return image.checkVisibility({ contentVisibilityAuto: true }) && (image.loading === 'eager' || (boite.bottom > 0 && boite.top < window.innerHeight));
     })
     .every(image => image.classList.contains('loaded') && getComputedStyle(image).opacity === '1'), null, { timeout: 10_000 });
 const attendreCartes = async (page, nombre) => {
@@ -362,6 +365,27 @@ const SCENES = [
     async preparer(page) {
       await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
       await exigerHabillage(page, { cartes: CARTES_ATTENDUES.fondateurs });
+    }
+  },
+  {
+    // La page défilée sur un écran de PC (1.31.0) : la barre d'outils reste en haut, au fond opaque, et la pastille
+    // « N contacts · Haut de page » est en bas à droite. La capture garde l'écran entier.
+    fichier: 'barre-fixe.png', hauteur: HAUTEUR_FENETRE_DEFILEE,
+    async preparer(page) {
+      await attendreCartes(page, CARTES_ATTENDUES.fondateurs);
+      exiger(await page.locator('#scrollTools').isHidden(), 'la pastille est déjà affichée en haut de la page');
+      await page.evaluate(() => window.scrollTo(0, 620));
+      await page.waitForFunction(() => !document.getElementById('scrollTools').hidden, null, { timeout: 10_000 });
+      await attendreLogos(page);
+      // Les cartes éloignées ne sont pas dessinées (content-visibility) : leur hauteur se corrige une image plus tard.
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      exiger(await page.locator('#scrollCount').textContent() === `${CARTES_ATTENDUES.fondateurs} contacts`, 'la pastille ne dit pas le nombre de contacts');
+      exiger(await page.getByRole('button', { name: 'Haut de page', exact: true }).isVisible(), 'le bouton « Haut de page » manque');
+      const barre = await page.locator('#toolbar').evaluate(element => ({
+        position: getComputedStyle(element).position, haut: element.getBoundingClientRect().top, fond: getComputedStyle(element).backgroundColor
+      }));
+      exiger(barre.position === 'sticky' && barre.haut === 0, 'la barre d\'outils ne reste pas en haut de l\'écran');
+      exiger(barre.fond === 'rgb(255, 255, 255)', 'la barre d\'outils n\'est pas opaque une fois la page défilée');
     }
   },
   {
