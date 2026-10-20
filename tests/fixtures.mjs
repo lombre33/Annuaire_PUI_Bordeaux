@@ -104,6 +104,26 @@ export function withEtablissement(tables, row) {
   return copy;
 }
 
+// Le document où Ana (la première fiche, la dernière de la grille) porte de longues listes de valeurs, de quoi essayer les cartes très
+// chargées (1.31.0, la barre d'outils des pastilles) : 9 compétences (« Compétence 1 » à « Compétence 9 »), 6 actions (« Action 1 » à
+// « Action 6 »), 5 communautés (« Communauté 1 » à « Communauté 5 ») et son instance de départ (CME), soit 21 pastilles. Les trois tables
+// de référence sont remplacées : les autres personnes y gardent leurs numéros de ligne, donc d'autres libellés (Bob porte la compétence 3,
+// Gina la 4), sans rapport avec ceux de la base.
+export function withLongTagLists(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  const rows = count => Array.from({ length: count }, (_, index) => index + 1);
+  const named = (word, count) => rows(count).map(number => `${word} ${number}`);
+  copy.Competences = {
+    id: rows(9), Competences: named('comp', 9), Competences_corrigees: named('Compétence', 9), Macro_competences: rows(9).map(() => 'Cancérologie')
+  };
+  copy.Actions = { id: rows(6), Actions: named('Action', 6), Actions_corrigees: rows(6).map(() => '') };
+  copy.Communautes = { id: rows(5), communautes: named('Communauté', 5), communautes_corrigees: rows(5).map(() => '') };
+  copy.BDD.Competences[0] = ['L', ...rows(9)];
+  copy.BDD.Actions[0] = ['L', ...rows(6)];
+  copy.BDD.Communautes[0] = ['L', ...rows(5)];
+  return copy;
+}
+
 // Le document avec `extra` fiches de plus dans BDD, de quoi remplir plus d'un écran de cartes. Chacune copie l'une des quatre premières
 // (Ana, Bob, Carla, Dan : des cartes de formes différentes, avec ou sans compétences, tâches, fonction), sous le nom « Copie n »
 // (n = 1, 2, … dans l'ordre) et une adresse à elle ; toutes sont au CHU, établissement fondateur validé, et ont accepté d'apparaître :

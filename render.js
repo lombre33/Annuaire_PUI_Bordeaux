@@ -213,6 +213,21 @@ function roleTag(tag, value) {
   return tag;
 }
 
+// Les pastilles d'une carte de l'annuaire sont un seul arrêt de tabulation (1.31.0, audit U22 : douze arrêts par carte rendaient une
+// carte lointaine presque inatteignable au clavier) : une barre d'outils à tabulation itinérante, que les flèches parcourent
+// (attachTagNavigation). Seule la première pastille se tabule au départ ; celle qui reçoit le focus prend la place. Une carte de
+// relecture n'a pas de bouton (des pastilles sans `onToggle`) : rien à faire. Le rôle n'en fait pas partie (il est dans `.role-col`).
+const TAG = '.card-tags button.tag';
+const tagButtons = container => [...container.querySelectorAll('button.tag')];
+
+function makeToolbar(container, contact) {
+  const tags = tagButtons(container);
+  if (tags.length === 0) return;
+  container.setAttribute('role', 'toolbar');
+  container.setAttribute('aria-label', `Filtrer par une valeur de la fiche de ${displayName(contact)}`);
+  tags.forEach((tag, index) => { tag.tabIndex = index === 0 ? 0 : -1; });
+}
+
 function fillTags(container, contact, onToggle, changes) {
   TAG_GROUPS.filter(group => group !== ROLE_GROUP).forEach(group => {
     const labels = labelsOf(contact, group.key);
@@ -223,6 +238,7 @@ function fillTags(container, contact, onToggle, changes) {
       container.appendChild(buildTagGroup(group, labels, onToggle, change, roles));
     }
   });
+  makeToolbar(container, contact);
 }
 
 // La ligne d'actions d'une carte que la personne connectée peut modifier (voir
@@ -407,6 +423,35 @@ export function keepFocus(grid, fallback, redraw) {
   redraw();
   if (!control || grid.contains(document.activeElement)) return;
   (control.isConnected ? control : equivalentControl(grid, where) ?? fallback).focus();
+}
+
+// Le lien d'évitement « Aller aux résultats » (1.31.0, audit U22) : le focus va au premier arrêt de tabulation de la première carte qui en a
+// un, ou, sans carte, à `fallback` (le compteur de contacts). Ni un contrôle caché (le bouton « Modifier » d'une carte qu'on ne peut pas
+// modifier), ni une pastille hors de la tabulation (tabindex -1) ne sont un arrêt.
+export function focusFirstResult(grid, fallback) {
+  for (const card of grid.children) {
+    const stop = [...card.querySelectorAll(CARD_CONTROLS)].find(control => control.tabIndex >= 0 && !control.closest('[hidden]'));
+    if (stop) return stop.focus();
+  }
+  return fallback.focus();
+}
+
+// Les flèches gauche et droite parcourent les pastilles d'une carte (la barre d'outils de makeToolbar) ; celle qui reçoit le focus,
+// à la flèche, au clic ou après keepFocus, devient l'arrêt de tabulation de la carte. Home et End restent à la page. Un seul écouteur
+// pour toute la grille, comme attachTagNotes.
+export function attachTagNavigation(grid) {
+  grid.addEventListener('focusin', event => {
+    const tag = event.target.closest(TAG);
+    if (tag) tagButtons(tag.closest('.card-tags')).forEach(other => { other.tabIndex = other === tag ? 0 : -1; });
+  });
+  grid.addEventListener('keydown', event => {
+    const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+    const tag = step && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey ? event.target.closest(TAG) : null;
+    if (!tag) return;
+    const tags = tagButtons(tag.closest('.card-tags'));
+    event.preventDefault();
+    tags[Math.min(Math.max(tags.indexOf(tag) + step, 0), tags.length - 1)].focus();
+  });
 }
 
 // Une carte pour la relecture d'une modification : même gabarit et mêmes classes que
