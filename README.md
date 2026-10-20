@@ -127,7 +127,8 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── main.js               Point d'entrée : état, événements, câblage Grist
 ├── grist-data.js         Lecture et enrichissement des données Grist
 ├── filters.js            Filtrage et compteurs (fonctions pures)
-├── render.js             Construction du DOM : menus, cartes (logo de l'établissement), boutons « Modifier »
+├── filter-menus.js       Menus de filtre : construction du DOM, noms pour les lecteurs d'écran, Échap
+├── render.js             Construction du DOM des cartes (logo de l'établissement), boutons « Modifier »
 ├── identity.js           Qui est connecté ? (table-sonde, créée si elle manque, dont Grist calcule l'adresse)
 ├── presence.js           « Ma présence » : message à la personne et écriture de son choix
 ├── account-ui.js         Bandeau « Ma présence » (dans l'en-tête), boutons « Créer ma fiche », « Modifier mon profil », « Mon établissement » et « Mode admin »
@@ -150,6 +151,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 ├── branding.js           Habillage : fondateurs, logo de chaque établissement (sans DOM)
 ├── attachments.js        Pièces jointes de Grist : jeton en lecture seule et adresse des logos et des photos
 ├── branding-ui.js        Images des logos, financeurs de l'en-tête, bandeau des fondateurs
+├── logos-report.js       Bilan des logos dans la console
 ├── avatar-ui.js          Photo de profil : avatars, agrandissement, miniatures
 ├── dom.js                Petits outils partagés : créer un élément avec son texte, liste déroulante à recherche
 ├── constants.js          Taxonomie : catégories, couleurs, tables

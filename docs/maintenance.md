@@ -1,6 +1,6 @@
 # Maintenance
 
-Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.29.2**.
+Cette page explique comment garder l'annuaire et le widget en bon état : qui fait quoi, comment renseigner et corriger les données dans Grist, comment diagnostiquer un problème, comment publier et revenir en arrière, et quelles sont les limites connues. Elle décrit la **version 1.30.0**.
 
 Pages liées : [README](../README.md), [guide utilisateur](utilisateurs.md), [documentation développeur](developpeurs.md), [sécurité](securite.md).
 
@@ -48,7 +48,7 @@ Une personne n'est affichée que si **toutes** les conditions suivantes sont vra
 
 Côté écran, les interrupteurs **Fondateurs** et **Partenaires** affinent ensuite l'affichage ([guide utilisateur](utilisateurs.md#fondateurs-et-partenaires)). Le schéma complet des règles est dans la [documentation développeur](developpeurs.md#règles-daffichage).
 
-Six précisions, à jour de la version 1.29.2 :
+Six précisions, à jour de la version 1.30.0 :
 
 - **Le périmètre ne décide plus de rien (1.27.0).** Jusqu'à la 1.26.0, une fiche devait aussi avoir au moins un périmètre (colonne `perimetre` de `BDD`) pour apparaître, et celle qu'une personne venait de créer restait donc masquée tant qu'un administrateur n'avait pas rempli la colonne. Le widget ne lit plus cette colonne : une fiche dont la personne a accepté d'apparaître et dont l'établissement est validé (fondateur ou partenaire) s'affiche, périmètre rempli ou non. La colonne peut rester dans le document, le widget l'ignore.
 - L'établissement vient de la référence `Etablissement`, résolue par identifiant de ligne. L'ancienne colonne calculée `Etablissement2` n'est plus utilisée depuis la 1.8.0, et deux lignes d'`Etablissements` de même acronyme ne se confondent plus.
@@ -168,7 +168,7 @@ Après chaque changement de données (ajout, modification, import), vérifier le
 
 ## Diagnostiquer un problème
 
-La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[REFS]` (entrées par catégorie de filtre, lectures échouées, compétences sans domaine, tâches sans action), `[ETABLISSEMENT]` (contacts sans établissement), `[CONSENTEMENT]` (personnes masquées faute d'accord), `[IDENTITE]` (pourquoi la personne connectée n'est pas identifiée), `[PRESENCE]` (écriture refusée), `[PROFIL]` (fiche illisible ou écriture refusée, envoi d'une photo compris), `[SCHEMA]` (types de colonnes illisibles), `[LOGOS]` (la version qui s'exécute et ce que Grist donne des logos, jeton d'accès aux pièces jointes refusé, fichiers que Grist refuse, habillage impossible), `[FICHE-ETAB]` (fiche d'un établissement illisible, liste des responsables illisible, écriture ou envoi de logo refusés), `[ENVOI]` (l'envoi du fichier d'un logo ou d'une photo à Grist : jeton, réseau, réponse de Grist) et `[IMAGE]` (une image de logo ou de photo que le navigateur n'a pas pu lire). Aucune de ces lignes ne contient de nom, d'adresse ni de jeton, hormis le message brut d'une erreur renvoyée par Grist. Quand un logo ne se charge pas, c'est le navigateur lui-même qui écrit dans la console « Failed to load resource » avec l'adresse de l'image, jeton compris : ne pas partager cette ligne.
+La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues, ou le script de l'API de Grist qui ne s'est pas chargé), `[REFS]` (entrées par catégorie de filtre, lectures échouées, compétences sans domaine, tâches sans action), `[ETABLISSEMENT]` (contacts sans établissement), `[CONSENTEMENT]` (personnes masquées faute d'accord), `[IDENTITE]` (pourquoi la personne connectée n'est pas identifiée), `[PRESENCE]` (écriture refusée), `[PROFIL]` (fiche illisible ou écriture refusée, envoi d'une photo compris), `[SCHEMA]` (types de colonnes illisibles), `[LOGOS]` (la version qui s'exécute et ce que Grist donne des logos, jeton d'accès aux pièces jointes refusé, fichiers que Grist refuse, habillage impossible), `[FICHE-ETAB]` (fiche d'un établissement illisible, liste des responsables illisible, écriture ou envoi de logo refusés), `[ENVOI]` (l'envoi du fichier d'un logo ou d'une photo à Grist : jeton, réseau, réponse de Grist) et `[IMAGE]` (une image de logo ou de photo que le navigateur n'a pas pu lire). Aucune de ces lignes ne contient de nom, d'adresse ni de jeton, hormis le message brut d'une erreur renvoyée par Grist. Quand un logo ne se charge pas, c'est le navigateur lui-même qui écrit dans la console « Failed to load resource » avec l'adresse de l'image, jeton compris : ne pas partager cette ligne.
 
 | Symptôme | Cause probable | Que faire |
 |---|---|---|
@@ -237,7 +237,7 @@ La console du navigateur (F12) porte le détail : `[GRIST]` (lignes reçues), `[
 ## Avant de publier une modification du code
 
 1. `node --test` est entièrement vert, avec Playwright installé pour exécuter aussi les scénarios navigateur ([documentation développeur](developpeurs.md#tests)).
-2. Si `main.js`, `render.js`, `profile-ui.js`, `profile-form.js`, `profile-review.js`, `dialog-shell.js`, `index.html`, `style.css` ou `dialogs.css` ont changé : jouer le protocole manuel de [`TESTING.md`](../TESTING.md) dans une **copie** du document Grist.
+2. Si `main.js`, `render.js`, `filter-menus.js`, `profile-ui.js`, `profile-form.js`, `profile-review.js`, `dialog-shell.js`, `index.html`, `style.css` ou `dialogs.css` ont changé : jouer le protocole manuel de [`TESTING.md`](../TESTING.md) dans une **copie** du document Grist.
 3. Une correction a son test de non-régression.
 4. [`CHANGELOG.md`](../CHANGELOG.md) et [`VERSION.md`](../VERSION.md) sont à jour.
 5. Si l'interface a changé : captures régénérées (`node docs/demo/capturer.mjs`) et [guide utilisateur](utilisateurs.md) corrigé.
@@ -292,7 +292,7 @@ L'annuaire n'a ni serveur ni base de données à lui : il tient à des comptes q
 | **Les réglages de « Ma présence » et de la modification de fiche** | Le document Grist : table `Annuaire_Sonde` et ses formules, colonnes de données que le widget écrit dans `BDD`, table `ACL`, règles d'accès | Les propriétaires du document | Sans la sonde, plus personne n'est identifié tant qu'un compte qui peut modifier la structure du document n'a pas ouvert l'annuaire : le widget la recrée alors lui-même (1.20.0) ; jusque-là, l'annuaire s'affiche normalement, mais sans bandeau ni modification (le widget échoue en sécurité). Sans `ACL`, la formule de `Admin` ne peut plus s'appliquer et plus personne ne serait reconnu comme administrateur (comportement de Grist non constaté : à essayer sur une copie). La sonde se recrée seule (table et formules) ; `ACL` et les règles d'accès, non : la marche à suivre est dans [`GRIST_SETUP.md`](../GRIST_SETUP.md) |
 | **Les logos** | Le document Grist : colonne `logo` d'`Etablissements` | Les propriétaires et les éditeurs du document | Les logos déjà en place restent affichés mais ne peuvent plus être remplacés. Si les fichiers sont supprimés, les noms les remplacent : l'annuaire continue de fonctionner |
 | **L'adresse du widget** | GitHub Pages, saisie dans « Enter Custom URL » du widget de chaque page Grist | Le même compte | Renommer ou transférer le dépôt change l'adresse du site **sans redirection** : à la place de l'annuaire, Grist affiche une erreur ou une zone vide, tant que l'adresse n'est pas corrigée dans chaque page |
-| **Le script de l'API Grist** | `docs.getgrist.com`, chargé par `index.html` | Grist | Sans lui, la page affiche « 0 contact » sans bandeau d'explication ; le détail est dans la console du navigateur |
+| **Le script de l'API Grist** | `docs.getgrist.com`, chargé par `index.html` | Grist | Sans lui, rien ne démarre : depuis la 1.30.0, un bandeau rouge dit « Impossible de joindre Grist », le compteur dit « Chargement impossible » et la console garde la cause (`[GRIST] window.grist est absent`) |
 | **La connaissance** | Cette documentation, `grist_structure.txt`, `specs.md`, les tests | Quiconque peut écrire dans le dépôt | Elle se périme : `tests/docs.test.mjs` signale une partie des oublis, pas tous |
 
 Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certificat), mais il suffit qu'un compte ou une adresse de messagerie disparaisse pour tout bloquer.
@@ -317,7 +317,8 @@ Rien n'est à renouveler (pas de serveur, pas de nom de domaine, pas de certific
 | Le seul propriétaire du document Grist n'a plus accès à son compte | Plus personne ne peut gérer le partage ni les règles d'accès | Prévenir : au moins deux propriétaires. Sinon, demander de l'aide à l'équipe qui gère l'instance Grist, sans garantie de réponse |
 | Le compte GitHub propriétaire est inaccessible ou supprimé | Inaccessible : le widget fonctionne, mais aucune correction ni publication n'est possible. Supprimé : le dépôt, donc le widget, disparaît | Dépôt dans une organisation à deux propriétaires, copie de secours ([Reprendre l'annuaire sans son créateur](#reprendre-lannuaire-sans-son-créateur)) |
 | Le dépôt est renommé ou transféré | L'adresse du widget change, sans redirection | Corriger l'adresse dans chaque page Grist |
-| GitHub Pages ou `docs.getgrist.com` est indisponible | Le widget est vide ou affiche « 0 contact » | Attendre : les données ne sont pas touchées |
+| GitHub Pages est indisponible | Grist affiche une erreur ou une zone vide à la place du widget | Attendre : les données ne sont pas touchées |
+| `docs.getgrist.com` est indisponible, ou son script est bloqué (réseau, pare-feu, extension) | Depuis la 1.30.0, un bandeau rouge « Impossible de joindre Grist » et le compteur « Chargement impossible » | Attendre ou lever le blocage, puis recharger la page : les données ne sont pas touchées |
 | Le document Grist est supprimé par erreur | Ses données et son historique disparaissent avec lui | Le restaurer depuis la corbeille dans les 30 jours ; au-delà, depuis une sauvegarde |
 | Une mise à jour de Grist change son API | Le widget peut mal fonctionner | Rejouer [`TESTING.md`](../TESTING.md) après chaque mise à jour de l'instance ([Dépendances et mises à jour](#dépendances-et-mises-à-jour)) |
 
