@@ -820,6 +820,7 @@ try {
     if (scene.hauteur) await page.setViewportSize({ width: LARGEUR, height: scene.hauteur });
     await page.goto(`${url}/${scene.requete ?? ''}`);
     await scene.preparer(page);
+    await attendreLogos(page); // une scène qui redessine les cartes (le mode admin) fait réapparaître leurs logos en fondu
     await page.mouse.move(0, 0); // pas de survol parasite sur la capture
     const fichier = path.join(dossierSortie, scene.fichier);
     await page.screenshot({ path: fichier, clip: scene.zone ? await scene.zone(page) : undefined, fullPage: scene.pagePleine });
