@@ -132,11 +132,6 @@ async function readFiche(docApi, rowId, log) {
   return { row, rows };
 }
 
-// La ligne `rowId` de BDD telle qu'elle est maintenant dans Grist. Lève une ProfileSaveError.
-export async function readRow(docApi, rowId, { log = console } = {}) {
-  return (await readFiche(docApi, rowId, log)).row;
-}
-
 // Adresse → vrai si une AUTRE ligne que `rowId` porte déjà cette adresse (sans tenir compte
 // de la casse ni des espaces) : l'adresse retrouve la personne, deux fiches ne la partagent pas.
 function emailTakenBy(rows, rowId) {

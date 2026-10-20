@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { diffContacts, hasMarks, previewOf, withAvatarChange } from '../preview.js';
+import { diffContacts, previewOf, withAvatarChange } from '../preview.js';
 import { TAG_GROUPS } from '../constants.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
@@ -24,10 +24,9 @@ const card = ({ prenom = 'Ana', nom = 'Martin', Fonction = '', numero_de_telepho
 
 // ===== diffContacts =====
 
-test('diffContacts finds nothing between two identical cards, and hasMarks agrees', () => {
+test('diffContacts finds nothing between two identical cards', () => {
   const marks = diffContacts(card({ labels: { instances: ['CME'] } }), card({ labels: { instances: ['CME'] } }));
   assert.deepEqual(marks, { texts: {}, tags: {} });
-  assert.equal(hasMarks(marks), false);
 });
 
 test('diffContacts marks each line of text that changed, and only that line', () => {
@@ -37,7 +36,6 @@ test('diffContacts marks each line of text that changed, and only that line', ()
   assert.deepEqual(role.texts, { fonction: { before: '', after: 'Cheffe de service' } });
   const phone = diffContacts(card({ numero_de_telephone: 536499012 }), card({ numero_de_telephone: 536499013 }));
   assert.deepEqual(phone.texts, { tel: { before: '05 36 49 90 12', after: '05 36 49 90 13' } });
-  assert.equal(hasMarks(name) && hasMarks(role) && hasMarks(phone), true);
 });
 
 test('diffContacts reads the name as the card shows it: a nameless card is called « Sans nom »', () => {
@@ -133,7 +131,6 @@ test('previewOf marks nothing when the values written are the ones the card alre
   const { referenceMaps, etabFlags, row } = await directory();
   const { marks } = previewOf(row(1), { Fonction: 'Pharmacienne', Competences: ['L', 2, 1], numero_de_telephone: 536499012 }, referenceMaps, etabFlags);
   assert.deepEqual(marks, { texts: {}, tags: {} });
-  assert.equal(hasMarks(marks), false);
 });
 
 test('previewOf keeps the values the form does not show: a value without a name is not turned into a tag', async () => {
@@ -163,8 +160,7 @@ test('diffContacts marks a new e-mail address and a new établissement, as lines
   assert.deepEqual(diffContacts(before, card({ email: 'ana@chu.example', etablissement_label: 'UBM' })).texts,
     { etab: { before: 'CHU', after: 'UBM' } });
   assert.deepEqual(diffContacts(card(), card({ email: 'ana@chu.example' })).texts, { email: { before: '', after: 'ana@chu.example' } }, 'une adresse ajoutée');
-  assert.equal(hasMarks(diffContacts(before, card({ email: 'ana@chu.example', etablissement_label: 'UBM' }))), true);
-  assert.equal(hasMarks(diffContacts(before, before)), false);
+  assert.deepEqual(diffContacts(before, before), { texts: {}, tags: {} }, 'rien à montrer entre deux cartes identiques');
 });
 
 test('previewOf shows the card after with the new address and the flags of the new établissement', async () => {
@@ -182,12 +178,6 @@ test('previewOf shows the card after with the new address and the flags of the n
 
 // ===== La photo de profil sur la carte « après » =====
 
-test('hasMarks counts a change of photo, which marks neither a text nor a tag', () => {
-  assert.equal(hasMarks({ texts: {}, tags: {}, avatar: { before: 0, after: 'replace' } }), true);
-  assert.equal(hasMarks({ texts: {}, tags: {}, avatar: { before: 501, after: 'remove' } }), true);
-  assert.equal(hasMarks({ texts: {}, tags: {} }), false);
-});
-
 test('withAvatarChange shows a new photo on the card after by its local address, and marks it', async () => {
   const { referenceMaps, etabFlags, row } = await directory();
   const preview = previewOf({ ...row(1), Avatar: ['L', 501] }, { Fonction: 'Cheffe' }, referenceMaps, etabFlags);
@@ -197,7 +187,6 @@ test('withAvatarChange shows a new photo on the card after by its local address,
   assert.equal(before.avatarUrl, undefined, 'la carte « avant » montre la photo de Grist, pas une image locale');
   assert.deepEqual(marks.avatar, { before: 501, after: 'replace' });
   assert.deepEqual(marks.texts, { fonction: { before: 'Pharmacienne', after: 'Cheffe' } }, 'les marques des autres champs restent');
-  assert.equal(hasMarks(marks), true);
 });
 
 test('withAvatarChange removes the photo from the card after: only the initials are left', async () => {

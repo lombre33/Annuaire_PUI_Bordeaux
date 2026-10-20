@@ -281,7 +281,7 @@ async function expandedMenuReport(filter) {
       clientWidth: menu.clientWidth,
       groups: menu.querySelectorAll('.filter-group').length,
       shownItems: [...menu.querySelectorAll('.filter-option')].filter(option => option.getClientRects().length > 0).length,
-      outside: ['.group-toggle', '.option-count', '.option-label'].flatMap(selector => inside(selector).map(element => selector))
+      outside: ['.group-toggle', '.option-count', '.option-label'].flatMap(selector => inside(selector).map(() => selector))
     };
   });
 }

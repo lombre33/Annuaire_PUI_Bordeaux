@@ -88,7 +88,7 @@ Sans dépendance, un fichier de tests par module :
   a une colonne `Avatar`.
 - `tests/profile-save.test.mjs` — `buildRowUpdate` (listes calculées sur la fiche
   actuelle, téléphone numérique ou texte, e-mail et établissement), `signatureOf`,
-  `readRow`, `prepareReview` (cartes avant et après, rien d'écrit, l'e-mail et
+  `prepareReview` (cartes avant et après, rien d'écrit, l'e-mail et
   l'établissement ignorés hors administrateur, une adresse prise refusée), `saveProfile`
   (une seule action atomique, changement concurrent, adresse prise entre-temps, fermé par
   défaut pour l'e-mail et l'établissement, refus de Grist, aucune adresse ni valeur dans la

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { text, normalize, enrich } from '../grist-data.js';
+import { normalize, enrich } from '../grist-data.js';
 import { FILTERS } from '../constants.js';
 import {
   filterContacts, createEmptyFilterState, pruneStaleFilters, computeFilterCounts,
