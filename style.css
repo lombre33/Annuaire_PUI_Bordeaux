@@ -152,6 +152,10 @@ h1 {
   font-weight: 800;
   white-space: nowrap;
 }
+/* Le compteur reçoit le focus quand la carte qui l'avait disparaît du dessin (keepFocus, render.js) : ce n'est pas un contrôle. */
+.result-count:focus {
+  outline: none;
+}
 
 /* Financeurs : une légende et le visuel des financeurs de la maquette (assets/financeurs.png),
    déjà en gris : discret en haut de page. */

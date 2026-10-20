@@ -53,7 +53,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.29.3';
+export const VERSION = '1.30.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en

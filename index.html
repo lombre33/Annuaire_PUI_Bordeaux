@@ -43,10 +43,12 @@
   <link rel="modulepreload" href="etablissement-save.js">
   <link rel="modulepreload" href="etablissement-ui.js">
   <link rel="modulepreload" href="etablissement.js">
+  <link rel="modulepreload" href="filter-menus.js">
   <link rel="modulepreload" href="filters.js">
   <link rel="modulepreload" href="grist-data.js">
   <link rel="modulepreload" href="identity.js">
   <link rel="modulepreload" href="image-prep.js">
+  <link rel="modulepreload" href="logos-report.js">
   <link rel="modulepreload" href="presence.js">
   <link rel="modulepreload" href="preview.js">
   <link rel="modulepreload" href="profile-form.js">
@@ -65,7 +67,7 @@
       <div class="page-title">
         <div class="title-line">
           <h1>PUI Bordeaux</h1>
-          <div id="resultCount" class="result-count" aria-live="polite">0 contact</div>
+          <div id="resultCount" class="result-count" role="status" tabindex="-1">Chargement…</div>
         </div>
         <p class="subtitle">Annuaire des accompagnateurs de l'innovation</p>
         <p class="tagline">Pas de mauvaise porte, toujours le bon interlocuteur</p>
@@ -110,7 +112,7 @@
     <p id="adminStrip" class="admin-strip" role="status" hidden>Mode admin : un bouton « Modifier la fiche » apparaît sur chaque carte. Vos changements sont relus avant d’être validés.</p>
 
     <p id="statusBanner" class="status-banner" role="alert" hidden></p>
-    <section id="cardsGrid" class="cards-grid" aria-live="polite"></section>
+    <section id="cardsGrid" class="cards-grid" aria-busy="true"></section>
     <section id="emptyState" class="empty-state" hidden>
       <div class="empty-mark">✦</div>
       <h2>Aucun contact trouvé</h2>

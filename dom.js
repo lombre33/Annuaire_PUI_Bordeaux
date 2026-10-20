@@ -54,6 +54,15 @@ export const matchesTerm = (label, term) => term === '' || normalize(label).incl
 // valeurs répondent.
 export const foundText = (term, count) => (term === '' ? '' : count === 0 ? 'Aucun résultat' : `${count} résultat${count > 1 ? 's' : ''}`);
 
+// Le focus est celui du clavier (l'anneau se voit), pas celui d'un clic. Un navigateur sans `:focus-visible` compte pour clavier.
+export function isFocusVisible(element) {
+  try {
+    return element.matches(':focus-visible');
+  } catch {
+    return true;
+  }
+}
+
 // Les éléments d'une liste déroulante, sans leur comportement : le bloc (`root`), le bouton, le texte du choix, le panneau
 // (recherche, liste, « aucun résultat » et sa version pour les lecteurs d'écran) et une entrée par option, { option, item }.
 function dropdownParts({ id, labelId, options, searchLabel, color, onTerm }) {

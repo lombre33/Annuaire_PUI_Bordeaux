@@ -24,10 +24,11 @@ const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 // (tests/support/fake-grist.js, `export` retiré), branché sur des variables que le
 // test pose avant le chargement et peut modifier ensuite (relues à chaque appel) :
 // __tables, __failTables, __user (la personne connectée), __denyWrites (tables dont
-// l'écriture est refusée), __denyRows (lignes protégées), __delay, __accessToken (la
-// réponse de getAccessToken), __withoutMethods (méthodes que cette version de Grist n'a
-// pas). __triggerRecords rejoue un onRecords (édition Grist) ; __fake.calls liste les
-// actions envoyées à Grist, __fake.tokenRequests les demandes de jeton.
+// l'écriture est refusée), __denyRows (lignes protégées), __delay, __readGate (la promesse
+// que toute lecture attend), __accessToken (la réponse de getAccessToken), __withoutMethods
+// (méthodes que cette version de Grist n'a pas). __triggerRecords rejoue un onRecords (édition
+// Grist) ; __fake.calls liste les actions envoyées à Grist, __fake.tokenRequests les demandes
+// de jeton ; __releaseReads laisse passer les lectures retenues (option `holdReads`).
 const FAKE_GRIST = fs.readFileSync(path.join(ROOT, 'tests/support/fake-grist.js'), 'utf8').replace(/^export /gm, '');
 const GRIST_MOCK = `${FAKE_GRIST}
 window.__fake = createFakeGrist({
@@ -37,6 +38,7 @@ window.__fake = createFakeGrist({
   denyWrites: () => window.__denyWrites,
   denyRows: () => window.__denyRows,
   delay: () => window.__delay,
+  readGate: () => window.__readGate,
   accessToken: () => window.__accessToken
 });
 (window.__withoutMethods || []).forEach(name => { delete window.__fake.docApi[name]; });
@@ -154,16 +156,18 @@ export async function createHarness({ keepScrollbars = false } = {}) {
   // suivantes passent) ; `initScript` : un script (texte) exécuté dans la page avant tout autre ; `contextOptions` : les options du
   // contexte Playwright (un écran tactile, sans survol : { hasTouch: true, isMobile: true }). `logs.pageErrors` : les exceptions
   // que la page n'a pas rattrapées, sans les messages d'erreur de sa console ; `logs.cspViolations` : ce que la politique de
-  // sécurité de contenu de index.html a refusé à la page (voir assertNoCspViolation).
+  // sécurité de contenu de index.html a refusé à la page (voir assertNoCspViolation). `holdReads` : aucune lecture de Grist
+  // n'aboutit avant `window.__releaseReads()` (un document lent à répondre) ; `apiBlocked` : le script de l'API de Grist ne se charge
+  // pas (réseau coupé, pare-feu, extension), `window.grist` n'existe pas.
   async function openWidget({
     tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false,
     accessToken, withoutMethods = [], downloadCors = true, downloadHold = false, downloadFirst = null, initScript = null,
-    contextOptions = {}
+    contextOptions = {}, holdReads = false, apiBlocked = false
   } = {}) {
     const context = await browser.newContext(contextOptions);
     // Hermétique : seuls le serveur local, l'API Grist simulée et ses pièces jointes répondent.
     await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
-    await context.route(GRIST_API_URL, route => route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK }));
+    await context.route(GRIST_API_URL, route => (apiBlocked ? route.abort() : route.fulfill({ contentType: 'text/javascript', body: GRIST_MOCK })));
     const files = await routeAttachments(context);
     files.download.cors = downloadCors;
     files.download.hold = downloadHold;
@@ -210,9 +214,10 @@ export async function createHarness({ keepScrollbars = false } = {}) {
       window.__denyWrites = values.denyWrites;
       window.__denyRows = values.denyRows;
       window.__delay = values.delay;
+      window.__readGate = values.holdReads ? new Promise(resolve => { window.__releaseReads = resolve; }) : null;
       window.__accessToken = values.accessToken;
       window.__withoutMethods = values.withoutMethods;
-    }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, delay, accessToken, withoutMethods });
+    }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, delay, accessToken, withoutMethods, holdReads });
     if (initScript) await page.addInitScript(initScript);
     // Le widget lit Grist dès son démarrage : ses cartes et leurs logos sont dans la page avant l'événement « load », qui attend les
     // images. Quand un fichier est retenu ou ne reçoit jamais de réponse, il ne viendrait pas : la navigation n'attend alors que le document.

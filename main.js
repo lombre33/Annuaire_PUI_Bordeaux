@@ -1,17 +1,19 @@
 // Point d'entrée : relie l'API Grist et les événements du DOM aux modules
-// grist-data.js (lecture, enrichissement), filters.js (filtrage), render.js
-// (construction du DOM), identity.js et presence.js (la personne connectée et
-// son choix d'apparaître), account-ui.js (son bandeau), pour la modification d'une
-// fiche, profile.js / profile-save.js / preview.js (la logique) avec profile-ui.js (la
-// fenêtre), pour celle d'un établissement etablissement.js / etablissement-save.js (la
-// logique), upload.js et image-prep.js (le logo, la photo) avec etablissement-ui.js (la
-// fenêtre), branding.js, attachments.js et branding-ui.js (les logos : cartes et
-// fondateurs) et avatar-ui.js (les photos de profil).
+// grist-data.js (lecture, enrichissement), filters.js (filtrage), filter-menus.js
+// (les menus de filtre), render.js (les cartes), identity.js et presence.js (la
+// personne connectée et son choix d'apparaître), account-ui.js (son bandeau), pour la
+// modification d'une fiche, profile.js / profile-save.js / preview.js (la logique) avec
+// profile-ui.js (la fenêtre), pour celle d'un établissement etablissement.js /
+// etablissement-save.js (la logique), upload.js et image-prep.js (le logo, la photo)
+// avec etablissement-ui.js (la fenêtre), branding.js, attachments.js, branding-ui.js
+// et logos-report.js (les logos : cartes, fondateurs, bilan de la console) et
+// avatar-ui.js (les photos de profil).
 
 import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
 import { loadDirectory, DirectoryLoadError, debounce, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
-import { attachTagNotes, createFilterUI, renderCards, renderPreviewCard, updateFilterUI, updateFilterCounts, initials } from './render.js';
+import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
+import { attachTagNotes, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
@@ -24,7 +26,8 @@ import { createEtablissementDialog } from './etablissement-ui.js';
 import { uploadAttachment } from './upload.js';
 import { brandingSummary, buildBranding, logoForContact } from './branding.js';
 import { avatarIdOf, createAttachments } from './attachments.js';
-import { createBrandingUI, createLogoImage, logoStats } from './branding-ui.js';
+import { createBrandingUI, createLogoImage } from './branding-ui.js';
+import { createLogoReport } from './logos-report.js';
 import { createAvatar, createPhotoViewer, createThumb } from './avatar-ui.js';
 
 // Le numéro de la version qui s'exécute, en bas de page (voir VERSION et index.html). Le cache de GitHub Pages garde chaque fichier dix
@@ -33,6 +36,9 @@ const versionNote = document.getElementById('versionNote');
 if (versionNote) versionNote.textContent = `Version ${VERSION}`;
 
 const state = {
+  // Faux jusqu'à la première lecture réussie de Grist : d'ici là le compteur dit « Chargement… » et rien d'autre ne s'affiche
+  // (ni « 0 contact », ni « Aucun contact trouvé » si l'on tape pendant l'attente).
+  loaded: false,
   allContacts: [],
   referenceMaps: {},
   // referenceMaps (libellés par clé de catégorie) dont celui des établissements
@@ -80,6 +86,16 @@ const elements = {
   scopeButtons: [...document.querySelectorAll('.scope-btn')]
 };
 
+// Le script de l'API de Grist vient de docs.getgrist.com (index.html) : bloqué (réseau, pare-feu, extension) ou en panne, `window.grist`
+// n'existe pas et rien de ce qui suit ne peut démarrer. La page le dit, au lieu de rester sur un compteur vide.
+if (!window.grist) {
+  showStatus(['Impossible de joindre Grist : le script de son API (docs.getgrist.com) ne s\'est pas chargé. Vérifiez la connexion, '
+    + 'puis rechargez la page ; si le problème persiste, le détail est dans la console du navigateur.']);
+  elements.resultCount.textContent = 'Chargement impossible';
+  elements.grid.removeAttribute('aria-busy');
+  throw new Error('[GRIST] window.grist est absent : le script de l\'API de Grist (docs.getgrist.com) ne s\'est pas chargé.');
+}
+
 // Les logos et les photos de profil sont des pièces jointes de Grist : leurs adresses demandent
 // un jeton, réclamé à Grist seulement quand une image est à afficher.
 const attachments = createAttachments(window.grist.docApi);
@@ -109,46 +125,8 @@ const brandingUI = createBrandingUI({
 // l'annuaire comme la carte « avant / après » de la relecture.
 const cardLogos = () => ({ attachments, logoFor: contact => logoForContact(state.branding, contact) });
 
-// ===== Bilan des logos dans la console =====
-
-// Les logos sont un habillage dont l'échec se voit mal : sans logo, la carte montre le sigle, ou rien. Quelques secondes après
-// le dernier dessin des cartes (et encore un peu plus tard, pour un logo qui n'arrive jamais), la console dit en une ligne
-// combien de logos Grist a donnés et combien s'affichent, sans adresse ni jeton : de quoi comprendre un logo manquant sans
-// l'ouvrir. Une ligne par changement du bilan, pas une par rendu.
-let rendered = 0; // combien de fois les cartes ont été redessinées depuis le chargement
-let reportedBalance = '';
-let reportTimers = [];
-const LOGO_REPORT_DELAYS_MS = [6000, 15000];
-
-function browserLabel() {
-  const agent = globalThis.navigator?.userAgent ?? '';
-  const named = /(Firefox|Edg|Chrome)\/(\d+)/.exec(agent);
-  const safari = /Version\/(\d+)/.exec(agent);
-  const name = named ? (named[1] === 'Edg' ? 'Edge' : named[1]) : safari ? 'Safari' : '';
-  return name ? `${name} ${(named ?? safari).at(-1)}${/Mobi|Android/.test(agent) ? ' mobile' : ''}` : 'navigateur inconnu';
-}
-
-function reportLogos() {
-  const stats = logoStats(attachments);
-  if (stats.asked === 0) return;
-  const shown = selector => ({ loaded: document.querySelectorAll(`${selector}.loaded`).length, all: document.querySelectorAll(selector).length });
-  const cards = shown('#cardsGrid .etablissement-tag .logo-img');
-  const band = shown('#bandLogos .logo-img');
-  const problems = stats.refused + stats.late + stats.token + stats.pending;
-  const balance = `${stats.loaded} logo${stats.loaded > 1 ? 's' : ''} chargé${stats.loaded > 1 ? 's' : ''} sur ${stats.asked}`
-    + (problems ? ` (${stats.refused} refusé${stats.refused > 1 ? 's' : ''}, ${stats.late} sans réponse, ${stats.token} sans jeton, ${stats.pending} en attente)` : '')
-    + ` ; affichés : ${cards.loaded}/${cards.all} sur les cartes, ${band.loaded}/${band.all} dans le bandeau`;
-  if (balance === reportedBalance) return;
-  reportedBalance = balance;
-  const token = attachments.stats();
-  const line = `[LOGOS] Bilan : ${balance} ; cartes redessinées ${rendered} fois ; jetons demandés à Grist ${token.requested} (${token.failed} en échec) ; ${browserLabel()}.`;
-  (problems || cards.loaded < cards.all || band.loaded < band.all ? console.warn : console.info)(line);
-}
-
-function scheduleLogoReport() {
-  reportTimers.forEach(clearTimeout);
-  reportTimers = LOGO_REPORT_DELAYS_MS.map(delay => setTimeout(reportLogos, delay));
-}
+// Le bilan des logos dans la console (logos-report.js), après chaque dessin des cartes.
+const reportLogosLater = createLogoReport(attachments);
 
 function toggleFilter(filterKey, value) {
   if (!state.activeFilters[filterKey]) state.activeFilters[filterKey] = new Set();
@@ -199,13 +177,15 @@ function refreshFilterMenus() {
 }
 
 function refreshCards() {
+  if (!state.loaded) return; // la frappe est gardée (state.searchTerm) : elle s'applique à l'arrivée de l'annuaire
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
-  renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights);
+  keepFocus(elements.grid, elements.resultCount, () =>
+    renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights));
+  elements.grid.removeAttribute('aria-busy');
   elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.emptyState.hidden = filtered.length !== 0;
   updateFilterCounts(elements.filtersContainer, currentCounts());
-  rendered += 1;
-  scheduleLogoReport();
+  reportLogosLater();
 }
 
 // La bulle du rôle dans une tâche, un seul écouteur lui aussi (render.js).
@@ -272,9 +252,7 @@ elements.resetFilters.addEventListener('click', () => {
   refreshCards();
 });
 
-document.addEventListener('click', () => {
-  document.querySelectorAll('.filter.open').forEach(f => f.classList.remove('open'));
-});
+document.addEventListener('click', () => closeFilterMenus());
 
 // Bandeau d'état (masqué si `messages` est vide) : un annuaire incomplet ne doit
 // jamais passer pour un annuaire vide.
@@ -289,6 +267,7 @@ function showLoadError(error) {
   showStatus([`Impossible de charger l'annuaire depuis Grist${reason}. Rechargez la page ; `
     + 'si le problème persiste, le détail est dans la console du navigateur.']);
   if (state.allContacts.length === 0) elements.resultCount.textContent = 'Chargement impossible';
+  elements.grid.removeAttribute('aria-busy');
 }
 
 // onRecords se redéclenche à chaque édition dans Grist. Le debounce absorbe les
@@ -315,6 +294,7 @@ function applyBranding({ etablissementRows }) {
 }
 
 function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissementRows }) {
+  state.loaded = true;
   state.referenceMaps = referenceMaps;
   state.etabFlags = etabFlags;
   state.allContacts = contacts;
