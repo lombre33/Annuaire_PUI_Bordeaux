@@ -4,6 +4,7 @@
 import { ETABLISSEMENT_TABLE, TAG_GROUPS, FILTERS } from './constants.js';
 import { displayName, formatPhone, labelsOf, mailtoHref, normalize, ownValue, refId, shownEmail } from './grist-data.js';
 import { el, isFocusVisible } from './dom.js';
+import { hiddenLabels, selectedValues } from './filters.js';
 import { createLogoImage, fitCardLogo } from './branding-ui.js';
 import { createAvatar } from './avatar-ui.js';
 import { avatarIdOf } from './attachments.js';
@@ -160,7 +161,26 @@ function buildRemovedTag(group, value) {
   return tag;
 }
 
-function buildTagGroup(group, labels, onToggle, change, roles) {
+// « +N » : montre les pastilles que le plafond cachait ; « Moins » les cache de nouveau. Le nom commence par le texte écrit (« +3 autres
+// valeurs : Compétences »), et le focus suit les pastilles montrées, pour que la lecture au clavier continue où elle en était.
+function buildMoreButton(group, extras) {
+  const more = el('button', 'tag tag-more');
+  more.type = 'button';
+  const show = expanded => {
+    more.setAttribute('aria-expanded', String(expanded));
+    more.replaceChildren(expanded ? 'Moins' : `+${extras.length}`, el('span', 'sr-only', `${expanded ? ' de valeurs' : ' autres valeurs'} : ${group.label}`));
+    extras.forEach(tag => { tag.hidden = !expanded; });
+  };
+  more.addEventListener('click', () => {
+    const expanded = more.getAttribute('aria-expanded') !== 'true';
+    show(expanded);
+    if (expanded) extras[0].focus();
+  });
+  show(false);
+  return more;
+}
+
+function buildTagGroup(group, labels, onToggle, change, roles, hidden = []) {
   const section = document.createElement('section');
   section.className = 'tag-group';
 
@@ -172,12 +192,14 @@ function buildTagGroup(group, labels, onToggle, change, roles) {
   const added = new Set((change?.added ?? []).map(normalize));
   const values = document.createElement('div');
   values.className = 'tag-group-values';
+  const tags = labels.map(value => {
+    const key = normalize(value);
+    return buildTag(group, value, onToggle, added.has(key), ownValue(roles, key));
+  });
   values.append(
-    ...labels.map(value => {
-      const key = normalize(value);
-      return buildTag(group, value, onToggle, added.has(key), ownValue(roles, key));
-    }),
-    ...(change?.removed ?? []).map(value => buildRemovedTag(group, value))
+    ...tags,
+    ...(change?.removed ?? []).map(value => buildRemovedTag(group, value)),
+    ...(hidden.length > 0 ? [buildMoreButton(group, tags.filter((tag, index) => hidden.includes(labels[index])))] : [])
   );
 
   section.append(title, values);
@@ -213,16 +235,32 @@ function roleTag(tag, value) {
   return tag;
 }
 
-function fillTags(container, contact, onToggle, changes) {
+// Les pastilles d'une carte de l'annuaire sont un seul arrêt de tabulation (1.31.0, audit U22 : douze arrêts par carte rendaient une
+// carte lointaine presque inatteignable au clavier) : une barre d'outils à tabulation itinérante, que les flèches parcourent
+// (attachTagNavigation). Seule la première pastille se tabule au départ ; celle qui reçoit le focus prend la place. Une carte de
+// relecture n'a pas de bouton (des pastilles sans `onToggle`) : rien à faire.
+function makeToolbar(container, contact) {
+  const tags = container.querySelectorAll('button.tag');
+  if (tags.length === 0) return;
+  container.setAttribute('role', 'toolbar');
+  container.setAttribute('aria-label', `Filtrer par une valeur de la fiche de ${displayName(contact)}`);
+  tags.forEach((tag, index) => { tag.tabIndex = index === 0 ? 0 : -1; });
+}
+
+// `selected` : ce que les filtres actifs désignent (selectedValues), dont dépend ce que le plafond cache.
+function fillTags(container, contact, onToggle, changes, selected) {
   TAG_GROUPS.filter(group => group !== ROLE_GROUP).forEach(group => {
     const labels = labelsOf(contact, group.key);
     const change = changes?.[group.key];
     if (labels.length > 0 || change?.removed.length > 0) {
-      // Le rôle dans une tâche ne se lit que dans l'annuaire, pas sur une carte de relecture (sans `onToggle`).
+      // Le rôle dans une tâche ne se lit que dans l'annuaire, pas sur une carte de relecture (sans `onToggle`) : le plafond non plus,
+      // la relecture montre tout, avant comme après.
       const roles = onToggle && group.key === 'taches' ? contact.taskRoles : null;
-      container.appendChild(buildTagGroup(group, labels, onToggle, change, roles));
+      const hidden = onToggle ? hiddenLabels(labels, selected[group.key]) : [];
+      container.appendChild(buildTagGroup(group, labels, onToggle, change, roles, hidden));
     }
   });
+  makeToolbar(container, contact);
 }
 
 // La ligne d'actions d'une carte que la personne connectée peut modifier (voir
@@ -321,9 +359,9 @@ function fillTexts(card, contact, onToggle, { marks, logos, etablissement }) {
 // carte de relecture (voir renderPreviewCard), { logos } de quoi montrer le logo de
 // l'établissement : { attachments, logoFor(contact) } (attachments.js, branding.js) ;
 // sans eux la carte garde la pastille texte et les initiales (une photo de Grist demande aussi
-// `attachments`).
+// `attachments`) ; { selected } ce que les filtres actifs désignent (selectedValues, filters.js).
 function buildCard(template, contact, onToggle, view = {}) {
-  const { rights = null, marks = null, logos = null, etabRights = null } = view;
+  const { rights = null, marks = null, logos = null, etabRights = null, selected = {} } = view;
   const card = template.content.cloneNode(true);
   if (contact.id !== undefined) card.firstElementChild.dataset.contactId = String(contact.id);
   const shown = { marks, logos, etablissement: logoOf(logos, contact) };
@@ -332,7 +370,7 @@ function buildCard(template, contact, onToggle, view = {}) {
   fillName(card.querySelector('.name'), contact, marks);
   fillTexts(card, contact, onToggle, shown);
   fillRole(card.querySelector('.details'), contact, onToggle, marks?.tags.role);
-  fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags);
+  fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags, selected);
   if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);
   // Fermé par défaut : seul un établissement dont la personne est responsable (et dont la carte
   // porte la référence) montre le bouton.
@@ -358,18 +396,23 @@ function editableEtablissement(contact, etabRights) {
 // personne connectée peut en faire et du logo de son établissement : rien de ce que le dessin change. Les construire de
 // nouveau coûtait l'essentiel du temps (plus de 5 secondes pour 4 500 cartes) ; elles sont donc gardées, par contact, et
 // reviennent telles quelles. Une relecture de Grist produit de nouveaux contacts, donc de nouvelles cartes : rien ne se périme.
-// Ce qui peut changer sans nouveau contact (les droits de la personne connectée, le mode admin, le gabarit) est rangé avec la
-// carte, et une carte dont l'un de ces éléments a changé est reconstruite.
+// Ce qui peut changer sans nouveau contact (les droits de la personne connectée, le mode admin, le gabarit, les pastilles que les
+// filtres actifs gardent visibles) est rangé avec la carte, et une carte dont l'un de ces éléments a changé est reconstruite.
 const cardCache = new WeakMap(); // contact → { ingredients, card }
 
 const sameIngredients = (a, b) => a.every((value, index) => value === b[index]);
 
-function cardFor(contact, template, onToggle, { rightsOf, logos, etabRights }) {
+// Ce que le plafond cache sur une carte, d'un mot : change quand un filtre fait passer une pastille du caché au visible, ou l'inverse.
+function hiddenKey(contact, selected) {
+  return JSON.stringify(TAG_GROUPS.map(group => hiddenLabels(labelsOf(contact, group.key), selected[group.key])));
+}
+
+function cardFor(contact, template, onToggle, { rightsOf, logos, etabRights, selected }) {
   const rights = rightsOf(contact);
-  const ingredients = [template, onToggle, rights, logos?.attachments, logoOf(logos, contact), editableEtablissement(contact, etabRights)];
+  const ingredients = [template, onToggle, rights, logos?.attachments, logoOf(logos, contact), editableEtablissement(contact, etabRights), hiddenKey(contact, selected)];
   const kept = cardCache.get(contact);
   if (kept && sameIngredients(kept.ingredients, ingredients)) return kept.card;
-  const card = buildCard(template, contact, onToggle, { rights, logos, etabRights }).firstElementChild;
+  const card = buildCard(template, contact, onToggle, { rights, logos, etabRights, selected }).firstElementChild;
   cardCache.set(contact, { ingredients, card });
   return card;
 }
@@ -377,9 +420,10 @@ function cardFor(contact, template, onToggle, { rightsOf, logos, etabRights }) {
 // `rightsOf(contact)` (facultatif) dit ce que la personne connectée peut faire de la
 // fiche : 'own', 'admin' ou rien. `logos` (facultatif) : de quoi montrer le logo de
 // l'établissement, voir buildCard. `etabRights(identifiant)` (facultatif) : vrai pour un
-// établissement dont la personne est responsable (etablissementRightsFor).
-export function renderCards(grid, template, contacts, onToggle, rightsOf = () => null, logos = null, etabRights = null) {
-  const view = { rightsOf, logos, etabRights };
+// établissement dont la personne est responsable (etablissementRightsFor). `activeFilters` (facultatif) : les filtres actifs, dont les
+// valeurs restent visibles sur une carte même au-delà du plafond de pastilles.
+export function renderCards(grid, template, contacts, onToggle, rightsOf = () => null, logos = null, etabRights = null, activeFilters = null) {
+  const view = { rightsOf, logos, etabRights, selected: activeFilters ? selectedValues(activeFilters) : {} };
   // Un fragment plutôt que des arguments : des dizaines de milliers de cartes étalées en arguments dépasseraient la pile.
   const cards = document.createDocumentFragment();
   contacts.forEach(contact => cards.appendChild(cardFor(contact, template, onToggle, view)));
@@ -396,9 +440,10 @@ export function renderCards(grid, template, contacts, onToggle, rightsOf = () =>
 const CARD_CONTROLS = 'a[href], button, input, select, textarea, [tabindex]';
 const controlKey = control => [control.tagName, control.className, control.getAttribute('aria-label'), control.title, control.textContent.trim()].join('|');
 
+// Une pastille que le plafond cache ne reçoit pas le focus : elle ne compte pas.
 function equivalentControl(grid, { contactId, key }) {
   const card = contactId ? grid.querySelector(`.contact-card[data-contact-id="${contactId}"]`) : null;
-  return card ? [...card.querySelectorAll(CARD_CONTROLS)].find(control => controlKey(control) === key) : null;
+  return card ? [...card.querySelectorAll(CARD_CONTROLS)].find(control => !control.hidden && controlKey(control) === key) : null;
 }
 
 export function keepFocus(grid, fallback, redraw) {
@@ -407,6 +452,37 @@ export function keepFocus(grid, fallback, redraw) {
   redraw();
   if (!control || grid.contains(document.activeElement)) return;
   (control.isConnected ? control : equivalentControl(grid, where) ?? fallback).focus();
+}
+
+// Le lien d'évitement « Aller aux résultats » (1.31.0, audit U22) : le focus va au premier arrêt de tabulation de la première carte qui en a
+// un, ou, sans carte, à `fallback` (le compteur de contacts). Ni un contrôle caché (le bouton « Modifier » d'une carte qu'on ne peut pas
+// modifier, une pastille derrière « +N »), ni une pastille hors de la tabulation (tabindex -1) ne sont un arrêt.
+export function focusFirstResult(grid, fallback) {
+  for (const card of grid.children) {
+    const stop = [...card.querySelectorAll(CARD_CONTROLS)].find(control => control.tabIndex >= 0 && !control.closest('[hidden]'));
+    if (stop) return stop.focus();
+  }
+  return fallback.focus();
+}
+
+// Les flèches gauche et droite parcourent les pastilles d'une carte (la barre d'outils de makeToolbar) ; celle qui reçoit le focus,
+// à la flèche, au clic ou après keepFocus, devient l'arrêt de tabulation de la carte. Les pastilles cachées par le plafond sont sautées.
+// Home et End restent à la page. Un seul écouteur pour toute la grille, comme attachTagNotes.
+const TAG = '.card-tags button.tag';
+
+export function attachTagNavigation(grid) {
+  grid.addEventListener('focusin', event => {
+    const tag = event.target.closest(TAG);
+    if (tag) tag.closest('.card-tags').querySelectorAll('button.tag').forEach(other => { other.tabIndex = other === tag ? 0 : -1; });
+  });
+  grid.addEventListener('keydown', event => {
+    const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+    const tag = step && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey ? event.target.closest(TAG) : null;
+    if (!tag) return;
+    const tags = [...tag.closest('.card-tags').querySelectorAll('button.tag:not([hidden])')];
+    event.preventDefault();
+    tags[Math.min(Math.max(tags.indexOf(tag) + step, 0), tags.length - 1)].focus();
+  });
 }
 
 // Une carte pour la relecture d'une modification : même gabarit et mêmes classes que

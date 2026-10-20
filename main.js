@@ -1,6 +1,7 @@
 // Point d'entrée : relie l'API Grist et les événements du DOM aux modules
 // grist-data.js (lecture, enrichissement), filters.js (filtrage), filter-menus.js
-// (les menus de filtre), render.js (les cartes), identity.js et presence.js (la
+// (les menus de filtre), render.js (les cartes), scroll-tools.js (la barre d'outils
+// fixe et la pastille « Haut de page »), identity.js et presence.js (la
 // personne connectée et son choix d'apparaître), account-ui.js (son bandeau), pour la
 // modification d'une fiche, profile.js / profile-save.js / preview.js (la logique) avec
 // profile-ui.js (la fenêtre), pour celle d'un établissement etablissement.js /
@@ -13,7 +14,8 @@ import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from '.
 import { loadDirectory, DirectoryLoadError, debounce, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
-import { attachTagNotes, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
+import { attachTagNavigation, attachTagNotes, focusFirstResult, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
+import { createScrollTools } from './scroll-tools.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
@@ -76,6 +78,7 @@ const elements = {
   template: document.getElementById('cardTemplate'),
   filtersContainer: document.getElementById('filtersContainer'),
   resultCount: document.getElementById('resultCount'),
+  skipLink: document.querySelector('.skip-link'),
   emptyState: document.getElementById('emptyState'),
   searchInput: document.getElementById('searchInput'),
   resetFilters: document.getElementById('resetFilters'),
@@ -127,6 +130,16 @@ const cardLogos = () => ({ attachments, logoFor: contact => logoForContact(state
 
 // Le bilan des logos dans la console (logos-report.js), après chaque dessin des cartes.
 const reportLogosLater = createLogoReport(attachments);
+
+// La pastille « N contacts · Haut de page » et la place que prend la barre d'outils fixe (scroll-tools.js).
+const scrollTools = createScrollTools({
+  sentinel: document.getElementById('toolbarSentinel'),
+  toolbar: document.getElementById('toolbar'),
+  tools: document.getElementById('scrollTools'),
+  count: document.getElementById('scrollCount'),
+  toTop: document.getElementById('toTop'),
+  home: elements.resultCount
+});
 
 function toggleFilter(filterKey, value) {
   if (!state.activeFilters[filterKey]) state.activeFilters[filterKey] = new Set();
@@ -180,16 +193,25 @@ function refreshCards() {
   if (!state.loaded) return; // la frappe est gardée (state.searchTerm) : elle s'applique à l'arrivée de l'annuaire
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
   keepFocus(elements.grid, elements.resultCount, () =>
-    renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights));
+    renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights, state.activeFilters));
   elements.grid.removeAttribute('aria-busy');
-  elements.resultCount.textContent = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
+  const count = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
+  elements.resultCount.textContent = count;
+  scrollTools.setCount(count);
   elements.emptyState.hidden = filtered.length !== 0;
   updateFilterCounts(elements.filtersContainer, currentCounts());
   reportLogosLater();
 }
 
-// La bulle du rôle dans une tâche, un seul écouteur lui aussi (render.js).
+// La bulle du rôle dans une tâche, un seul écouteur lui aussi (render.js), et les flèches qui parcourent les pastilles d'une carte.
 attachTagNotes(elements.grid);
+attachTagNavigation(elements.grid);
+
+// Le lien d'évitement (index.html) amène le focus à la première carte ; sans ce code, l'ancre `#cardsGrid` y amène déjà la page.
+elements.skipLink.addEventListener('click', event => {
+  event.preventDefault();
+  focusFirstResult(elements.grid, elements.resultCount);
+});
 
 // Un seul écouteur pour tous les boutons « Modifier » et les photos à agrandir : les cartes sont
 // reconstruites à chaque filtre. Les cartes étant redessinées après un enregistrement, le focus revient

@@ -98,6 +98,25 @@ input[type="checkbox"]:indeterminate {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+/* Lien d'évitement (1.31.0, audit U22) : hors de l'écran, il apparaît quand le clavier y arrive et mène aux cartes sans passer par les
+   contrôles de l'en-tête et de la barre d'outils (douze arrêts de tabulation avant la première carte). */
+.skip-link {
+  position: absolute;
+  z-index: 100;
+  top: 8px;
+  left: 8px;
+  padding: 10px 16px;
+  color: #fff;
+  background: var(--violet);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  transform: translateY(calc(-100% - 16px));
+}
+.skip-link:focus {
+  transform: none;
+}
 .widget-shell {
   max-width: 1480px;
   margin: auto;
@@ -314,6 +333,12 @@ h1 {
 }
 
 /* Barre d'outils : recherche, filtres, réinitialisation */
+/* Le repère que scroll-tools.js observe pour savoir qu'on a défilé au-delà de la place de la barre d'outils : une ligne sans
+   hauteur dans la page (sa hauteur de 1px est reprise par la marge négative). */
+.toolbar-sentinel {
+  height: 1px;
+  margin-bottom: -1px;
+}
 .toolbar {
   display: flex;
   align-items: center;
@@ -323,6 +348,25 @@ h1 {
   border: 1px solid #fff;
   border-radius: 18px;
   box-shadow: 0 12px 30px #38317414;
+}
+/* Barre d'outils fixe (1.31.0, audit U34) : elle reste en haut quand on défile, de quoi changer un filtre ou une recherche sans
+   remonter. Seulement quand elle tient sans prendre trop de place : à partir de 1180 px de large elle fait deux rangées (126 px), et il
+   faut un cadre assez haut. Plus étroite elle fait 180 à 370 px de haut : elle défile avec la page, et la pastille « Haut de page »
+   (plus bas) ramène à elle. */
+@media (min-width: 1180px) and (min-height: 560px) {
+  .toolbar {
+    position: sticky;
+    z-index: 20;
+    top: 0;
+  }
+  /* Ce que le clavier amène en vue s'arrête sous la barre fixe, pas dessous (WCAG 2.4.11) : scroll-tools.js dit sa hauteur. */
+  html {
+    scroll-padding-top: calc(var(--toolbar-height, 130px) + 12px);
+  }
+  /* Une fois les cartes passées dessous, la barre est opaque : leur texte ne se lirait pas à travers les contrôles. */
+  body.scrolled .toolbar {
+    background: #fff;
+  }
 }
 .search-box {
   display: flex;
@@ -797,6 +841,53 @@ button.avatar:hover {
   font-weight: 700;
   overflow-wrap: anywhere;
   cursor: pointer;
+}
+/* « +N » (1.31.0, audit U35) : les pastilles d'un groupe que le plafond cache. Elle n'a pas la couleur du groupe : ce n'est pas une
+   valeur. */
+.tag.tag-more {
+  color: #2b3550;
+  background: #eef0f6;
+  box-shadow: inset 0 0 0 1px #c5cbe0;
+}
+.tag.tag-more:hover {
+  background: #e1e5f0;
+}
+
+/* Pastille fixe, une fois la place de la barre d'outils passée (scroll-tools.js) : le nombre de contacts, et le bouton qui remonte. */
+.scroll-tools {
+  position: fixed;
+  z-index: 30;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.scroll-count {
+  padding: 10px 16px;
+  color: #443aaf;
+  background: #e8e6ff;
+  border-radius: 999px;
+  box-shadow: 0 6px 16px #38317433;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.to-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  color: #fff;
+  background: var(--violet);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 6px 16px #38317440;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 /* État vide */
@@ -1328,7 +1419,10 @@ button.avatar:hover {
 /* Couleurs imposées (mode contraste élevé) : la piste et le curseur y prendraient le même fond et
    l'interrupteur ne montrerait plus son état. On les pose en couleurs système, que le mode respecte. */
 @media (forced-colors: active) {
-  .tag-tip {
+  .tag-tip,
+  .scroll-count,
+  .to-top,
+  .tag.tag-more {
     border: 1px solid CanvasText;
   }
   input[type="checkbox"] {
@@ -1601,4 +1695,17 @@ button.avatar:hover {
 /* Sous la bande, les cartes la suivent de près : elle fait déjà la séparation. */
 .admin-strip:not([hidden]) ~ .cards-grid {
   margin-top: 14px;
+}
+/* Sur un téléphone, la pastille se cale sur la gouttière de la page. À l'impression, ni le lien d'évitement ni la pastille n'ont de sens. */
+@media (max-width: 599px) {
+  .scroll-tools {
+    right: 12px;
+    bottom: 12px;
+  }
+}
+@media print {
+  .skip-link,
+  .scroll-tools {
+    display: none;
+  }
 }

@@ -58,10 +58,12 @@
   <link rel="modulepreload" href="profile.js">
   <link rel="modulepreload" href="render.js">
   <link rel="modulepreload" href="save-upload.js">
+  <link rel="modulepreload" href="scroll-tools.js">
   <link rel="modulepreload" href="schema.js">
   <link rel="modulepreload" href="upload.js">
 </head>
 <body>
+  <a class="skip-link" href="#cardsGrid">Aller aux résultats</a>
   <main class="widget-shell">
     <header class="page-header">
       <div class="page-title">
@@ -96,7 +98,8 @@
       </section>
     </header>
 
-    <section class="toolbar" aria-label="Recherche et filtres">
+    <div id="toolbarSentinel" class="toolbar-sentinel" aria-hidden="true"></div>
+    <section id="toolbar" class="toolbar" aria-label="Recherche et filtres">
       <label class="search-box" for="searchInput">
         <span class="search-icon" aria-hidden="true">⌕</span>
         <input id="searchInput" type="search" placeholder="Rechercher par nom ou prénom…" aria-label="Rechercher par nom ou prénom" autocomplete="off">
@@ -118,6 +121,11 @@
       <h2>Aucun contact trouvé</h2>
       <p>Modifiez votre recherche ou réinitialisez les filtres.</p>
     </section>
+
+    <div id="scrollTools" class="scroll-tools" hidden>
+      <span id="scrollCount" class="scroll-count" aria-hidden="true"></span>
+      <button id="toTop" class="to-top" type="button"><span aria-hidden="true">↑</span>Haut de page</button>
+    </div>
 
     <footer class="page-footer">
       <section id="foundersBand" class="band" aria-label="Établissements fondateurs du PUI" hidden>

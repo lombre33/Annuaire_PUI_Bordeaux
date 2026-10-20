@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATEGORIES } from '../constants.js';
-import { sampleTables, withIdentity, ANA_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
+import { sampleTables, withIdentity, withLongTagLists, ANA_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 import { skip, waitForCards, withWidget } from './support/browser.mjs';
 import { parseColor, blend, contrastRatio, WHITE } from './support/contrast.mjs';
 import { measureCards } from './support/card-metrics.mjs';
@@ -291,16 +291,17 @@ const renderedText = (page, selector) => page.locator(selector).evaluateAll(elem
 
 test('pastilles, titres de groupe et lien e-mail d’une carte gardent 4,5:1 sur la page rendue (WCAG 1.4.3)', { skip }, async () => {
   const tables = sampleTables();
-  // Ana porte une pastille de chaque catégorie : GT et Tâches sont vides dans le jeu de base.
+  // Ana porte une pastille de chaque catégorie : GT et Tâches sont vides dans le jeu de base. Elle a aussi de longues listes, donc des
+  // boutons « +N » (1.31.0), que ce test mesure avec les pastilles.
   tables.BDD.GT[0] = ['L', 1];
   tables.BDD.Taches[0] = ['L', 1];
-  await withWidget({ tables }, async ({ page }) => {
+  await withWidget({ tables: withLongTagLists(tables) }, async ({ page }) => {
     await waitForCards(page, 4);
     const pills = await renderedText(page, '.contact-card .tag');
     const titles = await renderedText(page, '.contact-card .tag-group-title');
     const links = await renderedText(page, '.contact-card a.email');
     const categories = new Set(pills.map(pill => /\btag-(\w+)/.exec(pill.classes)?.[1]));
-    for (const key of ['actions', 'communautes', 'gt', 'instances', 'taches']) {
+    for (const key of ['actions', 'communautes', 'gt', 'instances', 'taches', 'more']) {
       assert.ok(categories.has(key), `une pastille « ${key} » est mesurée (sinon le test ne prouve rien pour elle)`);
     }
     assert.ok(titles.length >= 7 && links.length >= 1, `titres et liens mesurés (${titles.length}, ${links.length})`);
