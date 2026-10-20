@@ -3,8 +3,8 @@
 Ce widget n'a pas de test automatisé contre une vraie instance Grist (voir
 « Tests automatisés » plus bas pour ce qui est couvert avec une API Grist
 simulée). Ce document est le protocole de test **manuel**, à exécuter dans
-Grist avant tout déploiement qui touche `main.js`, `render.js`, `index.html`
-ou `style.css`. Pour un changement limité à `grist-data.js`/`filters.js`, les
+Grist avant tout déploiement qui touche `main.js`, `render.js`, `filter-menus.js`,
+`index.html` ou `style.css`. Pour un changement limité à `grist-data.js`/`filters.js`, les
 tests automatisés suffisent à condition d'être complétés pour le changement.
 
 ## Tests automatisés
@@ -160,7 +160,9 @@ Sans dépendance, un fichier de tests par module :
   dernière carte ne bougent plus pendant six images) : depuis la 1.29.0 le navigateur ne dessine que les
   cartes proches de l'écran et corrige la hauteur estimée des autres une ou deux images après un
   changement de largeur, ce qui faisait échouer par intermittence deux mesures de
-  `tests/branding-layout.test.mjs` (1.29.1).
+  `tests/branding-layout.test.mjs` (1.29.1). Depuis la 1.30.0, deux options simulent un Grist lent ou
+  absent : `holdReads` retient les lectures de Grist jusqu'à `window.__releaseReads()` (le faux Grist les
+  attend par son option `readGate`), et `apiBlocked` empêche le script de l'API de se charger.
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : ce harnais, et les attentes
   que ces tests partagent (cartes, bandeau, message, focus rendu, sa propre fiche ouverte,
   actions envoyées à `BDD`, ni jeton ni adresse du document dans la console, aucune violation de la
@@ -212,6 +214,9 @@ Sans dépendance, un fichier de tests par module :
 - `tests/support/card-metrics.mjs` — la taille du texte et des cibles des cartes sur la page rendue
   (`measureCards` : texte sous 12px, pastilles ou boutons sous 24px de haut, petites cibles trop près
   d'une autre), pour `tests/responsive.test.mjs` et `tests/accessibility.test.mjs`.
+- `tests/support/accessibility-tree.mjs` — l'arbre d'accessibilité de Chromium, nœud par nœud
+  (`accessibilityTree`, `accessibleNode` : rôle, nom, description, états ARIA), tel qu'un lecteur d'écran
+  le lit et non le seul HTML, pour `tests/accessibility-filters.test.mjs` (1.30.0).
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
 - `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
@@ -242,6 +247,13 @@ Sans dépendance, un fichier de tests par module :
   exemples écrits de toutes les façons (espaces, points, tirets, `+33`, `0033`, majuscules), dans une expression
   régulière (points échappés), dans un modèle de texte (`${…}`) ou collé à une lettre ; et aucun texte du dépôt
   (code, tests, documentation) n'en contient, le journal des versions excepté. Sans navigateur.
+- `tests/dead-code.test.mjs` — aucun code mort (1.29.3, guide de contribution Grist.Gouv) : aucun module du
+  widget n'exporte un nom que ni un autre module ni lui-même ne lit (un commentaire, une propriété `objet.nom` ou
+  un nom plus long ne comptent pas comme une lecture), et la garde échoue devant une forme d'export ou
+  d'import qu'elle ne sait pas suivre (`export default`, `export { … }`, `export * from`, `import * as`,
+  `import()`). 6 tests : 2 sur le dépôt, 4 qui essaient la garde sur de petits modules écrits pour l'occasion
+  (un export que rien ne lit, un commentaire ou une propriété qui ne comptent pas, chaque forme qu'elle ne
+  suit pas). Sans navigateur.
 
 Avec Playwright (`npm install --no-save playwright`, puis
 `npx playwright install chromium`), `tests/e2e.test.mjs` exécute en plus 75
@@ -397,6 +409,13 @@ sur la carte de la personne connectée, « Votre fiche » et les boutons « Modi
 vide reste blanche à bordure visible même avec le thème sombre du téléphone et prend le violet une fois
 cochée, et ce qu'on tape dans la recherche (comme son texte d'invite) reste lisible quand le navigateur
 passe en sombre (Firefox mobile, 1.21.2 et 1.21.3).
+`tests/accessibility-filters.test.mjs` (14 scénarios) et `tests/accessibility-loading.test.mjs` (4) y ajoutent, en
+1.30.0, ce que le clavier et les lecteurs d'écran tirent des menus de filtre, du focus et du chargement : les noms,
+descriptions et états lus dans l'arbre d'accessibilité de Chromium (`tests/support/accessibility-tree.mjs`) et non
+dans le seul HTML ; Échap et la tabulation qui referment un menu ; le focus rendu au même contrôle, à son équivalent
+ou au compteur quand la grille est redessinée ; le compteur, seule zone vivante ; « Chargement… » tant que Grist n'a
+pas répondu (`holdReads`), « Chargement impossible » quand la première lecture échoue, et le bandeau quand le script de
+l'API de Grist ne se charge pas (`apiBlocked`). Rien n'y est joué avec un vrai lecteur d'écran : c'est la section 23.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -1528,3 +1547,52 @@ une case échoue, la cause probable est une ressource que la politique refuse, e
 - [ ] **Retour en arrière** si le widget ne s'ouvre pas ou s'ouvre incomplet : supprimer la balise
       `<meta http-equiv="Content-Security-Policy" …>` de `index.html` (le reste du code n'en dépend pas) et noter ce que la
       console avait dit.
+
+## 23. Menus de filtre, focus et chargement (1.30.0)
+
+Réglages d'abord : aucun. À jouer dans le vrai Grist, d'abord au clavier seul sur un ordinateur, puis avec un lecteur
+d'écran (NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkBack sous Android). **Ce protocole est le seul
+contrôle de ces dispositifs avec un vrai lecteur d'écran, dans un vrai Grist, sur Firefox et Safari et sur un vrai
+téléphone : les tests de la 1.30.0 lisent l'arbre d'accessibilité et le clavier de Chromium, sur un Grist simulé.** Les
+seuls changements visibles sont le texte du compteur pendant le chargement et le bandeau quand le script de l'API de
+Grist ne se charge pas ; le reste se lit ou se tabule.
+
+- [ ] **Un bouton de filtre dit son état.** Tabuler jusqu'à un bouton de filtre (« Compétences » par exemple) : le lecteur
+      d'écran annonce son nom, un bouton, et s'il est fermé ou ouvert (les mots dépendent du lecteur) ; une fois le
+      menu ouvert par Entrée ou Espace, il dit ouvert. Le chevron ▾ n'est pas lu.
+- [ ] **Le nombre de valeurs choisies est dit en toutes lettres.** Cocher deux compétences, refermer le menu, revenir au
+      bouton : « Compétences (2 sélectionnés) » (« 1 sélectionné » pour une seule). Le badge à l'écran garde son chiffre.
+- [ ] **Les cases ont un nom et une description.** Dans le menu ouvert, une case est annoncée par son libellé seul
+      (« Oncologie »), puis le nombre de fiches ; la case d'un domaine du menu Compétences de même. Le menu est annoncé
+      comme un groupe qui porte le libellé de son bouton (« Compétences »), sans le nombre de valeurs choisies.
+- [ ] **Échap referme le menu.** Menu ouvert, focus dans la recherche du menu ou sur une case : Échap le referme et le
+      focus revient sur son bouton ; ce qui était tapé dans la recherche du menu y est encore à la réouverture. Échap
+      sans menu ouvert ne fait rien.
+- [ ] **La tabulation qui sort du menu le referme**, avec Tab comme avec Maj+Tab : il ne reste pas ouvert au-dessus des
+      boutons suivants. À la souris, cliquer ailleurs dans la page le referme comme avant, y compris dans Safari.
+- [ ] **Le focus du clavier ne se perd pas.** Tabuler jusqu'à une étiquette de carte (une compétence, une instance) et
+      appuyer sur Entrée : le filtre se pose, la liste se redessine et le focus est toujours sur le même contrôle, ou
+      sur son équivalent dans la carte refaite, ou, si la carte a disparu, sur le compteur de contacts ; il ne repart
+      jamais du haut de la page et reste à l'écran. Même chose en tapant dans la recherche (le focus reste dans le
+      champ) et après un changement fait dans Grist (relecture). À la souris, cliquer une étiquette filtre la liste sans
+      faire apparaître d'anneau de focus.
+- [ ] **Une case cochée au clavier garde le focus.** Dans un menu à plat (Établissement, par exemple), elle passe en
+      tête sans que le focus la quitte et, dans un menu long, le menu défile jusqu'à elle ; à la souris, la liste ne
+      bouge pas sous le doigt. Dans un menu par groupe (Compétences, Tâches), rien ne bouge pendant qu'on coche, au
+      clavier comme à la souris : les cases cochées passent devant à l'ouverture suivante.
+- [ ] **Une seule zone annoncée.** Avec un lecteur d'écran, taper un nom dans la recherche : il annonce le nombre de
+      contacts (« 3 contacts »), pas la liste des cartes.
+- [ ] **Chargement.** Recharger la page de Grist en ralentissant le réseau (outils de développement, onglet « Réseau »,
+      limitation) : tant que Grist n'a pas répondu, le compteur dit « Chargement… », sans « 0 contact » ni « Aucun
+      contact trouvé », même si l'on tape dans la recherche ou si l'on change Fondateurs et Partenaires ; à l'arrivée de
+      l'annuaire, la recherche tapée s'applique.
+- [ ] **Première lecture en échec** (sur une copie du document, section 10 : renommer `Etablissements`) : le bandeau rouge
+      s'affiche, le compteur dit « Chargement impossible » et taper une recherche ne fait pas apparaître « Aucun contact
+      trouvé » sous le message d'erreur.
+- [ ] **Script de l'API de Grist bloqué.** Dans les outils de développement, onglet « Réseau », bloquer l'adresse
+      `docs.getgrist.com` (si le Grist du document n'est pas sur ce domaine : sinon, bloquer seulement le script
+      `grist-plugin-api.js`), puis recharger le widget : le bandeau rouge dit « Impossible de joindre Grist : le script de
+      son API (docs.getgrist.com) ne s'est pas chargé… », le compteur « Chargement impossible », et la console porte une
+      seule ligne `[GRIST] window.grist est absent`. Débloquer et recharger : tout revient.
+- [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles. Safari ne donne pas le focus à un bouton
+      cliqué : un menu doit pourtant s'y refermer d'un clic ailleurs.
