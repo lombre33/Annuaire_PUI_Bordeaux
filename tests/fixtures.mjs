@@ -104,11 +104,11 @@ export function withEtablissement(tables, row) {
   return copy;
 }
 
-// Le document où Ana (la première fiche, la dernière de la grille) porte de longues listes de valeurs, de quoi essayer le plafond de
-// pastilles d'une carte (1.31.0, TAGS_SHOWN_PER_GROUP = 4) : 9 compétences (« Compétence 1 » à « Compétence 9 »), 6 actions
-// (« Action 1 » à « Action 6 »), 5 communautés (« Communauté 1 » à « Communauté 5 », juste ce que la carte montre en entier) et son
-// instance de départ (CME). Les trois tables de référence sont remplacées : les autres personnes y gardent leurs numéros de ligne,
-// donc d'autres libellés (Bob porte la compétence 3, Gina la 4), sans rapport avec ceux de la base.
+// Le document où Ana (la première fiche, la dernière de la grille) porte de longues listes de valeurs, de quoi essayer les cartes très
+// chargées (1.31.0, la barre d'outils des pastilles) : 9 compétences (« Compétence 1 » à « Compétence 9 »), 6 actions (« Action 1 » à
+// « Action 6 »), 5 communautés (« Communauté 1 » à « Communauté 5 ») et son instance de départ (CME), soit 21 pastilles. Les trois tables
+// de référence sont remplacées : les autres personnes y gardent leurs numéros de ligne, donc d'autres libellés (Bob porte la compétence 3,
+// Gina la 4), sans rapport avec ceux de la base.
 export function withLongTagLists(tables = sampleTables()) {
   const copy = structuredClone(tables);
   const rows = count => Array.from({ length: count }, (_, index) => index + 1);

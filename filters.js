@@ -1,6 +1,6 @@
 // Filtrage et comptage des contacts, sans DOM ni effet de bord.
 
-import { CATEGORIES, FILTERS, TAGS_SHOWN_PER_GROUP } from './constants.js';
+import { CATEGORIES, FILTERS } from './constants.js';
 import { normalize, normalizeForSearch, labelsOf, compareLabels, text } from './grist-data.js';
 
 export function createEmptyFilterState() {
@@ -17,19 +17,6 @@ function activeSelections(activeFilters, excludeKey) {
   return FILTERS
     .filter(filter => filter.key !== excludeKey && activeFilters[filter.key]?.size > 0)
     .map(filter => ({ key: filter.key, values: new Set([...activeFilters[filter.key]].map(normalize)) }));
-}
-
-// Les valeurs que les filtres actifs désignent, normalisées, par catégorie : { clé: Set } (les catégories sans sélection n'y sont pas).
-export function selectedValues(activeFilters) {
-  return Object.fromEntries(activeSelections(activeFilters).map(({ key, values }) => [key, values]));
-}
-
-// Les pastilles d'un groupe que « +N » cache sur une carte (TAGS_SHOWN_PER_GROUP) : celles au-delà du plafond, sauf un groupe qui le dépasse d'une
-// seule (le bouton n'y gagnerait rien) et sauf les valeurs que les filtres actifs désignent (`selected` : les valeurs normalisées de la
-// catégorie, voir selectedValues) : sans elles on ne verrait pas pourquoi la carte est là.
-export function hiddenLabels(labels, selected) {
-  const hidden = labels.slice(TAGS_SHOWN_PER_GROUP).filter(label => !selected?.has(normalize(label)));
-  return hidden.length > 1 ? hidden : [];
 }
 
 // Les mots de la recherche, normalisés (voir normalizeForSearch) : « Karim  Benali » donne

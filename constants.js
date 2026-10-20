@@ -55,10 +55,6 @@ export const IMAGE_RULES = {
 // CHANGELOG (tests/docs.test.mjs le contrôle).
 export const VERSION = '1.31.0';
 
-// Pastilles d'une carte (1.31.0, audit UI/UX U35) : un groupe (Compétences, Tâches…) n'en montre que ce nombre, les autres sont derrière un
-// bouton « +N » (render.js). Un groupe qui n'en aurait qu'une de plus les montre toutes : le bouton n'y gagnerait rien.
-export const TAGS_SHOWN_PER_GROUP = 4;
-
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
 // largeur et en hauteur, voir logoSize() dans branding.js. Ces valeurs reproduisent, à une

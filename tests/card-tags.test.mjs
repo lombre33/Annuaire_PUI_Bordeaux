@@ -1,199 +1,35 @@
-// Les pastilles d'une carte (1.31.0, audit UI/UX U35 et U22) : un groupe de plus de cinq valeurs n'en montre que quatre, les autres
-// sont derrière « +N » ; et les pastilles d'une carte ne sont plus qu'un seul arrêt de tabulation, que les flèches parcourent, avec un
-// lien d'évitement « Aller aux résultats » avant tout le reste. Chaque test échoue sur le code de la 1.30.0, sauf les gardes qui disent
-// ce qui ne change pas (la carte de relecture, un groupe de cinq, la souris).
+// Les pastilles d'une carte (1.31.0, audit UI/UX U22) : elles ne sont plus qu'un seul arrêt de tabulation par carte, que les flèches
+// gauche et droite parcourent, avec un lien d'évitement « Aller aux résultats » avant tout le reste. Chaque test échoue sur le code de la
+// 1.30.0, sauf les gardes qui disent ce qui ne change pas (la carte de relecture, le rôle, la souris, les cartes qui montrent toutes leurs
+// pastilles). Le plafond de pastilles « +N » (audit U35) a été écarté par Antoine le 20 octobre 2026 : les cartes restent comme avant.
 //
 // Les tests chargent le vrai index.html dans Chromium (optionnel : voir TESTING.md). Ana, la dernière carte de la grille, porte des listes
 // longues (withLongTagLists, tests/fixtures.mjs) : 9 compétences, 6 actions, 5 communautés et une instance.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hiddenLabels, selectedValues } from '../filters.js';
 import { sampleTables, withClones, withLongTagLists } from './fixtures.mjs';
 import { accessibilityTree, accessibleNode } from './support/accessibility-tree.mjs';
 import { gridCard, skip, waitForCards, withWidget } from './support/browser.mjs';
 
 const ANA = 'Ana Martin';
 const group = (card, title) => card.locator('.tag-group', { has: card.page().locator('.tag-group-title', { hasText: title }) });
-const visibleTags = group => group.locator('.tag:not([hidden]):not(.tag-more)').allTextContents();
-const moreButton = group => group.locator('.tag-more');
-
-// Les pastilles que le plafond cache dans un groupe : dans la page, mais pas à l'écran.
-const hiddenCount = group => group.locator('.tag[hidden]').count();
-
 const names = (word, from, to) => Array.from({ length: to - from + 1 }, (_, index) => `${word} ${from + index}`);
 
-// ===== U35 : le plafond, sans navigateur =====
+// ===== Les cartes montrent toutes leurs pastilles =====
 
-test('hiddenLabels cache ce qui dépasse quatre pastilles, sauf quand il n\'en dépasse qu\'une, et garde visible ce que les filtres désignent (audit U35)', () => {
-  const labels = names('Valeur', 1, 9);
-  assert.deepEqual(hiddenLabels([], undefined), []);
-  assert.deepEqual(hiddenLabels(names('Valeur', 1, 4), undefined), [], 'quatre : tout est visible');
-  assert.deepEqual(hiddenLabels(names('Valeur', 1, 5), undefined), [], 'cinq : cacher une seule pastille derrière « +1 » n\'y gagnerait rien');
-  assert.deepEqual(hiddenLabels(names('Valeur', 1, 6), undefined), ['Valeur 5', 'Valeur 6'], 'six : deux cachées');
-  assert.deepEqual(hiddenLabels(labels, undefined), names('Valeur', 5, 9), 'neuf : cinq cachées, les quatre premières visibles, dans l\'ordre de la fiche');
-
-  // Une valeur que les filtres désignent reste visible, dans les mêmes termes que les filtres (casse et accents ignorés).
-  assert.deepEqual(hiddenLabels(labels, new Set(['valeur 7'])), ['Valeur 5', 'Valeur 6', 'Valeur 8', 'Valeur 9']);
-  assert.deepEqual(hiddenLabels(names('Valeur', 1, 6), new Set(['valeur 5'])), [], 'si une seule reste cachée, « +1 » n\'a plus de raison d\'être : tout est montré');
-  assert.deepEqual(hiddenLabels(names('Valeur', 1, 6), new Set(['valeur 5', 'valeur 6'])), []);
-  assert.deepEqual(hiddenLabels(labels, new Set(['valeur 1'])), names('Valeur', 5, 9), 'une valeur déjà visible ne change rien');
-  assert.deepEqual(hiddenLabels(labels, new Set(names('valeur', 5, 9))), [], 'tout ce qui était caché est désigné : rien à cacher');
-});
-
-test('selectedValues donne, par catégorie, les valeurs que les filtres actifs désignent, normalisées, et rien pour une catégorie sans sélection (audit U35)', () => {
-  const active = { instances: new Set(['CME', 'Comité Éthique']), actions: new Set(), competences: new Set(['Hématologie']) };
-  const selected = selectedValues(active);
-  assert.deepEqual(Object.keys(selected).sort(), ['competences', 'instances']);
-  assert.deepEqual([...selected.instances].sort(), ['cme', 'comite ethique']);
-  assert.deepEqual([...selected.competences], ['hematologie']);
-  assert.deepEqual(selectedValues({}), {});
-});
-
-// ===== U35 : le plafond, dans la page =====
-
-test('Ana a neuf compétences et six actions : quatre pastilles par groupe et « +5 », « +2 » ; ses cinq communautés restent toutes visibles (audit U35)', { skip }, () =>
+test('une carte montre toutes ses pastilles, sans plafond ni bouton « +N » (audit U35 écarté par Antoine, garde)', { skip }, () =>
   withWidget({ tables: withLongTagLists() }, async ({ page }) => {
     await waitForCards(page, 4);
-    const card = gridCard(page, 'Ana');
-    const competences = group(card, 'Compétences');
-    assert.deepEqual(await visibleTags(competences), names('Compétence', 1, 4));
-    assert.equal(await hiddenCount(competences), 5, 'cinq pastilles dans la page, cachées');
-    assert.equal(await moreButton(competences).textContent(), '+5 autres valeurs : Compétences');
-
-    const actions = group(card, 'Actions');
-    assert.deepEqual(await visibleTags(actions), names('Action', 1, 4));
-    assert.equal(await hiddenCount(actions), 2);
-    assert.match(await moreButton(actions).textContent(), /^\+2/);
-
-    const communautes = group(card, 'Communautés');
-    assert.deepEqual(await visibleTags(communautes), names('Communauté', 1, 5), 'cinq : cacher une seule pastille derrière « +1 » n\'y gagnerait rien');
-    assert.equal(await moreButton(communautes).count(), 0);
-    assert.equal(await hiddenCount(communautes), 0);
-
-    // Une pastille cachée n'est pas à l'écran, et la carte est plus courte que sans plafond.
-    assert.equal(await competences.locator('.tag[hidden]').first().isVisible(), false);
-    assert.equal(await moreButton(competences).isVisible(), true);
-    assert.ok((await moreButton(competences).boundingBox()).width < 70, '« +5 » montre son nombre seulement : la suite de son nom n\'est pas à l\'écran');
-    assert.equal(await group(card, 'Instances').locator('.tag-more').count(), 0, 'une instance : rien à cacher');
+    const ana = gridCard(page, 'Ana');
+    assert.deepEqual(await group(ana, 'Compétences').locator('.tag').allTextContents(), names('Compétence', 1, 9));
+    assert.deepEqual(await group(ana, 'Actions').locator('.tag').allTextContents(), names('Action', 1, 6));
+    assert.equal(await ana.locator('.tag[hidden]').count(), 0, 'aucune pastille cachée');
+    assert.equal(await ana.locator('.tag').filter({ hasText: /^\+\d/ }).count(), 0, 'aucun bouton « +N »');
+    assert.equal(await ana.locator('.card-tags .tag').evaluateAll(tags => tags.filter(tag => tag.getClientRects().length === 0).length), 0, 'et toutes sont à l\'écran');
   }));
 
-test('« +N » montre les autres pastilles, le focus va à la première montrée, « Moins » les cache de nouveau (audit U35)', { skip }, () =>
-  withWidget({ tables: withLongTagLists() }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const competences = group(gridCard(page, 'Ana'), 'Compétences');
-    const more = moreButton(competences);
-    assert.equal(await more.getAttribute('aria-expanded'), 'false');
-
-    await more.click();
-    assert.deepEqual(await visibleTags(competences), names('Compétence', 1, 9));
-    assert.equal(await more.getAttribute('aria-expanded'), 'true');
-    assert.equal((await more.textContent()).startsWith('Moins'), true);
-    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Compétence 5', 'le focus suit la première pastille montrée');
-
-    await more.click();
-    assert.deepEqual(await visibleTags(competences), names('Compétence', 1, 4));
-    assert.equal(await more.getAttribute('aria-expanded'), 'false');
-    assert.equal((await more.textContent()).startsWith('+5'), true);
-    assert.equal(await hiddenCount(competences), 5);
-    assert.equal(await page.evaluate(() => document.activeElement.className.includes('tag-more')), true, 'refermer garde le focus sur le bouton');
-  }));
-
-test('le nom de « +N » commence par le texte écrit et dit de quel groupe il s\'agit ; il annonce s\'il est déplié (audit U35)', { skip }, () =>
-  withWidget({ tables: withLongTagLists() }, async ({ page }) => {
-    await waitForCards(page, 4);
-    let tree = await accessibilityTree(page);
-    assert.equal(accessibleNode(tree, 'button', '+5 autres valeurs : Compétences')?.expanded, false);
-    assert.equal(accessibleNode(tree, 'button', '+2 autres valeurs : Actions')?.expanded, false);
-
-    await moreButton(group(gridCard(page, 'Ana'), 'Compétences')).click();
-    tree = await accessibilityTree(page);
-    assert.equal(accessibleNode(tree, 'button', 'Moins de valeurs : Compétences')?.expanded, true);
-    assert.equal(accessibleNode(tree, 'button', '+5 autres valeurs : Compétences'), undefined);
-    assert.equal(accessibleNode(tree, 'button', '+2 autres valeurs : Actions')?.expanded, false, 'l\'autre groupe reste replié');
-    assert.ok(accessibleNode(tree, 'button', 'Compétence 9'), 'une pastille montrée se lit');
-  }));
-
-test('un filtre garde visible la valeur qu\'il désigne même au-delà du plafond, et la carte reprend son plafond quand le filtre part (audit U35)', { skip }, () =>
-  withWidget({ tables: withLongTagLists() }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const competences = () => group(gridCard(page, 'Ana'), 'Compétences');
-    await moreButton(competences()).click();
-    await competences().locator('.tag', { hasText: /^Compétence 8$/ }).click(); // filtre « Compétences : Compétence 8 »
-    await waitForCards(page, 1);
-
-    assert.deepEqual(await visibleTags(competences()), [...names('Compétence', 1, 4), 'Compétence 8'], 'la valeur choisie est là, à sa place');
-    assert.match(await moreButton(competences()).textContent(), /^\+4/, 'les quatre autres restent derrière « +4 »');
-    assert.equal(await hiddenCount(competences()), 4);
-
-    await page.locator('#resetFilters').click();
-    await waitForCards(page, 4);
-    assert.deepEqual(await visibleTags(competences()), names('Compétence', 1, 4));
-    assert.match(await moreButton(competences()).textContent(), /^\+5/);
-
-    // Six actions dont deux cachées : en choisir une, il n'en reste qu'une derrière le bouton, donc le groupe est montré en entier.
-    const actions = () => group(gridCard(page, 'Ana'), 'Actions');
-    await moreButton(actions()).click();
-    await actions().locator('.tag', { hasText: /^Action 6$/ }).click();
-    await waitForCards(page, 1);
-    assert.deepEqual(await visibleTags(actions()), names('Action', 1, 6), 'un seul « +1 » ne se justifie pas : les six sont là');
-    assert.equal(await moreButton(actions()).count(), 0);
-  }));
-
-test('si le filtre qui gardait une pastille visible part pendant que le focus y est, le focus va au compteur : la pastille est de nouveau cachée (audit U35 et U17)', { skip }, () =>
-  withWidget({ tables: withLongTagLists() }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const ana = () => gridCard(page, 'Ana');
-    await moreButton(group(ana(), 'Compétences')).click();
-    await group(ana(), 'Compétences').locator('.tag', { hasText: /^Compétence 8$/ }).focus();
-    await page.keyboard.press('Enter'); // filtre « Compétence 8 » : la pastille est gardée visible
-    await page.waitForFunction(() => document.getElementById('resultCount').textContent === '1 contact');
-    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Compétence 8', 'la pastille choisie garde le focus');
-
-    await page.keyboard.press('Enter'); // le filtre part : la pastille retourne derrière « +5 »
-    await page.waitForFunction(() => document.getElementById('resultCount').textContent === '4 contacts');
-    assert.equal(await page.evaluate(() => document.activeElement.id), 'resultCount', 'le focus n\'est pas resté sur une pastille cachée, où il se perdrait');
-  }));
-
-test('renderCards refait la carte dont une pastille cachée devient visible, et seulement celle-là (audit U35)', { skip }, () =>
-  withWidget({ tables: withLongTagLists(), user: null }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const result = await page.evaluate(async () => {
-      const { renderCards } = await import('/render.js');
-      const { loadDirectory } = await import('/grist-data.js');
-      const { createEmptyFilterState } = await import('/filters.js');
-      const { contacts } = await loadDirectory(window.grist.docApi, {});
-      const template = document.getElementById('cardTemplate');
-      const grid = document.createElement('div');
-      // Les mêmes fonctions à chaque dessin : un `onToggle` neuf serait déjà un ingrédient qui change.
-      const onToggle = () => {};
-      const rightsOf = () => null;
-      const draw = filters => {
-        renderCards(grid, template, contacts, onToggle, rightsOf, null, null, filters);
-        return [...grid.children];
-      };
-      const rebuiltBy = filters => {
-        const before = draw(null);
-        return draw(filters).filter((card, index) => card !== before[index]).length;
-      };
-      const withValue = (key, value) => ({ ...createEmptyFilterState(), [key]: new Set([value]) });
-      // D'une valeur cachée gardée visible à une autre, autant de pastilles cachées dans les deux cas : la carte change quand même.
-      const changedBy = (from, to) => {
-        const before = draw(from);
-        return draw(to).filter((card, index) => card !== before[index]).length;
-      };
-      return {
-        sansFiltre: rebuiltBy(null),
-        valeurDejaVisible: rebuiltBy(withValue('competences', 'Compétence 1')),
-        valeurCachee: rebuiltBy(withValue('competences', 'Compétence 8')),
-        autreCategorie: rebuiltBy(withValue('instances', 'CME')),
-        autreValeurCachee: changedBy(withValue('competences', 'Compétence 8'), withValue('competences', 'Compétence 7'))
-      };
-    });
-    assert.deepEqual(result, { sansFiltre: 0, valeurDejaVisible: 0, valeurCachee: 1, autreCategorie: 0, autreValeurCachee: 1 });
-  }));
-
-test('la carte de relecture d\'une modification montre toutes les pastilles, sans plafond ni « +N » ni barre d\'outils (audit U35, garde)', { skip }, () =>
+test('la carte de relecture d\'une modification n\'a ni barre d\'outils ni pastille dans la tabulation (audit U22, garde)', { skip }, () =>
   withWidget({ tables: withLongTagLists(), user: null }, async ({ page }) => {
     await waitForCards(page, 4);
     const preview = await page.evaluate(async () => {
@@ -204,13 +40,11 @@ test('la carte de relecture d\'une modification montre toutes les pastilles, san
       const card = renderPreviewCard(document.getElementById('cardTemplate'), ana).firstElementChild;
       return {
         tags: card.querySelectorAll('.card-tags .tag').length,
-        hidden: card.querySelectorAll('.tag[hidden]').length,
-        more: card.querySelectorAll('.tag-more').length,
         toolbar: card.querySelector('.card-tags').getAttribute('role'),
         focusable: card.querySelectorAll('.card-tags [tabindex]').length
       };
     });
-    assert.deepEqual(preview, { tags: 21, hidden: 0, more: 0, toolbar: null, focusable: 0 });
+    assert.deepEqual(preview, { tags: 21, toolbar: null, focusable: 0 });
   }));
 
 // ===== U22 : un arrêt de tabulation par carte =====
@@ -249,19 +83,19 @@ test('à la tabulation, on traverse une carte en peu d\'arrêts : l\'établissem
       await page.keyboard.press('Tab');
       if (!(await page.evaluate(() => document.activeElement.closest('.contact-card')?.querySelector('.name')?.textContent.includes('Ana')))) break;
     }
-    assert.ok(stops <= 6, `${stops} arrêts dans la carte d'Ana (21 pastilles, dont 2 « +N », et son badge, son e-mail) : au plus 6`);
+    assert.ok(stops <= 6, `${stops} arrêts dans la carte d'Ana (21 pastilles, son badge, son e-mail) : au plus 6`);
   }));
 
-test('les flèches gauche et droite passent d\'une pastille à l\'autre, sautent celles que le plafond cache, et la dernière pastille touchée devient l\'arrêt de la carte (audit U22)', { skip }, () =>
-  withWidget({ tables: withLongTagLists() }, async ({ page }) => {
+test('les flèches gauche et droite passent d\'une pastille à l\'autre, et la dernière pastille touchée devient l\'arrêt de la carte (audit U22)', { skip }, () =>
+  withWidget({ tables: withLongTagLists() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     const ana = gridCard(page, 'Ana');
     const focused = () => page.evaluate(() => document.activeElement.firstChild.textContent);
     await tabbablePills(ana).first().focus();
     assert.equal(await focused(), 'CME');
 
-    // Dans l'ordre de la carte : l'instance, quatre actions puis « +2 », quatre compétences puis « +5 », cinq communautés.
-    const path = ['CME', ...names('Action', 1, 4), '+2', ...names('Compétence', 1, 4), '+5', ...names('Communauté', 1, 5)];
+    // Dans l'ordre de la carte : l'instance, les six actions, les neuf compétences, les cinq communautés.
+    const path = ['CME', ...names('Action', 1, 6), ...names('Compétence', 1, 9), ...names('Communauté', 1, 5)];
     const seen = ['CME'];
     for (let step = 1; step < path.length; step += 1) {
       await page.keyboard.press('ArrowRight');
@@ -277,6 +111,7 @@ test('les flèches gauche et droite passent d\'une pastille à l\'autre, sautent
     assert.equal(await focused(), 'Communauté 4');
     for (let step = 0; step < 30; step += 1) await page.keyboard.press('ArrowLeft');
     assert.equal(await focused(), 'CME', 'au début, la flèche reste sur la première pastille');
+    assert.deepEqual(logs.pageErrors, [], 'aux deux bouts, la flèche ne cherche pas une pastille qui n\'existe pas');
   }));
 
 test('Tab sort de la barre d\'outils de la carte pour la carte suivante et Maj+Tab y revient à la dernière pastille touchée ; une flèche avec une touche de commande ne la parcourt pas (audit U22)', { skip }, () =>

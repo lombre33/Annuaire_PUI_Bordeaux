@@ -193,7 +193,7 @@ function refreshCards() {
   if (!state.loaded) return; // la frappe est gardée (state.searchTerm) : elle s'applique à l'arrivée de l'annuaire
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
   keepFocus(elements.grid, elements.resultCount, () =>
-    renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights, state.activeFilters));
+    renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights));
   elements.grid.removeAttribute('aria-busy');
   const count = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
   elements.resultCount.textContent = count;
