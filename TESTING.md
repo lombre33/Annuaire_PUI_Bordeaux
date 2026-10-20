@@ -4,7 +4,7 @@ Ce widget n'a pas de test automatisé contre une vraie instance Grist (voir
 « Tests automatisés » plus bas pour ce qui est couvert avec une API Grist
 simulée). Ce document est le protocole de test **manuel**, à exécuter dans
 Grist avant tout déploiement qui touche `main.js`, `render.js`, `filter-menus.js`,
-`index.html` ou `style.css`. Pour un changement limité à `grist-data.js`/`filters.js`, les
+`scroll-tools.js`, `index.html` ou `style.css`. Pour un changement limité à `grist-data.js`/`filters.js`, les
 tests automatisés suffisent à condition d'être complétés pour le changement.
 
 ## Tests automatisés
@@ -416,6 +416,18 @@ dans le seul HTML ; Échap et la tabulation qui referment un menu ; le focus ren
 ou au compteur quand la grille est redessinée ; le compteur, seule zone vivante ; « Chargement… » tant que Grist n'a
 pas répondu (`holdReads`), « Chargement impossible » quand la première lecture échoue, et le bandeau quand le script de
 l'API de Grist ne se charge pas (`apiBlocked`). Rien n'y est joué avec un vrai lecteur d'écran : c'est la section 23.
+`tests/card-tags.test.mjs` (13 scénarios) et `tests/sticky-toolbar.test.mjs` (12) y ajoutent, en 1.31.0, le clavier
+des cartes et la barre d'outils fixe, noms et états lus eux aussi dans l'arbre d'accessibilité de Chromium. Les
+pastilles d'une carte, sur des listes longues (`withLongTagLists` dans `tests/fixtures.mjs` : Ana a 21 pastilles) :
+une barre d'outils nommée et un seul arrêt de tabulation par carte, les flèches gauche et droite et leurs deux
+bouts, Tab et Maj+Tab, Entrée, la souris, le lien « Aller aux résultats » (premier arrêt de la page, caché jusqu'au
+focus, la première carte ou le compteur, absent à l'impression) et deux gardes : la carte de relecture n'a pas de
+barre d'outils, et une carte montre toutes ses pastilles (le plafond « +N » a été écarté). La barre d'outils, sur 44
+cartes (`withClones`) : fixe à partir de 1 180 px de large et 560 px de haut, qui défile avec la page en dessous,
+inchangée en haut de page, opaque une fois la page défilée, la place que le clavier lui laisse
+(`scroll-padding-top`), la pastille « N contacts · Haut de page » et son bouton, son contraste, le téléphone et
+l'impression. Rien n'y est joué dans un vrai Grist, sur Firefox ou Safari, avec un vrai lecteur d'écran ni sur un
+vrai téléphone : c'est la section 24.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -989,9 +1001,11 @@ focus : ils ne remplacent ni un lecteur d'écran réel, ni Firefox, ni Safari. *
 dans le vrai Grist** (la section du widget dans la page, pas la démonstration), avec le clavier seul. Pour un
 lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkBack sous Android.
 
-- [ ] Appuyer sur **Tab** depuis le début de la page : le focus passe, dans l'ordre, par l'interrupteur et le
-      bouton de « Ma présence » (si on est identifié), le champ de recherche, les boutons de filtre, les
-      boutons Fondateurs et Partenaires, Réinitialiser, puis les boutons et liens de chaque carte. À chaque
+- [ ] Appuyer sur **Tab** depuis le début de la page : le focus passe, dans l'ordre, par le lien « Aller aux
+      résultats » (1.31.0, qui apparaît alors en haut à gauche), l'interrupteur et le bouton de « Ma présence »
+      (si on est identifié), le champ de recherche, les boutons de filtre, les boutons Fondateurs et
+      Partenaires, Réinitialiser, puis les boutons et liens de chaque carte, dont **les étiquettes ne forment
+      qu'un seul arrêt** (1.31.0 : les flèches gauche et droite passent de l'une à l'autre, section 24). À chaque
       arrêt, **un anneau violet de 2 px entoure le contrôle** ; aucun arrêt n'est invisible. **Maj+Tab** revient
       en arrière.
 - [ ] Le champ de recherche : l'anneau entoure le cadre entier, loupe comprise, avec ses coins arrondis (pas
@@ -1476,8 +1490,9 @@ automatiques simulent `fetchTable`.** Le rôle se retrouve par les identifiants 
       partage l'étiquette.
 - [ ] Souris : survoler l'étiquette d'une tâche qui a un rôle ouvre une bulle « Rôle : Pilote » au-dessus de
       l'étiquette, entière dans le cadre ; la quitter la ferme ; un clic sur l'étiquette filtre toujours sur la tâche.
-- [ ] Clavier : Tab jusqu'à l'étiquette ouvre la même bulle ; Échap la ferme (sans fermer autre chose). Lecteur
-      d'écran (au moins une fois) : le rôle est lu avec la tâche.
+- [ ] Clavier : Tab jusqu'aux étiquettes de la carte (un seul arrêt depuis la 1.31.0), puis les flèches gauche et
+      droite jusqu'à l'étiquette de la tâche, ouvrent la même bulle ; Échap la ferme (sans fermer autre chose).
+      Lecteur d'écran (au moins une fois) : le rôle est lu avec la tâche.
 - [ ] Téléphone (écran tactile, ou émulation) : pas de bulle ; le rôle est écrit sous le nom de la tâche, dans
       l'étiquette.
 - [ ] Rôle vide, colonne `Taches_role` renommée ou absente, ligne sans libellé corrigé (jamais affichée) : l'étiquette
@@ -1570,12 +1585,12 @@ Grist ne se charge pas ; le reste se lit ou se tabule.
       sans menu ouvert ne fait rien.
 - [ ] **La tabulation qui sort du menu le referme**, avec Tab comme avec Maj+Tab : il ne reste pas ouvert au-dessus des
       boutons suivants. À la souris, cliquer ailleurs dans la page le referme comme avant, y compris dans Safari.
-- [ ] **Le focus du clavier ne se perd pas.** Tabuler jusqu'à une étiquette de carte (une compétence, une instance) et
-      appuyer sur Entrée : le filtre se pose, la liste se redessine et le focus est toujours sur le même contrôle, ou
-      sur son équivalent dans la carte refaite, ou, si la carte a disparu, sur le compteur de contacts ; il ne repart
-      jamais du haut de la page et reste à l'écran. Même chose en tapant dans la recherche (le focus reste dans le
-      champ) et après un changement fait dans Grist (relecture). À la souris, cliquer une étiquette filtre la liste sans
-      faire apparaître d'anneau de focus.
+- [ ] **Le focus du clavier ne se perd pas.** Tabuler jusqu'aux étiquettes d'une carte (un seul arrêt depuis la 1.31.0),
+      puis les flèches jusqu'à une étiquette (une compétence, une instance) et appuyer sur Entrée : le filtre se pose, la
+      liste se redessine et le focus est toujours sur le même contrôle, ou sur son équivalent dans la carte refaite, ou,
+      si la carte a disparu, sur le compteur de contacts ; il ne repart jamais du haut de la page et reste à l'écran.
+      Même chose en tapant dans la recherche (le focus reste dans le champ) et après un changement fait dans Grist
+      (relecture). À la souris, cliquer une étiquette filtre la liste sans faire apparaître d'anneau de focus.
 - [ ] **Une case cochée au clavier garde le focus.** Dans un menu à plat (Établissement, par exemple), elle passe en
       tête sans que le focus la quitte et, dans un menu long, le menu défile jusqu'à elle ; à la souris, la liste ne
       bouge pas sous le doigt. Dans un menu par groupe (Compétences, Tâches), rien ne bouge pendant qu'on coche, au
@@ -1596,3 +1611,54 @@ Grist ne se charge pas ; le reste se lit ou se tabule.
       seule ligne `[GRIST] window.grist est absent`. Débloquer et recharger : tout revient.
 - [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles. Safari ne donne pas le focus à un bouton
       cliqué : un menu doit pourtant s'y refermer d'un clic ailleurs.
+
+## 24. Barre d'outils fixe, pastille et clavier des cartes (1.31.0)
+
+Réglages d'abord : aucun. À jouer dans le vrai Grist, sur un ordinateur puis sur un téléphone, au clavier seul puis avec un
+lecteur d'écran (NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkBack sous Android). **Ce protocole est le seul
+contrôle de la barre fixe dans un vrai Grist, sur Firefox et Safari, avec un vrai lecteur d'écran et sur un vrai
+téléphone : les tests de la 1.31.0 jouent la page dans Chromium, dans une fenêtre dont ils règlent la taille, sur un Grist
+simulé.** Une barre d'outils fixe suppose que **la page défile dans le cadre du widget** ; si Grist fait défiler la page qui
+contient le cadre, et non le cadre, la barre ne restera pas en haut (premier point). À comparer avec
+`docs/images/barre-fixe.png`.
+
+- [ ] **La barre reste en haut.** Dans une section du widget d'au moins 1 180 px de large et 560 px de haut (agrandir la
+      section sur la page), descendre dans la liste à la molette : la barre (recherche, filtres,
+      Fondateurs et Partenaires, Réinitialiser) reste en haut du cadre et le texte des cartes qui passent dessous ne se lit
+      pas à travers elle. En haut de la page, elle garde son fond translucide d'avant. **Si elle défile avec la page alors
+      que le cadre a la taille voulue, Grist ne laisse pas la page défiler dans le cadre : c'est le résultat le plus
+      important de cette section, à noter.**
+- [ ] **Assez de place pour les cartes.** Dans un cadre de 560 à 700 px de haut, la barre fixe prend de 18 à 23 % de la
+      hauteur : juger si ce qui reste suffit pour lire les cartes (sinon, relever le seuil de hauteur de 560 px dans
+      `style.css`).
+- [ ] **Un cadre plus petit garde l'ancien comportement.** Réduire la section (moins de 1 180 px de large, ou moins de
+      560 px de haut), ou passer le zoom du navigateur à 200 % : la barre défile avec la page comme avant la 1.31.0 et ne
+      cache rien au passage.
+- [ ] **La pastille « Haut de page ».** Dès que la place de la barre est passée, une pastille apparaît en bas à droite :
+      « N contacts » et un bouton « ↑ Haut de page ». Le nombre suit la recherche et les filtres. Le bouton remonte tout en
+      haut de la page (pas seulement jusqu'au compteur) et le focus du clavier revient au compteur ; de retour en haut, la
+      pastille disparaît. Elle apparaît aussi dans un cadre étroit, sur une tablette et sur un téléphone (où la barre ne
+      reste pas en haut), à 12 px des bords sur un téléphone. À regarder aussi, en bas de la liste : elle ne cache aucun
+      bouton.
+- [ ] **Le clavier ne se cache pas sous la barre fixe.** Barre fixe, page défilée, tabuler et faire Maj+Tab d'un contrôle de
+      carte à l'autre : le contrôle qui a le focus n'est jamais caché par la barre (la page s'arrête un peu sous elle). Même
+      chose en passant d'une étiquette à l'autre avec les flèches.
+- [ ] **Un arrêt par carte.** Tab carte après carte : les étiquettes d'une carte ne font qu'un arrêt, le badge de
+      l'établissement, le lien e-mail, le rôle, la photo (quand elle en a une) et les boutons « Modifier » restent chacun un
+      arrêt. Sur ce seul arrêt, le lecteur d'écran annonce la barre d'outils (« Filtrer par une valeur de la fiche de … »)
+      puis l'étiquette (les mots dépendent du lecteur).
+- [ ] **Les flèches parcourent les étiquettes.** Sur l'arrêt des étiquettes d'une carte, la flèche droite passe à l'étiquette
+      suivante, la gauche à la précédente, et l'on s'arrête à la première et à la dernière. Entrée filtre sur l'étiquette et
+      le focus reste sur elle. Tab sort de la barre d'étiquettes, Maj+Tab y revient à la dernière étiquette touchée. Avec Maj,
+      Ctrl, Alt ou Méta, une flèche fait ce que le navigateur en fait ; Origine et Fin aussi.
+- [ ] **Le lien « Aller aux résultats ».** Recharger la page et appuyer une fois sur Tab : le lien apparaît en haut à gauche
+      (invisible avant). Entrée : le focus passe au premier contrôle de la première carte (pas à la barre d'outils) et
+      l'adresse de la page ne change pas. Avec une recherche qui ne trouve personne : le focus va au compteur de contacts.
+      Lecteur d'écran : il est annoncé comme un lien, en premier.
+- [ ] **La pastille, au lecteur d'écran.** Elle est lue comme un seul bouton « Haut de page » : le nombre de contacts qu'elle
+      répète n'est pas lu une seconde fois (le compteur de la page reste la seule zone annoncée).
+- [ ] **Impression** (aperçu avant impression du navigateur) : ni la pastille ni le lien d'évitement n'apparaissent.
+- [ ] **Toutes les étiquettes sont montrées.** La carte d'une personne qui a beaucoup de compétences ou d'actions les montre
+      toutes : ni plafond, ni bouton « +N » (le plafond, constat U35, a été écarté par Antoine le 20 octobre 2026).
+- [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles. Ce sont eux qui disent si la barre fixe, la
+      pastille et l'arrêt sous la barre se comportent comme dans Chromium.
