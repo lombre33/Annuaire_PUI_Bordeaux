@@ -27,6 +27,8 @@
 //   triggers    formules déclenchées en plus de celles de la sonde :
 //               { table: { colonne: ({ user, tables }) => valeur } }
 //   delay       millisecondes d'attente avant chaque écriture (une écriture lente)
+//   readGate    une promesse (ou null) que chaque lecture attend avant de répondre : une lecture lente, que le test
+//               libère quand il veut (en la résolvant)
 //   accessToken la réponse de getAccessToken { token, baseUrl, ttlMsecs } ; null
 //               simule un refus de Grist (par défaut : un jeton valable dix minutes)
 //
@@ -140,6 +142,7 @@ export function createFakeGrist(options = {}) {
 
   const docApi = {
     async fetchTable(name) {
+      await read(options.readGate);
       if ((read(options.failTables) || []).includes(name)) throw new Error(`Grist indisponible : ${name}`);
       return structuredClone(requireTable(read(options.tables), name));
     },

@@ -450,7 +450,7 @@ test('le menu Tâches ouvert n\'a aucun contrôle sans nom : recherche, case d\'
     assert.ok(snapshot.includes('textbox "Rechercher dans Tâches"'), 'la recherche du menu est nommée');
     assert.ok(snapshot.includes(`button "Détail de ${VACCINATION}" [expanded]`), 'la flèche d\'une action dépliée porte son nom et son état');
     assert.ok(snapshot.includes(`button "Détail de ${AUDIT}"`), 'celle d\'une action repliée aussi');
-    assert.ok(snapshot.includes(`checkbox "${RELECTURE} 1"`), 'une tâche dépliée est une case nommée');
+    assert.ok(snapshot.includes(`checkbox "${RELECTURE}"`), 'une tâche dépliée est une case nommée par son libellé, sans le nombre de fiches (1.30.0)');
     assert.deepEqual(unnamedControls(snapshot), []);
   }));
 

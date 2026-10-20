@@ -41,7 +41,9 @@ const OUTLINE_REMOVED_ALLOWED = {
   // Le champ de recherche n'a pas de bordure : l'anneau est dessiné autour du cadre entier.
   '.search-box input': '.search-box:focus-within',
   // Le titre de la fenêtre reçoit le focus pour être annoncé : ce n'est pas un contrôle.
-  '.dlg-head h2:focus': null
+  '.dlg-head h2:focus': null,
+  // Le compteur reçoit le focus quand la carte qui l'avait disparaît du dessin : ce n'est pas un contrôle non plus.
+  '.result-count:focus': null
 };
 
 function cssRules(css) {
