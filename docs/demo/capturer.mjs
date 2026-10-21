@@ -722,7 +722,8 @@ const SCENES = [
       exiger(JSON.stringify(responsables) === JSON.stringify([
         { nom: 'Sofia Almeida', vous: false, bouton: 'Retirer' }, { nom: 'Léa Fontaine', vous: true, bouton: 'Retirer' }
       ]), `les responsables sont ${JSON.stringify(responsables)}`);
-      exiger(await fenetreEtab(page).locator('.es-add button').textContent() === 'Nommer', 'le bloc pour nommer un responsable manque');
+      exiger(await fenetreEtab(page).locator('.es-add > button').textContent() === 'Nommer', 'le bloc pour nommer un responsable manque');
+      exiger(await fenetreEtab(page).locator('#etabNominate').textContent() === 'Choisir une personne', 'la liste des personnes à nommer n\'est pas celle du départ');
       exiger(await fenetreEtab(page).locator('.dlg-summary').textContent() === 'Aucune modification', 'le pied ne dit pas « Aucune modification »');
       exiger(await fenetreEtab(page).getByRole('button', { name: 'Enregistrer', exact: true }).isDisabled(), '« Enregistrer » n\'est pas grisé');
       exiger(await fenetreEtab(page).getByRole('button', { name: 'Annuler', exact: true }).isEnabled(), '« Annuler » n\'est pas cliquable');

@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.32.0 — « Nommer » : la même liste déroulante à recherche que l'établissement
+
+Décision d'Antoine du 21 octobre 2026 (10 h 40), qui a répondu « Oui » à la question « Donner à « Nommer » la liste déroulante à recherche ? » : la fiche d'un établissement nomme
+ses responsables avec la liste déroulante de la 1.28.0.
+
+- **Avant**, pour nommer une personne de l'établissement, la fenêtre montrait un champ de recherche sur toute la largeur, puis, dessous, une liste native, une adresse e-mail et « Nommer ».
+- **Maintenant**, le champ de recherche disparaît : la liste est une **liste déroulante à recherche intégrée** (`dropdown()`, `dom.js`), la même que celle de l'établissement et du rôle.
+  Fermée, un bouton de la forme du champ voisin montre « Choisir une personne » ou la personne choisie ; ouverte, un panneau aux couleurs d'un menu de filtre : **la recherche en haut,
+  les noms dessous, réduits en direct** à mesure qu'on tape (casse et accents ignorés), « Aucun résultat » quand rien ne répond. Les gestes sont ceux de la 1.28.0 (Entrée, Espace ou une
+  flèche ouvre ; Entrée choisit le premier nom qui répond ; Échap ne referme que le panneau, pas la fenêtre ; sur un écran tactile le panneau s'ouvre sans prendre le focus). « Choisir une
+  personne » reste la première valeur : on la choisit pour revenir sans personne et rendre la main à l'adresse e-mail.
+- **Ne change pas** : ce qu'on peut nommer (les personnes de l'établissement qui apparaissent dans l'annuaire, sans les responsables, plus celles qu'on vient de retirer), la liste et l'adresse
+  qui ne se cumulent pas (l'une grise l'autre ; la liste se grise aussi quand il n'y a plus personne : « Aucune autre personne »), le bouton « Nommer » et la touche Entrée dans l'adresse, ce
+  qui s'écrit dans Grist. Rien à régler dans Grist.
+- **Change aussi** : dans une liste déroulante, la valeur « aucune valeur » (identifiant 0 : « Non renseigné » du rôle, « Choisir une personne » ici) n'est plus un résultat de recherche. Avant,
+  taper « re » dans le rôle la plaçait en tête et Entrée la choisissait à la place de « Référent… ». Sans recherche, elle reste la première valeur.
+- **Corrigé au passage** : une personne choisie dans la liste puis rétablie comme responsable (elle avait été retirée) n'est plus proposée, et l'adresse e-mail, que le choix avait grisée,
+  ne le reste plus.
+- Tests : `tests/e2e-etablissement.test.mjs` passe par la liste (valeurs, recherche en direct, Entrée, Échap qui ne ferme que le panneau et n'éveille pas l'avertissement de la fenêtre,
+  retour à « Choisir une personne », personne nommée qui n'est plus proposée, personne rétablie, liste grisée par une adresse, nom accessible). Vu en capture dans Chromium.
+  **Non essayé dans le vrai Grist d'Antoine ni sur un vrai Firefox mobile.** Revenir en arrière : `git revert` de la fusion de cette version.
+
 ## 1.31.0 — Audit UI/UX : la barre d'outils reste en haut et le clavier traverse les pastilles d'une carte d'un seul arrêt
 
 Deux des trois derniers constats importants de l'audit UI/UX du 12 octobre 2026 (U22 et U34), repris le 20 octobre 2026 à la demande d'Antoine (« Les neuf » : les six autres sont dans la 1.30.0). **Deux changements visibles, qui s'écartent de la maquette v5** : chacun est décrit ci-dessous avec sa raison et a été montré à Antoine, le 20 octobre 2026, sur des images avant/après (jeu fictif de la démonstration) ; il a répondu « le reste, go ». Le troisième constat, U35 (les cartes de hauteur inégale), n'est pas traité : un plafond de quatre pastilles par groupe, le reste derrière un bouton « +N », était écrit, testé et montré, puis retiré avant la fusion sur la réponse d'Antoine, « on laisse comme avant, pas de +N ». Les cartes montrent donc toujours toutes leurs pastilles. En haut de la page, sans défilement ni clavier, l'écran est celui de la maquette.

@@ -359,7 +359,7 @@ textarea {
   font-size: 14px;
   text-align: left;
 }
-.dd-trigger:hover,
+.dd-trigger:not(:disabled):hover,
 .dd.open .dd-trigger {
   border-color: var(--violet);
 }
@@ -368,6 +368,10 @@ textarea {
 }
 .dd-trigger[aria-invalid="true"] {
   border-color: #d85b5b;
+}
+.dd-trigger:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 .dd-value {
   min-width: 0;
@@ -1079,10 +1083,12 @@ textarea {
   gap: 8px;
   margin-top: 10px;
 }
-.es-add select,
-.es-add input {
+.es-add .dd,
+.es-add > input {
   flex: 1 1 200px;
   min-width: 0;
+}
+.es-add > input {
   height: 40px;
   padding: 0 12px;
   color: var(--ink);
@@ -1091,27 +1097,16 @@ textarea {
   border-radius: 12px;
   font-size: 13.5px;
 }
-.es-add select:focus,
-.es-add input:focus {
+/* La liste des personnes à nommer (dropdown(), dom.js) a la hauteur et le texte de l'adresse qui l'accompagne. */
+.es-add .dd-trigger {
+  height: 40px;
+  font-size: 13.5px;
+}
+.es-add > input:focus {
   background: #fff;
   border-color: var(--violet);
 }
-.es-add select:disabled,
-.es-add input:disabled {
-  opacity: 0.5;
-}
-/* La recherche des personnes à nommer, au-dessus de la liste qu'elle réduit : même hauteur que les champs
-   de la ligne qui suit. */
-.es-find {
-  margin-top: 10px;
-}
-.es-find .pick-search {
-  height: 40px;
-  margin-bottom: 0;
-  border-radius: 12px;
-  font-size: 13.5px;
-}
-.es-find .pick-search:disabled {
+.es-add > input:disabled {
   opacity: 0.5;
 }
 .es-err {

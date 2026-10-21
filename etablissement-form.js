@@ -13,7 +13,7 @@
 //   shell                               le cadre commun des fenêtres (dialog-shell.js)
 
 import { IMAGE_RULES } from './constants.js';
-import { button, el, matchesTerm, notice, searchField } from './dom.js';
+import { button, dropdown, el, notice } from './dom.js';
 import { KEEP_ONE, diffEtablissement, nominate, summaryOf, toggleResponsable, visibilityWarning } from './etablissement.js';
 import { imageFaultMessage, megabytes, prepareImage } from './image-prep.js';
 
@@ -25,6 +25,7 @@ const LOGO_HELP = {
 const NO_LIST = 'La liste des responsables n’a pas pu être lue : elle n’est ni affichée ni modifiable d’ici. '
   + 'Les règles d’accès de Grist doivent laisser un responsable lire la table ACL pour son établissement (GRIST_SETUP.md).';
 const SELF_REMOVAL = 'Vous retirez votre propre accès : une fois enregistré, vous ne pourrez plus modifier cette fiche.';
+const PICK_ONE = 'Choisir une personne';
 
 // ===== Le logo =====
 
@@ -245,24 +246,30 @@ function responsableRow(ctx, item) {
   return row;
 }
 
-// Les personnes qu'on peut encore nommer : celles de l'établissement qui ne sont pas déjà responsables, réduites
-// par la recherche. La personne choisie dans la liste y reste, quoi qu'on cherche ensuite.
+// Les personnes qu'on peut encore nommer : celles de l'établissement qui ne sont pas déjà responsables. Une personne retirée (pas
+// encore enregistré) redevient proposée. `ui.picked` est l'adresse de la personne choisie dans la liste, '' tant qu'on n'a choisi
+// personne ; elle ne reste choisie que si elle est toujours proposée.
 function paintCandidates(ctx) {
   const { ui } = ctx;
   const taken = new Set(ctx.draft.responsables.filter(item => item.state !== 'removed').map(item => item.email));
-  const candidates = ctx.fiche.candidates.filter(candidate => !taken.has(candidate.email));
-  const picked = ui.pick.value;
-  const shown = candidates.filter(candidate => candidate.email === picked || matchesTerm(candidate.name, ui.term));
-  const none = candidates.length === 0 ? 'Aucune autre personne' : shown.length === 0 ? 'Aucun résultat' : 'Choisir une personne';
-  ui.pick.replaceChildren(...[{ email: '', name: none }, ...shown].map(candidate => {
-    const option = document.createElement('option');
-    option.value = candidate.email;
-    option.textContent = candidate.name;
-    return option;
-  }));
-  ui.pick.value = shown.some(candidate => candidate.email === picked) ? picked : '';
-  ui.pick.disabled = candidates.length === 0 || ui.mail.value.trim() !== '';
-  ui.search.disabled = ui.pick.disabled;
+  ui.candidates = ctx.fiche.candidates.filter(candidate => !taken.has(candidate.email));
+  const at = ui.candidates.findIndex(candidate => candidate.email === ui.picked);
+  if (at < 0) ui.picked = '';
+  const nobody = ui.candidates.length === 0;
+  ui.pick.update({
+    options: nobody ? [] : [{ id: 0, label: PICK_ONE }, ...ui.candidates.map((candidate, index) => ({ id: index + 1, label: candidate.name }))],
+    value: at + 1,
+    placeholder: nobody ? 'Aucune autre personne' : PICK_ONE
+  });
+  syncAddRow(ctx);
+}
+
+// La liste et l'adresse ne se cumulent pas : choisir une personne grise l'adresse, saisir une adresse grise la liste (qui l'est
+// aussi quand il n'y a plus personne à nommer).
+function syncAddRow(ctx) {
+  const { ui } = ctx;
+  ui.pick.setDisabled(ui.candidates.length === 0 || ui.mail.value.trim() !== '');
+  ui.mail.disabled = ui.picked !== '';
 }
 
 export function paintResponsables(ctx) {
@@ -272,42 +279,38 @@ export function paintResponsables(ctx) {
 
 function nominateTyped(ctx) {
   const { ui } = ctx;
-  const problem = nominate(ctx.draft, ui.pick.value || ui.mail.value);
+  const problem = nominate(ctx.draft, ui.picked || ui.mail.value);
   ui.addErr.textContent = problem;
   ui.addErr.hidden = problem === '';
   if (problem) return;
-  ui.pick.value = '';
+  ui.picked = '';
   ui.mail.value = '';
-  ui.mail.disabled = false;
-  ui.search.value = '';
-  ui.term = '';
   paintResponsables(ctx);
   refreshForm(ctx);
 }
 
-// La recherche d'une personne de l'établissement à nommer.
-function candidateSearch(ctx) {
-  const { ui } = ctx;
-  const find = el('div', 'es-find');
-  ui.term = '';
-  ui.search = searchField({
-    label: 'Rechercher une personne de l’établissement',
-    placeholder: 'Rechercher une personne de l’établissement…',
-    onTerm: term => {
-      ui.term = term;
-      paintCandidates(ctx);
-    }
-  });
-  find.append(ui.search);
-  return find;
-}
-
-// Nommer un responsable : une personne de l'établissement, ou une adresse e-mail saisie.
+// Nommer un responsable : une personne de l'établissement, choisie dans une liste déroulante qui a sa recherche (dropdown(), dom.js),
+// ou une adresse e-mail saisie.
 function nominateControls(ctx) {
   const { ui } = ctx;
   const add = el('div', 'es-add');
-  ui.pick = document.createElement('select');
-  ui.pick.setAttribute('aria-label', 'Nommer une personne de l’établissement');
+  const label = el('span', 'sr-only', 'Nommer une personne de l’établissement'); // la liste n'a pas d'étiquette visible
+  label.id = 'etabNominateLabel';
+  ui.picked = '';
+  ui.candidates = [];
+  const choice = dropdown({
+    id: 'etabNominate',
+    labelId: label.id,
+    options: [],
+    value: 0,
+    placeholder: PICK_ONE,
+    searchLabel: 'Rechercher une personne',
+    onChange: index => {
+      ui.picked = index === 0 ? '' : ui.candidates[index - 1].email;
+      syncAddRow(ctx);
+    }
+  });
+  ui.pick = choice;
   ui.mail = document.createElement('input');
   ui.mail.type = 'email';
   ui.mail.autocomplete = 'off';
@@ -317,15 +320,14 @@ function nominateControls(ctx) {
   ui.addErr = el('p', 'fld-err es-err');
   ui.addErr.setAttribute('role', 'alert');
   ui.addErr.hidden = true;
-  ui.pick.addEventListener('change', () => { ui.mail.disabled = ui.pick.value !== ''; });
-  ui.mail.addEventListener('input', () => paintCandidates(ctx));
+  ui.mail.addEventListener('input', () => syncAddRow(ctx));
   ui.mail.addEventListener('keydown', event => {
     if (event.key === 'Enter') {
       event.preventDefault();
       nominateTyped(ctx);
     }
   });
-  add.append(ui.pick, ui.mail, button('Nommer', 'btn', () => nominateTyped(ctx)));
+  add.append(label, choice.element, ui.mail, button('Nommer', 'btn', () => nominateTyped(ctx)));
   return add;
 }
 
@@ -346,9 +348,7 @@ function responsablesSection(ctx) {
   ui.selfNote.id = 'etabSelfNote';
   ui.minErr = el('p', 'fld-err es-err', KEEP_ONE);
   ui.minErr.setAttribute('role', 'alert');
-  const find = candidateSearch(ctx);
-  const add = nominateControls(ctx);
-  box.append(ui.list, ui.selfNote, ui.minErr, find, add, ui.addErr);
+  box.append(ui.list, ui.selfNote, ui.minErr, nominateControls(ctx), ui.addErr);
   return box;
 }
 
