@@ -39,6 +39,17 @@ const save = page => press(page, 'Enregistrer');
 const rows = page => dlg(page).locator('.es-resp');
 const rowFor = (page, email) => dlg(page).locator(`.es-resp[data-mail="${email}"]`);
 
+// La liste des personnes à nommer (dropdown(), dom.js) : son bouton, ses valeurs (toutes, ou celles que la recherche laisse) et sa
+// recherche, dans le panneau.
+const pickButton = page => page.locator('#etabNominate');
+const pickValues = page => page.locator('#etabNominate-list .dd-option').allTextContents();
+const pickShown = page => page.locator('#etabNominate-list .dd-option:not([hidden])').allTextContents();
+const pickSearch = page => dlg(page).locator('.es-add .dd-search');
+async function pickPerson(page, name) {
+  await pickButton(page).click();
+  await page.locator('#etabNominate-list').getByRole('option', { name, exact: true }).click();
+}
+
 // Les actions que le widget a envoyées à Grist pour Etablissements et ACL (écrites ou refusées).
 // Le numéro d'une ligne ajoutée est celui que le faux Grist invente (il réutilise un numéro libéré) :
 // il n'est pas gardé.
@@ -244,9 +255,10 @@ test('la fenêtre montre le logo, le sigle et le statut en lecture seule, le nom
     assert.equal(await rows(page).locator('.es-resp-name').textContent(), 'Ana Martinvous');
     assert.equal(await rows(page).locator('.es-resp-mail').textContent(), ANA_EMAIL);
     assert.equal(await rows(page).getByRole('button').getAttribute('aria-label'), 'Retirer Ana Martin');
-    assert.deepEqual(await dlg(page).locator('.es-add select option').allTextContents(), ['Choisir une personne', `${HOSTILE_FIRST_NAME} Hostile`],
+    assert.deepEqual(await pickValues(page), ['Choisir une personne', `${HOSTILE_FIRST_NAME} Hostile`],
       'les personnes de l’établissement que l’annuaire montre, sans les responsables');
-    assert.equal(await dlg(page).locator('.es-add input').getAttribute('placeholder'), 'ou une autre adresse e-mail');
+    assert.equal(await pickButton(page).textContent(), 'Choisir une personne');
+    assert.equal(await dlg(page).locator('.es-add > input').getAttribute('placeholder'), 'ou une autre adresse e-mail');
 
     assert.equal(await summary(page), 'Aucune modification');
     assert.equal(await save(page).isDisabled(), true);
@@ -401,14 +413,14 @@ test('le message de visibilité s’accorde au nombre de fiches et ne parle de �
 test('on nomme un responsable par son adresse, la ligne est ajoutée à ACL sans toucher au droit d’administrateur', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await openFromBar(page);
-    await dlg(page).locator('.es-add input').fill('  Claire.Moreau@CHU-Bordeaux.example ');
+    await dlg(page).locator('.es-add > input').fill('  Claire.Moreau@CHU-Bordeaux.example ');
     await press(page, 'Nommer').click();
     assert.equal(await rows(page).count(), 2);
     const added = rowFor(page, 'claire.moreau@chu-bordeaux.example');
     assert.equal(await added.getAttribute('data-state'), 'added');
     assert.equal(await added.locator('.es-resp-name').textContent(), 'Adresse sans fiche dans l’annuaireajouté');
     assert.equal(await added.getByRole('button').getAttribute('aria-label'), 'Retirer claire.moreau@chu-bordeaux.example');
-    assert.equal(await dlg(page).locator('.es-add input').inputValue(), '', 'le champ est vidé');
+    assert.equal(await dlg(page).locator('.es-add > input').inputValue(), '', 'le champ est vidé');
     assert.equal(await summary(page), '1 modification : responsables');
     await save(page).click();
     await closed(page);
@@ -427,7 +439,7 @@ test('on nomme un responsable par son adresse, la ligne est ajoutée à ACL sans
 test('nommer l’adresse d’une personne dont la fiche est masquée de l’annuaire ne dévoile pas son nom', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await openFromBar(page);
-    await dlg(page).locator('.es-add input').fill(IRIS_EMAIL);
+    await dlg(page).locator('.es-add > input').fill(IRIS_EMAIL);
     await press(page, 'Nommer').click();
     const added = rowFor(page, IRIS_EMAIL);
     assert.equal(await added.locator('.es-resp-name').textContent(), 'Fiche masquée de l’annuaireajouté', 'Iris a refusé d’apparaître : on dit qu’elle existe, pas qui elle est');
@@ -439,56 +451,81 @@ test('nommer l’adresse d’une personne dont la fiche est masquée de l’annu
 test('on nomme une personne de l’établissement depuis la liste, son nom s’affiche sans être lu comme du HTML', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await openFromBar(page);
-    await dlg(page).locator('.es-add select').selectOption({ label: `${HOSTILE_FIRST_NAME} Hostile` });
-    assert.equal(await dlg(page).locator('.es-add input').isDisabled(), true, 'la liste et l’adresse ne se cumulent pas');
+    await pickPerson(page, `${HOSTILE_FIRST_NAME} Hostile`);
+    assert.equal(await pickButton(page).textContent(), `${HOSTILE_FIRST_NAME} Hostile`);
+    assert.equal(await dlg(page).locator('.es-add > input').isDisabled(), true, 'la liste et l’adresse ne se cumulent pas');
     await press(page, 'Nommer').click();
     const added = rowFor(page, 'hostile@chu-bordeaux.example');
     assert.equal(await added.locator('.es-resp-name').textContent(), `${HOSTILE_FIRST_NAME} Hostileajouté`);
     assert.equal(await added.locator('.avatar').textContent(), '<H');
     assert.equal(await dlg(page).locator('img[src="x"]').count(), 0, 'aucune balise n’est née du prénom');
     assert.equal(await page.evaluate(() => window.__xss), undefined);
-    assert.deepEqual(await dlg(page).locator('.es-add select option').allTextContents(), ['Aucune autre personne']);
-    assert.equal(await dlg(page).locator('.es-add select').isDisabled(), true);
-    assert.equal(await dlg(page).locator('.es-add input').isDisabled(), false);
+    assert.equal(await pickButton(page).textContent(), 'Aucune autre personne');
+    assert.equal(await pickButton(page).isDisabled(), true);
+    assert.equal(await dlg(page).locator('.es-add > input').isDisabled(), false);
   }));
 
-test('la liste des personnes à nommer a sa recherche : elle ne garde que les noms qui répondent, et la personne choisie y reste', { skip }, () =>
+test('la liste des personnes à nommer a sa recherche dans son panneau : elle se réduit en direct, Entrée choisit, Échap ne ferme que le panneau', { skip }, () =>
   withWidget({ tables: world(tables => { tables.BDD.email[9] = 'hugo.bernard@chu-bordeaux.example'; }), user: ANA_EMAIL }, async ({ page, logs }) => {
     await openFromBar(page);
-    const pick = dlg(page).locator('.es-add select');
-    const options = () => pick.locator('option').allTextContents();
-    const search = dlg(page).locator('.es-find input.pick-search');
-    assert.equal(await search.getAttribute('aria-label'), 'Rechercher une personne de l’établissement');
-    assert.deepEqual(await options(), ['Choisir une personne', `${HOSTILE_FIRST_NAME} Hostile`, 'Hugo Bernard']);
+    const mail = dlg(page).locator('.es-add > input');
+    assert.equal(await pickButton(page).getAttribute('role'), 'combobox');
+    assert.equal(await pickSearch(page).isHidden(), true, 'fermée, la liste ne montre que son bouton : plus de champ de recherche à côté');
+    assert.equal(await dlg(page).locator('select').count(), 0);
+    await pickButton(page).click();
+    assert.equal(await pickSearch(page).getAttribute('aria-label'), 'Rechercher une personne');
+    assert.deepEqual(await pickShown(page), ['Choisir une personne', `${HOSTILE_FIRST_NAME} Hostile`, 'Hugo Bernard']);
 
-    await search.fill('BERN'); // sans casse ni accent, comme partout
-    assert.deepEqual(await options(), ['Choisir une personne', 'Hugo Bernard']);
-    await pick.selectOption({ label: 'Hugo Bernard' });
-    await search.fill('zzz');
-    assert.deepEqual(await options(), ['Choisir une personne', 'Hugo Bernard'], 'la personne choisie reste, quoi qu’on cherche ensuite');
-    await search.fill('');
-    assert.equal(await pick.inputValue(), 'hugo.bernard@chu-bordeaux.example');
-    assert.equal(await pick.locator('option').count(), 3);
+    await pickSearch(page).fill('BERN'); // sans casse ni accent, comme partout
+    assert.deepEqual(await pickShown(page), ['Hugo Bernard'], '« Choisir une personne » n’est pas un résultat de recherche');
+    await pickSearch(page).press('Enter'); // Entrée choisit la première qui répond
+    assert.equal(await pickButton(page).textContent(), 'Hugo Bernard');
+    assert.equal(await pickSearch(page).isHidden(), true, 'le choix referme le panneau');
+    assert.equal(await mail.isDisabled(), true, 'la liste et l’adresse ne se cumulent pas');
 
+    // Échap referme le panneau sans toucher à la fenêtre : avec un brouillon, elle aurait prévenu qu’il serait perdu.
+    await nameInput(page).fill('Brouillon');
+    await pickButton(page).click();
+    await pickSearch(page).fill('zzz');
+    assert.equal(await dlg(page).locator('.es-add .dd-none').isVisible(), true);
+    await pickSearch(page).press('Escape');
+    assert.equal(await pickSearch(page).isHidden(), true);
+    assert.equal(await isOpen(page), true);
+    assert.equal(await dlg(page).locator('.dlg-hint').isHidden(), true, 'la touche n’a pas atteint la fenêtre');
+    assert.equal(await pickButton(page).textContent(), 'Hugo Bernard', 'Échap ne change pas le choix');
+
+    // « Choisir une personne » vide le choix et rend la main à l’adresse.
+    await pickPerson(page, 'Choisir une personne');
+    assert.equal(await pickButton(page).textContent(), 'Choisir une personne');
+    assert.equal(await mail.isDisabled(), false);
+
+    await pickPerson(page, 'Hugo Bernard');
     await press(page, 'Nommer').click();
     assert.equal(await rowFor(page, 'hugo.bernard@chu-bordeaux.example').locator('.es-resp-name').textContent(), 'Hugo Bernardajouté');
-    assert.equal(await search.inputValue(), '', 'la recherche est vidée avec la liste');
-    await search.fill('zzz');
-    assert.deepEqual(await options(), ['Aucun résultat']);
+    assert.equal(await pickButton(page).textContent(), 'Choisir une personne', 'la liste repart sans choix');
+    assert.deepEqual(await pickValues(page), ['Choisir une personne', `${HOSTILE_FIRST_NAME} Hostile`], 'Hugo est responsable : il n’est plus proposé');
+    assert.equal(await mail.isDisabled(), false);
 
-    // Une adresse saisie remplace la liste : la recherche s’éteint avec elle.
-    await dlg(page).locator('.es-add input').fill('autre@exemple.example');
-    assert.equal(await search.isDisabled(), true);
-    assert.equal(await pick.isDisabled(), true);
-    await dlg(page).locator('.es-add input').fill('');
-    assert.equal(await search.isDisabled(), false);
+    // Une personne choisie puis rétablie comme responsable (elle avait été retirée) n'est plus proposée : le choix s'efface et l'adresse se dégrise.
+    await rowFor(page, ANA_EMAIL).getByRole('button', { name: 'Retirer Ana Martin' }).click();
+    await pickPerson(page, 'Ana Martin');
+    assert.equal(await mail.isDisabled(), true);
+    await rowFor(page, ANA_EMAIL).getByRole('button', { name: 'Rétablir Ana Martin' }).click();
+    assert.equal(await pickButton(page).textContent(), 'Choisir une personne');
+    assert.equal(await mail.isDisabled(), false);
+
+    // Une adresse saisie remplace la liste : elle se grise avec elle.
+    await mail.fill('autre@exemple.example');
+    assert.equal(await pickButton(page).isDisabled(), true);
+    await mail.fill('');
+    assert.equal(await pickButton(page).isDisabled(), false);
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
 test('nommer sans rien choisir, avec une adresse invalide ou une personne déjà responsable dit pourquoi', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await openFromBar(page);
-    const input = dlg(page).locator('.es-add input');
+    const input = dlg(page).locator('.es-add > input');
     const problem = dlg(page).locator('.es-add ~ .fld-err');
     await press(page, 'Nommer').click();
     assert.equal(await problem.textContent(), 'Choisissez une personne ou saisissez une adresse e-mail.');
@@ -518,7 +555,7 @@ test('retirer puis rétablir un responsable, ou retirer une adresse qu’on vien
     assert.equal(await own.getByRole('button').getAttribute('aria-label'), 'Rétablir Ana Martin');
     await own.getByRole('button', { name: 'Rétablir Ana Martin' }).click();
     assert.equal(await own.getAttribute('data-state'), 'kept');
-    await dlg(page).locator('.es-add input').fill('provisoire@exemple.example');
+    await dlg(page).locator('.es-add > input').fill('provisoire@exemple.example');
     await press(page, 'Nommer').click();
     await rowFor(page, 'provisoire@exemple.example').getByRole('button').click();
     assert.equal(await rows(page).count(), 1);
@@ -536,7 +573,7 @@ test('un établissement garde toujours un responsable : retirer le dernier est r
     assert.equal(await minimum.textContent(), 'Un établissement doit garder au moins un responsable.');
     assert.equal(await summary(page), 'Gardez au moins un responsable');
     assert.equal(await save(page).isDisabled(), true);
-    await dlg(page).locator('.es-add input').fill('relais@exemple.example');
+    await dlg(page).locator('.es-add > input').fill('relais@exemple.example');
     await press(page, 'Nommer').click();
     assert.equal(await minimum.isHidden(), true, 'un autre responsable suffit');
     assert.equal(await save(page).isEnabled(), true);
@@ -548,7 +585,7 @@ test('se retirer soi-même prévient qu’on perdra l’accès, puis les boutons
     await openFromBar(page);
     const warning = dlg(page).locator('#etabSelfNote');
     assert.equal(await warning.isHidden(), true);
-    await dlg(page).locator('.es-add input').fill('relais@exemple.example');
+    await dlg(page).locator('.es-add > input').fill('relais@exemple.example');
     await press(page, 'Nommer').click();
     await rowFor(page, ANA_EMAIL).getByRole('button').click();
     assert.equal(await warning.isVisible(), true);
@@ -571,7 +608,7 @@ test('se retirer soi-même prévient qu’on perdra l’accès, puis les boutons
 test('retirer un responsable ordinaire supprime sa ligne d’ACL', { skip }, () =>
   withWidget({ tables: world(), user: BOB_EMAIL }, async ({ page }) => {
     await openFromBar(page);
-    await dlg(page).locator('.es-add input').fill('relais@exemple.example');
+    await dlg(page).locator('.es-add > input').fill('relais@exemple.example');
     await press(page, 'Nommer').click();
     await rowFor(page, BOB_EMAIL).getByRole('button').click();
     await save(page).click();
@@ -847,7 +884,7 @@ test('un refus de Grist (règle d’accès) ne laisse rien à moitié écrit : n
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await openFromBar(page);
     await nameInput(page).fill('Nom refusé');
-    await dlg(page).locator('.es-add input').fill('relais@exemple.example');
+    await dlg(page).locator('.es-add > input').fill('relais@exemple.example');
     await press(page, 'Nommer').click();
     await page.evaluate(() => { window.__denyWrites = ['ACL']; });
     await save(page).click();
@@ -910,7 +947,7 @@ test('si quelqu’un d’autre a déjà fait le même changement, il n’y a plu
 test('une liste de responsables modifiée ailleurs est reprise : ce qu’un autre a nommé reste', { skip }, () =>
   withWidget({ tables: world(), user: BOB_EMAIL }, async ({ page }) => {
     await openFromBar(page);
-    await dlg(page).locator('.es-add input').fill('moi@exemple.example');
+    await dlg(page).locator('.es-add > input').fill('moi@exemple.example');
     await press(page, 'Nommer').click();
     await page.evaluate(() => {
       const acl = window.__tables.ACL;
@@ -1004,7 +1041,7 @@ test('chaque contrôle de la fenêtre a un nom accessible précis, et Tab les pa
       ['button', 'Fermer la fenêtre'], ['button', 'Remplacer le logo'], ['button', 'Retirer le logo'],
       ['textbox', 'Sigle'], ['textbox', 'Statut'], ['textbox', 'Nom complet'],
       ['checkbox', 'Établissement visible dans l’annuaire'],
-      ['button', 'Retirer Ana Martin'], ['combobox', 'Nommer une personne de l’établissement'],
+      ['button', 'Retirer Ana Martin'], ['combobox', 'Nommer une personne de l’établissement Choisir une personne'],
       ['textbox', 'Adresse e-mail du nouveau responsable'], ['button', 'Nommer'],
       ['button', 'Annuler'], ['button', 'Enregistrer']
     ];

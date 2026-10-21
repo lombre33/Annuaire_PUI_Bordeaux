@@ -1145,6 +1145,11 @@ message du widget, la ligne de la console, la requête et son code de réponse d
       l'adresse (en minuscules) et l'établissement ; `admin` n'est pas coché. Une adresse mal formée est refusée.
       Nommer l'adresse d'un administrateur qui a une ligne `ACL` sans établissement : cette ligne **reprend** l'établissement
       (pas de seconde ligne) et son `admin` reste coché.
+- [ ] La liste des personnes à nommer (1.32.0) est un bouton « Choisir une personne » : ouvert, un panneau avec la recherche
+      en haut, dont les noms se réduisent à mesure qu'on tape (casse et accents ignorés) ; Entrée choisit le premier nom, Échap
+      ne referme que le panneau (la fenêtre reste ouverte), « Choisir une personne » en tête de liste efface le choix. Une personne
+      choisie grise l'adresse e-mail, une adresse saisie grise la liste. Sur un téléphone, le panneau s'ouvre sans faire monter
+      le clavier et un appui sur un nom le choisit.
 - [ ] Retirer un responsable : sa ligne disparaît d'`ACL`, **sauf** si elle porte `admin` : elle perd alors seulement
       l'établissement. « Rétablir » annule un retrait non enregistré. Retirer le dernier : « Un établissement doit
       garder au moins un responsable », « Enregistrer » grisé.
