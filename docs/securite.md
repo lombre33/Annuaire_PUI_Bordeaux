@@ -150,6 +150,7 @@ Depuis la 1.29.1, `index.html` déclare une **politique de sécurité de contenu
 default-src 'none';
 script-src 'self' https://docs.getgrist.com 'unsafe-eval';
 style-src 'self' 'unsafe-inline';
+font-src 'self';
 img-src 'self' data: blob: https: http://127.0.0.1:* http://localhost:*;
 connect-src 'self' https: http://127.0.0.1:* http://localhost:*;
 object-src 'none';
@@ -157,12 +158,13 @@ base-uri 'none';
 form-action 'none'
 ```
 
-- **Ce qui est fermé.** Tout ce qui n'est pas nommé (`default-src 'none'` : ni cadre, ni police, ni média, ni travailleur), les objets, la balise `<base>` et les formulaires. Les scripts viennent du dépôt et de `docs.getgrist.com`, jamais de la page elle-même ; les feuilles de style, du dépôt. Les images et les requêtes ne vont en `http`, en clair, que vers la machine de la personne.
+- **Ce qui est fermé.** Tout ce qui n'est pas nommé (`default-src 'none'` : ni cadre, ni média, ni travailleur), les objets, la balise `<base>` et les formulaires. Les scripts viennent du dépôt et de `docs.getgrist.com`, jamais de la page elle-même ; les feuilles de style, du dépôt. Les images et les requêtes ne vont en `http`, en clair, que vers la machine de la personne.
 - **Ce qui est ouvert, et pourquoi.**
   - `https://docs.getgrist.com` : d'où vient `grist-plugin-api.js`. Charger ce script d'une autre instance (recommandation 4) demande de changer la balise `<script>` et la politique ensemble : `tests/csp.test.mjs` échoue si l'une ne suit pas l'autre.
   - `'unsafe-eval'` : par prudence pour ce script, dont le fichier hébergé n'a pas pu être relu pour l'audit (une copie construite depuis le code de Grist n'en a pas besoin). Le code du widget, lui, n'emploie ni `eval` ni `new Function` (`tests/docs.test.mjs`) : le retirer ne coûtera rien au widget si Grist s'en passe.
   - `'unsafe-inline'`, pour les styles seulement : le script de Grist ajoute une balise `<style>` au document.
   - `https:` pour les images et les requêtes : les pièces jointes (logos, photos) et l'envoi vont à l'instance Grist du document, dont l'adresse n'est pas connue d'avance. **Cela n'empêche donc pas une page piégée d'envoyer des données vers un site en `https`.** Pour le fermer, remplacer `https:` par l'adresse de l'instance (par exemple `https://grist.numerique.gouv.fr`) dans `img-src` et `connect-src`, puis mettre à jour cette page (`tests/csp.test.mjs` accepte l'un ou l'autre, et vérifie que cette page recopie la politique).
+  - `'self'` pour les polices (1.36.0) : les quatre fichiers d'Inter, dans `assets/fonts` ; une police d'un autre site reste refusée.
   - `data:` et `blob:` pour les images : les aperçus d'un logo ou d'une photo choisis, et les copies redessinées des logos.
   - `http://127.0.0.1` et `http://localhost` : un Grist de test sur la machine de la personne.
 - **Ce qu'elle ne couvre pas.** Un dépôt compromis : qui publie sur `main` écrit aussi cette balise (voir [Risques et protections](#risques-et-protections), « Code malveillant publié »). Le cadrage du widget par une autre page (`frame-ancestors` n'existe que dans un en-tête, que ni GitHub Pages ni une balise ne peuvent régler). Le contenu du script de Grist, qui reste chargé depuis `docs.getgrist.com` sans version figée.

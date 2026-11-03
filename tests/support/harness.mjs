@@ -17,7 +17,9 @@ import { sampleTables } from '../fixtures.mjs';
 import { routeAttachments } from './fake-attachments.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
+const MIME = {
+  '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.woff2': 'font/woff2'
+};
 const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 
 // Remplace grist-plugin-api.js : le faux document que partagent les tests Node
@@ -114,6 +116,12 @@ export const layoutSettled = (page, { frames = 6, timeout = 5000 } = {}) => page
   };
   requestAnimationFrame(tick);
 }), { stableFor: frames, limit: timeout });
+
+// Les quatre fichiers de la police Inter (assets/fonts, style.css) sont chargés. Le navigateur ne charge une graisse qu'au premier texte qui
+// l'emploie, puis remet la page en forme : un fichier qui arrive en cours de test change la largeur des textes, donc la mise en page que
+// le test mesure. Chaque ouverture de page les attend tous. Une police introuvable ne bloque pas le test : tests/fonts.test.mjs la
+// signale, et la politique de sécurité de contenu (assertNoCspViolation) refuserait une police venue d'ailleurs.
+export const fontsLoaded = page => page.evaluate(() => Promise.all([...document.fonts].map(face => face.load()))).catch(() => {});
 
 // Joue `run` sur la page ouverte, vérifie qu'elle n'a pas enfreint sa politique de sécurité de contenu, puis ferme le contexte :
 // la fin commune de `withWidget` ici et dans tests/support/layout.mjs.
@@ -223,6 +231,7 @@ export async function createHarness({ keepScrollbars = false } = {}) {
     // images. Quand un fichier est retenu ou ne reçoit jamais de réponse, il ne viendrait pas : la navigation n'attend alors que le document.
     const downloadsStall = downloadHold || downloadFirst === 'hang' || downloadCors === 'hang';
     await page.goto(`${baseUrl}/index.html${readOnly ? '?readonly=true' : ''}`, { waitUntil: downloadsStall ? 'domcontentloaded' : 'load' });
+    await fontsLoaded(page);
     return { page, context, logs, files };
   }
 

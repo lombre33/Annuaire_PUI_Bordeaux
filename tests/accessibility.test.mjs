@@ -15,9 +15,9 @@ import { sampleTables, withIdentity, ANA_EMAIL, IRIS_EMAIL } from './fixtures.mj
 import { skip, waitForCards, withWidget } from './support/browser.mjs';
 import { parseColor, blend, contrastRatio, WHITE } from './support/contrast.mjs';
 import { measureCards } from './support/card-metrics.mjs';
+import { cssRules, readCss } from './support/css.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const readCss = name => fs.readFileSync(path.join(ROOT, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 // ===== Contrastes (sans navigateur) =====
 
@@ -45,13 +45,6 @@ const OUTLINE_REMOVED_ALLOWED = {
   // Le compteur reçoit le focus quand la carte qui l'avait disparaît du dessin : ce n'est pas un contrôle non plus.
   '.result-count:focus': null
 };
-
-function cssRules(css) {
-  return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({
-    selector: selector.replace(/\s+/g, ' ').trim(),
-    body
-  }));
-}
 
 test('aucune règle ne supprime l’anneau de focus sans le remplacer (WCAG 2.4.7)', () => {
   const rules = ['style.css', 'dialogs.css'].flatMap(name => cssRules(readCss(name)));
