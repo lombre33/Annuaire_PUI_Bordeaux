@@ -109,12 +109,15 @@ test('dans la page, les quatre graisses sont chargées', { skip }, () =>
       WEIGHTS.map(weight => `Inter ${weight === 700 ? '650 750' : weight} loaded`));
   }));
 
+// Le texte mesuré est grand (48 px) : un poste dont les lettres sont arrondies au pixel (hinting complet, ce que fait la CI) mesure, à 20 px,
+// 429 px pour la graisse 400 et 428 pour la 600 : l'écart entre deux graisses y disparaît dans l'arrondi. À 48 px il fait 20 px ou plus,
+// avec ou sans arrondi (tests/fonts.test.mjs a échoué ainsi sur la CI, à 20 px, au premier essai de la 1.36.0).
 test('650, 700 et 750 se dessinent avec la même graisse, 600 et 800 chacune avec la leur : l\'aspect mesuré de la feuille de style ne change pas', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const widths = await page.evaluate(() => Object.fromEntries([400, 600, 650, 700, 750, 800].map(weight => {
       const probe = document.createElement('span');
-      probe.style.cssText = `position: absolute; visibility: hidden; white-space: nowrap; font: ${weight} 20px Inter`;
+      probe.style.cssText = `position: absolute; visibility: hidden; white-space: nowrap; font: ${weight} 48px Inter`;
       probe.textContent = 'Mathématiques et compétences numériques';
       document.body.append(probe);
       const width = probe.getBoundingClientRect().width;
