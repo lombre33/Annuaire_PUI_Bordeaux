@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.33.1 — Relecture : les titres de groupe des cartes retrouvent leurs 8 px
+
+Correctif d'une régression de la 1.33.0, signalée par le fil documentation en mesurant la fenêtre de relecture. Rien à régler dans Grist.
+
+- **Avant (1.33.0).** Quand les titres de groupe des pastilles (Instances, Actions, Compétences…) sont devenus des `div` nommés et non des `h3` (U23), la règle `.rv-col h3 { margin-bottom: 8px }` de `dialogs.css` a cessé de les atteindre : dans les
+  cartes « Avant » et « Après » de la fenêtre de relecture, ils ont repris les 3 px de la grille. Six groupes de 5 px en moins : la fenêtre était **30 px plus basse** (par exemple 1 391 px au lieu de 1 436 sur la fiche fictive de Camille Rousseau)
+  et les titres plus près de leurs pastilles que sur la mise en page validée. La 1.33.0 disait pourtant « la mise en page est la même » : c'était vrai de la grille, pas de la relecture.
+- **Maintenant.** `.rv-card .tag-group-title { margin-bottom: 8px }` (`dialogs.css`) : huit pixels entre un titre de groupe et ses pastilles dans la fenêtre de relecture, comme avant. La grille de l'annuaire (3 px) n'a pas bougé.
+- Test : une vérification de plus dans le test de la relecture de `tests/e2e-profile.test.mjs` (l'écart titre-pastilles des cartes « Avant » et « Après » : 8 px), qui échoue sur le code de la 1.33.0 (3 px au lieu de 8). Toujours 1 096 tests. Les images de la documentation de la relecture gardaient déjà la mise en page validée.
+  Revenir en arrière : `git revert` de la fusion.
+
 ## 1.33.0 — Audit UI/UX : cinq constats mineurs (interrupteur de présence fidèle à Grist, repères pour lecteurs d'écran, lien tel: sur téléphone, espaces insécables)
 
 Premier lot de la réponse d'Antoine du 3 novembre 2026 (« Les seize ») à sa question du 20 octobre sur les 20 constats mineurs de l'audit UI/UX : les **cinq qui ne changent rien à ce qu'on voit sur un ordinateur**
