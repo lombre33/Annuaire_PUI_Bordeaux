@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { UploadError, uploadAttachment } from '../upload.js';
 import { PHOTO_UPLOAD_HINT } from '../profile-save.js';
 import { createFakeGrist, FAKE_ATTACHMENTS_URL } from './support/fake-grist.js';

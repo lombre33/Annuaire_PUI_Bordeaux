@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import {
   loadDirectory, buildContacts, tableToRows, describeVisibility, createPeopleIndex, normalizeEmail
 } from '../grist-data.js';

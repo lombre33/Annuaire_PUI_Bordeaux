@@ -36,13 +36,13 @@ const recapTitle = ctx => (ctx.creating ? 'Ce qui sera enregistré' : 'Ce qui va
 
 export function editingHeading(ctx) {
   if (ctx.creating) {
-    return ['Créer ma fiche', 'Vous relisez votre fiche avant de la publier : elle est ajoutée tout de suite, sans validation.'];
+    return ['Créer ma fiche', 'Vous relisez votre fiche avant de la publier : elle est ajoutée tout de suite, sans validation.'];
   }
   return [
     ctx.admin ? `Modifier la fiche de ${ctx.session.person.name}` : 'Modifier mon profil',
     ctx.admin
-      ? 'Mode admin : vous modifiez la fiche d’une autre personne. Vous relisez les modifications avant de les valider, elles s’appliquent ensuite tout de suite.'
-      : 'Vous relisez vos modifications avant de les valider : elles s’appliquent ensuite tout de suite à votre fiche.'
+      ? 'Mode admin : vous modifiez la fiche d’une autre personne. Vous relisez les modifications avant de les valider, elles s’appliquent ensuite tout de suite.'
+      : 'Vous relisez vos modifications avant de les valider : elles s’appliquent ensuite tout de suite à votre fiche.'
   ];
 }
 
@@ -61,8 +61,8 @@ function identityBlock(ctx) {
     main.append(el('p', 'ident-lock', 'L’adresse e-mail est celle de votre compte. Une fois la fiche créée, seul un administrateur peut changer l’établissement.'));
   } else if (!ctx.admin) {
     main.append(el('p', 'ident-lock', session.viewerAdmin
-      ? 'Verrouillé sur votre propre fiche : l’e-mail et l’établissement sont liés à votre compte.'
-      : 'Verrouillé : l’e-mail et l’établissement sont liés à votre compte. Pour les corriger, contactez un administrateur.'));
+      ? 'Verrouillé sur votre propre fiche : l’e-mail et l’établissement sont liés à votre compte.'
+      : 'Verrouillé : l’e-mail et l’établissement sont liés à votre compte. Pour les corriger, contactez un administrateur.'));
   }
   box.append(main);
   if (etablissement) box.append(session.renderEtablissement?.(etablissement) ?? el('span', 'et-pill', etablissement));
@@ -208,7 +208,7 @@ function textField(ctx, field) {
   error.id = `${id}-error`;
   error.hidden = true;
   // Une adresse facultative dit ce qu'elle remplace.
-  const hint = field.optional ? el('p', 'fld-hint', 'Facultatif : l’adresse montrée sur la carte. Laissée vide, la carte montre l’adresse du compte.') : null;
+  const hint = field.optional ? el('p', 'fld-hint', 'Facultatif : l’adresse montrée sur la carte. Laissée vide, la carte montre l’adresse du compte.') : null;
   if (hint) hint.id = `${id}-hint`;
   input.setAttribute('aria-describedby', hint ? `${error.id} ${hint.id}` : error.id);
   input.addEventListener('input', () => {

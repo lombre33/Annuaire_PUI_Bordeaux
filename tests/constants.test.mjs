@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { CATEGORIES, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE, PROFILE_FIELDS, fieldsFor } from '../constants.js';
 
 test('FILTERS lists the 8 filter buttons in display order, Rôle PUI last: a grouping has no button of its own, it is the groups of the menu it arranges', () => {

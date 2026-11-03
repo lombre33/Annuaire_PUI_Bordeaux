@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert, { plain } from './support/assert.mjs';
 import { loadDirectory, DirectoryLoadError } from '../grist-data.js';
 import { FILTERS } from '../constants.js';
 import { computeFilterCounts, createEmptyFilterState, filterContacts, menuGroups } from '../filters.js';
@@ -119,7 +119,7 @@ test('loadDirectory refuses a BDD table that lacks a required column instead of 
     delete tables.BDD[column];
     await assert.rejects(
       load(tables),
-      error => error instanceof DirectoryLoadError && error.message.includes(`« ${column} »`) && error.message.includes('BDD')
+      error => error instanceof DirectoryLoadError && plain(error.message).includes(`« ${column} »`) && error.message.includes('BDD')
     );
   }
 });
@@ -142,7 +142,7 @@ test('loadDirectory refuses an Etablissements table that lacks a visibility colu
     delete tables.Etablissements[column];
     await assert.rejects(
       load(tables),
-      error => error instanceof DirectoryLoadError && error.message.includes(`« ${column} »`) && error.message.includes('Etablissements')
+      error => error instanceof DirectoryLoadError && plain(error.message).includes(`« ${column} »`) && error.message.includes('Etablissements')
     );
   }
 });

@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { diffContacts, previewOf, withAvatarChange } from '../preview.js';
 import { TAG_GROUPS } from '../constants.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';

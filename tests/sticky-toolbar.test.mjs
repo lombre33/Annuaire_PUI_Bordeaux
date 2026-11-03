@@ -5,7 +5,7 @@
 // Les tests chargent le vrai index.html dans Chromium (optionnel : voir TESTING.md). 44 cartes (withClones) : la page défile.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { sampleTables, withClones } from './fixtures.mjs';
 import { accessibilityTree, accessibleNode } from './support/accessibility-tree.mjs';
 import { resultCount, skip, waitForCards, withWidget } from './support/browser.mjs';

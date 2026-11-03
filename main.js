@@ -11,7 +11,7 @@
 // avatar-ui.js (les photos de profil).
 
 import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
-import { loadDirectory, DirectoryLoadError, debounce, filterVisibleEstablishments, createRequestSequencer, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
+import { loadDirectory, DirectoryLoadError, debounce, filterVisibleEstablishments, createRequestSequencer, formatCount, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
 import { attachTagNavigation, attachTagNotes, focusFirstResult, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
@@ -92,11 +92,11 @@ const elements = {
 // Le script de l'API de Grist vient de docs.getgrist.com (index.html) : bloqué (réseau, pare-feu, extension) ou en panne, `window.grist`
 // n'existe pas et rien de ce qui suit ne peut démarrer. La page le dit, au lieu de rester sur un compteur vide.
 if (!window.grist) {
-  showStatus(['Impossible de joindre Grist : le script de son API (docs.getgrist.com) ne s\'est pas chargé. Vérifiez la connexion, '
-    + 'puis rechargez la page ; si le problème persiste, le détail est dans la console du navigateur.']);
+  showStatus(['Impossible de joindre Grist : le script de son API (docs.getgrist.com) ne s\'est pas chargé. Vérifiez la connexion, '
+    + 'puis rechargez la page ; si le problème persiste, le détail est dans la console du navigateur.']);
   elements.resultCount.textContent = 'Chargement impossible';
   elements.grid.removeAttribute('aria-busy');
-  throw new Error('[GRIST] window.grist est absent : le script de l\'API de Grist (docs.getgrist.com) ne s\'est pas chargé.');
+  throw new Error('[GRIST] window.grist est absent : le script de l\'API de Grist (docs.getgrist.com) ne s\'est pas chargé.');
 }
 
 // Les logos et les photos de profil sont des pièces jointes de Grist : leurs adresses demandent
@@ -195,7 +195,7 @@ function refreshCards() {
   keepFocus(elements.grid, elements.resultCount, () =>
     renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights));
   elements.grid.removeAttribute('aria-busy');
-  const count = `${filtered.length} contact${filtered.length > 1 ? 's' : ''}`;
+  const count = `${formatCount(filtered.length)} contact${filtered.length > 1 ? 's' : ''}`;
   elements.resultCount.textContent = count;
   scrollTools.setCount(count);
   elements.emptyState.hidden = filtered.length !== 0;
@@ -286,7 +286,7 @@ function showStatus(messages) {
 // Les cartes déjà affichées (chargement précédent réussi) restent en place.
 function showLoadError(error) {
   const reason = error instanceof DirectoryLoadError ? ` (${error.message})` : '';
-  showStatus([`Impossible de charger l'annuaire depuis Grist${reason}. Rechargez la page ; `
+  showStatus([`Impossible de charger l'annuaire depuis Grist${reason}. Rechargez la page ; `
     + 'si le problème persiste, le détail est dans la console du navigateur.']);
   if (state.allContacts.length === 0) elements.resultCount.textContent = 'Chargement impossible';
   elements.grid.removeAttribute('aria-busy');
@@ -308,10 +308,10 @@ function applyBranding({ etablissementRows }) {
     brandingUI.render(state.branding);
     // Une ligne dans la console, relue seulement quand elle change : la version qui s'exécute (le cache de GitHub Pages
     // peut en garder une ancienne dix minutes) et ce que Grist donne des logos.
-    const note = `[LOGOS] Version ${VERSION} : ${brandingSummary(state.branding)}.`;
+    const note = `[LOGOS] Version ${VERSION} : ${brandingSummary(state.branding)}.`;
     if (note !== brandingNote) console.info(brandingNote = note);
   } catch (error) {
-    console.error('[LOGOS] Impossible d\'afficher les logos :', error);
+    console.error('[LOGOS] Impossible d\'afficher les logos :', error);
   }
 }
 
@@ -325,6 +325,7 @@ function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissem
   refreshFilterMenus();
   refreshCards();
   refreshAccount();
+  accountBar.clearStale();
 }
 
 // Relit Grist et met l'affichage à jour. Renvoie 'applied', 'stale' (une lecture
@@ -386,17 +387,17 @@ function refreshAccount() {
   const admin = isAdmin();
   if (persons.length === 0) {
     warnOnce('no-row', state.people.hasEmailColumn
-      ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bouton « Modifier mon profil ».'
-      : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
+      ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bouton « Modifier mon profil ».'
+      : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
     accountBar.show(describeUnknownAccount({ email: state.identity.email, admin, emailColumn: state.people.hasEmailColumn }));
     // Sans colonne « email », la fiche créée ne pourrait pas être reliée à la personne : rien à proposer.
     accountBar.setActions({ create: state.people.hasEmailColumn, etab: myEtablissements().length > 0, admin, adminMode: state.adminMode });
     return;
   }
   if (persons.length > 1) {
-    warnOnce('duplicates', `[IDENTITE] ${persons.length} lignes de BDD portent la même adresse (identifiants de ligne : `
-      + `${persons.map(person => person.row.id).join(', ')}) : le choix de présence s'applique à toutes, `
-      + 'le bouton « Modifier mon profil » n\'est pas proposé (chaque carte garde le sien).');
+    warnOnce('duplicates', `[IDENTITE] ${persons.length} lignes de BDD portent la même adresse (identifiants de ligne : `
+      + `${persons.map(person => person.row.id).join(', ')}) : le choix de présence s'applique à toutes, `
+      + 'le bouton « Modifier mon profil » n\'est pas proposé (chaque carte garde le sien).');
   }
   accountBar.show({
     name: persons[0].name || 'Ma fiche',
@@ -432,9 +433,13 @@ async function togglePresence() {
   try {
     const accepted = !persons.every(person => person.status.accepted);
     await setPresence(window.grist.docApi, persons, accepted);
+    // Grist a enregistré le choix : l'interrupteur le montre même si la relecture échoue, et un deuxième clic écrit le contraire.
+    state.people.rememberConsent(persons.map(({ row }) => row.id), accepted);
     const outcome = await reloadDirectory();
-    if (outcome === 'failed') accountBar.setStatus('Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.');
-    else accountBar.announce(accepted
+    if (outcome === 'failed') {
+      refreshAccount();
+      accountBar.setStatus('Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.', 'stale');
+    } else accountBar.announce(accepted
       ? 'Modification enregistrée. Vous avez accepté d\'apparaître dans l\'annuaire.'
       : 'Modification enregistrée. Vous n\'apparaissez plus dans l\'annuaire.');
   } catch (error) {
@@ -468,7 +473,7 @@ function userFacing(error) {
     if (!error.leftover) return error;
     return new Error(`${error.message} Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.`);
   }
-  console.error('[PROFIL] Erreur inattendue :', error);
+  console.error('[PROFIL] Erreur inattendue :', error);
   return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
 }
 
@@ -508,7 +513,7 @@ function etablissementName(contact) {
 function etablissementWarning(id) {
   const flags = state.etabFlags?.byId?.[String(id)];
   return flags && flags.ok_pour_apparaitre !== true
-    ? 'Cet établissement n’a pas validé sa présence : la fiche ne sera pas visible dans l’annuaire.'
+    ? 'Cet établissement n’a pas validé sa présence : la fiche ne sera pas visible dans l’annuaire.'
     : '';
 }
 
@@ -695,7 +700,7 @@ function userFacingEtab(error) {
     if (!error.leftover) return error;
     return new Error(`${error.message} Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.`);
   }
-  console.error('[FICHE-ETAB] Erreur inattendue :', error);
+  console.error('[FICHE-ETAB] Erreur inattendue :', error);
   return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
 }
 
@@ -756,7 +761,7 @@ async function saveFiche(draft, fiche) {
   const { id } = fiche.etablissement;
   const diff = diffEtablissement(fiche.etablissement, draft, { readable: fiche.responsables !== null });
   if (diff.errors.length > 0 || diff.labels.length === 0) {
-    throw new Error('Il n\'y a rien à enregistrer : corrigez les champs signalés ou modifiez la fiche.');
+    throw new Error('Il n\'y a rien à enregistrer : corrigez les champs signalés ou modifiez la fiche.');
   }
   const file = draft.logo.action === 'replace' ? draft.logo.file : null;
   const plan = savePlanOf(fiche.row, diff.champs, { file, responsable: state.etabRights(id) });
@@ -772,7 +777,7 @@ async function saveFiche(draft, fiche) {
       status: 'changed',
       fiche: ficheOf({ row, etablissement: etablissementOf(row), responsables: acl === null ? null : responsablesOf(acl, id) }),
       notice: `La fiche a changé dans Grist pendant que la fenêtre était ouverte (${result.moved.join(', ')}). `
-        + 'Ce que vous avez saisi est conservé : relisez-le, puis enregistrez à nouveau.'
+        + 'Ce que vous avez saisi est conservé : relisez-le, puis enregistrez à nouveau.'
         + (result.leftover ? ' Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.' : '')
     };
   }

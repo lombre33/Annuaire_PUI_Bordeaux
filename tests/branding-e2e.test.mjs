@@ -8,7 +8,7 @@
 // tests sont ignorés et `node --test` reste vert.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { sampleTables, withBranding, withIdentity, withSchema, HOSTILE_FIRST_NAME, ANA_EMAIL } from './fixtures.mjs';
 import { FAKE_ATTACHMENTS_URL } from './support/fake-grist.js';
 import { MISSING_FILE, BROKEN_FILE, PADDED_FILE } from './support/fake-attachments.mjs';

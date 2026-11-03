@@ -1,7 +1,7 @@
 // Petits outils partagés par les fenêtres (profile-form.js, profile-review.js, etablissement-ui.js,
 // etablissement-form.js, changes-ui.js...). Rien ne s'exécute à l'import : les fonctions qui touchent au DOM ne sont appelées que par les écrans.
 
-import { normalize } from './grist-data.js';
+import { formatCount, normalize } from './grist-data.js';
 
 // Un élément avec sa classe et son texte. Le texte passe toujours par textContent :
 // ce qui vient de Grist (un nom, une fonction) n'est jamais lu comme du HTML.
@@ -10,6 +10,14 @@ export function el(tag, className = '', text = '') {
   if (className) node.className = className;
   if (text) node.textContent = text;
   return node;
+}
+
+// Un glyphe qui orne sans rien dire (✓ d'une confirmation, ☎ devant un numéro) : vu à l'écran, jamais lu par un lecteur d'écran, qui
+// dirait « black telephone » ou « check mark » avant le texte (audit UI/UX, U24).
+export function glyph(symbol, tag = 'span', className = 'glyph') {
+  const mark = el(tag, className, symbol);
+  mark.setAttribute('aria-hidden', 'true');
+  return mark;
 }
 
 // Un bouton (type « button » : jamais un envoi de formulaire) avec son texte et, s'il y en a un, son
@@ -52,7 +60,7 @@ export const matchesTerm = (label, term) => term === '' || normalize(label).incl
 
 // Ce que dit une recherche de liste, lu par les lecteurs d'écran : rien tant que rien n'est tapé, puis combien de
 // valeurs répondent.
-export const foundText = (term, count) => (term === '' ? '' : count === 0 ? 'Aucun résultat' : `${count} résultat${count > 1 ? 's' : ''}`);
+export const foundText = (term, count) => (term === '' ? '' : count === 0 ? 'Aucun résultat' : `${formatCount(count)} résultat${count > 1 ? 's' : ''}`);
 
 // Le focus est celui du clavier (l'anneau se voit), pas celui d'un clic. Un navigateur sans `:focus-visible` compte pour clavier.
 export function isFocusVisible(element) {

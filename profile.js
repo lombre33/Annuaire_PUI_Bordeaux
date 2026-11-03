@@ -357,7 +357,7 @@ export function diffProfile(row, draft, referenceMaps, { admin = false, creating
   const errors = [];
   const fieldErrors = {};
   const fail = (field, message) => {
-    errors.push(`${field.label} : ${message}`);
+    errors.push(`${field.label} : ${message}`);
     fieldErrors[field.key] = message;
   };
 

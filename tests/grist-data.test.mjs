@@ -1,10 +1,10 @@
 import { mock, test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import {
   safeValues, tableToRows, text, pickLabel, refId, refLabel, isEmptyReference, normalize, normalizeForSearch,
   compareLabels, compareContacts,
   formatPhone, createRequestSequencer, debounce, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
-  labelMapFromRows, mailtoHref, groupLabelMap, hasAccepted, buildContacts, describeVisibility, displayName, taskActionNumber, actionNumber, shownEmail,
+  labelMapFromRows, mailtoHref, telHref, groupLabelMap, hasAccepted, buildContacts, describeVisibility, displayName, taskActionNumber, actionNumber, shownEmail,
   loadDirectory
 } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
@@ -348,6 +348,21 @@ test('mailtoHref builds a link for a plain address and refuses anything that cou
   ['a@b.example?cc=x@y.example', 'a@b.example,c@d.example', 'a@b.example;c@d.example', 'a@b.example&bcc=x@y.example', 'a@b.example#x', 'a b@c.example',
     'pas-une-adresse', '@b.example', 'a@', '', null, undefined].forEach(value => {
     assert.equal(mailtoHref(value), '', `${value} ne doit pas devenir un lien`);
+  });
+});
+
+test('telHref builds a tel: link for a number that can be dialled unambiguously, and leaves free text as text (audit UI/UX, U38)', () => {
+  assert.equal(telHref('05 36 49 90 12'), 'tel:0536499012', 'les espaces de lecture disparaissent');
+  assert.equal(telHref('05.36.49.90.12'), 'tel:0536499012');
+  assert.equal(telHref('05-36-49-90-12'), 'tel:0536499012');
+  assert.equal(telHref('  05 36 49 90 12  '), 'tel:0536499012', 'espaces autour retirés');
+  assert.equal(telHref('+33 5 36 49 90 13'), 'tel:+33536499013', 'le « + » d\'un numéro international est gardé');
+  assert.equal(telHref('0033 5 36 49 90 13'), 'tel:0033536499013');
+  assert.equal(telHref('12 34 56'), 'tel:123456', 'six chiffres : le plus court qu\'on propose');
+  ['poste 23', '05 36 49 90 12 / 06 39 98 12 34', '05 36 49 90 12 ou 06 39 98 12 34', '+33 (0)5 36 49 90 13', '05 36 49 90 12 p. 23',
+    '05 36 49 90 12;ext=23', '123', '12345', '+1234567890123456', '0'.repeat(16), '+', '++33 5 36 49 90 13', '33+5', 'tel:0536499012',
+    'javascript:alert(1)', '', '   ', null, undefined].forEach(value => {
+    assert.equal(telHref(value), '', `${value} ne doit pas devenir un lien`);
   });
 });
 

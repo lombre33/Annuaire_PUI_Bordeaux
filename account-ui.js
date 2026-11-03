@@ -55,8 +55,9 @@ function buttonPlacer(root, { switchButton, adminButton, etabButton, createButto
   };
 }
 
-// Message passager sous le bandeau. `setStatus(message, tone)` : '' l'efface ; `tone` : 'info', 'error' pour un échec, ou
-// 'done' (invisible, voir announce). Un nouveau message remplace le précédent et son délai.
+// Message passager sous le bandeau. `setStatus(message, tone)` : '' l'efface ; `tone` : 'info', 'error' pour un échec,
+// 'stale' (comme 'info', mais pour un écran qui n'est plus à jour : la lecture suivante qui réussit l'efface, voir
+// clearStale) ou 'done' (invisible, voir announce). Un nouveau message remplace le précédent et son délai.
 function statusLine(status) {
   let announceTimer = 0;
   const setStatus = (message, tone = 'info') => {
@@ -72,7 +73,10 @@ function statusLine(status) {
     setStatus(message, 'done');
     announceTimer = setTimeout(() => setStatus(''), PRESENCE_ANNOUNCE_MS);
   };
-  return { setStatus, announce };
+  const clearStale = () => {
+    if (status.dataset.tone === 'stale') setStatus('');
+  };
+  return { setStatus, announce, clearStale };
 }
 
 // Rend le focus au bouton quand la fenêtre qu'il a ouverte se ferme ; faux quand le bouton n'est pas là.
@@ -93,7 +97,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
   const { name, detail, switchButton, createButton, editButton, etabButton, adminButton } = parts;
   const paintAvatar = avatarPainter(parts.avatar, attachments);
   const placeButtons = buttonPlacer(root, parts);
-  const { setStatus, announce } = statusLine(parts.status);
+  const { setStatus, announce, clearStale } = statusLine(parts.status);
   const focusEdit = focusIfShown(editButton);
   const focusCreate = focusIfShown(createButton);
   const focusEtab = focusIfShown(etabButton);
@@ -141,7 +145,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
       adminButton.setAttribute('aria-pressed', String(admin && adminMode));
       adminButton.title = adminMode
         ? 'Quitter le mode admin'
-        : 'Mode admin : modifier la fiche de n\'importe quelle personne';
+        : 'Mode admin : modifier la fiche de n\'importe quelle personne';
     },
 
     // Le focus revient au bouton « Modifier mon profil », « Créer ma fiche » (quand la fenêtre se ferme sans que la
@@ -159,6 +163,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
     },
 
     setStatus,
-    announce
+    announce,
+    clearStale
   };
 }

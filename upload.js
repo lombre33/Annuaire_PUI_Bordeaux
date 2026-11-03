@@ -52,12 +52,12 @@ const lowerFirst = text => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
 const failuresFor = hint => ({
   token: `Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. ${hint}`,
   address: `Grist a indiqué une adresse d’envoi que le widget n’accepte pas. ${hint}`,
-  network: `L’envoi du fichier à Grist a échoué : le navigateur n’a pas pu joindre le serveur, ou l’a refusé. ${hint}`,
-  timeout: `Grist n’a pas répondu à temps à l’envoi du fichier. Réessayez ; ${lowerFirst(hint)}`,
-  denied: 'Grist a refusé le fichier : vos droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur.',
-  tooLarge: 'Grist a refusé le fichier : il est trop volumineux.',
-  response: `Grist n’a pas confirmé l’envoi du fichier. Réessayez ; ${lowerFirst(hint)}`,
-  failedWith: status => `Grist a refusé le fichier (erreur ${status}). Réessayez ; ${lowerFirst(hint)}`
+  network: `L’envoi du fichier à Grist a échoué : le navigateur n’a pas pu joindre le serveur, ou l’a refusé. ${hint}`,
+  timeout: `Grist n’a pas répondu à temps à l’envoi du fichier. Réessayez ; ${lowerFirst(hint)}`,
+  denied: 'Grist a refusé le fichier : vos droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur.',
+  tooLarge: 'Grist a refusé le fichier : il est trop volumineux.',
+  response: `Grist n’a pas confirmé l’envoi du fichier. Réessayez ; ${lowerFirst(hint)}`,
+  failedWith: status => `Grist a refusé le fichier (erreur ${status}). Réessayez ; ${lowerFirst(hint)}`
 });
 
 // L'adresse d'envoi est celle que Grist a donnée pour le jeton : https, ou le poste local pour la
@@ -73,7 +73,7 @@ async function writeAccess(docApi, failures, log) {
   try {
     raw = await docApi.getAccessToken({ readOnly: false });
   } catch (error) {
-    log.warn('[ENVOI] Jeton d\'écriture refusé par Grist :', error?.message || error);
+    log.warn('[ENVOI] Jeton d\'écriture refusé par Grist :', error?.message || error);
     throw new UploadError(failures.token, error);
   }
   const info = readTokenInfo(raw);
@@ -99,7 +99,7 @@ async function post(info, file, { fetchImpl, timeout }, failures, log) {
       signal: controller.signal
     });
   } catch (error) {
-    log.warn('[ENVOI] Requête d\'envoi impossible :', error?.name === 'AbortError' ? 'délai dépassé' : (error?.name || 'erreur'));
+    log.warn('[ENVOI] Requête d\'envoi impossible :', error?.name === 'AbortError' ? 'délai dépassé' : (error?.name || 'erreur'));
     throw new UploadError(error?.name === 'AbortError' ? failures.timeout : failures.network, error);
   } finally {
     clearTimeout(timer);

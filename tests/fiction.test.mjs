@@ -3,7 +3,7 @@
 // (CHANGELOG.md) cite des messages d'autrefois : il n'est pas relu.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { sampleTables } from './fixtures.mjs';
 import { assertFictionalContacts, realLookingCoordinates } from './support/fiction.mjs';
 import { REPOSITORY_TEXTS } from './support/widget-sources.mjs';

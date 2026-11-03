@@ -6,7 +6,7 @@
 // déclaration. Les tests, la démonstration et les commentaires ne comptent pas.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { WIDGET_SOURCES, withoutComments } from './support/widget-sources.mjs';
 
 const EXPORTED = /^export\s+(?:async\s+)?(?:function\*?|class|const|let|var)\s+([A-Za-z_$][\w$]*)/gm;

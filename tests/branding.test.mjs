@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import fs from 'node:fs';
 import { brandingSummary, buildBranding, logoForContact, logoSize, inkBounds, hasInk } from '../branding.js';
 import { BAND_LOGO } from '../constants.js';

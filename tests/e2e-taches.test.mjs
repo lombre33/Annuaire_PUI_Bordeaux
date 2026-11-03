@@ -16,7 +16,7 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { unrankableTaskTables, withTaskActions, withIdentity, ANA_EMAIL } from './fixtures.mjs';
 import { skip, reload, waitForCards, cardNames, gridCard, openOwn, withWidget } from './support/browser.mjs';
 import { assertKeyboardWalk, groupedMenu, optionCounts } from './support/grouped-menu.mjs';

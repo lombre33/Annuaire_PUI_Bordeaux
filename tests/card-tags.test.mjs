@@ -7,7 +7,7 @@
 // longues (withLongTagLists, tests/fixtures.mjs) : 9 compétences, 6 actions, 5 communautés et une instance.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { sampleTables, withClones, withLongTagLists } from './fixtures.mjs';
 import { accessibilityTree, accessibleNode } from './support/accessibility-tree.mjs';
 import { gridCard, skip, waitForCards, withWidget } from './support/browser.mjs';

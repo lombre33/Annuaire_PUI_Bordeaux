@@ -96,7 +96,7 @@ export function createAttachments(docApi, { now = Date.now, timeout = TOKEN_TIME
         counts.failed += 1;
         if (!warned) {
           warned = true;
-          log.warn('[LOGOS] Jeton d\'accès aux pièces jointes indisponible : les logos sont remplacés par le texte.', error);
+          log.warn('[LOGOS] Jeton d\'accès aux pièces jointes indisponible : les logos sont remplacés par le texte.', error);
         }
         return false;
       } finally {

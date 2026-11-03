@@ -33,11 +33,11 @@ export function createLogoReport(attachments) {
     const problems = stats.refused + stats.late + stats.token + stats.pending;
     const balance = `${stats.loaded} logo${stats.loaded > 1 ? 's' : ''} chargé${stats.loaded > 1 ? 's' : ''} sur ${stats.asked}`
       + (problems ? ` (${stats.refused} refusé${stats.refused > 1 ? 's' : ''}, ${stats.late} sans réponse, ${stats.token} sans jeton, ${stats.pending} en attente)` : '')
-      + ` ; affichés : ${cards.loaded}/${cards.all} sur les cartes, ${band.loaded}/${band.all} dans le bandeau`;
+      + ` ; affichés : ${cards.loaded}/${cards.all} sur les cartes, ${band.loaded}/${band.all} dans le bandeau`;
     if (balance === reportedBalance) return;
     reportedBalance = balance;
     const token = attachments.stats();
-    const line = `[LOGOS] Bilan : ${balance} ; cartes redessinées ${rendered} fois ; jetons demandés à Grist ${token.requested} (${token.failed} en échec) ; ${browserLabel()}.`;
+    const line = `[LOGOS] Bilan : ${balance} ; cartes redessinées ${rendered} fois ; jetons demandés à Grist ${token.requested} (${token.failed} en échec) ; ${browserLabel()}.`;
     (problems || cards.loaded < cards.all || band.loaded < band.all ? console.warn : console.info)(line);
   }
 

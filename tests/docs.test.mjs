@@ -19,7 +19,7 @@
 // captures de démonstration »).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert, { plain } from './support/assert.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -43,7 +43,9 @@ import { WIDGET_SOURCES, withoutComments } from './support/widget-sources.mjs';
 import { startDemoServer } from '../docs/demo/serveur-demo.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
+// Les textes se lisent sans espace insécable : le guide cite les messages du widget avec des espaces ordinaires (le widget, lui, y met des
+// espaces insécables, tests/typography.test.mjs).
+const read = file => plain(fs.readFileSync(path.join(ROOT, file), 'utf8'));
 
 // Chemins du dépôt écrits avec « / », comme dans les liens Markdown.
 const DOC_FILES = ['README.md', ...fs.readdirSync(path.join(ROOT, 'docs'))
@@ -300,27 +302,25 @@ test('pour chaque personne de démonstration, le bandeau « Ma présence » dit 
     assert.equal(persons.length, 1, `${role} : une seule fiche doit porter ${email}`);
     const { tone, message } = describePresence(persons);
     assert.equal(tone, expectedTone[role], role);
-    assert.ok(guide.includes(message), `Le guide utilisateur doit citer le message de « ${role} » : ${message}`);
+    assert.ok(guide.includes(plain(message)), `Le guide utilisateur doit citer le message de « ${role} » : ${message}`);
   }
 });
 
 test('le guide utilisateur cite les autres messages de « Ma présence » : raisons de masquage, fiches multiples, erreurs d\'écriture', () => {
   const guide = read('docs/utilisateurs.md');
   const status = overrides => ({ accepted: true, visible: false, named: true, etablissement: 'ok', partnerOnly: false, ...overrides });
-  const alone = overrides => describePresence([{ status: status(overrides) }]).message;
+  const alone = overrides => plain(describePresence([{ status: status(overrides) }]).message);
   const reasons = [{ named: false }, { etablissement: 'missing' }, { etablissement: 'unknown' },
     { etablissement: 'not_validated' }, { etablissement: 'not_eligible' }]
     .map(overrides => alone(overrides).match(/masquée : (.+)\. Contactez/)?.[1]);
   assert.ok(reasons.every(Boolean), 'presence.js ne donne plus la raison du masquage sous la forme attendue : adaptez ce test et le guide.');
 
-  const two = statuses => describePresence(statuses.map(item => ({ status: status(item) }))).message;
+  const two = statuses => plain(describePresence(statuses.map(item => ({ status: status(item) }))).message);
   const messages = [
     ...reasons,
     ...two([{ accepted: true, visible: true }, { accepted: false }]).split(/(?<=\.) /),
     ...two([{ accepted: true, visible: true }, { accepted: true, visible: true }]).split(/(?<=\.) /),
-    explainWriteError(new Error('Blocked by table update access rules')),
-    explainWriteError(new Error('Cannot modify a formula column')),
-    explainWriteError(new Error('boom'))
+    ...['Blocked by table update access rules', 'Cannot modify a formula column', 'boom'].map(detail => plain(explainWriteError(new Error(detail))))
   ];
   const missing = messages.filter(message => !guide.includes(message));
   assert.deepEqual(missing, [], 'Citez ces messages dans la section « Ma présence » de docs/utilisateurs.md.');
@@ -588,7 +588,7 @@ test('les messages cités dans « Modifier ma fiche » et « Créer ma fiche » 
   const composed = [describeHiddenFiche(hidden({}), { own: true }), describeHiddenFiche(hidden({}), { own: false }),
     describeHiddenFiche(hidden({ etablissement: 'not_eligible' }), { own: false }), ...photoRefusals,
     // ce que la personne lit une fois sa fiche créée (la raison d'une fiche masquée varie : le guide la remplace par …)
-    describeCreated({ visible: true }, true), describeCreated({ visible: false }, false), describeCreated(null, true)];
+    describeCreated({ visible: true }, true), describeCreated({ visible: false }, false), describeCreated(null, true)].map(plain);
   composed.forEach(message => assert.ok(section.includes(message), `Le guide doit citer : ${message}`));
 
   const code = withUploadHint(widgetCode(), PHOTO_UPLOAD_HINT);
@@ -622,7 +622,7 @@ test('les messages cités dans « La fiche de mon établissement » sont ceux du
   assert.ok(byHand, 'upload.js doit définir la consigne par défaut des échecs d\'envoi (BY_HAND), celle des logos.');
   const code = withUploadHint(rawCode, byHand);
   // Le refus d'un format liste les formats acceptés : on le demande à la fonction qui le compose.
-  const composed = [checkImageFile({ type: 'application/pdf', size: 10 })];
+  const composed = [checkImageFile({ type: 'application/pdf', size: 10 })].map(plain);
   const known = fragment => code.includes(fragment) || code.includes(fragment.replace(/\.$/, '')) || composed.includes(fragment)
     || code.includes(fragment.replace(/ : [A-Z]{2,}$/, ' : '))                // le sigle de l'établissement est ajouté à l'affichage
     || /^\d+ modifications? : .+$/.test(fragment) || /^\d+,\d Mo$/.test(fragment) || /^Cette image pèse \d+,\d Mo : choisissez-en une de 1 Mo au plus\.$/.test(fragment)
@@ -648,7 +648,7 @@ test('le guide cite le bandeau d\'un compte reconnu mais sans fiche', () => {
   const admin = describeUnknownAccount({ email: '…', admin: true });
   const noColumn = describeUnknownAccount({ email: '…', admin: false, emailColumn: false });
   [unknown.name, unknown.message, admin.name, noColumn.name, noColumn.message]
-    .forEach(cited => assert.ok(guide.includes(cited), `Le guide doit citer : ${cited}`));
+    .forEach(cited => assert.ok(guide.includes(plain(cited)), `Le guide doit citer : ${cited}`));
   assert.equal(unknown.switchable, false, 'le guide dit que ce bandeau n\'a pas d\'interrupteur');
 });
 

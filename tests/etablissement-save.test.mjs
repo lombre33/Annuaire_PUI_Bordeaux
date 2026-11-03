@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { EtablissementSaveError, readEtablissement, saveEtablissement, savePlanOf } from '../etablissement-save.js';
 import { KEEP_ONE, diffEtablissement, draftOfEtablissement, nominate, toggleResponsable } from '../etablissement.js';
 import { createFakeGrist } from './support/fake-grist.js';

@@ -7,7 +7,7 @@
 // fenêtre et enchaîne les étapes ; le formulaire est dans etablissement-form.js et le cadre commun
 // aux fenêtres (titre, pied, Échap) dans dialog-shell.js.
 
-import { button, el, notice } from './dom.js';
+import { button, el, glyph, notice } from './dom.js';
 import { createDialogShell, dialogApi } from './dialog-shell.js';
 import { draftOfEtablissement, rebaseDraft } from './etablissement.js';
 import { buildForm, forgetPreview, paintLogo, paintResponsables, refreshForm } from './etablissement-form.js';
@@ -53,7 +53,7 @@ function choiceItem(ctx, choice) {
 function renderChooser(ctx) {
   const { shell } = ctx;
   ctx.phase = 'choosing';
-  shell.setHeading('Mon établissement', 'Vous êtes responsable de plusieurs établissements : choisissez celui dont vous voulez modifier la fiche.');
+  shell.setHeading('Mon établissement', 'Vous êtes responsable de plusieurs établissements : choisissez celui dont vous voulez modifier la fiche.');
   ctx.ui = {};
   const list = el('ul', 'es-choices');
   list.append(...ctx.session.choices.map(choice => choiceItem(ctx, choice)));
@@ -72,7 +72,7 @@ function start(ctx, choice) {
 function renderLoading(ctx) {
   const { shell } = ctx;
   ctx.phase = 'loading';
-  shell.setHeading(`Fiche de l’établissement : ${ctx.acronym}`, 'Lecture de la fiche dans Grist…');
+  shell.setHeading(`Fiche de l’établissement : ${ctx.acronym}`, 'Lecture de la fiche dans Grist…');
   ctx.ui = {};
   const wait = el('p', 'es-wait', 'Lecture de la fiche dans Grist…');
   wait.setAttribute('role', 'status');
@@ -84,7 +84,7 @@ function renderLoading(ctx) {
 function renderFailed(ctx, message) {
   const { shell } = ctx;
   ctx.phase = 'failed';
-  shell.setHeading(`Fiche de l’établissement : ${ctx.acronym}`, 'La fiche n’a pas pu être ouverte.');
+  shell.setHeading(`Fiche de l’établissement : ${ctx.acronym}`, 'La fiche n’a pas pu être ouverte.');
   shell.body.replaceChildren(notice('ko', message || 'La fiche n’a pas pu être lue dans Grist.', 'alert'));
   shell.showActions(button('Fermer', 'btn btn-primary', shell.close));
   shell.announceStep();
@@ -113,7 +113,7 @@ async function load(ctx) {
 function renderForm(ctx, message = '') {
   const { shell, fiche } = ctx;
   ctx.phase = 'editing';
-  shell.setHeading(`Fiche de l’établissement : ${fiche.etablissement.acronym}`, 'Vos modifications s’enregistrent tout de suite, sans validation ni relecture.');
+  shell.setHeading(`Fiche de l’établissement : ${fiche.etablissement.acronym}`, 'Vos modifications s’enregistrent tout de suite, sans validation ni relecture.');
   shell.body.replaceChildren(...buildForm(ctx, message));
   ctx.ui.save = button('Enregistrer', 'btn btn-primary', () => save(ctx));
   ctx.ui.cancel = button('Annuler', 'btn', shell.close);
@@ -187,7 +187,7 @@ function finish(ctx) {
 function savedParts(ctx, result) {
   const done = el('div', 'sent');
   done.append(
-    el('div', 'sent-mark', '✓'),
+    glyph('✓', 'div', 'sent-mark'),
     el('h3', '', `La fiche de ${ctx.acronym} est enregistrée`),
     el('p', '', 'Les modifications s’appliquent tout de suite dans Grist, sans validation.')
   );

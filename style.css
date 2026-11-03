@@ -806,6 +806,11 @@ button.avatar:hover {
   color: var(--blue);
   text-decoration: none;
 }
+/* Le numéro est un lien `tel:` quand il se compose (render.js, fillPhone) : il garde l'aspect d'une ligne de texte, la couleur de
+   `.detail-row` et pas de soulignement. */
+.tel {
+  text-decoration: none;
+}
 .card-tags {
   display: block;
   grid-column: 1/-1;
@@ -1273,7 +1278,8 @@ button.avatar:hover {
   .etablissement-tag {
     padding: 3px 10px;
   }
-  a.email {
+  a.email,
+  a.tel[href] {
     padding: 6px 0;
   }
 }

@@ -166,7 +166,7 @@ export function createLogoImage(attachments, attachmentId, alt, onFail, { eager 
     try {
       held = onLoad?.(image, show) === false;
     } catch (error) {
-      console.error('[LOGOS] Erreur en préparant un logo :', error);
+      console.error('[LOGOS] Erreur en préparant un logo :', error);
     }
     if (held) setTimeout(show, holdLimit);
     else show();
@@ -242,7 +242,7 @@ const explained = new Set();
 function explain(reason) {
   if (explained.has(reason)) return;
   explained.add(reason);
-  console.warn(`[LOGOS] Les pixels d'un logo ne se lisent pas (${WHY[reason]}) : les logos des cartes se montrent tels quels, `
+  console.warn(`[LOGOS] Les pixels d'un logo ne se lisent pas (${WHY[reason]}) : les logos des cartes se montrent tels quels, `
     + 'dans leur case, sans égalisation de taille.');
 }
 

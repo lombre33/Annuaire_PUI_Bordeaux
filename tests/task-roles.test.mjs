@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { enrich, loadDirectory } from '../grist-data.js';
 import { withTaskRoles } from './support/task-role-tables.mjs';
 

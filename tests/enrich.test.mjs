@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { enrich, labelsOf } from '../grist-data.js';
 
 test('enrich: etablissement_label resolves BDD.Etablissement, a direct Reference, in any of the shapes Grist can send', () => {

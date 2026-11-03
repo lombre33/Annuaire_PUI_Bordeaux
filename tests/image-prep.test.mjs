@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { ImageError, checkImageFile, fitWithin, imageFaultMessage, megabytes, prepareImage, squareCrop } from '../image-prep.js';
 import { IMAGE_RULES } from '../constants.js';
 

@@ -12,13 +12,14 @@
 // `node --test` reste vert. CHROMIUM_PATH désigne un Chromium déjà installé.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert, { plain } from './support/assert.mjs';
 import {
   sampleTables, withDuplicateCHU, withoutOptionalColumns, withIdentity, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL
 } from './fixtures.mjs';
 import {
   skip, reload, cardCount, probeRemoved, waitForCards, waitForBanner, cardNames, resultCount, bannerText, withWidget, openWidget
 } from './support/browser.mjs';
+import { accessibilityTree, accessibleNode } from './support/accessibility-tree.mjs';
 import { assertKeyboardWalk, groupedMenu, optionCounts } from './support/grouped-menu.mjs';
 import { SEARCH_DELAY_MS } from '../constants.js';
 
@@ -134,6 +135,65 @@ test('une carte sans téléphone ni rôle PUI n\'affiche aucune ligne vide', { s
     const gina = cardNamed(page, 'Gina Bergonié');
     assert.equal(await gina.locator('.tel.visible').count(), 0);
     assert.equal(await gina.locator('.tag-static').count(), 0);
+  }));
+
+// Audit UI/UX, U38 : sur un écran tactile, le numéro d'une carte devient un lien `tel:` quand il se compose, avec l'aspect d'une ligne de texte
+// (grise, sans soulignement) ; une saisie libre ou deux numéros restent du texte. Sur ordinateur le numéro reste du texte : un second lien de
+// 15 px de haut sous l'adresse e-mail les ferait passer tous deux sous la cible de 24 px exigée sans l'espace qui les isole (WCAG 2.5.8).
+const phoneTables = () => {
+  const tables = sampleTables();
+  tables.BDD.numero_de_telephone[5] = '+33 5 36 49 90 13'; // Hostile : numéro international
+  tables.BDD.numero_de_telephone[8] = 'poste 23'; // Gina : une saisie libre
+  tables.BDD.numero_de_telephone[9] = '05 36 49 90 12 / 06 39 98 12 34'; // Hugo : deux numéros
+  return tables;
+};
+const TOUCH = { hasTouch: true, isMobile: true, viewport: { width: 412, height: 915 } };
+const phoneLook = link => link.evaluate(node => {
+  const probe = document.createElement('i');
+  probe.style.color = getComputedStyle(document.documentElement).getPropertyValue('--muted');
+  document.body.append(probe);
+  const muted = getComputedStyle(probe).color;
+  probe.remove();
+  const style = getComputedStyle(node);
+  return { color: style.color, muted, underline: style.textDecorationLine, display: style.display, size: style.fontSize };
+});
+
+test('sur un écran tactile le numéro d\'une carte est un lien tel: qui garde l\'aspect d\'un texte, et une saisie libre reste du texte (audit U38)', { skip }, () =>
+  withWidget({ tables: phoneTables(), contextOptions: TOUCH }, async ({ page }) => {
+    await waitForCards(page, 4);
+    const phone = name => cardNamed(page, name).locator('.tel');
+    assert.equal(await phone('Ana Martin').getAttribute('href'), 'tel:0536499012', 'le 0 initial rétabli est composé');
+    assert.equal(await phone('Hostile').getAttribute('href'), 'tel:+33536499013', 'l\'indicatif international garde son « + »');
+    assert.equal(await phone('Ana Martin').textContent(), '☎ 05 36 49 90 12', 'le texte affiché ne change pas');
+    assert.equal(await phone('Ana Martin').getAttribute('aria-label'), 'Téléphone : 05 36 49 90 12');
+    assert.ok(accessibleNode(await accessibilityTree(page), 'link', 'Téléphone : 05 36 49 90 12'), 'le lien se nomme sans le glyphe');
+    for (const [name, shown] of [['Gina Bergonié', '☎ poste 23'], ['Hugo Bernard', '☎ 05 36 49 90 12 / 06 39 98 12 34']]) {
+      assert.equal(await phone(name).textContent(), shown);
+      assert.equal(await phone(name).getAttribute('href'), null, `« ${shown} » ne se compose pas : du texte seulement`);
+      assert.equal(await phone(name).getAttribute('aria-label'), null);
+    }
+
+    // Même aspect qu'une ligne de texte : la couleur grise des détails, pas le bleu d'un lien, et pas de soulignement.
+    const look = await phoneLook(phone('Ana Martin'));
+    assert.deepEqual(look, { color: look.muted, muted: look.muted, underline: 'none', display: 'block', size: '12px' });
+    assert.equal((await phoneLook(phone('Gina Bergonié'))).color, look.muted, 'le numéro en texte a la même couleur');
+
+    // La cible du doigt : la même marge que l'adresse e-mail (WCAG 2.5.8) pour le lien, rien de plus pour le texte.
+    const padding = locator => locator.evaluate(node => getComputedStyle(node).paddingTop);
+    assert.equal(await padding(phone('Ana Martin')), '6px');
+    assert.equal(await padding(phone('Gina Bergonié')), '0px');
+  }));
+
+test('sur ordinateur le numéro d\'une carte reste du texte, au même aspect : aucun second lien sous l\'adresse e-mail (audit U38, WCAG 2.5.8)', { skip }, () =>
+  withWidget({ tables: phoneTables() }, async ({ page }) => {
+    await waitForCards(page, 4);
+    for (const name of ['Ana Martin', 'Hostile']) {
+      const phone = cardNamed(page, name).locator('.tel');
+      assert.equal(await phone.getAttribute('href'), null, `${name} : un numéro qui se compose reste du texte sur ordinateur`);
+      assert.equal(await phone.getAttribute('aria-label'), null);
+    }
+    const look = await phoneLook(cardNamed(page, 'Ana Martin').locator('.tel'));
+    assert.deepEqual(look, { color: look.muted, muted: look.muted, underline: 'none', display: 'block', size: '12px' });
   }));
 
 test('s\'affiche sans erreur si BDD n\'a pas les colonnes facultatives téléphone et rôle PUI', { skip }, () =>
@@ -1100,12 +1160,48 @@ test('écriture réussie mais annuaire impossible à relire : le bandeau le dit,
     await presenceSwitch(page).click();
     await page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent !== 'Enregistrement…');
     assert.equal(await accountStatus(page), 'Modification enregistrée ; l\'annuaire n\'a pas pu être rechargé.');
-    assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'info',
+    assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'stale',
       'ce n\'est pas une réussite confirmée : l\'annuaire montre encore l\'ancien état');
     assert.equal(await isStatusOnScreen(page), true, 'et le message se voit');
     assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), true, 'le choix est bien dans Grist');
     await waitForBanner(page);
     assert.equal(await presenceSwitch(page).getAttribute('aria-disabled'), null, 'l\'interrupteur est de nouveau utilisable');
+  }));
+
+// Audit UI/UX, U53 : l'écriture a réussi, la relecture a échoué. L'interrupteur lisait encore l'ancien état de l'annuaire : il restait sur
+// « éteint » alors que Grist avait « accepté », et un deuxième clic réécrivait la même valeur au lieu de la défaire.
+test('écriture réussie mais annuaire impossible à relire : l\'interrupteur montre ce que Grist a enregistré et un deuxième clic écrit le contraire', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: IRIS_EMAIL }, async ({ page }) => {
+    await waitForAccountBar(page);
+    await page.evaluate(() => { window.__failTables = ['Etablissements']; });
+    const stillSaved = () => page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent.startsWith('Modification enregistrée'));
+    await presenceSwitch(page).click();
+    await stillSaved();
+    assert.equal(await isSwitchOn(page), true, 'Grist a enregistré « j\'accepte » : l\'interrupteur le dit');
+    assert.equal(await cardCount(page), 4, 'les cartes, elles, n\'ont pas pu être relues');
+
+    await presenceSwitch(page).click();
+    await page.waitForFunction(() => window.__fake.calls.filter(call => call.table === 'BDD').length === 2);
+    await stillSaved();
+    assert.equal(await isSwitchOn(page), false, 'le deuxième clic a défait le premier');
+    assert.deepEqual((await writesTo(page, 'BDD')).map(call => call.values.Accepte_apparaitre), [true, false],
+      'la deuxième écriture est le contraire de la première, pas la même valeur');
+    assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), false);
+  }));
+
+test('le message « l\'annuaire n\'a pas pu être rechargé » s\'efface dès qu\'une lecture suivante réussit', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: IRIS_EMAIL }, async ({ page }) => {
+    await waitForAccountBar(page);
+    await page.evaluate(() => { window.__failTables = ['Etablissements']; });
+    await presenceSwitch(page).click();
+    await page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent.startsWith('Modification enregistrée'));
+    assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'stale');
+
+    await page.evaluate(() => { window.__failTables = []; });
+    await reload(page);
+    await waitForCards(page, 5);
+    assert.equal(await accountStatus(page), '', 'l\'écran est de nouveau à jour : plus rien à dire');
+    assert.equal(await isSwitchOn(page), true);
   }));
 
 test('une personne identifiée sans fiche dans BDD voit une mention sans interrupteur, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
@@ -1136,7 +1232,7 @@ test('BDD sans colonne email : le bandeau accuse la configuration, la console l\
     assert.equal(await accountMessage(page),
       'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.');
     assert.equal(await presenceSwitch(page).isHidden(), true);
-    assert.ok((await identityLogs(logs)).some(line => line.includes('colonne « email »')));
+    assert.ok((await identityLogs(logs)).some(line => plain(line).includes('colonne « email »')));
     assert.deepEqual(await Promise.all(logs.errors), []);
   });
 });

@@ -6,7 +6,7 @@
 // Optionnel, comme tests/support/browser.mjs : nécessite Playwright (voir TESTING.md). Sans lui les scénarios navigateur sont
 // ignorés et `node --test` reste vert.
 
-import assert from 'node:assert/strict';
+import assert from './assert.mjs';
 import { createHarness, layoutSettled, runWidget } from './harness.mjs';
 
 const harness = await createHarness({ keepScrollbars: true });

@@ -8,7 +8,7 @@
 // `node --test` reste vert. CHROMIUM_PATH désigne un Chromium déjà installé.
 
 import { test, after } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './assert.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

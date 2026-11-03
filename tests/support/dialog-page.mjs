@@ -3,7 +3,7 @@
 // (#profileDialog, #etabDialog) et les contrôles d'accessibilité et de mise en page qui valent pour toutes. Les fonctions
 // reçoivent la `page` du harnais (tests/support/browser.mjs).
 
-import assert from 'node:assert/strict';
+import assert from './assert.mjs';
 
 // Les repères de la fenêtre dont le <dialog> a pour identifiant `id` et le titre `titleId`.
 export function dialogPage(id, titleId) {

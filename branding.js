@@ -98,7 +98,7 @@ export function brandingSummary(branding) {
   const entries = [...branding.logos.byId.values()];
   const withLogo = entries.filter(entry => entry.logo !== null).length;
   return `${entries.length} établissement${entries.length > 1 ? 's' : ''} lu${entries.length > 1 ? 's' : ''} dans ${ETABLISSEMENT_TABLE}, `
-    + `${withLogo} avec un logo dans la colonne ${BRANDING.logoColumn}${withLogo === 0 && entries.length > 0 ? ' (aucun : les cartes montrent le sigle)' : ''}`;
+    + `${withLogo} avec un logo dans la colonne ${BRANDING.logoColumn}${withLogo === 0 && entries.length > 0 ? ' (aucun : les cartes montrent le sigle)' : ''}`;
 }
 
 // Taille d'un logo de même poids visuel que ses voisins : on vise une surface, répartie

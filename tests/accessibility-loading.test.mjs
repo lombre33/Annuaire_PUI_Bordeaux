@@ -6,7 +6,7 @@
 // jusqu'à `window.__releaseReads()` ; `apiBlocked` empêche le script de l'API de se charger (tests/support/harness.mjs).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { SEARCH_DELAY_MS } from '../constants.js';
 import { sampleTables } from './fixtures.mjs';
 import { accessibilityTree } from './support/accessibility-tree.mjs';

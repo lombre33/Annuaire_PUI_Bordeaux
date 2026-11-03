@@ -5,6 +5,8 @@
 // Chaque nœud : { role, name, description, backendDOMNodeId, … } puis ses états et propriétés ARIA (`expanded`, `checked`, `live`,
 // `busy`…), tels que Chromium les nomme. Optionnel comme les autres tests navigateur : nécessite Chromium (voir TESTING.md).
 
+import { plain } from './assert.mjs';
+
 export async function accessibilityTree(page) {
   const session = await page.context().newCDPSession(page);
   try {
@@ -22,4 +24,4 @@ export async function accessibilityTree(page) {
 }
 
 // Le premier nœud d'un rôle et d'un nom : `name` est le nom entier, pas un morceau.
-export const accessibleNode = (tree, role, name) => tree.find(node => node.role === role && node.name === name);
+export const accessibleNode = (tree, role, name) => tree.find(node => node.role === role && plain(node.name) === plain(name));

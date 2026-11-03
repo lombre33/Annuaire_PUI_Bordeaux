@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert, { plain as readable } from './support/assert.mjs';
 import {
   ProfileSaveError, buildRowUpdate, signatureOf, prepareReview, saveProfile, unsavedLabels, prepareCreation, createProfile
 } from '../profile-save.js';
@@ -478,7 +478,7 @@ test('saveProfile refuses an address that another fiche took since the review, a
   const next = await review(w, 2, { email: 'convoite@exemple.example' }, { admin: true });
   w.tables.BDD.email[3] = 'Convoite@Exemple.example'; // Dan a pris l'adresse entre-temps (sans toucher à la fiche de Bob)
   await assert.rejects(saveProfile(w.docApi, next, { log: quiet }),
-    error => error instanceof ProfileSaveError && /Cette adresse e-mail est maintenant celle d'une autre fiche : rien n'a été modifié/.test(error.message));
+    error => error instanceof ProfileSaveError && /Cette adresse e-mail est maintenant celle d'une autre fiche : rien n'a été modifié/.test(readable(error.message)));
   assert.deepEqual(writes(w), []);
 });
 
@@ -613,7 +613,7 @@ test('prepareReview refuses a photo when the Avatar column is not a column of at
   tables._grist_Tables_column.type[column] = 'Text';
   const text = await world({ tables });
   await assert.rejects(review(text, 1, { Avatar: photo() }),
-    error => error instanceof ProfileSaveError && /Photo de profil : la colonne Avatar n'est pas une colonne de pièces jointes/.test(error.message));
+    error => error instanceof ProfileSaveError && /Photo de profil : la colonne Avatar n'est pas une colonne de pièces jointes/.test(readable(error.message)));
 
   const plain = await world();
   const { row, draft } = plain.form(1);
@@ -676,7 +676,7 @@ test('saveProfile asks for the photo again when there is no file or no way to se
   const calls = w.calls.length;
   for (const options of [{ log: quiet }, { upload: 'oui', log: quiet }]) {
     await assert.rejects(saveProfile(w.docApi, next, options),
-      error => error instanceof ProfileSaveError && error.message === 'La photo choisie n\'est plus disponible : choisissez-la de nouveau.' && error.leftover === null);
+      error => error instanceof ProfileSaveError && readable(error.message) === 'La photo choisie n\'est plus disponible : choisissez-la de nouveau.' && error.leftover === null);
   }
   await assert.rejects(saveProfile(w.docApi, { ...next, file: null }, { upload: uploader(w).upload, log: quiet }), /choisissez-la de nouveau/);
   assert.equal(w.calls.length, calls, 'rien n\'a été lu ni écrit');
