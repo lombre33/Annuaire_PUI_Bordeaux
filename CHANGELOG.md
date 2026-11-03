@@ -32,6 +32,17 @@ en 1.35.0 et 1.36.0. Comme convenu, chacun est montré en images avant/après à
   `contactCountText` et `countInScope`, le compteur après un interrupteur, une recherche ou un filtre, « Réinitialiser » grisé, allumé et rendu au focus, la pastille « Haut de page » à 320, 360, 390 et 1 280 px). Les tests qui lisaient « 1 contact » après une recherche lisent « 1 sur 4 contacts ».
   Neuf des dix échouent sur le code de la 1.33.0 (le dixième est une garde : un menu à plat n'a pas de ligne d'aide). **Non essayé** dans le vrai Grist d'Antoine, ni avec un vrai lecteur d'écran. Revenir en arrière : `git revert` de la fusion.
 
+## 1.33.1 — Relecture : les titres de groupe des cartes retrouvent leurs 8 px
+
+Correctif d'une régression de la 1.33.0, signalée par le fil documentation en mesurant la fenêtre de relecture. Rien à régler dans Grist.
+
+- **Avant (1.33.0).** Quand les titres de groupe des pastilles (Instances, Actions, Compétences…) sont devenus des `div` nommés et non des `h3` (U23), la règle `.rv-col h3 { margin-bottom: 8px }` de `dialogs.css` a cessé de les atteindre : dans les
+  cartes « Avant » et « Après » de la fenêtre de relecture, ils ont repris les 3 px de la grille. Six groupes de 5 px en moins : la fenêtre était **30 px plus basse** (par exemple 1 391 px au lieu de 1 436 sur la fiche fictive de Camille Rousseau)
+  et les titres plus près de leurs pastilles que sur la mise en page validée. La 1.33.0 disait pourtant « la mise en page est la même » : c'était vrai de la grille, pas de la relecture.
+- **Maintenant.** `.rv-card .tag-group-title { margin-bottom: 8px }` (`dialogs.css`) : huit pixels entre un titre de groupe et ses pastilles dans la fenêtre de relecture, comme avant. La grille de l'annuaire (3 px) n'a pas bougé.
+- Test : une vérification de plus dans le test de la relecture de `tests/e2e-profile.test.mjs` (l'écart titre-pastilles des cartes « Avant » et « Après » : 8 px), qui échoue sur le code de la 1.33.0 (3 px au lieu de 8). Toujours 1 096 tests. Les images de la documentation de la relecture gardaient déjà la mise en page validée.
+  Revenir en arrière : `git revert` de la fusion.
+
 ## 1.33.0 — Audit UI/UX : cinq constats mineurs (interrupteur de présence fidèle à Grist, repères pour lecteurs d'écran, lien tel: sur téléphone, espaces insécables)
 
 Premier lot de la réponse d'Antoine du 3 novembre 2026 (« Les seize ») à sa question du 20 octobre sur les 20 constats mineurs de l'audit UI/UX : les **cinq qui ne changent rien à ce qu'on voit sur un ordinateur**
