@@ -1,7 +1,7 @@
 // Filtrage et comptage des contacts, sans DOM ni effet de bord.
 
 import { CATEGORIES, FILTERS } from './constants.js';
-import { normalize, normalizeForSearch, labelsOf, compareLabels, text } from './grist-data.js';
+import { formatCount, normalize, normalizeForSearch, labelsOf, compareLabels, text } from './grist-data.js';
 
 export function createEmptyFilterState() {
   const state = {};
@@ -76,6 +76,28 @@ export function filterContacts(contacts, activeFilters, searchTerm, scope, exclu
 // l'ensemble dont on part, ils ne comptent pas parmi les contacts « écartés ».
 export function countInScope(contacts, scope) {
   return contacts.filter(contact => matchesScope(contact, scope)).length;
+}
+
+const BOTH_SCOPES = { fondateur: true, partenaire: true };
+
+// Ce que dit l'écran « Aucun contact » : pourquoi il n'y a rien à voir, et ce qu'il faut changer (audit UI/UX, U30). Il disait
+// toujours « Modifiez votre recherche ou réinitialisez les filtres », même quand l'annuaire était vide ou que les deux interrupteurs
+// Fondateurs et Partenaires étaient éteints (« Réinitialiser » ne les rallume pas). Les mêmes arguments que filterContacts, pour une
+// recherche qui ne donne rien. Renvoie { title, text }.
+export function describeEmptyResults(contacts, activeFilters, searchTerm, scope) {
+  const view = (title, message) => ({ title, text: message });
+  if (contacts.length === 0) return view('Aucun contact à afficher', 'L\'annuaire ne contient aucun contact pour le moment.');
+  if (!scope.fondateur && !scope.partenaire) {
+    return view('Aucun contact affiché', 'Ni « Fondateurs » ni « Partenaires » n\'est activé : activez-en un pour voir des contacts.');
+  }
+  // Des résultats attendent derrière l'interrupteur éteint : il suffit de l'activer.
+  const elsewhere = filterContacts(contacts, activeFilters, searchTerm, BOTH_SCOPES).length;
+  if (elsewhere > 0) {
+    const [own, other] = scope.fondateur ? ['les fondateurs', 'Partenaires'] : ['les partenaires', 'Fondateurs'];
+    return view('Aucun contact trouvé',
+      `Parmi ${own}, aucun contact ne correspond. Activez « ${other} » pour voir ${formatCount(elsewhere)} résultat${elsewhere > 1 ? 's' : ''}.`);
+  }
+  return view('Aucun contact trouvé', 'Modifiez votre recherche ou réinitialisez les filtres.');
 }
 
 // Renvoie les filtres actifs privés des valeurs qui ne sont plus une option du

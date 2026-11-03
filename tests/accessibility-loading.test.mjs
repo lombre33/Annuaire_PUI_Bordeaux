@@ -83,7 +83,7 @@ test('si le script de l\'API de Grist ne se charge pas, la page dit pourquoi et 
     assert.match(banner, /Impossible de joindre Grist/);
     assert.match(banner, /docs\.getgrist\.com/, 'le message nomme le script qui manque');
     assert.match(banner, /recharge/i, 'et dit quoi faire');
-    assert.equal(await page.locator('#statusBanner').getAttribute('role'), 'alert', 'le message est annoncé tout de suite');
+    assert.equal(await page.locator('#statusBanner .status-text').getAttribute('role'), 'alert', 'le message est annoncé tout de suite');
     // La console garde la cause, une seule fois : le widget s'arrête là, sans enchaîner d'autres erreurs.
     assert.deepEqual(logs.pageErrors, ['[GRIST] window.grist est absent : le script de l\'API de Grist (docs.getgrist.com) ne s\'est pas chargé.']);
   }));

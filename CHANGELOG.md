@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.35.0 — Audit UI/UX : le bandeau « Ma présence » garde sa place, des messages en clair, « Réessayer » quand l'annuaire ne se charge pas, un écran vide qui dit pourquoi
+
+Troisième lot de la réponse d'Antoine du 3 novembre 2026 (« Les seize »), le deuxième des **onze constats qui changent un peu l'écran** (U50, U52, U51, U30) ; les derniers (U25, U12, U11, U41) suivent en 1.36.0. Comme convenu,
+chacun est montré en images avant/après à Antoine avant d'être fusionné, et il peut en refuser un. Rien à régler dans Grist.
+
+- **U50, le bandeau « Ma présence » ne repousse plus les cartes.** La personne connectée n'est connue qu'après une écriture dans la table-sonde (`readIdentity()`, `identity.js`) ; quand cette écriture finissait après la lecture de l'annuaire,
+  le bandeau apparaissait au-dessus des cartes déjà affichées et les poussait de 44 px (cadre de 860 px) à 172 px (téléphone). `pending()` (`account-ui.js`) lui réserve sa place dès le départ : une **copie du bandeau**, grisée, sans texte
+  lisible, avec les éléments du cas le plus courant (une personne qui apparaît : l'interrupteur et « Modifier mon profil »), donc la même mise en page et la même hauteur à toutes les largeurs. Elle n'a pas d'identifiant, est `aria-hidden` et
+  `inert` (ni lue, ni atteignable au clavier) et reste invisible en mode contraste élevé tout en gardant sa place. Elle disparaît quand le vrai bandeau paraît, ou quand il est sûr qu'il ne paraîtra pas : personne d'identifié (compte anonyme,
+  sonde refusée), annuaire illisible. Un compte Lecteur (`readonly=true`) n'a jamais de bandeau : rien n'est posé pour lui, donc rien n'apparaît puis ne disparaît (`READ_ONLY`, `main.js`, que les trois lectures de l'identité se partagent).
+  **Mesuré avec une sonde ralentie à 2,5 s : la première carte ne bouge plus, à 0 px près, de 320 à 1 480 px**, avec les polices du poste d'audit comme avec celles de la CI. **Limite** : un bandeau plus haut que le cas courant (trois raisons
+  de masquage, un administrateur ou un responsable avec leurs boutons) pousse encore les cartes de la différence.
+- **U52, les messages du bandeau « Ma présence ».** Les deux phrases qui renvoyaient à « un administrateur » sans dire qui ni comment ne le font plus : « Vous avez accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'a pas
+  encore été validé. » et « Grist a refusé la modification : vos droits ne permettent pas de changer cette information. » (le widget ne sait pas qui est l'administrateur, et ne donnera pas d'adresse de personnes : la formule est retirée plutôt que
+  laissée vague). Les raisons du masquage n'avaient plus de jargon à perdre (« périmètre » a disparu en 1.27.0) : inchangées. **La colonne à formule** n'affiche plus à toute personne un nom de colonne et un renvoi à `GRIST_SETUP.md` : elle lit la
+  phrase générale (« La modification n'a pas pu être enregistrée. Réessayez ; … »), et la console dit la colonne et la marche à suivre (`[PRESENCE] La colonne Accepte_apparaitre est une colonne à formule…`). **Un échec d'écriture est annoncé
+  tout de suite** : il a sa propre région (`.account-error`, `role="alert"`) au lieu de la région d'état polie, qui garde « Enregistrement… » et les confirmations. Visuellement rien ne change. **Non touché** : les « Contactez un administrateur »
+  des fenêtres de modification, de création, d'établissement et d'envoi de fichier (d'autres constats), la phrase d'une fiche créée mais masquée (`describeCreated()`) et celle de la colonne « email » absente de `BDD`, qui est une affaire de
+  configuration où prévenir l'administrateur reste le seul geste.
+- **U51, ce qu'on voit quand le bandeau n'apparaît pas : rien de plus à l'écran, volontairement.** Une adresse absente de `BDD` a son bandeau depuis la 1.18.0 (« Compte absent de l'annuaire », avec « Créer ma fiche ») ; la table-sonde absente, la
+  formule qui ne renvoie aucune adresse et l'écriture de la sonde refusée restent en console (`[IDENTITE] …`), ce que l'audit jugeait suffisant (« la console suffit ») ; le compte Lecteur le dit aussi en console. **La ligne « Compte en lecture seule :
+  votre présence ne peut pas être modifiée ici » que l'audit proposait n'est pas ajoutée** : un compte Lecteur est, le plus souvent, celui d'un visiteur qui consulte l'annuaire sans y avoir de fiche, et elle lui parlerait d'une « présence » qu'il
+  n'a pas ; elle ajouterait aussi une rangée au-dessus des cartes pour tous ces visiteurs. À arbitrer par Antoine : si la personne dont c'est le cas doit être prévenue, c'est peu de code.
+- **U30, des messages en clair et un geste pour réparer.** Le bandeau rouge (`#statusBanner`, devenu un conteneur : `p.status-text` en `role="alert"`, et un bouton) offre **« Réessayer »** quand l'annuaire ne se charge pas : il relit Grist ; pendant
+  l'essai le bouton dit « Nouvelle tentative… » et ne répond plus (`aria-disabled`, pour garder le focus) ; si l'essai échoue le message le dit (« La nouvelle tentative a échoué. ») et le bouton redevient « Réessayer », avec le focus ; si l'essai réussit
+  le bandeau part avec son bouton et le focus passe au compteur, au lieu de se perdre. Une panne ultérieure d'un annuaire déjà affiché garde les cartes et offre le bouton aussi. Quand le script de l'API de Grist ne s'est pas chargé, le bouton est
+  **« Recharger la page »**. Le message d'une panne de chargement (`describeLoadFailure()`, `grist-data.js`) nomme toujours la table ou la colonne manquante, puis dit quoi faire : « Cliquez sur « Réessayer » ; si le problème persiste, prévenez la personne
+  qui gère l'annuaire (le détail est dans la console du navigateur). » Les trois messages d'un annuaire dont rien ne s'affiche ne citent plus de colonne : « Personne n'a encore accepté d'apparaître dans l'annuaire. », « Aucun contact ne peut s'afficher :
+  aucun n'est rattaché à un établissement. Prévenez la personne qui gère l'annuaire. » et « Aucun contact ne remplit les conditions pour s'afficher (un nom, un établissement validé, fondateur ou partenaire). … » ; **la phrase d'avant, avec le nom des colonnes
+  et le geste à faire dans Grist, passe en console** (`[GRIST] …`, en avertissement), à l'usage de qui gère le document. **L'écran « Aucun contact » dit pourquoi** (`describeEmptyResults()`, `filters.js`) au lieu de dire toujours « Modifiez votre recherche ou
+  réinitialisez les filtres » : annuaire sans contact (titre « Aucun contact à afficher », phrase « L'annuaire ne contient aucun contact pour le moment. », sous le bandeau qui l'explique au lieu de le contredire), « Fondateurs » et « Partenaires » tous deux éteints
+  (« Ni « Fondateurs » ni « Partenaires » n'est activé : activez-en un pour voir des contacts. », ce que « Réinitialiser » ne dit pas), résultats derrière l'autre interrupteur (« Parmi les fondateurs, aucun contact ne correspond. Activez « Partenaires » pour voir 1 résultat. »),
+  et, pour une recherche qui ne donne vraiment rien, la phrase d'avant, mot pour mot. Nouveau module `status-ui.js` (`createStatusBanner()`, `createEmptyState()`, DOM seulement) ; `showStatus()` disparaît de `main.js`, le bandeau est un objet.
+- **Écarts avec la maquette v5, à signaler à Antoine.** Pendant l'attente de l'identité, une copie grisée du bandeau « Ma présence » tient la place du vrai (la maquette n'a pas d'attente) ; le bandeau d'état a un bouton ; l'écran « Aucun contact » a trois phrases
+  de plus que celle de la maquette, qui reste celle d'une recherche sans résultat ; deux messages du bandeau « Ma présence » ne disent plus « Contactez un administrateur » ; un échec d'écriture est annoncé aux lecteurs d'écran en alerte (rien ne change à l'œil).
+- Tests : 18 de plus (1 124 en tout), dont 12 dans un vrai navigateur (467 en tout) (`tests/account-room.test.mjs` : la première carte ne bouge pas de 320 à 1 280 px, la copie ni lue ni atteignable, jamais de copie pour un compte Lecteur, la place rendue quand personne
+  n'est identifié ou que l'annuaire est illisible ; `tests/status-feedback.test.mjs` : `describeEmptyResults()`, l'écran vide dans la page selon la cause, « Réessayer » du premier clic à la réussite en passant par une panne et par un essai lent, le focus, « Recharger la page » ;
+  `tests/presence.test.mjs`, `tests/load-directory.test.mjs`, `tests/e2e.test.mjs` : les nouvelles phrases, la colonne à formule en console, `describeLoadFailure()`). Tous échouent sur le code de la 1.34.0, sauf deux gardes (un compte Lecteur n'a pas de bandeau,
+  un annuaire illisible ne garde pas la place du bandeau). La suite complète passe avec les polices du poste d'audit (Inter) et avec celles de la CI (DejaVu Sans). **Non essayé** dans le vrai Grist d'Antoine (la durée réelle de la sonde et l'ordre d'arrivée de l'identité
+  et de l'annuaire sont à vérifier), ni avec un vrai lecteur d'écran. Revenir en arrière : `git revert` de la fusion.
+
 ## 1.34.0 — Audit UI/UX : la recherche d'un menu reste en haut, le compteur dit « N sur M », « Réinitialiser » grisé au repos, l'aide des menus rangés par groupe
 
 Deuxième lot de la réponse d'Antoine du 3 novembre 2026 (« Les seize »), le premier des **onze constats qui changent un peu l'écran** (U37, U36, U27) ; les autres (U30, U51, U52, U50, puis U25, U12, U11, U41) suivent

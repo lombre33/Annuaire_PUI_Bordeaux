@@ -286,7 +286,8 @@ h1 {
   .page-header > .account-bar[data-corner] .account-identity {
     grid-column: 2;
   }
-  .page-header > .account-bar .account-status {
+  .page-header > .account-bar .account-status,
+  .page-header > .account-bar .account-error {
     grid-column: 1 / -1;
   }
   .page-header > .account-bar .presence-switch,
@@ -1335,6 +1336,10 @@ button.avatar:hover {
   }
 }
 .status-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
   margin-top: 12px;
   padding: 12px 16px;
   color: #8a1c1c;
@@ -1343,6 +1348,40 @@ button.avatar:hover {
   border-radius: 12px;
   font-size: 13px;
   font-weight: 600;
+}
+.status-banner[hidden] {
+  display: none;
+}
+.status-text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+/* Le geste qui répare la panne (« Réessayer » ; « Recharger la page » sans l'API de Grist) : bordure à 3:1 au moins avec le
+   fond du bandeau (WCAG 1.4.11). */
+.status-action {
+  flex: none;
+  padding: 8px 16px;
+  color: #8a1c1c;
+  background: #fff;
+  border: 1px solid #c06a6a;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+.status-action[hidden] {
+  display: none;
+}
+.status-action:hover {
+  border-color: #8a1c1c;
+}
+.status-action:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+.status-action[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.65;
 }
 
 /* Ma présence : la personne connectée choisit d'apparaître ou non dans l'annuaire */
@@ -1493,12 +1532,53 @@ button.avatar:hover {
 .account-status:empty {
   display: none;
 }
-.account-status[data-tone="error"] {
+/* L'échec d'une écriture : sa propre région, annoncée tout de suite aux lecteurs d'écran (account-ui.js). */
+.account-error {
+  flex-basis: 100%;
   padding: 8px 12px;
   color: #8a1c1c;
   background: #fdecec;
   border: 1px solid #f5c2c2;
   border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.account-error:empty {
+  display: none;
+}
+
+/* La copie qui garde la place du bandeau pendant qu'on cherche qui est connecté (account-ui.js, audit UI/UX U50) : les mêmes éléments, donc
+   la même hauteur, mais sans texte visible, en gris. Hors de la lecture (aria-hidden) et du clavier (inert). */
+.account-bar[data-pending] .account-name,
+.account-bar[data-pending] .account-detail {
+  width: fit-content;
+  max-width: 100%;
+  color: transparent;
+  background: #e9e8f5;
+  border-radius: 6px;
+  user-select: none;
+}
+.account-bar[data-pending] .avatar {
+  color: transparent;
+  background: #e9e8f5;
+}
+.account-bar[data-pending] button {
+  color: transparent;
+  background: #e9e8f5;
+  border-color: transparent;
+  cursor: default;
+}
+.account-bar[data-pending] .presence-track {
+  background: #cfd2e2;
+}
+.account-bar[data-pending] .presence-thumb {
+  box-shadow: none;
+}
+/* Couleurs imposées (mode contraste élevé) : le texte transparent y deviendrait lisible. La place reste prise. */
+@media (forced-colors: active) {
+  .account-bar[data-pending] {
+    visibility: hidden;
+  }
 }
 
 /* Bandeau des fondateurs, tout en bas : leurs logos en rangées de huit, puis le logo de

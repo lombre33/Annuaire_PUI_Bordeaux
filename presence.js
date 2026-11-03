@@ -63,7 +63,7 @@ export function describePresence(persons) {
     accepted,
     visible,
     tone: 'warn',
-    message: `Vous avez accepté d'apparaître, mais votre fiche reste masquée${why}. Contactez un administrateur.${several}`
+    message: `Vous avez accepté d'apparaître, mais votre fiche reste masquée${why}.${several}`
   };
 }
 
@@ -151,15 +151,15 @@ export function classifyWriteError(error) {
 }
 
 export function explainWriteError(error) {
-  const kind = classifyWriteError(error);
-  if (kind === 'denied') {
-    return 'Grist a refusé la modification : vos droits ne permettent pas de changer cette information. Contactez un administrateur.';
-  }
-  if (kind === 'formula') {
-    return `La colonne ${CONSENT_COLUMN} est une colonne à formule : elle doit être une colonne de données (case à cocher). Voir GRIST_SETUP.md.`;
+  if (classifyWriteError(error) === 'denied') {
+    return 'Grist a refusé la modification : vos droits ne permettent pas de changer cette information.';
   }
   return 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.';
 }
+
+// Une colonne à formule est une affaire de configuration du document, que la personne ne peut pas régler : elle lit le message
+// général ci-dessus, et seule la console dit la colonne et la marche à suivre (audit UI/UX, U52).
+const FORMULA_COLUMN_NOTE = `[PRESENCE] La colonne ${CONSENT_COLUMN} est une colonne à formule : elle doit être une colonne de données (case à cocher). Voir GRIST_SETUP.md.`;
 
 // Écrit le choix de la personne sur toutes ses lignes, en une seule action
 // atomique : jamais une ligne changée et pas l'autre. Lève une PresenceError.
@@ -170,6 +170,7 @@ export async function setPresence(docApi, persons, accepted, { log = console } =
     await docApi.applyUserActions(actions);
   } catch (error) {
     log.error('[PRESENCE] écriture impossible :', error);
+    if (classifyWriteError(error) === 'formula') log.error(FORMULA_COLUMN_NOTE);
     throw new PresenceError(explainWriteError(error), error);
   }
 }
