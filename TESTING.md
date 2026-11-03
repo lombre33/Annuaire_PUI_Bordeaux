@@ -24,7 +24,8 @@ Sans dépendance, un fichier de tests par module :
   `refId`, `refLabel`, `isEmptyReference`,
   `resolveListItem`, `createRequestSequencer`, `debounce` (une rafale n'appelle qu'une fois, le
   premier appel part tout de suite, 1.29.0),
-  `referenceMapsEqual`, `mailtoHref` et `shownEmail` (l'adresse montrée sur la carte : `email_affiche`,
+  `referenceMapsEqual`, `mailtoHref`, `telHref` (le lien `tel:` d'un numéro qui se compose sans équivoque, rien pour
+  une saisie libre : 1.33.0) et `shownEmail` (l'adresse montrée sur la carte : `email_affiche`,
   sinon celle du compte).
 - `tests/enrich.test.mjs` — `enrich` (établissement dans ses 3 encodages, rôle,
   catégories liste dont compétences, domaines, tâches et actions, libellés sans doublon, anciennes
@@ -190,6 +191,9 @@ Sans dépendance, un fichier de tests par module :
   (`WIDGET_SOURCES` : les modules à la racine, `withoutComments` : sans leurs commentaires) et tous les
   textes du dépôt sauf le journal des versions (`REPOSITORY_TEXTS`), pour `tests/docs.test.mjs`,
   `tests/csp.test.mjs` et `tests/fiction.test.mjs`.
+- `tests/support/assert.mjs` — le `assert` de tous les tests (1.33.0) : celui de Node (`node:assert/strict`), qui compare un texte
+  à un autre sans tenir compte de l'espace insécable que le widget écrit devant « : ; ? ! » ; `plain` en donne la même lecture aux
+  comparaisons qui n'en passent pas (`includes`, une attente dans la page).
 - `tests/support-helpers.test.mjs` — les aides ci-dessus refusent ce qu'elles doivent refuser :
   chaque cas leur donne une page volontairement fautive (un bouton sans nom, un élément qui
   sort de la fenêtre ou de la carte, une tabulation qui s'échappe, le jeton dans la console, un
@@ -334,7 +338,7 @@ qui voit « ✎ Modifier » sous un logo et « Mon établissement » (responsabl
 responsable, compte Lecteur, anonyme, plusieurs établissements, établissement masqué, bouton forcé à
 la main), le contenu de
 la fenêtre face à la maquette v5, l'enregistrement du nom, de la visibilité, du logo (PNG, JPG, WebP,
-SVG piégé redessiné en PNG, retrait) et des responsables (nommer, retirer, rétablir, dernier
+SVG piégé redessiné en PNG, retrait) et des responsables (nommer par la liste déroulante à recherche, 1.32.0, ou par une adresse, retirer, rétablir, dernier
 responsable, retrait de soi-même, adresse dont la fiche est masquée), les refus avant envoi (dont les
 dimensions démesurées et le poids d'un PNG redessiné) et les pannes de l'envoi (droits, taille,
 serveur, réponse illisible, jeton refusé), le fichier resté sans servir, le refus de Grist, le conflit
@@ -428,6 +432,18 @@ inchangée en haut de page, opaque une fois la page défilée, la place que le c
 (`scroll-padding-top`), la pastille « N contacts · Haut de page » et son bouton, son contraste, le téléphone et
 l'impression. Rien n'y est joué dans un vrai Grist, sur Firefox ou Safari, avec un vrai lecteur d'écran ni sur un
 vrai téléphone : c'est la section 24.
+`tests/accessibility-cards.test.mjs` (4 scénarios), `tests/typography.test.mjs` (5) et quatre scénarios de `tests/e2e.test.mjs` y
+ajoutent, en 1.33.0, cinq constats mineurs de l'audit UI/UX. Les cartes lues par un lecteur d'écran (U23, U24), dans l'arbre
+d'accessibilité de Chromium : un `article` nommé par la personne pour chaque carte, la grille nommée « Contacts », des
+identifiants de nom uniques, aucun titre de plus au plan de la page (les groupes de pastilles sont des groupes nommés), le ☎
+qui n'entre dans aucun nom. L'interrupteur de présence (U53) : l'écriture réussit et la relecture échoue, l'interrupteur montre
+ce que Grist a enregistré, un deuxième clic écrit le contraire, et le message « l'annuaire n'a pas pu être rechargé » s'efface à la
+lecture suivante qui réussit. Le numéro d'une carte (U38) : un lien `tel:` à l'aspect d'un texte sur un écran tactile émulé, du texte
+sur ordinateur et pour une saisie libre (`telHref` est testé à part, dans `tests/grist-data.test.mjs`). La typographie (U39) : un petit
+lecteur de code, vérifié par ses propres cas, lit chaque texte des modules du widget et de `index.html` et refuse une espace
+ordinaire devant « : ; ? ! » ou dans « » ; le compteur dit « 1 234 contacts » avec l'espace insécable fine. Les tests comparent sans
+tenir compte de l'espace insécable (`tests/support/assert.mjs`). Rien n'y est joué dans un vrai Grist, avec un vrai lecteur d'écran ni
+sur un vrai téléphone : c'est la section 25.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -1667,3 +1683,37 @@ contient le cadre, et non le cadre, la barre ne restera pas en haut (premier poi
       toutes : ni plafond, ni bouton « +N » (le plafond, constat U35, a été écarté par Antoine le 20 octobre 2026).
 - [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles. Ce sont eux qui disent si la barre fixe, la
       pastille et l'arrêt sous la barre se comportent comme dans Chromium.
+
+## 25. Cartes pour lecteur d'écran, lien d'appel et typographie (1.33.0)
+
+Réglages d'abord : aucun. À jouer dans le vrai Grist, avec un vrai lecteur d'écran (NVDA ou JAWS sous Windows, VoiceOver sous
+macOS ou iOS, TalkBack sous Android) et sur un vrai téléphone. **Ce protocole est le seul contrôle de ces points avec de vrais
+outils : les tests de la 1.33.0 lisent l'arbre d'accessibilité de Chromium et émulent un écran tactile, sur un Grist simulé.**
+La 1.33.0 corrige aussi l'interrupteur de « Ma présence » quand l'écriture réussit et que la relecture de l'annuaire échoue
+(constat U53) : il ne se rejoue pas à la main dans un vrai Grist, puisqu'il faudrait faire échouer la lecture juste après
+l'écriture ; `tests/e2e.test.mjs` le joue sur le Grist simulé.
+
+- [ ] **Une carte est une fiche nommée.** Avec le lecteur d'écran, passer d'une carte à la suivante (touche des régions ou des
+      repères, selon le lecteur) : chaque carte est annoncée avec le nom de la personne, et non comme un « article » sans nom.
+      La liste des cartes est annoncée comme une zone « Contacts ».
+- [ ] **Le plan de la page est court.** Ouvrir la liste des titres du lecteur d'écran (touche H, ou le rotor de VoiceOver) :
+      aucun titre « Instances », « Actions », « GT »… par carte.
+- [ ] **Les groupes d'étiquettes sont des groupes nommés.** En entrant dans une carte, le lecteur annonce « Instances »,
+      « Actions »… comme un groupe, une seule fois (les mots dépendent du lecteur), puis lit les étiquettes.
+- [ ] **Les symboles décoratifs ne sont pas lus.** Devant un numéro de téléphone, pas de « black telephone » ni de nom de
+      symbole ; dans le message d'une fiche enregistrée, pas de « check mark » ; sur « Aucun contact trouvé » (chercher un nom qui
+      n'existe pas), pas de nom de symbole.
+- [ ] **Le numéro est un lien sur un téléphone.** Sur un vrai téléphone ou une tablette, dans le widget : le numéro d'une carte a
+      l'aspect d'une ligne de texte (gris, sans soulignement) ; un appui propose d'appeler ce numéro (l'application Téléphone
+      s'ouvre avec lui). Le lecteur d'écran le dit « Téléphone : 05 36 49 90 12 ». La ligne du numéro se touche sans toucher
+      l'adresse e-mail juste au-dessus.
+- [ ] **Une saisie libre reste du texte** (seulement si la colonne du téléphone est de type Texte : une colonne numérique
+      n'accepte qu'un nombre). Dans Grist, donner à une fiche de test le numéro « poste 23 », puis deux numéros, puis
+      « +33 (0)5 36 49 90 13 » : sur le téléphone, la carte l'écrit sans en faire un lien.
+- [ ] **Sur ordinateur, le numéro reste du texte.** À la souris, un numéro n'est pas un lien : le survol ne change rien et un clic
+      n'ouvre rien.
+- [ ] **Les espaces insécables.** Sur un téléphone ou dans une section étroite (320 à 360 px), un message long (le bandeau d'une
+      erreur de lecture, un refus d'écriture) ne laisse aucun « : », « ; », « ? », « ! » ni guillemet seul au début d'une ligne.
+      Si le document a mille contacts ou plus, le compteur dit « 1 234 contacts » et ne se coupe pas au milieu du nombre.
+- [ ] **Firefox mobile et Safari (iPhone)** : les mêmes contrôles. Ce sont eux qui disent si le lien d'appel et les repères pour
+      lecteur d'écran se comportent comme dans Chromium.
