@@ -681,6 +681,17 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     assert.deepEqual(await after.locator('.tag:not(.tag-add):not(.tag-del)').allTextContents(),
       ['Référent qualité', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur']);
 
+    // Le titre de chaque groupe de pastilles garde 8 px sous lui, la mise en page validée : il les perdit en 1.33.0, quand les titres
+    // de groupe cessèrent d'être des `h3` que `.rv-col h3` atteignait (et reprirent les 3 px de la grille), et la fenêtre baissa de 30 px.
+    for (const card of [before, after]) {
+      const gaps = await card.locator('.tag-group').evaluateAll(groups => groups.map(group => {
+        const title = group.querySelector('.tag-group-title').getBoundingClientRect();
+        return Math.round(group.querySelector('.tag-group-values').getBoundingClientRect().top - title.bottom);
+      }));
+      assert.ok(gaps.length >= 3, 'Ana a au moins trois groupes de pastilles');
+      assert.deepEqual([...new Set(gaps)], [8], 'huit pixels entre le titre d\'un groupe et ses pastilles, comme sur la carte validée');
+    }
+
     // Les deux cartes sont des aperçus : rien n'y est cliquable.
     for (const card of [before, after]) {
       assert.equal(await card.locator('a.email').getAttribute('href'), null);

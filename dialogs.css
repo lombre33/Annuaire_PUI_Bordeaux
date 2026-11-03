@@ -645,6 +645,11 @@ textarea {
 .rv-card .tag-group-values {
   gap: 6px 4px;
 }
+/* Sous le titre d'un groupe de pastilles, 8 px et non les 3 px de la grille : c'était `.rv-col h3` tant que ces titres étaient des
+   `h3` (jusqu'en 1.33.0, où le groupe est devenu un `div` nommé, audit U23). */
+.rv-card .tag-group-title {
+  margin-bottom: 8px;
+}
 
 /* Les repères de la carte « Après » : un texte modifié ou ajouté est en relief et porte sa
    pastille, un tag ajouté un contour, ce qui a été retiré reste visible, barré. */
