@@ -66,12 +66,13 @@ const attendreBandeau = page =>
   page.waitForFunction(() => !document.getElementById('statusBanner').hidden, null, { timeout: 10_000 });
 // Le bandeau « Ma présence » est affiché, dit `extrait` et n'a plus de message passager à
 // l'écran (« Enregistrement… » après un clic). L'annonce d'une réussite (data-tone="done") est
-// réservée aux lecteurs d'écran : elle ne se voit pas, donc ne compte pas.
+// réservée aux lecteurs d'écran : elle ne se voit pas, donc ne compte pas. Le widget met une espace insécable
+// devant « : ; ? ! » (1.33.0) ; les textes attendus ici s'écrivent avec des espaces ordinaires.
 const attendrePresence = (page, extrait) =>
   page.waitForFunction(attendu => {
     const bandeau = document.getElementById('accountBar');
     const message = bandeau.querySelector('.account-status');
-    return !bandeau.hidden && bandeau.querySelector('.account-detail').textContent.includes(attendu)
+    return !bandeau.hidden && bandeau.querySelector('.account-detail').textContent.replace(/[  ]/g, ' ').includes(attendu)
       && (message.textContent === '' || message.dataset.tone === 'done');
   }, extrait, { timeout: 10_000 });
 const filtre = (page, cle) => page.locator(`.filter[data-filter-key="${cle}"]`);
@@ -698,7 +699,7 @@ const SCENES = [
       await page.locator('#accountBar .account-etab').waitFor();
       await page.click('#accountBar .account-etab');
       await page.waitForFunction(() => document.getElementById('etabDialog').open
-        && document.getElementById('etabTitle').textContent === 'Fiche de l’établissement : CHD'
+        && document.getElementById('etabTitle').textContent.replace(/[  ]/g, ' ') === 'Fiche de l’établissement : CHD'
         && document.querySelectorAll('#etabDialog .es-resp').length > 0, null, { timeout: 10_000 });
       // Le logo de l'établissement est chargé (la capture ne montre pas un cadre vide) ; aucun contour de saisie.
       await page.waitForFunction(() => {
