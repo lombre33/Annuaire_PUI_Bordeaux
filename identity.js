@@ -79,7 +79,7 @@ export function responsableIds(cell) {
 // Ne lève jamais : une identité introuvable n'est pas une panne du widget.
 export async function readIdentity(docApi, { readOnly = false, log = console, cleanupWaitMs = CLEANUP_WAIT_MS } = {}) {
   if (readOnly) {
-    log.info('[IDENTITE] Grist a ouvert le widget en lecture seule (readonly=true dans l\'adresse du cadre) : '
+    log.info('[IDENTITE] Grist a ouvert le widget en lecture seule (readonly=true dans l\'adresse du cadre) : '
       + 'personne n\'est identifié et aucune modification n\'est proposée.');
     return { status: 'viewer', email: '', admin: false, etablissements: [], reason: 'document ouvert en lecture seule' };
   }
@@ -109,19 +109,19 @@ export async function readIdentity(docApi, { readOnly = false, log = console, cl
     const admin = row.Admin === true;
     const etablissements = responsableIds(row[PROBE_RESPONSABLE_COLUMN]);
     if (!(PROBE_RESPONSABLE_COLUMN in row)) {
-      log.info(`[IDENTITE] la sonde n'a pas de colonne « ${PROBE_RESPONSABLE_COLUMN} » : pas de fiche d'établissement (GRIST_SETUP.md).`);
+      log.info(`[IDENTITE] la sonde n'a pas de colonne « ${PROBE_RESPONSABLE_COLUMN} » : pas de fiche d'établissement (GRIST_SETUP.md).`);
     }
-    log.info(`[IDENTITE] personne identifiée (administrateur : ${admin ? 'oui' : 'non'}, `
+    log.info(`[IDENTITE] personne identifiée (administrateur : ${admin ? 'oui' : 'non'}, `
       + `responsable de ${etablissements.length} établissement${etablissements.length > 1 ? 's' : ''})`);
     return { status: 'ready', email, admin, etablissements, reason: '' };
   } catch (error) {
-    return reportUnavailable(log, `lecture impossible : ${error?.message || error}`);
+    return reportUnavailable(log, `lecture impossible : ${error?.message || error}`);
   } finally {
     // Le nettoyage est attendu, mais pas indéfiniment : une réponse qui ne vient pas ne prive pas la personne
     // de son identité (il continue en arrière-plan et dit lui-même comment il finit).
     const cleanup = removeProbeRows(docApi, rowId, older, log).catch(() => {});
     if (!(await finishesWithin(cleanup, cleanupWaitMs))) {
-      log.warn(`[IDENTITE] Grist n'a pas répondu à la suppression de la ligne de ${PROBE_TABLE} en ${cleanupWaitMs / 1000} s : `
+      log.warn(`[IDENTITE] Grist n'a pas répondu à la suppression de la ligne de ${PROBE_TABLE} en ${cleanupWaitMs / 1000} s : `
         + 'l\'identité est rendue sans l\'attendre.');
     }
   }
@@ -164,13 +164,13 @@ async function removeProbeRows(docApi, rowId, older, log) {
   if (rowId === null) return;
   const refused = await removeRows(docApi, [rowId]);
   if (refused) {
-    log.warn(`[IDENTITE] la ligne ${rowId} de ${PROBE_TABLE} n'a pas pu être supprimée : ${refused} `
-      + '(règles d\'accès de la sonde : la personne doit pouvoir supprimer sa propre ligne, GRIST_SETUP.md étape 4).');
+    log.warn(`[IDENTITE] la ligne ${rowId} de ${PROBE_TABLE} n'a pas pu être supprimée : ${refused} `
+      + '(règles d\'accès de la sonde : la personne doit pouvoir supprimer sa propre ligne, GRIST_SETUP.md étape 4).');
     return;
   }
   if (older.length === 0) return;
   const stale = await removeRows(docApi, older);
-  if (stale) log.warn(`[IDENTITE] ${older.length} ancienne(s) ligne(s) de ${PROBE_TABLE} à votre adresse n'ont pas pu être supprimées : ${stale}`);
+  if (stale) log.warn(`[IDENTITE] ${older.length} ancienne(s) ligne(s) de ${PROBE_TABLE} à votre adresse n'ont pas pu être supprimées : ${stale}`);
   else log.info(`[IDENTITE] ${older.length} ancienne(s) ligne(s) de ${PROBE_TABLE} à votre adresse, laissées par un chargement précédent, supprimées.`);
 }
 
@@ -184,13 +184,13 @@ async function createProbeTable(docApi, log) {
     const made = created?.retValues?.[0]?.id;
     if (typeof made === 'string' && made !== PROBE_TABLE) {
       await Promise.resolve(docApi.applyUserActions([['RemoveTable', made]])).catch(() => {});
-      log.info(`[IDENTITE] table « ${PROBE_TABLE} » déjà créée par une autre personne.`);
+      log.info(`[IDENTITE] table « ${PROBE_TABLE} » déjà créée par une autre personne.`);
     } else {
-      log.info(`[IDENTITE] table « ${PROBE_TABLE} » absente : créée (GRIST_SETUP.md, étape 2).`);
+      log.info(`[IDENTITE] table « ${PROBE_TABLE} » absente : créée (GRIST_SETUP.md, étape 2).`);
     }
     return '';
   } catch (error) {
-    return `table « ${PROBE_TABLE} » introuvable, et Grist n'a pas permis de la créer : ${error?.message || error} (voir GRIST_SETUP.md)`;
+    return `table « ${PROBE_TABLE} » introuvable, et Grist n'a pas permis de la créer : ${error?.message || error} (voir GRIST_SETUP.md)`;
   }
 }
 

@@ -6,7 +6,7 @@
 // npx playwright install chromium). Sans lui ces tests sont ignorés et
 // `node --test` reste vert. CHROMIUM_PATH désigne un Chromium déjà installé.
 
-import assert from 'node:assert/strict';
+import assert from './assert.mjs';
 import { assertNoCspViolation, createHarness, layoutSettled } from './harness.mjs';
 
 // openWidget(options), assertNoCspViolation(widget), layoutSettled(page) : voir tests/support/harness.mjs.

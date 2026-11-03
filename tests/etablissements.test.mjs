@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import {
   tableToRows, etablissementFlagsFromRows, etablissementFlags, isEtablissementEligible,
   filterVisibleEstablishments, buildContacts

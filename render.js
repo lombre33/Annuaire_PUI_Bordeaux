@@ -2,8 +2,8 @@
 // filter-menus.js.
 
 import { ETABLISSEMENT_TABLE, TAG_GROUPS, FILTERS } from './constants.js';
-import { displayName, formatPhone, labelsOf, mailtoHref, normalize, ownValue, refId, shownEmail } from './grist-data.js';
-import { el, isFocusVisible } from './dom.js';
+import { displayName, formatPhone, labelsOf, mailtoHref, normalize, ownValue, refId, shownEmail, telHref } from './grist-data.js';
+import { el, glyph, isFocusVisible } from './dom.js';
 import { createLogoImage, fitCardLogo } from './branding-ui.js';
 import { createAvatar } from './avatar-ui.js';
 import { avatarIdOf } from './attachments.js';
@@ -40,13 +40,22 @@ function spoken(element, word) {
   element.append(el('span', 'sr-only', ` (${word})`));
 }
 
+// Un glyphe devant un texte (☎ devant un numéro), non lu par les lecteurs d'écran (glyph, dom.js). Le texte garde l'espace qui le sépare
+// du glyphe, si bien que le `textContent` de la ligne reste « ☎ 05 36 49 90 12 ».
+const withGlyph = (symbol, text) => [glyph(symbol), ` ${text}`];
+
 // Une ligne de texte de la carte de relecture qui a changé (marque `{ before, after }`
 // de preview.js) : la nouvelle valeur en relief (« ajouté » si la ligne était vide, sinon
 // « modifié »), ou l'ancienne barrée si la ligne a été vidée (« supprimé »).
-function showTextChange(element, mark, format = value => value) {
+function showTextChange(element, mark, format = value => [value]) {
   element.classList.add('visible');
-  if (mark.after) element.replaceChildren(el('span', 'mk', format(mark.after)), ' ', pill(mark.before ? 'modifié' : 'ajouté'));
-  else element.replaceChildren(el('span', 'mk-gone', format(mark.before)), ' ', pill('supprimé', true));
+  const shown = (className, value) => {
+    const span = el('span', className);
+    span.append(...format(value));
+    return span;
+  };
+  if (mark.after) element.replaceChildren(shown('mk', mark.after), ' ', pill(mark.before ? 'modifié' : 'ajouté'));
+  else element.replaceChildren(shown('mk-gone', mark.before), ' ', pill('supprimé', true));
 }
 
 // Le badge de l'établissement d'une carte « Après » dont l'établissement a changé : un
@@ -82,11 +91,11 @@ function warnLogoFailed(logo, cause) {
     why = 'Grist ne l\'a pas donné (même cause probable que plus haut)';
   } else {
     accessRemedyGiven = true;
-    why = 'Grist ne l\'a pas donné. Cause probable : une règle d\'accès. Le jeton qui sert à afficher les pièces jointes est en lecture seule, '
-      + `donc compté comme un Lecteur du document : la colonne logo de la table ${ETABLISSEMENT_TABLE} doit être lisible par les Lecteurs, les Éditeurs et les propriétaires `
-      + '(GRIST_SETUP.md, étape 5). Autres causes : fichier supprimé, jeton refusé';
+    why = 'Grist ne l\'a pas donné. Cause probable : une règle d\'accès. Le jeton qui sert à afficher les pièces jointes est en lecture seule, '
+      + `donc compté comme un Lecteur du document : la colonne logo de la table ${ETABLISSEMENT_TABLE} doit être lisible par les Lecteurs, les Éditeurs et les propriétaires `
+      + '(GRIST_SETUP.md, étape 5). Autres causes : fichier supprimé, jeton refusé';
   }
-  console.warn(`[LOGOS] Le logo de la ligne ${logo.row} d'${ETABLISSEMENT_TABLE} (pièce jointe ${logo.attachment}) ne se charge pas : ${why}. `
+  console.warn(`[LOGOS] Le logo de la ligne ${logo.row} d'${ETABLISSEMENT_TABLE} (pièce jointe ${logo.attachment}) ne se charge pas : ${why}. `
     + 'Le sigle est affiché à la place.');
 }
 
@@ -115,6 +124,22 @@ function fillEtablissement(badge, label, onToggle, logo) {
   badge.append(createLogoImage(logo.attachments, logo.attachment, label, showName, { preload: true, onLoad }));
 }
 
+// Le numéro de la carte : sur un écran tactile (téléphone, tablette), un lien `tel:` quand il se compose, pour appeler d'un geste ;
+// du texte sinon. Sur ordinateur il reste du texte : un second lien de 15 px de haut juste sous l'adresse e-mail les ferait passer
+// tous deux sous la cible de 24 px que la norme exige sans l'espace qui isole une petite cible (WCAG 2.5.8), et un clic n'y ouvre le plus
+// souvent rien. Comme l'adresse, il reste du texte sur une carte de relecture. Le nom du lien dit ce qu'il est (« Téléphone : … ») :
+// le glyphe ☎ n'est pas lu.
+const dials = () => window.matchMedia?.('(pointer: coarse)').matches === true;
+
+function fillPhone(link, phone, linked) {
+  link.classList.add('visible');
+  link.replaceChildren(...withGlyph('☎', phone));
+  const href = linked && dials() ? telHref(phone) : '';
+  if (!href) return;
+  link.href = href;
+  link.setAttribute('aria-label', `Téléphone : ${phone}`);
+}
+
 // Sans `onToggle` (carte de relecture), l'adresse est du texte : un clic ne doit pas
 // ouvrir un message depuis une fenêtre de relecture.
 function fillEmail(link, email, linked) {
@@ -127,7 +152,7 @@ function fillEmail(link, email, linked) {
 // Le rôle de la personne dans une tâche (taskRolesOf dans grist-data.js), écrit dans l'étiquette de la tâche : les
 // lecteurs d'écran le lisent avec elle, la bulle d'attachTagNotes le montre au survol et au clavier, et sur un écran
 // qui ne survole pas (téléphone) style.css l'affiche sous le nom de la tâche. Masqué à l'écran sinon.
-const roleNote = roles => `${roles.length > 1 ? 'Rôles' : 'Rôle'} : ${roles.join(', ')}`;
+const roleNote = roles => `${roles.length > 1 ? 'Rôles' : 'Rôle'} : ${roles.join(', ')}`;
 
 // Un tag d'une catégorie sans filtre serait fait de <span> non cliquables : un bouton qui ne
 // filtre rien induirait en erreur. Il en va de même sans `onToggle` (carte de relecture).
@@ -160,13 +185,15 @@ function buildRemovedTag(group, value) {
   return tag;
 }
 
+// Un groupe nommé et non un titre : chaque carte comptait jusqu'à six titres de niveau 3, des centaines de titres de plus dans le plan
+// de la page (audit UI/UX, U23). Le titre reste à l'écran ; un lecteur d'écran entend le nom du groupe en y entrant, pas deux fois.
 function buildTagGroup(group, labels, onToggle, change, roles) {
-  const section = document.createElement('section');
-  section.className = 'tag-group';
+  const section = el('div', 'tag-group');
+  section.setAttribute('role', 'group');
+  section.setAttribute('aria-label', group.label);
 
-  const title = document.createElement('h3');
-  title.className = 'tag-group-title';
-  title.textContent = group.label;
+  const title = el('div', 'tag-group-title', group.label);
+  title.setAttribute('aria-hidden', 'true');
   title.style.color = group.color;
 
   const added = new Set((change?.added ?? []).map(normalize));
@@ -261,7 +288,7 @@ function fillEtablissementEdit(box, etablissementId, contactId, label) {
   edit.type = 'button';
   edit.dataset.etabId = String(etablissementId);
   edit.dataset.rowId = String(contactId);
-  edit.title = `Modifier la fiche de l’établissement : ${label}`;
+  edit.title = `Modifier la fiche de l’établissement : ${label}`;
   edit.setAttribute('aria-label', `Modifier l’établissement ${label}`);
   edit.setAttribute('aria-haspopup', 'dialog');
   box.append(edit);
@@ -329,8 +356,18 @@ function fillTexts(card, contact, onToggle, { marks, logos, etablissement }) {
 
   const tel = card.querySelector('.tel');
   const phone = formatPhone(contact.numero_de_telephone);
-  if (marks?.texts.tel) showTextChange(tel, marks.texts.tel, value => `☎ ${value}`);
-  else if (phone) reveal(tel, `☎ ${phone}`);
+  if (marks?.texts.tel) showTextChange(tel, marks.texts.tel, value => withGlyph('☎', value));
+  else if (phone) fillPhone(tel, phone, Boolean(onToggle));
+}
+
+// Chaque carte porte le nom de la personne (« Ana Martin », puis son contenu) : un lecteur d'écran qui passe d'un `article` à l'autre
+// n'entend plus « article » dix fois de suite sans savoir de qui il s'agit (audit UI/UX, U23). Les identifiants restent uniques même
+// quand une fenêtre de relecture montre deux cartes de la même personne.
+let nameSerial = 0;
+function nameCard(card) {
+  const name = card.querySelector('.name');
+  name.id = `contact-name-${++nameSerial}`;
+  card.firstElementChild.setAttribute('aria-labelledby', name.id);
 }
 
 // `view` : { rights } pour la grille ('own', 'admin' ou rien), { marks } pour une
@@ -342,6 +379,7 @@ function buildCard(template, contact, onToggle, view = {}) {
   const { rights = null, marks = null, logos = null, etabRights = null } = view;
   const card = template.content.cloneNode(true);
   if (contact.id !== undefined) card.firstElementChild.dataset.contactId = String(contact.id);
+  nameCard(card);
   const shown = { marks, logos, etablissement: logoOf(logos, contact) };
 
   fillAvatar(card, contact, onToggle, shown);

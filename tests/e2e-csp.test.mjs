@@ -11,7 +11,7 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { sampleTables } from './fixtures.mjs';
 import { skip, until, waitForCards, withWidget } from './support/browser.mjs';
 

@@ -9,7 +9,7 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { withTaskRoles } from './support/task-role-tables.mjs';
 import { gridCard, skip, waitForCards, withWidget } from './support/browser.mjs';
 
@@ -64,7 +64,7 @@ test('la souris sur la tâche ouvre une bulle au-dessus qui dit le rôle, et la 
     assert.equal(await tip(page).getAttribute('aria-hidden'), 'true', 'le lecteur d\'écran a déjà lu le rôle avec la tâche');
 
     await taskOf(page, 'Hugo').hover();
-    await page.waitForFunction(() => document.querySelector('.tag-tip').textContent === 'Rôles : Contributeur, Observateur');
+    await page.waitForFunction(() => document.querySelector('.tag-tip').textContent.replace(/\s/g, ' ') === 'Rôles : Contributeur, Observateur');
     await page.mouse.move(0, 0);
     await tipGone(page);
     await taskOf(page, 'Gina').hover();

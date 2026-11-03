@@ -43,7 +43,7 @@ export function describePresence(persons) {
   const accepted = statuses.every(status => status.accepted);
   const visible = statuses.some(status => status.visible);
   const several = persons.length > 1
-    ? ` ${persons.length} fiches portent votre adresse : votre choix s'applique à toutes.`
+    ? ` ${persons.length} fiches portent votre adresse : votre choix s'applique à toutes.`
     : '';
 
   if (!accepted) {
@@ -54,11 +54,11 @@ export function describePresence(persons) {
   }
   if (visible) {
     const partnerOnly = statuses.filter(status => status.visible).every(status => status.partnerOnly);
-    const where = partnerOnly ? ' (visible avec l\'interrupteur « Partenaires »)' : '';
+    const where = partnerOnly ? ' (visible avec l\'interrupteur « Partenaires »)' : '';
     return { accepted, visible, tone: 'ok', message: `Vous apparaissez dans l'annuaire${where}.${several}` };
   }
   const reasons = hiddenReasons(statuses);
-  const why = reasons.length ? ` : ${reasons.join(' ; ')}` : '';
+  const why = reasons.length ? ` : ${reasons.join(' ; ')}` : '';
   return {
     accepted,
     visible,
@@ -79,10 +79,10 @@ export function describeUnknownAccount({ email, admin, emailColumn = true }) {
     return {
       ...view,
       name: admin ? name : 'Fiche introuvable',
-      message: 'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.'
+      message: 'Le widget ne peut pas retrouver votre fiche : la colonne « email » n\'existe pas dans BDD. Contactez un administrateur.'
     };
   }
-  const who = email ? `Connecté avec ${email} : cette adresse ne figure pas dans l'annuaire` : 'Cette adresse ne figure pas dans l\'annuaire';
+  const who = email ? `Connecté avec ${email} : cette adresse ne figure pas dans l'annuaire` : 'Cette adresse ne figure pas dans l\'annuaire';
   return {
     ...view,
     message: admin
@@ -105,16 +105,16 @@ export function describeHiddenFiche(status, { own, etablissement = '', creating 
   if (status.visible) return '';
   if (status.etablissement === 'not_validated' && status.named) {
     return own
-      ? 'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.'
-      : `${etablissement || 'Son établissement'} n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.`;
+      ? 'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.'
+      : `${etablissement || 'Son établissement'} n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.`;
   }
   if (!status.accepted) {
     return own
-      ? 'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).'
-      : 'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.';
+      ? 'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).'
+      : 'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.';
   }
   const reasons = hiddenReasons([status], own ? VOICES.own : VOICES.admin);
-  const why = reasons.length ? ` : ${reasons.join(' ; ')}` : '';
+  const why = reasons.length ? ` : ${reasons.join(' ; ')}` : '';
   if (creating) return `Votre fiche sera publiée, mais elle restera masquée de l’annuaire${why}. Un administrateur doit d’abord régler ce point.`;
   return `${own ? 'Votre fiche reste masquée' : 'Cette fiche reste masquée'} de l'annuaire${why}.`;
 }
@@ -124,11 +124,11 @@ export function describeHiddenFiche(status, { own, etablissement = '', creating 
 // publiée apparaît tout de suite ; si quelque chose la retient (son établissement n'a pas validé sa présence),
 // elle existe mais reste masquée, et le message le dit au lieu de promettre qu'elle apparaît.
 export function describeCreated(status, accepted) {
-  if (!accepted) return 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
+  if (!accepted) return 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
   if (!status) return 'Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire.';
-  if (status.visible) return 'Votre fiche est publiée : elle apparaît dans l’annuaire.';
+  if (status.visible) return 'Votre fiche est publiée : elle apparaît dans l’annuaire.';
   const reasons = hiddenReasons([status]);
-  return `Votre fiche est publiée, mais elle reste masquée de l’annuaire${reasons.length ? ` : ${reasons.join(' ; ')}` : ''}. Contactez un administrateur.`;
+  return `Votre fiche est publiée, mais elle reste masquée de l’annuaire${reasons.length ? ` : ${reasons.join(' ; ')}` : ''}. Contactez un administrateur.`;
 }
 
 // Erreur d'écriture dont le message est une phrase française destinée à la
@@ -153,23 +153,23 @@ export function classifyWriteError(error) {
 export function explainWriteError(error) {
   const kind = classifyWriteError(error);
   if (kind === 'denied') {
-    return 'Grist a refusé la modification : vos droits ne permettent pas de changer cette information. Contactez un administrateur.';
+    return 'Grist a refusé la modification : vos droits ne permettent pas de changer cette information. Contactez un administrateur.';
   }
   if (kind === 'formula') {
-    return `La colonne ${CONSENT_COLUMN} est une colonne à formule : elle doit être une colonne de données (case à cocher). Voir GRIST_SETUP.md.`;
+    return `La colonne ${CONSENT_COLUMN} est une colonne à formule : elle doit être une colonne de données (case à cocher). Voir GRIST_SETUP.md.`;
   }
-  return 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.';
+  return 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.';
 }
 
 // Écrit le choix de la personne sur toutes ses lignes, en une seule action
 // atomique : jamais une ligne changée et pas l'autre. Lève une PresenceError.
 export async function setPresence(docApi, persons, accepted, { log = console } = {}) {
-  if (persons.length === 0) throw new PresenceError('Votre fiche est introuvable : rien n\'a été modifié.');
+  if (persons.length === 0) throw new PresenceError('Votre fiche est introuvable : rien n\'a été modifié.');
   const actions = persons.map(({ row }) => ['UpdateRecord', MAIN_TABLE, row.id, { [CONSENT_COLUMN]: accepted }]);
   try {
     await docApi.applyUserActions(actions);
   } catch (error) {
-    log.error('[PRESENCE] écriture impossible :', error);
+    log.error('[PRESENCE] écriture impossible :', error);
     throw new PresenceError(explainWriteError(error), error);
   }
 }

@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import {
   profileFormModel, diffProfile, cleanText, frenchPhoneDigits, textFault, MAX_TEXT_LENGTH,
   draftOf, rightsFor, rebaseChanges, describeChanges, blankFiche, NAME_REQUIRED, ETABLISSEMENT_REQUIRED
@@ -345,7 +345,7 @@ test('diffProfile reports each refusal against its own field', async () => {
   assert.equal(result.fieldErrors.Fonction, 'Ne peut pas commencer par = + - ou @.');
   assert.match(result.fieldErrors.numero_de_telephone, /^Un numéro français compte 10 chiffres/);
   assert.equal(result.errors.length, 5);
-  assert.ok(result.errors.every(message => /^[^:]+ : /.test(message)), 'chaque phrase nomme son champ');
+  assert.ok(result.errors.every(message => /^[^:]+\s:\s/.test(message)), 'chaque phrase nomme son champ');
   const nameless = diffProfile({ ...row(1), nom: '' }, { prenom: '' }, referenceMaps);
   assert.deepEqual(nameless.fieldErrors, { prenom: 'Indiquez au moins un prénom ou un nom.' });
 });

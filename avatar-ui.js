@@ -101,7 +101,7 @@ export function createThumb({ photo, attachments = null, label, onOpen }) {
   thumb.type = 'button';
   thumb.className = 'thumb';
   thumb.title = 'Agrandir';
-  thumb.setAttribute('aria-label', `Agrandir : ${label}`);
+  thumb.setAttribute('aria-label', `Agrandir : ${label}`);
   thumb.append(photoImage(source, attachments, {
     eager: true,
     onFail: () => thumb.replaceWith(el('span', 'none', 'photo illisible'))

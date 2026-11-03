@@ -6,7 +6,7 @@
 // autres chargent le vrai index.html dans Chromium (optionnel : voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

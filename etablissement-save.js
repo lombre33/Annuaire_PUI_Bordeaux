@@ -34,16 +34,16 @@ export class EtablissementSaveError extends Error {
 }
 
 const FAILURES = {
-  read: 'La fiche de l’établissement n’a pas pu être relue dans Grist : rien n’a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
-  aclRead: 'La liste des responsables n’a pas pu être relue dans Grist : rien n’a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
-  gone: 'Cet établissement n’existe plus dans Grist : rien n’a été modifié.',
-  denied: 'Grist a refusé la modification : vos droits ne permettent pas de changer cet établissement ou la liste de ses responsables. Contactez un administrateur.',
-  formula: 'Une colonne de l’établissement est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md.',
-  other: 'La modification n’a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
-  notResponsable: 'Cette modification ne peut pas être enregistrée : vous n’êtes pas responsable de cet établissement.',
+  read: 'La fiche de l’établissement n’a pas pu être relue dans Grist : rien n’a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
+  aclRead: 'La liste des responsables n’a pas pu être relue dans Grist : rien n’a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
+  gone: 'Cet établissement n’existe plus dans Grist : rien n’a été modifié.',
+  denied: 'Grist a refusé la modification : vos droits ne permettent pas de changer cet établissement ou la liste de ses responsables. Contactez un administrateur.',
+  formula: 'Une colonne de l’établissement est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md.',
+  other: 'La modification n’a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
+  notResponsable: 'Cette modification ne peut pas être enregistrée : vous n’êtes pas responsable de cet établissement.',
   nothing: 'Aucun changement à enregistrer.',
-  already: 'Ces modifications sont déjà dans la fiche de l’établissement : il n’y a rien à enregistrer.',
-  noFile: 'Le logo choisi n’est plus disponible : choisissez-le de nouveau.'
+  already: 'Ces modifications sont déjà dans la fiche de l’établissement : il n’y a rien à enregistrer.',
+  noFile: 'Le logo choisi n’est plus disponible : choisissez-le de nouveau.'
 };
 
 // Les champs de la fiche qui s'écrivent dans Etablissements, avec leur mot dans les phrases.
@@ -67,7 +67,7 @@ async function readState(docApi, etablissementId, log) {
   try {
     rows = tableToRows(await docApi.fetchTable(ETABLISSEMENT_TABLE));
   } catch (error) {
-    log.error('[FICHE-ETAB] lecture de la fiche impossible :', error);
+    log.error('[FICHE-ETAB] lecture de la fiche impossible :', error);
     throw new EtablissementSaveError(FAILURES.read, error);
   }
   const row = rows.find(candidate => candidate.id === etablissementId);
@@ -77,7 +77,7 @@ async function readState(docApi, etablissementId, log) {
   try {
     acl = tableToRows(await docApi.fetchTable(ACL_TABLE));
   } catch (error) {
-    log.warn(`[FICHE-ETAB] La table ${ACL_TABLE} ne peut pas être lue : la liste des responsables n'est ni montrée ni modifiable (GRIST_SETUP.md).`, error?.message || error);
+    log.warn(`[FICHE-ETAB] La table ${ACL_TABLE} ne peut pas être lue : la liste des responsables n'est ni montrée ni modifiable (GRIST_SETUP.md).`, error?.message || error);
   }
   return { row, acl };
 }
@@ -118,7 +118,7 @@ function rebaseRow(row, plan) {
     if (!change) return;
     const column = ETABLISSEMENT_COLUMNS[key];
     if (!(column in row)) {
-      throw new EtablissementSaveError(`Ces modifications ne peuvent pas être enregistrées : la colonne ${column} n’existe pas dans ${ETABLISSEMENT_TABLE}${key === 'logo' ? ' (GRIST_SETUP.md, étape 5)' : ''}.`);
+      throw new EtablissementSaveError(`Ces modifications ne peuvent pas être enregistrées : la colonne ${column} n’existe pas dans ${ETABLISSEMENT_TABLE}${key === 'logo' ? ' (GRIST_SETUP.md, étape 5)' : ''}.`);
     }
     const now = row[column] ?? null;
     if (key === 'logo') {
@@ -235,7 +235,7 @@ async function writeEtablissement(docApi, plan, values, aclActions, attachmentId
   try {
     await docApi.applyUserActions(actions);
   } catch (error) {
-    log.error('[FICHE-ETAB] écriture impossible :', error);
+    log.error('[FICHE-ETAB] écriture impossible :', error);
     throw new EtablissementSaveError(FAILURES[classifyWriteError(error)], error, { leftover: attachmentId });
   }
 }
@@ -259,7 +259,7 @@ export async function saveEtablissement(docApi, plan, { upload, log = console } 
   if (replacing) {
     // L'envoi prend du temps : la fiche a pu bouger, on relit avant d'écrire.
     ({ attachmentId, state: evaluated } = await uploadThenRecheck(plan.file, {
-      upload, recheck, ErrorClass: EtablissementSaveError, fallback: FAILURES.other, consoleLine: '[FICHE-ETAB] envoi du logo impossible :', log
+      upload, recheck, ErrorClass: EtablissementSaveError, fallback: FAILURES.other, consoleLine: '[FICHE-ETAB] envoi du logo impossible :', log
     }));
     if (evaluated.status === 'changed') return { ...evaluated, leftover: attachmentId };
   }

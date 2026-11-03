@@ -421,6 +421,27 @@ export function mailtoHref(email) {
   return SAFE_EMAIL.test(address) ? `mailto:${address}` : '';
 }
 
+// ===== EFFECTIFS =====
+// Un effectif écrit à la française : « 1 234 contacts », l'espace insécable fine entre les milliers que le navigateur donne à la langue
+// (jamais un nombre coupé en fin de ligne). Pour les phrases ; les nombres des pastilles de menu restent des chiffres seuls.
+const COUNT_FORMAT = new Intl.NumberFormat('fr-FR');
+export const formatCount = count => COUNT_FORMAT.format(count);
+
+// ===== LIEN TEL =====
+// Le numéro que montre la carte (formatPhone) devient un lien `tel:` quand il se compose sans équivoque : des chiffres, des
+// séparateurs usuels (espace, point, tiret) et un « + » devant pour un numéro international. Une saisie libre (« poste 23 »,
+// deux numéros, « (0) » après l'indicatif...) reste du texte : composer un numéro déduit à la place de la personne serait
+// pire que de ne rien proposer. De 6 à 15 chiffres (le plus long numéro international en compte 15).
+const DIALABLE_PHONE = /^\+?[\d\s.-]+$/;
+
+export function telHref(phone) {
+  const shown = text(phone);
+  if (!DIALABLE_PHONE.test(shown)) return '';
+  const digits = shown.replace(/\D/g, '');
+  if (digits.length < 6 || digits.length > 15) return '';
+  return `tel:${shown.startsWith('+') ? '+' : ''}${digits}`;
+}
+
 // ===== CHARGEMENT COMPLET DE L'ANNUAIRE =====
 
 // Sans l'une de ces colonnes aucun contact n'est affichable : mieux vaut une
@@ -510,12 +531,20 @@ export function createPeopleIndex(rows, referenceMaps, etabFlags, columns = rows
     if (!byEmail.has(key)) byEmail.set(key, []);
     byEmail.get(key).push(row);
   });
-  const entry = row => ({
-    row,
-    name: `${text(row.prenom)} ${text(row.nom)}`.trim(),
-    etablissement: refLabel(row.Etablissement, referenceMaps.etablissement),
-    status: describeVisibility(row, referenceMaps, etabFlags)
-  });
+  // Le choix de présence qu'une écriture réussie a enregistré dans Grist, quand la relecture qui devait le montrer
+  // a échoué : sans lui, l'interrupteur resterait sur l'ancien état et un deuxième clic réécrirait la même valeur.
+  // L'index suivant, construit d'une lecture réussie, repart sans cette mémoire.
+  const written = new Map();
+  const current = row => (written.has(row.id) ? { ...row, [CONSENT_COLUMN]: written.get(row.id) } : row);
+  const entry = source => {
+    const row = current(source);
+    return {
+      row,
+      name: `${text(row.prenom)} ${text(row.nom)}`.trim(),
+      etablissement: refLabel(row.Etablissement, referenceMaps.etablissement),
+      status: describeVisibility(row, referenceMaps, etabFlags)
+    };
+  };
   return {
     columns,
     hasEmailColumn: rows.length === 0 || 'email' in rows[0],
@@ -525,6 +554,10 @@ export function createPeopleIndex(rows, referenceMaps, etabFlags, columns = rows
     },
     findById(id) {
       return byId.has(id) ? entry(byId.get(id)) : null;
+    },
+    // `ids` : les lignes de BDD dont Grist a enregistré le choix `accepted`.
+    rememberConsent(ids, accepted) {
+      ids.forEach(id => written.set(id, accepted));
     }
   };
 }
@@ -535,13 +568,13 @@ export function createPeopleIndex(rows, referenceMaps, etabFlags, columns = rows
 function describeEmptyDirectory(rows, contacts) {
   if (contacts.length > 0 || rows.length === 0) return null;
   if (rows.every(row => isEmptyReference(row.Etablissement))) {
-    return 'Etablissement est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
+    return 'Etablissement est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
   }
   if (!rows.some(hasAccepted)) {
-    return 'Personne n\'a accepté d\'apparaître : Accepte_apparaitre n\'est coché pour aucun contact. '
+    return 'Personne n\'a accepté d\'apparaître : Accepte_apparaitre n\'est coché pour aucun contact. '
       + 'Cochez cette colonne dans Grist pour les personnes qui doivent figurer dans l\'annuaire.';
   }
-  return `Aucun contact affichable alors que la table ${MAIN_TABLE} contient des lignes : vérifiez les noms et Etablissement `
+  return `Aucun contact affichable alors que la table ${MAIN_TABLE} contient des lignes : vérifiez les noms et Etablissement `
     + '(établissement validé, fondateur ou partenaire).';
 }
 
@@ -558,7 +591,7 @@ function requireReadable(results, log) {
   [MAIN_TABLE, 'Etablissements'].forEach(name => {
     if (results[name].status === 'fulfilled') return;
     log.warn(`[REFS] Impossible de charger ${name}`, results[name].reason);
-    throw new DirectoryLoadError(`table « ${name} » illisible`, results[name].reason);
+    throw new DirectoryLoadError(`table « ${name} » illisible`, results[name].reason);
   });
 }
 
@@ -571,7 +604,7 @@ function missingColumns(rows, columns) {
 function requireColumns(table, columns, rows) {
   const missing = missingColumns(rows, columns);
   if (missing.length) {
-    throw new DirectoryLoadError(`colonne « ${missing.join(' », « ')} » absente de la table ${table}`);
+    throw new DirectoryLoadError(`colonne « ${missing.join(' », « ')} » absente de la table ${table}`);
   }
 }
 
@@ -607,7 +640,7 @@ function readReferenceMap({ key, table, field, corrected }, result, log) {
   log.info(`[REFS] ${key} (${table}): ${Object.keys(map).length} entrées`
     + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${correctedOnly ? `${labelFields[0]}, ignorée(s)` : labelFields.join('/')})` : ''));
   const absent = missingColumns(rows, labelFields);
-  if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
+  if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
   return { map, labelColumnsMissing: absent.length === labelFields.length };
 }
 
@@ -685,13 +718,13 @@ function completeGroupMap({ key, table, groups, fallback, numberedIn }, referenc
       const numbered = Object.values(detailMap).filter(label => taskActionNumber(label) !== null).length;
       const actions = actionLabelsByNumber(referenceMaps[numberedIn] || {}).size;
       log.info(`[REFS] ${table}: aucune ligne n'est rattachée à une action pour ${key} `
-        + `(${numbered} sur ${ids.length} ont un numéro, ${actions} action(s) en ont un) : le menu reste à plat.`);
+        + `(${numbered} sur ${ids.length} ont un numéro, ${actions} action(s) en ont un) : le menu reste à plat.`);
     }
     return {};
   }
   if (unclassified.length) {
     log.info(`[REFS] ${table}: ${unclassified.length} ligne(s) sans regroupement pour ${key}, `
-      + `classées sous « ${fallback} » (identifiants de ligne) :`, unclassified.slice(0, 20));
+      + `classées sous « ${fallback} » (identifiants de ligne) :`, unclassified.slice(0, 20));
   }
   return groupLabelMap(groupMap, detailMap, fallback);
 }
@@ -737,14 +770,14 @@ function warnAboutMissingEtablissement(rows, log) {
   const ids = rows.filter(row => isEmptyReference(row.Etablissement)).map(row => row.id);
   if (!ids.length) return;
   log.warn(`[ETABLISSEMENT] ${ids.length}/${rows.length} contact(s) sans Etablissement `
-    + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
+    + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
 }
 
 // Les personnes qui n'ont pas accepté d'apparaître sont normales, pas une anomalie : la console en
 // donne seulement le nombre (jamais leurs noms).
 function logWithoutConsent(rows, log) {
   const count = rows.filter(row => !hasAccepted(row)).length;
-  if (count) log.info(`[CONSENTEMENT] ${count}/${rows.length} contact(s) masqué(s) : Accepte_apparaitre n'est pas coché.`);
+  if (count) log.info(`[CONSENTEMENT] ${count}/${rows.length} contact(s) masqué(s) : Accepte_apparaitre n'est pas coché.`);
 }
 
 // Des acronymes en double ne masquent des contacts que lorsque Grist envoie
@@ -758,15 +791,15 @@ function resolvedByLabel(rows) {
 function directoryIssues({ unreadable, unlabeled, etabFlags, rows, emptyReason }) {
   const issues = [];
   if (unreadable.length) {
-    issues.push(`Tables illisibles (${unreadable.join(', ')}) : des libellés ou des tags peuvent manquer.`);
+    issues.push(`Tables illisibles (${unreadable.join(', ')}) : des libellés ou des tags peuvent manquer.`);
   }
   if (unlabeled.length) {
     const expected = unlabeled.map(({ table, fields }) => `${table} (${fields.join(' ou ')})`).join(', ');
-    issues.push(`Colonne de libellé introuvable : ${expected}. Les tags et le filtre correspondants restent vides.`);
+    issues.push(`Colonne de libellé introuvable : ${expected}. Les tags et le filtre correspondants restent vides.`);
   }
   if (etabFlags.conflicts.length && resolvedByLabel(rows)) {
     issues.push(`Acronymes en double dans Etablissements (${etabFlags.conflicts.join(', ')}) avec des statuts `
-      + 'différents : leurs contacts sont masqués.');
+      + 'différents : leurs contacts sont masqués.');
   }
   if (emptyReason) issues.push(emptyReason);
   return issues;
@@ -795,7 +828,7 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   referenceMaps[ETABLISSEMENT_NAMES] = labelMapFromRows(etablissementRows, ['nom_complet', 'acronyme']);
   const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const contacts = buildContacts(rows, referenceMaps, etabFlags);
-  log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
+  log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
   warnAboutMissingEtablissement(rows, log);
   logWithoutConsent(rows, log);
 

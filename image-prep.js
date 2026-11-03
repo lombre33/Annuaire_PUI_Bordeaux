@@ -29,17 +29,17 @@ const TYPE_NAMES = { 'image/png': 'PNG', 'image/jpeg': 'JPG', 'image/webp': 'Web
 export const megabytes = bytes => `${String(Math.ceil((bytes / MEGABYTE) * 10 - 1e-9) / 10).replace('.', ',')} Mo`;
 
 const FAILURES = {
-  unreadable: 'Cette image n’a pas pu être lue : choisissez un autre fichier.',
-  noSize: 'Cette image n’a pas de dimensions lisibles : choisissez un autre fichier.',
-  empty: 'Ce fichier est vide : choisissez-en un autre.',
-  huge: 'Cette image est beaucoup trop grande : choisissez-en une plus petite.'
+  unreadable: 'Cette image n’a pas pu être lue : choisissez un autre fichier.',
+  noSize: 'Cette image n’a pas de dimensions lisibles : choisissez un autre fichier.',
+  empty: 'Ce fichier est vide : choisissez-en un autre.',
+  huge: 'Cette image est beaucoup trop grande : choisissez-en une plus petite.'
 };
 
 // La phrase à montrer pour une image qui n'a pas pu être préparée : celle d'une ImageError, telle quelle. Toute autre erreur
 // (imprévue) va dans la console, et la personne lit la phrase d'un fichier illisible.
 export function imageFaultMessage(error) {
   if (error?.name === 'ImageError') return error.message;
-  console.error('[IMAGE] Préparation de l\'image impossible :', error);
+  console.error('[IMAGE] Préparation de l\'image impossible :', error);
   return FAILURES.unreadable;
 }
 
@@ -48,10 +48,10 @@ export function checkImageFile(file, rules = IMAGE_RULES.logo) {
   if (!file || !rules.types.includes(file.type)) {
     const names = rules.types.map(type => TYPE_NAMES[type] ?? type);
     const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} ou ${names.at(-1)}` : names[0];
-    return `Ce fichier n’est pas une image acceptée : choisissez un fichier ${list}.`;
+    return `Ce fichier n’est pas une image acceptée : choisissez un fichier ${list}.`;
   }
   if (file.size === 0) return FAILURES.empty;
-  if (file.size > rules.maxBytes) return `Cette image pèse ${megabytes(file.size)} : choisissez-en une de ${megabytes(rules.maxBytes)} au plus.`;
+  if (file.size > rules.maxBytes) return `Cette image pèse ${megabytes(file.size)} : choisissez-en une de ${megabytes(rules.maxBytes)} au plus.`;
   return '';
 }
 
@@ -135,7 +135,7 @@ export async function prepareImage(file, rules = IMAGE_RULES.logo, { doc } = {})
   const blob = await new Promise(resolve => canvas.toBlob(resolve, rules.output ?? 'image/png', rules.quality));
   if (!blob) throw new ImageError(FAILURES.unreadable);
   if (blob.size > rules.maxBytes) {
-    throw new ImageError(`Une fois redessinée, cette image pèse ${megabytes(blob.size)} : choisissez-en une plus simple, de ${megabytes(rules.maxBytes)} au plus.`);
+    throw new ImageError(`Une fois redessinée, cette image pèse ${megabytes(blob.size)} : choisissez-en une plus simple, de ${megabytes(rules.maxBytes)} au plus.`);
   }
   return { blob, name: rules.name ?? 'image.png', width, height };
 }

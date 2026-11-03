@@ -7,7 +7,7 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { sampleTables, withIdentity, withSchema, withShownEmail, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
 import {
   assertFooterWraps, bddCalls, bddCell, changeFonction, focusReturnsTo, gridCard, openOwn, probeRemoved, reload, skip, toast, until, waitForCards,

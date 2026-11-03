@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import {
   etablissementRightsFor, statusLabel, etablissementOf, responsablesOf, draftOfEtablissement,
   toggleResponsable, nominate, diffEtablissement, summaryOf, visibilityWarning, rebaseDraft, peopleOfEtablissement, NAME_REQUIRED, KEEP_ONE

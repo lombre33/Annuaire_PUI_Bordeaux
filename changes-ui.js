@@ -15,7 +15,7 @@ function listChange(kind, sign, spoken, label) {
   const chip = el('span', `chg chg-${kind}`);
   const mark = el('span', '', `${sign} `);
   mark.setAttribute('aria-hidden', 'true');
-  chip.append(mark, el('span', 'sr-only', `${spoken} : `), label);
+  chip.append(mark, el('span', 'sr-only', `${spoken} : `), label);
   return chip;
 }
 

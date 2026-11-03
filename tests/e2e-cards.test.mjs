@@ -7,7 +7,7 @@
 // Optionnel : nécessite Playwright (voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { ANA_EMAIL, sampleTables, withBranding, withClones, withIdentity } from './fixtures.mjs';
 import { cardCount, changeFonction, gridCard, openOwn, skip, until, waitForCards, waitForEditButtons, withWidget } from './support/browser.mjs';
 import { profileDialogPage } from './support/dialog-page.mjs';

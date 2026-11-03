@@ -8,7 +8,7 @@
 // Optionnel, comme les autres tests navigateur : sans Playwright ils sont ignorés.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { sampleTables, withBranding, withIdentity, ANA_EMAIL } from './fixtures.mjs';
 import { MISSING_FILE } from './support/fake-attachments.mjs';
 import { skip, reload, waitForCards, withWidget as withWidgetOn } from './support/browser.mjs';

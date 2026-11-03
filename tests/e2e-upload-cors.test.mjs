@@ -9,7 +9,7 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { skip, withWidget } from './support/browser.mjs';
 import { FIRST_ID, startGristRest } from './support/grist-rest-server.mjs';
 

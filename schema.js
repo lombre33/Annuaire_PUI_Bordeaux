@@ -20,7 +20,7 @@ export async function readColumnTypes(docApi, tableId = MAIN_TABLE, { log = cons
       .filter(column => column.parentId === table.id)
       .map(column => [column.colId, column.type]));
   } catch (error) {
-    log.warn('[SCHEMA] Types de colonnes illisibles :', error?.message || error);
+    log.warn('[SCHEMA] Types de colonnes illisibles :', error?.message || error);
     return {};
   }
 }

@@ -236,7 +236,7 @@ export function summaryOf({ errors, fieldErrors, labels }) {
   if (fieldErrors.responsables) return 'Gardez au moins un responsable';
   if (errors.length > 0) return 'Corrigez les champs signalés';
   if (labels.length === 0) return 'Aucune modification';
-  return `${labels.length} modification${labels.length > 1 ? 's' : ''} : ${labels.join(', ')}`;
+  return `${labels.length} modification${labels.length > 1 ? 's' : ''} : ${labels.join(', ')}`;
 }
 
 // ===== Ce que la fenêtre dit =====
@@ -245,7 +245,7 @@ export function summaryOf({ errors, fieldErrors, labels }) {
 // l'établissement l'est aujourd'hui ; `hidden` : le nombre de fiches qui disparaîtront (celles qui
 // figurent dans l'annuaire) ; `includesMe` : la fiche de la personne en fait partie.
 export function visibilityWarning({ wasVisible, hidden, includesMe }) {
-  if (!wasVisible) return 'Cet établissement est masqué de l’annuaire : aucune de ses fiches n’y apparaît.';
+  if (!wasVisible) return 'Cet établissement est masqué de l’annuaire : aucune de ses fiches n’y apparaît.';
   if (hidden === 0) return 'Cet établissement n’apparaîtra plus dans l’annuaire.';
   const who = hidden === 1 ? 'La fiche de cet établissement sera masquée' : `Les ${hidden} fiches de cet établissement seront masquées`;
   return `${who} de l’annuaire${includesMe ? ', y compris la vôtre' : ''}.`;

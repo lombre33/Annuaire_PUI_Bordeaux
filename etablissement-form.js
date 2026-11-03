@@ -20,11 +20,11 @@ import { imageFaultMessage, megabytes, prepareImage } from './image-prep.js';
 const LOGO_HELP = {
   with: `Il apparaît sur les cartes de l’établissement et dans le bandeau du bas. PNG, JPG, WebP ou SVG, ${megabytes(IMAGE_RULES.logo.maxBytes)} au maximum, ramené à ${IMAGE_RULES.logo.maxSide} px de large.`,
   without: `Sans logo, les cartes affichent le sigle de l’établissement et le bandeau du bas son nom. PNG, JPG, WebP ou SVG, ${megabytes(IMAGE_RULES.logo.maxBytes)} au maximum.`,
-  noColumn: 'Le logo ne peut pas être modifié d’ici : la colonne « logo » n’existe pas dans la table Etablissements (GRIST_SETUP.md, étape 5).'
+  noColumn: 'Le logo ne peut pas être modifié d’ici : la colonne « logo » n’existe pas dans la table Etablissements (GRIST_SETUP.md, étape 5).'
 };
-const NO_LIST = 'La liste des responsables n’a pas pu être lue : elle n’est ni affichée ni modifiable d’ici. '
+const NO_LIST = 'La liste des responsables n’a pas pu être lue : elle n’est ni affichée ni modifiable d’ici. '
   + 'Les règles d’accès de Grist doivent laisser un responsable lire la table ACL pour son établissement (GRIST_SETUP.md).';
-const SELF_REMOVAL = 'Vous retirez votre propre accès : une fois enregistré, vous ne pourrez plus modifier cette fiche.';
+const SELF_REMOVAL = 'Vous retirez votre propre accès : une fois enregistré, vous ne pourrez plus modifier cette fiche.';
 const PICK_ONE = 'Choisir une personne';
 
 // ===== Le logo =====
@@ -365,7 +365,7 @@ export function buildForm(ctx, message = '') {
 
   const fields = el('div', 'fld-grid');
   fields.append(
-    readOnlyField('etabAcronym', 'Sigle', etablissement.sigle, 'Il sert de filtre sur les cartes : il ne se change pas ici.', 'Aucun sigle'),
+    readOnlyField('etabAcronym', 'Sigle', etablissement.sigle, 'Il sert de filtre sur les cartes : il ne se change pas ici.', 'Aucun sigle'),
     readOnlyField('etabStatus', 'Statut', etablissement.status, 'Géré par l’équipe du PUI.'),
     nameField(ctx)
   );

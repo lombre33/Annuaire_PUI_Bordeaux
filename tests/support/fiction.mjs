@@ -1,7 +1,7 @@
 // Le jeu de données d'un test ne contient que des coordonnées inventées (docs/securite.md) : des adresses du domaine réservé
 // .example (RFC 2606) et des numéros des plages que l'ARCEP réserve à la fiction. `tables` : les tables de BDD, comme Grist les rend.
 
-import assert from 'node:assert/strict';
+import assert from './assert.mjs';
 
 // 05 36 49 xx xx et 06 39 98 xx xx (ARCEP, décision n° 2018-0881), en dix chiffres.
 const FICTION_PHONE = /^0(?:53649|63998)\d{4}$/;

@@ -6,7 +6,7 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { ANA_EMAIL, withIdentity } from './fixtures.mjs';
 import { assertNoCspViolation, assertNoSecretLogged, layoutSettled, openOwn, skip, until, waitForCards, withWidget } from './support/browser.mjs';
 import { FITS, assertTabStaysInDialog, dialogFit, profileDialogPage, spillOf, unnamedControls } from './support/dialog-page.mjs';

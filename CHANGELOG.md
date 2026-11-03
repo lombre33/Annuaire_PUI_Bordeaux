@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.33.0 — Audit UI/UX : cinq constats mineurs (interrupteur de présence fidèle à Grist, repères pour lecteurs d'écran, lien tel: sur téléphone, espaces insécables)
+
+Premier lot de la réponse d'Antoine du 3 novembre 2026 (« Les seize ») à sa question du 20 octobre sur les 20 constats mineurs de l'audit UI/UX : les **cinq qui ne changent rien à ce qu'on voit sur un ordinateur**
+(U53, U23, U24, U38, U39). Les onze qui changent l'écran viennent dans une version à part, montrés en images avant/après avant d'être fusionnés. Rien à régler dans Grist.
+
+- **U53, l'interrupteur « Apparaître dans l'annuaire » dit ce que Grist a enregistré.** Quand l'écriture réussissait mais que la relecture de l'annuaire échouait, l'interrupteur restait sur l'ancien état : un
+  deuxième clic réécrivait la même valeur au lieu de la défaire. `createPeopleIndex()` (`grist-data.js`) garde maintenant le choix écrit (`rememberConsent()`, pour les lignes écrites, jusqu'à la lecture
+  suivante qui réussit) et `togglePresence()` (`main.js`) redessine le bandeau avant de dire « Modification enregistrée ; l'annuaire n'a pas pu être rechargé. ». Ce message, qui ne valait plus rien une fois
+  l'annuaire relu, s'efface à la première lecture suivante qui réussit (ton `stale` de `account-ui.js`).
+- **U23, une carte se lit comme une fiche et non comme un plan de page.** Chaque groupe de pastilles d'une carte (Instances, Actions, Compétences…) était un titre de niveau 3 : jusqu'à six titres de plus par
+  carte dans le plan de la page, des centaines pour un lecteur d'écran qui navigue par titres. C'est maintenant un `div role="group"` nommé (`aria-label`) dont le titre, qui reste à l'écran, n'est plus lu
+  une seconde fois. Chaque carte est un `article` nommé par la personne (`aria-labelledby` sur son nom) et la grille est une zone nommée « Contacts » (le lien « Aller aux résultats » y mène). **La grille n'est
+  pas devenue une liste** (`ul`/`li`) : cela aurait demandé de ranger chaque carte dans un `li`, donc de toucher à la mise en page de la grille, aux tests et à la reprise du focus, pour un gain que je n'ai pas pu
+  mesurer avec un vrai lecteur d'écran. Le nom du groupe est celui du titre ; la mise en page est la même (`div` à la place de `h3`, mêmes classes).
+- **U24, les glyphes qui ornent un texte ne sont plus lus.** `glyph()` (`dom.js`) marque `aria-hidden` le ☎ devant un numéro, le ✓ des confirmations d'enregistrement et le ✦ de « Aucun contact trouvé » : un lecteur
+  d'écran disait « black telephone » devant chaque numéro. Le texte affiché ne change pas (`textContent` reste « ☎ 05 36 49 90 12 »). Les ✎ des boutons « Modifier » n'avaient pas besoin d'y passer : le bouton porte
+  déjà son `aria-label`, le glyphe n'était pas lu ; les ▾ l'étaient déjà (`aria-hidden`).
+- **U38, le numéro est un lien `tel:` sur téléphone et tablette.** `telHref()` (`grist-data.js`) n'en fait un lien que pour un numéro qui se compose sans équivoque (6 à 15 chiffres, des espaces, points ou tirets,
+  un « + » devant pour l'international) ; « poste 23 », deux numéros ou « +33 (0)5… » restent du texte. Le lien a l'aspect du texte qu'il remplace (gris, pas de soulignement), s'annonce « Téléphone : 05 36 49 90 12 »
+  et prend, sur écran tactile, la marge de toucher de l'adresse e-mail (+12 px de haut pour la ligne du numéro). **Sur ordinateur le numéro reste du texte, volontairement** : un second lien de 15 px de haut juste sous
+  l'adresse e-mail les ferait passer tous deux sous la cible de 24 px que la norme exige quand rien ne les isole (WCAG 2.5.8 ; `tests/accessibility.test.mjs` le mesurait et a échoué sur cette variante), et le
+  clic n'y ouvre le plus souvent rien. La carte de relecture garde le numéro en texte.
+- **U39, espaces insécables.** Les 172 textes du widget qui écrivaient une espace ordinaire devant « : ; ? ! » ou dans « » (messages, libellés, infobulles, `aria-label`, lignes de la console) ont maintenant une
+  espace insécable (U+00A0) : sur un téléphone, un « ? » ou un « : » ne reste plus seul en début de ligne. `index.html` (le bandeau du mode admin) de même. Le compteur dit « 1 234 contacts » avec l'espace
+  insécable fine de la langue (`formatCount()`, `grist-data.js`, aussi dans « N résultats » des listes à recherche) ; les nombres des pastilles de menu restent des chiffres seuls. **`tests/typography.test.mjs`
+  garde la règle** : il lit chaque chaîne et chaque modèle de texte des modules du widget (un petit lecteur de code, qui se vérifie lui-même) et le texte de `index.html`, et échoue sur une espace ordinaire à ces
+  endroits. Pour une espace ordinaire voulue (du code dans une chaîne), l'écrire `\x20`.
+- **Les tests comparent sans tenir compte de l'espace insécable.** Les 50 fichiers de tests et les 7 outils de `tests/support/` importent `assert` de `tests/support/assert.mjs` (celui de Node, qui confond l'espace insécable avec l'espace
+  ordinaire dans `equal`, `deepEqual`, `match`, `throws` et `rejects`) ; `plain()` en donne la même lecture aux comparaisons qui n'en passent pas (`includes`, une expression régulière dans une fonction). Aucun test n'a
+  perdu un contrôle : seul le caractère de l'espace est confondu. `tests/docs.test.mjs` lit de même le guide, qui cite les messages avec des espaces ordinaires.
+- Tests : 14 de plus (1 096 en tout), dont 9 dans un vrai navigateur (447 en tout) (`tests/e2e.test.mjs` : l'interrupteur et le message périmé, le lien `tel:` sur écran tactile et le texte sur ordinateur ; `tests/accessibility-cards.test.mjs` : les articles, les groupes, la
+  grille, les glyphes ; `tests/grist-data.test.mjs` : `telHref` ; `tests/typography.test.mjs` : la garde, son lecteur, `formatCount`, le compteur). Les quatre de `accessibility-cards` et celui de l'interrupteur échouent
+  sur le code de la 1.32.0. **Non essayé** dans le vrai Grist d'Antoine, ni sur un vrai téléphone (`tel:`), ni avec un vrai lecteur d'écran (TESTING.md, sections 23 et 24). Revenir en arrière : `git revert` de la fusion.
+
 ## 1.32.0 — « Nommer » : la même liste déroulante à recherche que l'établissement
 
 Décision d'Antoine du 21 octobre 2026 (10 h 40), qui a répondu « Oui » à la question « Donner à « Nommer » la liste déroulante à recherche ? » : la fiche d'un établissement nomme

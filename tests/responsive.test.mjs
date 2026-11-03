@@ -18,7 +18,7 @@
 // les scénarios navigateur sont ignorés et `node --test` reste vert.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { crowdedTables, crowdedTablesByAction } from './fixtures-responsive.mjs';
 import { measureCards } from './support/card-metrics.mjs';
 import { assertFictionalContacts } from './support/fiction.mjs';

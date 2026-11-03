@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import { uploadThenRecheck } from '../save-upload.js';
 
 // ===== save-upload : envoyer le fichier d'une modification puis relire l'état de la fiche, avant d'écrire (commun à

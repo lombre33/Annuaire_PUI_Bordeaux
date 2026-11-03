@@ -1,7 +1,7 @@
 // Ce que montre une photo : seules deux sources existent (voir avatar-ui.js). Le DOM lui-même est
 // essayé dans un navigateur (tests/e2e-avatar.test.mjs) ; ici, la règle qui décide d'où une photo peut venir.
 import test from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 
 import { photoSource } from '../avatar-ui.js';
 

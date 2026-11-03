@@ -8,7 +8,7 @@
 // Optionnel, comme e2e.test.mjs : nécessite Playwright (voir TESTING.md).
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert, { plain } from './support/assert.mjs';
 import { sampleTables, withAvatars, withBranding, withIdentity, withSchema, ANA_EMAIL, IRIS_EMAIL, NEW_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
 import {
   assertNoSecretLogged, bddCalls, bddCell, changeFonction, focusReturnsTo, gridCard, openOwn, skip, tokenRequests, toast, until, waitForCards,
@@ -564,7 +564,7 @@ test('un fichier refusé avant l\'envoi (format, poids, contenu illisible) ne ch
     const error = photoError(page);
     const expectError = async (file, message, label) => {
       await chooseFile(page, file);
-      await until(async () => (await error.textContent()) === message, `${label} : « ${message} » (obtenu : « ${await error.textContent()} »)`);
+      await until(async () => plain(await error.textContent()) === message, `${label} : « ${message} » (obtenu : « ${await error.textContent()} »)`);
       assert.equal(await error.isVisible(), true, label);
       assert.equal(await error.getAttribute('class'), 'fld-err', label);
       assert.equal(await summary(page), 'Aucune modification', `${label} : rien n'a changé`);

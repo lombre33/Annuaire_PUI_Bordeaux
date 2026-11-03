@@ -1,7 +1,7 @@
 // Règles du projet qui ne relèvent d'aucune fonction en particulier.
 
 import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assert from './support/assert.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

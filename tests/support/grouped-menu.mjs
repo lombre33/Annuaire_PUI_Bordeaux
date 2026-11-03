@@ -3,7 +3,7 @@
 // un nombre de cartes, un bouton de dépli) ; un « élément » est une valeur de son détail (une
 // compétence, une tâche). Sans effet de bord : ce module ne lance pas de navigateur.
 
-import assert from 'node:assert/strict';
+import assert from './assert.mjs';
 
 // { libellé → nombre de cartes } des éléments d'un menu, d'un groupe (`filter` est un locator).
 export const optionCounts = filter => filter.locator('.filter-option').evaluateAll(options =>

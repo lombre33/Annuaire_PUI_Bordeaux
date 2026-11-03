@@ -47,7 +47,7 @@ function phoneIsNumeric(columnTypes, row) {
 // La photo s'écrit après son envoi à Grist (saveProfile) : son identifiant n'existe pas encore.
 function writeImage(field, change, row, columnTypes) {
   const type = columnTypes[field.key];
-  return type && type !== 'Attachments' ? { error: `${field.label} : la colonne ${field.key} n'est pas une colonne de pièces jointes` } : {};
+  return type && type !== 'Attachments' ? { error: `${field.label} : la colonne ${field.key} n'est pas une colonne de pièces jointes` } : {};
 }
 
 const writeText = (field, change) => ({ value: change.apres });
@@ -64,7 +64,7 @@ const writeReference = (field, change) => ({ value: change.apres.id });
 function writeList(field, change, row) {
   const current = safeValues(row[field.key]);
   if (current.some(item => !Number.isSafeInteger(item))) {
-    return { error: `${field.label} : la fiche contient des valeurs que le widget ne sait pas modifier, à corriger dans Grist` };
+    return { error: `${field.label} : la fiche contient des valeurs que le widget ne sait pas modifier, à corriger dans Grist` };
   }
   // Une entrée qui réunit plusieurs lignes de la table liée (`ids`) se retire de toutes, et ne
   // s'ajoute pas si la fiche en porte déjà une.
@@ -84,7 +84,7 @@ export function buildRowUpdate(champs, row, columnTypes = {}) {
   for (const field of PROFILE_FIELDS) {
     const change = champs[field.key];
     if (!change) continue;
-    if (!(field.key in row)) return { error: `${field.label} : la colonne ${field.key} n'existe pas dans ${MAIN_TABLE}` };
+    if (!(field.key in row)) return { error: `${field.label} : la colonne ${field.key} n'existe pas dans ${MAIN_TABLE}` };
     const written = (WRITERS[field.kind] ?? writeList)(field, change, row, columnTypes);
     if (written.error) return { error: written.error };
     if ('value' in written) values[field.key] = written.value;
@@ -104,13 +104,13 @@ export function signatureOf(row, keys) {
 
 // Les phrases dites à la personne quand Grist n'a pas pu lire ou écrire.
 const FAILURES = {
-  read: 'La fiche n\'a pas pu être relue dans Grist : rien n\'a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
-  gone: 'Cette fiche n\'existe plus dans Grist : rien n\'a été modifié.',
-  denied: 'Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche. Contactez un administrateur.',
-  emailTaken: 'Cette adresse e-mail est maintenant celle d\'une autre fiche : rien n\'a été modifié. Revenez à la fiche et choisissez-en une autre.',
-  formula: 'Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md.',
-  other: 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
-  noFile: 'La photo choisie n\'est plus disponible : choisissez-la de nouveau.'
+  read: 'La fiche n\'a pas pu être relue dans Grist : rien n\'a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
+  gone: 'Cette fiche n\'existe plus dans Grist : rien n\'a été modifié.',
+  denied: 'Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche. Contactez un administrateur.',
+  emailTaken: 'Cette adresse e-mail est maintenant celle d\'une autre fiche : rien n\'a été modifié. Revenez à la fiche et choisissez-en une autre.',
+  formula: 'Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md.',
+  other: 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
+  noFile: 'La photo choisie n\'est plus disponible : choisissez-la de nouveau.'
 };
 
 // Le conseil donné à qui n'a pas pu envoyer sa photo à Grist (upload.js).
@@ -123,7 +123,7 @@ async function readFiche(docApi, rowId, log) {
   try {
     table = await docApi.fetchTable(MAIN_TABLE);
   } catch (error) {
-    log.error('[PROFIL] lecture de la fiche impossible :', error);
+    log.error('[PROFIL] lecture de la fiche impossible :', error);
     throw new ProfileSaveError(FAILURES.read, error);
   }
   const rows = tableToRows(table);
@@ -156,15 +156,15 @@ export async function prepareReview(docApi, row, draft, { referenceMaps, etabFla
   const { row: fresh, rows } = await readFiche(docApi, row.id, log);
   const { champs, errors } = diffProfile(row, draft, referenceMaps, { admin, emailTaken: emailTakenBy(rows, row.id) });
   if (errors.length > 0 || Object.keys(champs).length === 0) {
-    throw new ProfileSaveError('Il n\'y a rien à relire : corrigez les champs signalés ou modifiez la fiche.');
+    throw new ProfileSaveError('Il n\'y a rien à relire : corrigez les champs signalés ou modifiez la fiche.');
   }
   const { champs: rebased, moved } = rebaseChanges(champs, fresh, referenceMaps, { admin });
   if (Object.keys(rebased).length === 0) {
-    throw new ProfileSaveError('Ces modifications sont déjà dans la fiche : il n\'y a rien à enregistrer.');
+    throw new ProfileSaveError('Ces modifications sont déjà dans la fiche : il n\'y a rien à enregistrer.');
   }
   const columnTypes = await readColumnTypes(docApi, MAIN_TABLE, { log });
   const built = buildRowUpdate(rebased, fresh, columnTypes);
-  if (built.error) throw new ProfileSaveError(`Ces modifications ne peuvent pas être enregistrées : ${built.error}.`);
+  if (built.error) throw new ProfileSaveError(`Ces modifications ne peuvent pas être enregistrées : ${built.error}.`);
   const preview = previewOf(fresh, built.values, referenceMaps, etabFlags);
   const { before, after, marks } = rebased.Avatar ? withAvatarChange(preview, rebased.Avatar, draft.Avatar) : preview;
   return {
@@ -180,7 +180,7 @@ export async function prepareReview(docApi, row, draft, { referenceMaps, etabFla
     marks,
     visibility: describeVisibility({ ...fresh, ...built.values }, referenceMaps, etabFlags),
     notice: moved.length > 0
-      ? `Ces informations ont changé dans Grist depuis l'ouverture de la fenêtre : ${moved.join(', ')}. La carte « Avant » montre leur état actuel.`
+      ? `Ces informations ont changé dans Grist depuis l'ouverture de la fenêtre : ${moved.join(', ')}. La carte « Avant » montre leur état actuel.`
       : ''
   };
 }
@@ -209,7 +209,7 @@ function checkSaveable(review, upload) {
   if (keys.length === 0) throw new ProfileSaveError('Aucun changement à enregistrer.');
   // Fermé par défaut : l'e-mail et l'établissement ne s'écrivent que pour un administrateur.
   if (review.admin !== true && PROFILE_FIELDS.some(field => field.admin && keys.includes(field.key))) {
-    throw new ProfileSaveError('Ces modifications ne peuvent pas être enregistrées : l\'e-mail et l\'établissement sont réservés à un administrateur.');
+    throw new ProfileSaveError('Ces modifications ne peuvent pas être enregistrées : l\'e-mail et l\'établissement sont réservés à un administrateur.');
   }
   const replacing = review.champs.Avatar?.action === 'replace';
   if (replacing && (!review.file || typeof upload !== 'function')) throw new ProfileSaveError(FAILURES.noFile);
@@ -230,7 +230,7 @@ async function writeFiche(docApi, review, values, attachmentId, log) {
   try {
     await docApi.applyUserActions([['UpdateRecord', MAIN_TABLE, review.rowId, values]]);
   } catch (error) {
-    log.error('[PROFIL] écriture impossible :', error);
+    log.error('[PROFIL] écriture impossible :', error);
     throw new ProfileSaveError(FAILURES[classifyWriteError(error)], error, { leftover: attachmentId });
   }
 }
@@ -253,13 +253,13 @@ export async function saveProfile(docApi, review, { upload, log = console } = {}
   if (replacing) {
     // L'envoi prend du temps : la fiche a pu bouger, on relit avant d'écrire.
     ({ attachmentId, state: current } = await uploadThenRecheck(review.file, {
-      upload, recheck: inspect, ErrorClass: ProfileSaveError, fallback: FAILURES.other, consoleLine: '[PROFIL] envoi de la photo impossible :', log
+      upload, recheck: inspect, ErrorClass: ProfileSaveError, fallback: FAILURES.other, consoleLine: '[PROFIL] envoi de la photo impossible :', log
     }));
     if (current.changed) return { status: 'changed', row: current.changed, leftover: attachmentId };
   }
 
   const built = buildRowUpdate(review.champs, current.row, review.columnTypes);
-  if (built.error) throw new ProfileSaveError(`Ces modifications ne peuvent pas être enregistrées : ${built.error}.`, null, { leftover: attachmentId });
+  if (built.error) throw new ProfileSaveError(`Ces modifications ne peuvent pas être enregistrées : ${built.error}.`, null, { leftover: attachmentId });
   const values = { ...built.values };
   if (replacing) values.Avatar = ['L', attachmentId];
   else if (review.champs.Avatar) values.Avatar = ['L'];
@@ -272,10 +272,10 @@ export async function saveProfile(docApi, review, { upload, log = console } = {}
 // Les phrases dites à la personne quand sa fiche ne peut pas être créée.
 const CREATION_FAILURES = {
   ...FAILURES,
-  denied: 'Grist a refusé la création : vos droits ne permettent pas d\'ajouter une fiche. Contactez un administrateur.',
-  other: 'La fiche n\'a pas pu être créée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
-  exists: 'Une fiche porte déjà votre adresse : rien n\'a été créé. Rechargez la page pour la retrouver.',
-  noEmailColumn: 'BDD n\'a pas de colonne « email » : la fiche ne pourrait pas être reliée à votre compte. Rien n\'a été créé. Contactez un administrateur.'
+  denied: 'Grist a refusé la création : vos droits ne permettent pas d\'ajouter une fiche. Contactez un administrateur.',
+  other: 'La fiche n\'a pas pu être créée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
+  exists: 'Une fiche porte déjà votre adresse : rien n\'a été créé. Rechargez la page pour la retrouver.',
+  noEmailColumn: 'BDD n\'a pas de colonne « email » : la fiche ne pourrait pas être reliée à votre compte. Rien n\'a été créé. Contactez un administrateur.'
 };
 
 // Relit BDD et vérifie que la fiche peut y être créée : la table a une colonne « email » et aucune ligne
@@ -286,7 +286,7 @@ async function checkCanCreate(docApi, email, log) {
   try {
     table = await docApi.fetchTable(MAIN_TABLE);
   } catch (error) {
-    log.error('[PROFIL] lecture de BDD impossible :', error);
+    log.error('[PROFIL] lecture de BDD impossible :', error);
     throw new ProfileSaveError(FAILURES.read, error);
   }
   if (!('email' in table)) throw new ProfileSaveError(CREATION_FAILURES.noEmailColumn);
@@ -307,11 +307,11 @@ export async function prepareCreation(docApi, blank, draft, { email, referenceMa
   await checkCanCreate(docApi, email, log);
   const { champs, errors } = diffProfile(blank, draft, referenceMaps, { creating: true });
   if (errors.length > 0 || Object.keys(champs).length === 0) {
-    throw new ProfileSaveError('Il n\'y a rien à relire : corrigez les champs signalés ou remplissez la fiche.');
+    throw new ProfileSaveError('Il n\'y a rien à relire : corrigez les champs signalés ou remplissez la fiche.');
   }
   const columnTypes = await readColumnTypes(docApi, MAIN_TABLE, { log });
   const built = buildRowUpdate(champs, blank, columnTypes);
-  if (built.error) throw new ProfileSaveError(`Cette fiche ne peut pas être créée : ${built.error}.`);
+  if (built.error) throw new ProfileSaveError(`Cette fiche ne peut pas être créée : ${built.error}.`);
   const choice = typeof draft?.[CONSENT_COLUMN] === 'boolean' ? { [CONSENT_COLUMN]: draft[CONSENT_COLUMN] } : {};
   const row = { ...blank, email: normalizeEmail(email), ...choice };
   return {
@@ -340,7 +340,7 @@ export async function createProfile(docApi, review, { log = console } = {}) {
   try {
     added = await docApi.applyUserActions([['AddRecord', MAIN_TABLE, null, review.values]]);
   } catch (error) {
-    log.error('[PROFIL] création impossible :', error);
+    log.error('[PROFIL] création impossible :', error);
     throw new ProfileSaveError(CREATION_FAILURES[classifyWriteError(error)], error);
   }
   const rowId = added?.retValues?.[0];
