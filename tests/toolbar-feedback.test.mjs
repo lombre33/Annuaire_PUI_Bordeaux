@@ -9,6 +9,7 @@ import assert from './support/assert.mjs';
 import { CATEGORIES } from '../constants.js';
 import { contactCountText } from '../grist-data.js';
 import { countInScope } from '../filters.js';
+import { sampleTables, withClones } from './fixtures.mjs';
 import { crowdedTables, crowdedTablesByAction } from './fixtures-responsive.mjs';
 import { accessibilityTree, accessibleNode } from './support/accessibility-tree.mjs';
 import { resultCount, skip, waitForCards, withWidget } from './support/browser.mjs';
@@ -178,6 +179,31 @@ test('le compteur dit combien de contacts la recherche et les filtres écartent 
     await page.locator('#searchInput').fill('Zzz');
     await page.waitForFunction(() => document.getElementById('resultCount').textContent === '0 sur 29 contacts');
   }));
+
+// Le texte le plus long que le compteur écrira : un annuaire national, une recherche qui en écarte presque tout. La pastille « Haut de page » le
+// porte aussi ; sur un cadre étroit elle ne sort pas de l'écran, le bouton passe sous le nombre. Les polices ne sont pas celles de tout le monde
+// (Inter n'est pas installée partout, le navigateur prend celle du système, souvent plus large) : le test passe avec l'une et l'autre.
+test('la pastille « Haut de page » reste dans l\'écran avec « 1 234 sur 45 000 contacts », même sur un téléphone étroit (audit U36)', { skip }, async () => {
+  for (const width of [320, 360, 390, 1280]) {
+    await withWidget({ tables: withClones(sampleTables(), 40) }, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await waitForCards(page, 44);
+      await page.evaluate(() => window.scrollTo(0, 2500));
+      await page.waitForFunction(() => !document.getElementById('scrollTools').hidden);
+      await page.locator('#scrollCount').evaluate(node => { node.textContent = '1 234 sur 45 000 contacts'; });
+      const box = await page.locator('#scrollTools').evaluate(node => {
+        const { left, right, top, bottom } = node.getBoundingClientRect();
+        return { left, right: window.innerWidth - right, top, bottom: window.innerHeight - bottom };
+      });
+      assert.ok(box.left >= 0 && box.right >= 0 && box.top >= 0 && box.bottom >= 0, `la pastille sort de l'écran à ${width} px : ${JSON.stringify(box)}`);
+      const buttonVisible = await page.getByRole('button', { name: 'Haut de page' }).evaluate(node => {
+        const { left, right } = node.getBoundingClientRect();
+        return left >= 0 && right <= window.innerWidth;
+      });
+      assert.equal(buttonVisible, true, `le bouton « Haut de page » est entier à ${width} px`);
+    });
+  }
+});
 
 const reset = page => page.locator('#resetFilters');
 const resetIsGrey = async page => (await reset(page).getAttribute('aria-disabled')) === 'true';

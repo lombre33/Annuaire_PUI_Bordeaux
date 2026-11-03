@@ -156,7 +156,7 @@ test('une fois la barre d\'outils passée, une pastille donne le nombre de conta
     // Elle est fixe, en bas à droite de l'écran, et ne recouvre pas toute la page.
     const place = await page.locator('#scrollTools').evaluate(element => {
       const { right, bottom, width, height } = element.getBoundingClientRect();
-      return { right: window.innerWidth - right, bottom: window.innerHeight - bottom, small: width < 320 && height < 60, position: getComputedStyle(element).position };
+      return { right: window.innerWidth - right, bottom: window.innerHeight - bottom, small: width < 400 && height < 60, position: getComputedStyle(element).position };
     });
     assert.deepEqual(place, { right: 16, bottom: 16, small: true, position: 'fixed' });
 

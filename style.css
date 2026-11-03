@@ -859,14 +859,19 @@ button.avatar:hover {
   cursor: pointer;
 }
 /* Pastille fixe, une fois la place de la barre d'outils passée (scroll-tools.js) : le nombre de contacts, et le bouton qui remonte. */
+/* Le nombre de contacts peut s'allonger (« 1 234 sur 45 000 contacts », 1.34.0) : sur un cadre étroit, le bouton passe sous le nombre au lieu
+   de sortir de l'écran par la gauche. */
 .scroll-tools {
   position: fixed;
   z-index: 30;
   right: 16px;
   bottom: 16px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  max-width: calc(100% - 32px);
 }
 .scroll-count {
   padding: 10px 16px;
@@ -1727,6 +1732,7 @@ button.avatar:hover {
   .scroll-tools {
     right: 12px;
     bottom: 12px;
+    max-width: calc(100% - 24px);
   }
 }
 @media print {
