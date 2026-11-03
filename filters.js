@@ -71,6 +71,13 @@ export function filterContacts(contacts, activeFilters, searchTerm, scope, exclu
     matchesSearch(contact, words) && matchesScope(contact, scope) && matchesSelections(contact, selections));
 }
 
+// Combien de contacts les interrupteurs Fondateurs/Partenaires laissent voir, avant recherche et filtres : le « M » du compteur
+// « 12 sur 245 contacts » (audit UI/UX, U36). Les interrupteurs sont des commandes à part, à côté du compteur : ils changent
+// l'ensemble dont on part, ils ne comptent pas parmi les contacts « écartés ».
+export function countInScope(contacts, scope) {
+  return contacts.filter(contact => matchesScope(contact, scope)).length;
+}
+
 // Renvoie les filtres actifs privés des valeurs qui ne sont plus une option du
 // menu (libellé renommé ou supprimé dans Grist) : invisibles, elles bloqueraient
 // les résultats à 0. Une valeur valide sans contact pour l'instant reste cochée.

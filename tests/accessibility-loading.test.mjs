@@ -39,7 +39,7 @@ test('le compteur de contacts est la seule zone vivante : la grille ne l\'est pl
 
     await page.getByRole('searchbox').fill('Ana');
     await waitForCards(page, 1);
-    assert.equal(await resultCount(page), '1 contact', 'la zone vivante dit le résultat');
+    assert.equal(await resultCount(page), '1 sur 4 contacts', 'la zone vivante dit le résultat, et ce que la recherche écarte');
   }));
 
 // ===== U28 : l'état de chargement =====
@@ -56,8 +56,8 @@ test('tant que Grist n\'a pas répondu, la page dit « Chargement… » et rien 
 
     await page.evaluate(() => window.__releaseReads());
     await waitForCards(page, 1);
-    assert.deepEqual(await pageState(page), { counter: '1 contact', busy: null, cards: 1, emptyShown: false, bannerShown: false },
-      'la recherche tapée pendant l\'attente s\'applique à l\'arrivée');
+    assert.deepEqual(await pageState(page), { counter: '1 sur 5 contacts', busy: null, cards: 1, emptyShown: false, bannerShown: false },
+      'la recherche tapée pendant l\'attente s\'applique à l\'arrivée, et le total est celui de l\'interrupteur Partenaires allumé pendant l\'attente (5 contacts)');
     assert.equal(await page.getByRole('searchbox').inputValue(), 'Ana');
   }));
 

@@ -51,7 +51,7 @@ test('à partir de 1180 px de large, la barre d\'outils reste en haut de l\'écr
     });
     assert.equal(hit, true, 'le champ de recherche n\'est pas recouvert par les cartes');
     await page.locator('#searchInput').fill('Copie');
-    await page.waitForFunction(() => document.getElementById('resultCount').textContent === '40 contacts');
+    await page.waitForFunction(count => document.getElementById('resultCount').textContent === count, `40 sur ${CARDS} contacts`);
     assert.equal((await toolbarBox(page)).top, 0, 'toujours en haut après la recherche');
     assert.ok(await page.evaluate(() => window.scrollY) > 0, 'la page n\'est pas remontée');
 
@@ -150,8 +150,8 @@ test('une fois la barre d\'outils passée, une pastille donne le nombre de conta
 
     // Elle suit le compteur : une recherche la met à jour.
     await page.locator('#searchInput').fill('Copie');
-    await page.waitForFunction(() => document.getElementById('resultCount').textContent === '40 contacts');
-    assert.equal(await page.locator('#scrollCount').textContent(), '40 contacts');
+    await page.waitForFunction(count => document.getElementById('resultCount').textContent === count, `40 sur ${CARDS} contacts`);
+    assert.equal(await page.locator('#scrollCount').textContent(), `40 sur ${CARDS} contacts`);
 
     // Elle est fixe, en bas à droite de l'écran, et ne recouvre pas toute la page.
     const place = await page.locator('#scrollTools').evaluate(element => {

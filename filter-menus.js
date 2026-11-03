@@ -110,6 +110,26 @@ function buildMenuSearch(filter, menu) {
   return search;
 }
 
+// Le haut d'un menu : la recherche, qui reste là quand la liste défile (style.css, .filter-menu-head). Avec trente options le menu
+// fait mille pixels pour trois cents visibles, et la recherche sortait de la vue au premier défilement (audit UI/UX, U37).
+function buildMenuHead(filter, menu) {
+  const head = document.createElement('div');
+  head.className = 'filter-menu-head';
+  head.appendChild(buildMenuSearch(filter, menu));
+  return head;
+}
+
+// L'aide d'un menu rangé par groupe (« Cochez un domaine pour toutes ses compétences… »), écrite dans le menu et lue avec lui : elle
+// n'était que l'infobulle du bouton, qu'on ne voit ni au toucher ni au clavier (audit UI/UX, U27).
+function buildMenuHelp(filter, menu) {
+  const help = document.createElement('p');
+  help.className = 'filter-help';
+  help.id = `filter-help-${filter.key}`;
+  help.textContent = groupingWording(filter, true).hint;
+  menu.setAttribute('aria-describedby', help.id);
+  return help;
+}
+
 // Le nom d'une case est son libellé (« Oncologie »), pas le libellé suivi du nombre de fiches (« Oncologie 3 ») : le nombre est sa
 // description, que le lecteur d'écran lit après le nom. Le texte du nombre reste celui que updateFilterCounts() met à jour.
 let countSequence = 0;
@@ -145,7 +165,7 @@ function buildFilterMenu(filter, referenceMaps, selected, counts, onToggle) {
   const menu = document.createElement('div');
   menu.className = 'filter-menu';
   menu.style.borderTopColor = filter.color;
-  menu.appendChild(buildMenuSearch(filter, menu));
+  menu.appendChild(buildMenuHead(filter, menu));
 
   const values = orderedValues(Object.values(referenceMaps[filter.key] || {}), selected);
   values.forEach(value => {
@@ -232,7 +252,7 @@ function buildGroupedMenu(filter, groups, selected, counts, handlers) {
   menu.style.borderTopColor = filter.color;
   menu.style.setProperty('--group-color', CATEGORIES[filter.grouping].color);
   groupsByMenu.set(menu, groups);
-  menu.appendChild(buildMenuSearch(filter, menu));
+  menu.append(buildMenuHead(filter, menu), buildMenuHelp(filter, menu));
   groups.forEach((group, index) => menu.appendChild(buildGroup(filter, group, index, selected, counts, handlers)));
   return menu;
 }
