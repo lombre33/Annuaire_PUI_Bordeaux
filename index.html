@@ -60,6 +60,7 @@
   <link rel="modulepreload" href="save-upload.js">
   <link rel="modulepreload" href="scroll-tools.js">
   <link rel="modulepreload" href="schema.js">
+  <link rel="modulepreload" href="status-ui.js">
   <link rel="modulepreload" href="upload.js">
 </head>
 <body>
@@ -95,6 +96,7 @@
           <button type="button" class="account-admin" aria-pressed="false" hidden>Mode admin</button>
         </div>
         <p class="account-status" role="status" data-tone="info"></p>
+        <p class="account-error" role="alert"></p>
       </section>
     </header>
 
@@ -114,12 +116,15 @@
 
     <p id="adminStrip" class="admin-strip" role="status" hidden>Mode admin : un bouton « Modifier la fiche » apparaît sur chaque carte. Vos changements sont relus avant d’être validés.</p>
 
-    <p id="statusBanner" class="status-banner" role="alert" hidden></p>
+    <div id="statusBanner" class="status-banner" hidden>
+      <p class="status-text" role="alert"></p>
+      <button type="button" class="status-action" hidden></button>
+    </div>
     <section id="cardsGrid" class="cards-grid" aria-label="Contacts" aria-busy="true"></section>
     <section id="emptyState" class="empty-state" hidden>
       <div class="empty-mark" aria-hidden="true">✦</div>
-      <h2>Aucun contact trouvé</h2>
-      <p>Modifiez votre recherche ou réinitialisez les filtres.</p>
+      <h2 class="empty-title">Aucun contact trouvé</h2>
+      <p class="empty-text">Modifiez votre recherche ou réinitialisez les filtres.</p>
     </section>
 
     <div id="scrollTools" class="scroll-tools" hidden>

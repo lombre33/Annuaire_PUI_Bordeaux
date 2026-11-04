@@ -474,6 +474,15 @@ export class DirectoryLoadError extends Error {
   }
 }
 
+// Le bandeau d'état quand l'annuaire ne se charge pas : ce qui manque (la table ou la colonne, que `DirectoryLoadError` nomme), le geste
+// qui répare le plus souvent (le bouton « Réessayer » du bandeau, status-ui.js), puis qui prévenir. `retried` : une nouvelle tentative
+// vient d'échouer, ce que le message dit pour qu'un clic sans effet ne passe pas pour un bouton mort (audit UI/UX, U30).
+export function describeLoadFailure(error, { retried = false } = {}) {
+  const reason = error instanceof DirectoryLoadError ? ` (${error.message})` : '';
+  return `Impossible de charger l'annuaire depuis Grist${reason}. ${retried ? 'La nouvelle tentative a échoué. ' : ''}`
+    + `Cliquez sur « Réessayer » ; si le problème persiste, prévenez la personne qui gère l'annuaire (le détail est dans la console du navigateur).`;
+}
+
 // Une personne n'apparaît que si elle l'a accepté (BDD.Accepte_apparaitre, une
 // case à cocher) : seul `true` vaut accord. Vide, faux, 0 ou texte : pas d'accord.
 export function hasAccepted(record) {
@@ -570,20 +579,30 @@ export function createPeopleIndex(rows, referenceMaps, etabFlags, columns = rows
   };
 }
 
-// Quand la table contient des lignes mais qu'aucun contact n'est affichable,
-// dit pourquoi (colonne vide, établissements non validés...) au lieu de laisser
-// un « 0 contact » inexpliqué.
+// Quand la table contient des lignes mais qu'aucun contact n'est affichable, dit pourquoi (colonne vide, établissements non
+// validés...) au lieu de laisser un « 0 contact » inexpliqué. `message` : la phrase du bandeau, en clair pour qui consulte l'annuaire ;
+// `detail` : la même cause avec le nom des colonnes, pour la console, à l'usage de qui gère le document (audit UI/UX, U30).
 function describeEmptyDirectory(rows, contacts) {
   if (contacts.length > 0 || rows.length === 0) return null;
   if (rows.every(row => isEmptyReference(row.Etablissement))) {
-    return 'Etablissement est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.';
+    return {
+      message: 'Aucun contact ne peut s\'afficher : aucun n\'est rattaché à un établissement. Prévenez la personne qui gère l\'annuaire.',
+      detail: 'Etablissement est vide pour tous les contacts : aucun ne peut s\'afficher. Vérifiez cette colonne dans Grist.'
+    };
   }
   if (!rows.some(hasAccepted)) {
-    return 'Personne n\'a accepté d\'apparaître : Accepte_apparaitre n\'est coché pour aucun contact. '
-      + 'Cochez cette colonne dans Grist pour les personnes qui doivent figurer dans l\'annuaire.';
+    return {
+      message: 'Personne n\'a encore accepté d\'apparaître dans l\'annuaire.',
+      detail: 'Personne n\'a accepté d\'apparaître : Accepte_apparaitre n\'est coché pour aucun contact. '
+        + 'Cochez cette colonne dans Grist pour les personnes qui doivent figurer dans l\'annuaire.'
+    };
   }
-  return `Aucun contact affichable alors que la table ${MAIN_TABLE} contient des lignes : vérifiez les noms et Etablissement `
-    + '(établissement validé, fondateur ou partenaire).';
+  return {
+    message: 'Aucun contact ne remplit les conditions pour s\'afficher (un nom, un établissement validé, fondateur ou partenaire). '
+      + 'Prévenez la personne qui gère l\'annuaire.',
+    detail: `Aucun contact affichable alors que la table ${MAIN_TABLE} contient des lignes : vérifiez les noms et Etablissement `
+      + '(établissement validé, fondateur ou partenaire).'
+  };
 }
 
 // Lit toutes les tables en parallèle : { nom de table → résultat de Promise.allSettled }.
@@ -840,7 +859,8 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   warnAboutMissingEtablissement(rows, log);
   logWithoutConsent(rows, log);
 
-  const emptyReason = describeEmptyDirectory(rows, contacts);
+  const empty = describeEmptyDirectory(rows, contacts);
+  if (empty) log.warn(`[GRIST] ${empty.detail}`);
   // Les colonnes de BDD viennent de la table elle-même : une table vide en a aussi.
   const mainTable = results[MAIN_TABLE].value;
   const columns = mainTable && typeof mainTable === 'object' && !Array.isArray(mainTable) ? Object.keys(mainTable) : undefined;
@@ -850,6 +870,6 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
     etabFlags,
     people: createPeopleIndex(rows, referenceMaps, etabFlags, columns),
     etablissementRows,
-    issues: directoryIssues({ unreadable, unlabeled, etabFlags, rows, emptyReason })
+    issues: directoryIssues({ unreadable, unlabeled, etabFlags, rows, emptyReason: empty?.message })
   };
 }

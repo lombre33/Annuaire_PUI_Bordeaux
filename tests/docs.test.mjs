@@ -312,7 +312,7 @@ test('le guide utilisateur cite les autres messages de « Ma présence » : rais
   const alone = overrides => plain(describePresence([{ status: status(overrides) }]).message);
   const reasons = [{ named: false }, { etablissement: 'missing' }, { etablissement: 'unknown' },
     { etablissement: 'not_validated' }, { etablissement: 'not_eligible' }]
-    .map(overrides => alone(overrides).match(/masquée : (.+)\. Contactez/)?.[1]);
+    .map(overrides => alone(overrides).match(/masquée : (.+)\.$/)?.[1]);
   assert.ok(reasons.every(Boolean), 'presence.js ne donne plus la raison du masquage sous la forme attendue : adaptez ce test et le guide.');
 
   const two = statuses => plain(describePresence(statuses.map(item => ({ status: status(item) }))).message);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert, { plain } from './support/assert.mjs';
-import { loadDirectory, DirectoryLoadError } from '../grist-data.js';
+import { loadDirectory, DirectoryLoadError, describeLoadFailure } from '../grist-data.js';
 import { FILTERS } from '../constants.js';
 import { computeFilterCounts, createEmptyFilterState, filterContacts, menuGroups } from '../filters.js';
 import {
@@ -225,18 +225,23 @@ test('loadDirectory shows a person as soon as they accept, and consent never ove
 test('loadDirectory says why the directory is empty when nobody has accepted to appear', async () => {
   const tables = sampleTables();
   tables.BDD.Accepte_apparaitre = tables.BDD.Accepte_apparaitre.map(() => false);
-  const { contacts, issues } = await load(tables);
+  const log = recordingLog();
+  const { contacts, issues } = await loadDirectory(fakeDocApi(tables), { log });
   assert.equal(contacts.length, 0);
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /Personne n'a accepté d'apparaître/);
-  assert.match(issues[0], /Accepte_apparaitre/);
+  assert.equal(issues[0], 'Personne n\'a encore accepté d\'apparaître dans l\'annuaire.');
+  // En clair pour qui consulte l'annuaire (audit UI/UX, U30) : le nom de la colonne et le geste sont pour la console.
+  assert.doesNotMatch(issues[0], /Accepte_apparaitre/);
+  const detail = log.warnings.map(args => String(args[0])).find(line => line.startsWith('[GRIST]'));
+  assert.match(detail, /Accepte_apparaitre n'est coché pour aucun contact.*Cochez cette colonne dans Grist/);
 });
 
 test('loadDirectory does not blame the consent column when it is another rule that empties the directory', async () => {
   const nothingValidated = sampleTables();
   nothingValidated.Etablissements.ok_pour_apparaitre = nothingValidated.Etablissements.ok_pour_apparaitre.map(() => false);
   const { issues } = await load(nothingValidated);
-  assert.match(issues[0], /Aucun contact affichable/);
+  assert.match(issues[0], /^Aucun contact ne remplit les conditions pour s'afficher \(un nom, un établissement validé, fondateur ou partenaire\)\./);
+  assert.doesNotMatch(issues[0], /Accepte_apparaitre/);
 });
 
 test('loadDirectory tells the console how many people are hidden for lack of consent, never who', async () => {
@@ -255,8 +260,27 @@ test('loadDirectory explains an empty directory instead of leaving an unexplaine
   nothingValidated.Etablissements.ok_pour_apparaitre = nothingValidated.Etablissements.ok_pour_apparaitre.map(() => false);
 
   const explain = async tables => (await load(tables)).issues;
-  assert.match((await explain(noEtablissement))[0], /Etablissement est vide/);
-  assert.match((await explain(nothingValidated))[0], /Aucun contact affichable/);
+  assert.match((await explain(noEtablissement))[0], /aucun n'est rattaché à un établissement/);
+  assert.match((await explain(nothingValidated))[0], /Aucun contact ne remplit les conditions pour s'afficher/);
+  // Aucune de ces phrases ne parle de colonne ni de table : la console porte le détail, à l'usage de qui gère le document.
+  for (const tables of [noEtablissement, nothingValidated]) {
+    const log = recordingLog();
+    const { issues } = await loadDirectory(fakeDocApi(tables), { log });
+    assert.doesNotMatch(issues[0], /Etablissement\b|BDD|colonne|table/i);
+    assert.ok(log.warnings.some(args => /^\[GRIST\] .*(Etablissement|BDD)/.test(String(args[0]))), 'le détail technique est dans la console');
+  }
+});
+
+test('describeLoadFailure names what is missing, offers « Réessayer », and says when a new attempt has failed (audit UI/UX, U30)', () => {
+  const missing = new DirectoryLoadError('table « BDD » illisible');
+  assert.equal(describeLoadFailure(missing),
+    'Impossible de charger l\'annuaire depuis Grist (table « BDD » illisible). Cliquez sur « Réessayer » ; si le problème persiste, '
+    + 'prévenez la personne qui gère l\'annuaire (le détail est dans la console du navigateur).');
+  assert.match(describeLoadFailure(missing, { retried: true }), /illisible\)\. La nouvelle tentative a échoué\. Cliquez sur « Réessayer »/);
+  // Une erreur qui n'est pas une DirectoryLoadError n'a pas de phrase à elle : rien entre parenthèses (jamais un message technique brut).
+  assert.equal(describeLoadFailure(new Error('boom')),
+    'Impossible de charger l\'annuaire depuis Grist. Cliquez sur « Réessayer » ; si le problème persiste, '
+    + 'prévenez la personne qui gère l\'annuaire (le détail est dans la console du navigateur).');
 });
 
 test('loadDirectory stays quiet when the BDD table is genuinely empty', async () => {

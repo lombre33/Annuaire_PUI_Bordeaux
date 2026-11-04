@@ -82,8 +82,7 @@ test('personne n\'a accepté d\'apparaître : le bandeau le dit au lieu de laiss
   tables.BDD.Accepte_apparaitre = tables.BDD.Accepte_apparaitre.map(() => false);
   return withWidget({ tables }, async ({ page }) => {
     await waitForBanner(page);
-    assert.match(await bannerText(page), /Personne n'a accepté d'apparaître/);
-    assert.match(await bannerText(page), /Accepte_apparaitre/);
+    assert.match(await bannerText(page), /Personne n'a encore accepté d'apparaître/);
     assert.equal(await cardCount(page), 0);
     assert.equal(await resultCount(page), '0 contact');
   });
@@ -930,7 +929,7 @@ test('Etablissement vide pour tous les contacts : le bandeau le dit', { skip }, 
   tables.BDD.Etablissement = tables.BDD.Etablissement.map(() => 0);
   return withWidget({ tables }, async ({ page }) => {
     await waitForBanner(page);
-    assert.match(await bannerText(page), /Etablissement est vide/);
+    assert.match(await bannerText(page), /aucun n'est rattaché à un établissement/);
     assert.equal(await cardCount(page), 0);
   });
 });
@@ -954,6 +953,9 @@ const isSwitchOn = async page => (await presenceSwitch(page).getAttribute('aria-
 const accountMessage = page => page.locator('#accountBar .account-detail').textContent();
 const accountName = page => page.locator('#accountBar .account-name').textContent();
 const accountStatus = page => page.locator('#accountBar .account-status').textContent();
+// L'échec d'une écriture a sa propre région, `role="alert"` (1.35.0, audit UI/UX U52) : la région d'état reste vide.
+const accountFailure = page => page.locator('#accountBar .account-error').textContent();
+const waitForAccountFailure = page => page.waitForFunction(() => document.querySelector('#accountBar .account-error').textContent !== '');
 // Le message est-il à l'écran ? Réduit à un pixel et rogné (.sr-only), il n'est que lu par les
 // lecteurs d'écran. Le rognage compte : une erreur garde ses marges et sa bordure, donc une boîte
 // de plus d'un pixel, même rognée.
@@ -1134,10 +1136,12 @@ test('écriture refusée par les règles d\'accès de Grist : message clair, rie
   withWidget({ tables: withIdentity(), user: IRIS_EMAIL, denyWrites: ['BDD'] }, async ({ page, logs }) => {
     await waitForAccountBar(page);
     await presenceSwitch(page).click();
-    await page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent !== '');
-    assert.match(await accountStatus(page), /^Grist a refusé la modification/);
-    assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'error');
-    assert.equal(await isStatusOnScreen(page), true, 'une erreur se voit à l\'écran');
+    await waitForAccountFailure(page);
+    assert.equal(await accountFailure(page), 'Grist a refusé la modification : vos droits ne permettent pas de changer cette information.',
+      'la phrase dit ce qui s\'est passé, sans renvoyer à un administrateur qu\'on ne sait pas nommer');
+    assert.equal(await page.locator('#accountBar .account-error').getAttribute('role'), 'alert', 'un échec est annoncé tout de suite (audit U52)');
+    assert.equal(await accountStatus(page), '', 'la région d\'état, polie, ne le répète pas');
+    assert.equal(await page.locator('#accountBar .account-error').isVisible(), true, 'une erreur se voit à l\'écran');
     assert.equal(await isSwitchOn(page), false, 'l\'interrupteur montre l\'état réel, pas le souhait');
     assert.equal(await cardCount(page), 4);
     assert.equal(await page.evaluate(() => window.__tables.BDD.Accepte_apparaitre[10]), false);
@@ -1149,11 +1153,12 @@ test('après une erreur, un nouvel essai réussi remplace le message d\'erreur p
   withWidget({ tables: withIdentity(), user: IRIS_EMAIL, denyWrites: ['BDD'] }, async ({ page }) => {
     await waitForAccountBar(page);
     await presenceSwitch(page).click();
-    await page.waitForFunction(() => document.querySelector('#accountBar .account-status').textContent !== '');
+    await waitForAccountFailure(page);
     await page.evaluate(() => { window.__denyWrites = []; });
     await presenceSwitch(page).click();
     await waitForCards(page, 5);
     assert.equal(await accountStatus(page), SAVED_ON, 'plus d\'erreur : la confirmation prend sa place');
+    assert.equal(await accountFailure(page), '', 'et la région des échecs est vide');
     assert.equal(await page.locator('#accountBar .account-status').getAttribute('data-tone'), 'done');
     assert.equal(await isSwitchOn(page), true);
   }));

@@ -1,7 +1,8 @@
 // Bandeau « Ma présence » : la personne connectée voit sa situation dans
 // l'annuaire et la change d'un clic ; elle ouvre de là la modification de sa fiche.
 // Un responsable d'établissement y trouve le raccourci « Mon établissement », un administrateur
-// le « mode admin ». DOM seulement ; presence.js décrit la situation et décide du message.
+// le « mode admin ». Tant que la personne n'est pas identifiée, le bandeau garde sa place avec une copie
+// grisée (`pending`). DOM seulement ; presence.js décrit la situation et décide du message.
 
 import { PRESENCE_ANNOUNCE_MS } from './constants.js';
 import { fillAvatar } from './avatar-ui.js';
@@ -21,7 +22,8 @@ function accountParts(root) {
     etabButton: part('.account-etab'),
     adminButton: part('.account-admin'),
     actions: part('.account-actions'),
-    status: part('.account-status')
+    status: part('.account-status'),
+    failure: part('.account-error')
   };
 }
 
@@ -57,14 +59,18 @@ function buttonPlacer(root, { switchButton, adminButton, etabButton, createButto
 
 // Message passager sous le bandeau. `setStatus(message, tone)` : '' l'efface ; `tone` : 'info', 'error' pour un échec,
 // 'stale' (comme 'info', mais pour un écran qui n'est plus à jour : la lecture suivante qui réussit l'efface, voir
-// clearStale) ou 'done' (invisible, voir announce). Un nouveau message remplace le précédent et son délai.
-function statusLine(status) {
+// clearStale) ou 'done' (invisible, voir announce). Un nouveau message remplace le précédent et son délai. Un échec a sa
+// propre région, `role="alert"` : les lecteurs d'écran l'annoncent tout de suite, au lieu d'attendre la fin de leur phrase
+// comme pour la région d'état (audit UI/UX, U52).
+function statusLine(status, failure) {
   let announceTimer = 0;
   const setStatus = (message, tone = 'info') => {
     clearTimeout(announceTimer);
-    status.textContent = message;
-    status.dataset.tone = tone;
+    const failed = tone === 'error';
+    status.textContent = failed ? '' : message;
+    status.dataset.tone = failed ? 'info' : tone;
     status.classList.toggle('sr-only', tone === 'done');
+    failure.textContent = failed ? message : '';
   };
   // Le résultat d'une écriture réussie, pour les lecteurs d'écran : la région d'état le
   // lit, mais il reste invisible, car l'écran dit déjà la même chose (le texte du bandeau
@@ -79,12 +85,58 @@ function statusLine(status) {
   return { setStatus, announce, clearStale };
 }
 
+// Le bandeau n'est montré qu'une fois la personne identifiée et l'annuaire lu, parfois après les cartes : il les repoussait alors
+// (audit UI/UX, U50). `pending()` lui réserve sa place dès le départ avec une copie du bandeau, grisée et sans texte lisible : la
+// même mise en page, donc la même hauteur, avec le message et les boutons les plus courants (une personne qui apparaît et qui peut
+// modifier sa fiche). La copie n'est ni lue (`aria-hidden`) ni atteignable au clavier (`inert`) ; elle n'a pas d'identifiant, si bien que
+// rien ne la prend pour le bandeau. Elle disparaît quand le vrai bandeau paraît, ou quand il est sûr qu'il ne paraîtra pas.
+const ROOM_VIEW = { name: 'Prénom Nom', initials: '', photo: 0, accepted: true, tone: 'info', message: 'Vous apparaissez dans l\'annuaire.' };
+
+function buildRoom(root) {
+  const copy = root.cloneNode(true);
+  copy.removeAttribute('id');
+  copy.removeAttribute('aria-label');
+  copy.setAttribute('aria-hidden', 'true');
+  copy.inert = true;
+  copy.dataset.pending = 'true';
+  root.after(copy);
+  const bar = createAccountBar(copy, { onToggle: noop });
+  bar.show(ROOM_VIEW);
+  bar.setActions({ edit: true });
+  return copy;
+}
+
+function roomKeeper(root) {
+  let copy = null;
+  return {
+    keep() {
+      if (!copy) copy = buildRoom(root);
+      copy.hidden = false;
+    },
+    release() {
+      if (copy) copy.hidden = true;
+    }
+  };
+}
+
 // Rend le focus au bouton quand la fenêtre qu'il a ouverte se ferme ; faux quand le bouton n'est pas là.
 const focusIfShown = target => () => {
   if (target.hidden) return false;
   target.focus();
   return true;
 };
+
+// Les clics des boutons du bandeau. Pendant une écriture l'interrupteur est « hors service » (`aria-disabled`) sans être désactivé :
+// un bouton désactivé perd le focus, et le clavier repartirait du haut de la page.
+function bindClicks({ switchButton, createButton, editButton, etabButton, adminButton }, { onToggle, onEdit, onCreate, onEtab, onAdminMode }) {
+  switchButton.addEventListener('click', () => {
+    if (switchButton.getAttribute('aria-disabled') !== 'true') onToggle();
+  });
+  createButton.addEventListener('click', () => onCreate());
+  editButton.addEventListener('click', () => onEdit());
+  etabButton.addEventListener('click', () => onEtab());
+  adminButton.addEventListener('click', () => onAdminMode());
+}
 
 // `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
 // personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
@@ -97,20 +149,13 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
   const { name, detail, switchButton, createButton, editButton, etabButton, adminButton } = parts;
   const paintAvatar = avatarPainter(parts.avatar, attachments);
   const placeButtons = buttonPlacer(root, parts);
-  const { setStatus, announce, clearStale } = statusLine(parts.status);
+  const { setStatus, announce, clearStale } = statusLine(parts.status, parts.failure);
+  const room = roomKeeper(root);
   const focusEdit = focusIfShown(editButton);
   const focusCreate = focusIfShown(createButton);
   const focusEtab = focusIfShown(etabButton);
 
-  // Pendant une écriture le bouton est « hors service » (`aria-disabled`) sans être désactivé :
-  // un bouton désactivé perd le focus, et le clavier repartirait du haut de la page.
-  switchButton.addEventListener('click', () => {
-    if (switchButton.getAttribute('aria-disabled') !== 'true') onToggle();
-  });
-  createButton.addEventListener('click', () => onCreate());
-  editButton.addEventListener('click', () => onEdit());
-  etabButton.addEventListener('click', () => onEtab());
-  adminButton.addEventListener('click', () => onAdminMode());
+  bindClicks(parts, { onToggle, onEdit, onCreate, onEtab, onAdminMode });
 
   return {
     // `view` : { name, initials, photo, accepted, tone, message } (voir describePresence ; `photo` :
@@ -125,11 +170,16 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
       switchButton.hidden = view.switchable === false;
       placeButtons();
       root.hidden = false;
+      room.release();
     },
 
     hide() {
       root.hidden = true;
+      room.release();
     },
+
+    // Garde la place du bandeau en attendant de savoir ce qu'il dira (voir roomKeeper).
+    pending: room.keep,
 
     // Les boutons du bandeau. « Modifier mon profil » : montré seulement quand la fiche de
     // la personne est identifiée sans ambiguïté. « Créer ma fiche » : montré seulement quand elle

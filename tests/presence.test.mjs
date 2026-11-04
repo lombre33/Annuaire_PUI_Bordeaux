@@ -40,7 +40,8 @@ test('describePresence: someone who accepted but stays hidden is told why, in th
   const { find } = await setup();
   const why = email => describePresence(find(email));
   assert.equal(why('carla@clinique.example').tone, 'warn');
-  assert.match(why('carla@clinique.example').message, /accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'est ni fondateur ni partenaire\. Contactez un administrateur\./);
+  assert.match(why('carla@clinique.example').message, /accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'est ni fondateur ni partenaire\.$/);
+  assert.doesNotMatch(why('carla@clinique.example').message, /Contactez/, 'ni qui ni comment : la formule est retirée (audit UI\/UX, U52)');
   assert.match(why('dan@inserm.example').message, /votre établissement n'a pas encore été validé/);
   assert.match(why('eve@example.example').message, /votre fiche n'a pas d'établissement/);
   assert.match(why('fred@chu-bordeaux.example').message, /votre établissement n'est pas reconnu/);
@@ -168,7 +169,7 @@ test('describeHiddenFiche lists every reason, and does not change what describeP
   const { find } = await setup(tables);
   assert.equal(describeHiddenFiche(find('dan@inserm.example')[0].status, { own: true }),
     'Votre fiche reste masquée de l\'annuaire : votre fiche n\'a ni prénom ni nom ; votre établissement n\'a pas encore été validé.');
-  assert.match(describePresence(find('dan@inserm.example')).message, /ni prénom ni nom ; votre établissement n'a pas encore été validé\. Contactez un administrateur\./);
+  assert.match(describePresence(find('dan@inserm.example')).message, /ni prénom ni nom ; votre établissement n'a pas encore été validé\.$/);
 });
 
 test('describePresence with several rows for one address: the switch is on only if all accepted, and the message says it applies to all', async () => {
@@ -247,6 +248,23 @@ test('setPresence turns a refusal by Grist access rules into a clear French mess
   assert.match(logged[0][0], /\[PRESENCE\]/);
 });
 
+test('setPresence on a formula column tells the person the general message and tells the console which column to convert', async () => {
+  const { find, docApi } = await setup(sampleTables());
+  const failing = { ...docApi, applyUserActions: async () => { throw new Error('Can\'t save value to formula column Accepte_apparaitre'); } };
+  const logged = [];
+  await assert.rejects(
+    setPresence(failing, find(ANA_EMAIL), false, { log: { error: (...args) => logged.push(args.join(' ')) } }),
+    error => {
+      assert.ok(error instanceof PresenceError);
+      assert.match(error.message, /^La modification n'a pas pu être enregistrée/);
+      assert.doesNotMatch(error.message, /Accepte_apparaitre|GRIST_SETUP/);
+      return true;
+    }
+  );
+  assert.equal(logged.length, 2, 'l\'erreur d\'origine, puis la marche à suivre');
+  assert.match(logged[1], /^\[PRESENCE\] La colonne Accepte_apparaitre est une colonne à formule.*colonne de données.*GRIST_SETUP\.md/);
+});
+
 test('setPresence refuses to run without a person to update', async () => {
   const { docApi, calls } = await setup();
   await assert.rejects(setPresence(docApi, [], true, { log: quiet }), PresenceError);
@@ -257,7 +275,11 @@ test('explainWriteError recognises access rules and formula columns, and stays g
   for (const detail of ['Blocked by table update access rules', 'ACL denied', 'Permission denied', 'forbidden']) {
     assert.match(explainWriteError(new Error(detail)), /^Grist a refusé la modification/, detail);
   }
-  assert.match(explainWriteError(new Error('Can\'t save value to formula column Accepte_apparaitre')), /colonne de données.*GRIST_SETUP\.md/);
+  // Une colonne à formule est une affaire de configuration : la personne lit le message général, la console dit la colonne (audit U52).
+  assert.match(explainWriteError(new Error('Can\'t save value to formula column Accepte_apparaitre')), /n'a pas pu être enregistrée/);
+  assert.doesNotMatch(explainWriteError(new Error('Can\'t save value to formula column Accepte_apparaitre')), /GRIST_SETUP|Accepte_apparaitre/);
+  assert.equal(explainWriteError(new Error('Blocked by table update access rules')),
+    'Grist a refusé la modification : vos droits ne permettent pas de changer cette information.');
   assert.match(explainWriteError(new Error('timeout')), /n'a pas pu être enregistrée/);
   assert.match(explainWriteError(undefined), /n'a pas pu être enregistrée/);
   assert.match(explainWriteError('texte brut'), /n'a pas pu être enregistrée/);

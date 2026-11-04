@@ -8,17 +8,18 @@
 // etablissement-save.js (la logique), upload.js et image-prep.js (le logo, la photo)
 // avec etablissement-ui.js (la fenêtre), branding.js, attachments.js, branding-ui.js
 // et logos-report.js (les logos : cartes, fondateurs, bilan de la console) et
-// avatar-ui.js (les photos de profil).
+// avatar-ui.js (les photos de profil), status-ui.js (le bandeau d'état et l'écran « Aucun contact »).
 
 import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
-import { loadDirectory, DirectoryLoadError, debounce, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
-import { createEmptyFilterState, filterContacts, countInScope, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
+import { loadDirectory, describeLoadFailure, debounce, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
+import { createEmptyFilterState, describeEmptyResults, filterContacts, countInScope, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
 import { attachTagNavigation, attachTagNotes, focusFirstResult, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
 import { createScrollTools } from './scroll-tools.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
+import { createEmptyState, createStatusBanner } from './status-ui.js';
 import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges, blankFiche } from './profile.js';
 import { PHOTO_UPLOAD_HINT, ProfileSaveError, createProfile, prepareCreation, prepareReview, saveProfile, unsavedLabels } from './profile-save.js';
 import { createProfileDialog } from './profile-ui.js';
@@ -73,16 +74,18 @@ const state = {
   etabFlags: null
 };
 
+// Le bandeau d'état (rouge) et l'écran « Aucun contact » (status-ui.js).
+const statusBanner = createStatusBanner(document.getElementById('statusBanner'));
+const emptyState = createEmptyState(document.getElementById('emptyState'));
+
 const elements = {
   grid: document.getElementById('cardsGrid'),
   template: document.getElementById('cardTemplate'),
   filtersContainer: document.getElementById('filtersContainer'),
   resultCount: document.getElementById('resultCount'),
   skipLink: document.querySelector('.skip-link'),
-  emptyState: document.getElementById('emptyState'),
   searchInput: document.getElementById('searchInput'),
   resetFilters: document.getElementById('resetFilters'),
-  statusBanner: document.getElementById('statusBanner'),
   adminStrip: document.getElementById('adminStrip'),
   toast: document.getElementById('toast'),
   toastLive: document.getElementById('toastLive'),
@@ -92,8 +95,8 @@ const elements = {
 // Le script de l'API de Grist vient de docs.getgrist.com (index.html) : bloqué (réseau, pare-feu, extension) ou en panne, `window.grist`
 // n'existe pas et rien de ce qui suit ne peut démarrer. La page le dit, au lieu de rester sur un compteur vide.
 if (!window.grist) {
-  showStatus(['Impossible de joindre Grist : le script de son API (docs.getgrist.com) ne s\'est pas chargé. Vérifiez la connexion, '
-    + 'puis rechargez la page ; si le problème persiste, le détail est dans la console du navigateur.']);
+  statusBanner.show(['Impossible de joindre Grist : le script de son API (docs.getgrist.com) ne s\'est pas chargé. Vérifiez la connexion, '
+    + 'puis rechargez la page ; si le problème persiste, le détail est dans la console du navigateur.'], { label: 'Recharger la page', run: () => window.location.reload() });
   elements.resultCount.textContent = 'Chargement impossible';
   elements.grid.removeAttribute('aria-busy');
   throw new Error('[GRIST] window.grist est absent : le script de l\'API de Grist (docs.getgrist.com) ne s\'est pas chargé.');
@@ -113,6 +116,11 @@ const accountBar = createAccountBar(document.getElementById('accountBar'), {
   onAdminMode: toggleAdminMode,
   attachments
 });
+
+// Grist ouvre le widget d'un compte Lecteur avec `readonly=true` (identity.js) : ce compte n'aura jamais de bandeau. Les autres le
+// verront apparaître, qui sait quand : sa place est réservée dès le départ pour qu'il ne repousse pas les cartes (audit UI/UX, U50).
+const READ_ONLY = isReadOnlyAddress(window.location.search);
+if (!READ_ONLY) accountBar.pending();
 
 const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
 const etablissementDialog = createEtablissementDialog(document.getElementById('etabDialog'));
@@ -208,7 +216,8 @@ function refreshCards() {
   const count = contactCountText(filtered.length, countInScope(state.allContacts, state.scope));
   elements.resultCount.textContent = count;
   scrollTools.setCount(count);
-  elements.emptyState.hidden = filtered.length !== 0;
+  if (filtered.length === 0) emptyState.show(describeEmptyResults(state.allContacts, state.activeFilters, state.searchTerm, state.scope));
+  else emptyState.hide();
   updateFilterCounts(elements.filtersContainer, currentCounts());
   syncResetButton();
   reportLogosLater();
@@ -289,20 +298,25 @@ elements.resetFilters.addEventListener('click', () => {
 
 document.addEventListener('click', () => closeFilterMenus());
 
-// Bandeau d'état (masqué si `messages` est vide) : un annuaire incomplet ne doit
-// jamais passer pour un annuaire vide.
-function showStatus(messages) {
-  elements.statusBanner.textContent = messages.join(' ');
-  elements.statusBanner.hidden = messages.length === 0;
-}
+// Les cartes déjà affichées (chargement précédent réussi) restent en place. Le bandeau offre « Réessayer » : après une panne passagère, c'est
+// le geste qui répare, et rien d'autre ne l'offrait (audit UI/UX, U30).
+let retried = false;
 
-// Les cartes déjà affichées (chargement précédent réussi) restent en place.
 function showLoadError(error) {
-  const reason = error instanceof DirectoryLoadError ? ` (${error.message})` : '';
-  showStatus([`Impossible de charger l'annuaire depuis Grist${reason}. Rechargez la page ; `
-    + 'si le problème persiste, le détail est dans la console du navigateur.']);
+  statusBanner.show([describeLoadFailure(error, { retried })], { label: 'Réessayer', run: retryLoad });
   if (state.allContacts.length === 0) elements.resultCount.textContent = 'Chargement impossible';
   elements.grid.removeAttribute('aria-busy');
+  if (!state.people) accountBar.hide(); // sans annuaire, pas de bandeau : sa place réservée n'a plus de raison d'être
+}
+
+// « Réessayer » : relit l'annuaire. Le bouton dit qu'il travaille ; une nouvelle panne le rend avec un message qui le dit ; une
+// réussite retire le bandeau, donc le bouton : le focus passe au compteur au lieu de se perdre.
+async function retryLoad() {
+  statusBanner.busy('Nouvelle tentative…');
+  retried = true;
+  const outcome = await reloadDirectory();
+  if (outcome !== 'failed') retried = false;
+  if (outcome === 'applied') elements.resultCount.focus();
 }
 
 // onRecords se redéclenche à chaque édition dans Grist. Le debounce absorbe les
@@ -354,7 +368,7 @@ async function reloadDirectory() {
     const directory = await loadDirectory(window.grist.docApi, { previousMaps: state.referenceMaps });
     if (!recordsSequencer.isLatest(requestId)) return 'stale'; // une invocation plus récente a démarré : résultat périmé
     applyDirectory(directory);
-    showStatus(directory.issues);
+    statusBanner.show(directory.issues);
     return 'applied';
   } catch (error) {
     if (!recordsSequencer.isLatest(requestId)) return 'stale';
@@ -387,15 +401,16 @@ const isAdmin = () => state.identity?.status === 'ready' && state.identity.admin
 // Les établissements dont la personne connectée est responsable (identifiants de ligne).
 const myEtablissements = () => (state.identity?.status === 'ready' ? state.identity.etablissements : []);
 
-// Le bandeau de la personne connectée. Sans identité (pas de table-sonde, compte Lecteur…)
-// ou tant que l'annuaire n'est pas lu, il reste masqué. Une adresse qui ne figure pas dans
-// BDD le dit, au lieu de disparaître sans explication : un administrateur y trouve quand
-// même son « mode admin ».
+// Le bandeau de la personne connectée. Sans identité (pas de table-sonde, compte Lecteur…) il
+// reste masqué ; tant que l'identité ou l'annuaire manque encore, sa place reste réservée
+// (accountBar.pending). Une adresse qui ne figure pas dans BDD le dit, au lieu de disparaître
+// sans explication : un administrateur y trouve quand même son « mode admin ».
 function refreshAccount() {
-  if (state.identity?.status !== 'ready' || !state.people) {
+  if (state.identity && state.identity.status !== 'ready') {
     accountBar.hide();
     return;
   }
+  if (!state.identity || !state.people) return;
   const persons = myPersons();
   const admin = isAdmin();
   if (persons.length === 0) {
@@ -475,7 +490,7 @@ function applyIdentity(identity) {
   refreshCards(); // les boutons « Modifier » apparaissent sur les cartes concernées
 }
 
-readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) }).then(applyIdentity);
+readIdentity(window.grist.docApi, { readOnly: READ_ONLY }).then(applyIdentity);
 
 // ===== Modifier une fiche =====
 
@@ -741,7 +756,7 @@ function etablissementLogo({ etablissement }) {
 // Relit l'identité après un changement de responsables : les droits en dépendent. Une relecture qui
 // échoue laisse l'identité d'avant, que Grist a bien reconnue.
 async function refreshIdentity() {
-  const identity = await readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.search) });
+  const identity = await readIdentity(window.grist.docApi, { readOnly: READ_ONLY });
   if (identity.status === 'ready') applyIdentity(identity);
 }
 
