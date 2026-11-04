@@ -31,7 +31,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 - Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (instances, actions, groupes de travail ou GT, communautés, tâches, compétences, rôle) et, si elle l'a ajoutée, sa **photo de profil** à la place de ses initiales ([La photo de profil](#la-photo-de-profil)).
 - On retrouve quelqu'un par son **nom** ou, grâce aux **filtres**, par ce qu'il fait.
 - L'annuaire porte les **logos** du PUI : celui de chaque établissement sur ses cartes, ceux des financeurs au centre de l'en-tête et ceux des établissements fondateurs dans un bandeau tout en bas ([Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)).
-- L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un grand écran, une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
+- L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un écran de PC, quatre ou cinq sur un très grand écran (à partir de 1 670 px de large), une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
 - **Chacun décide s'il y figure.** Une personne n'apparaît que si elle a accepté d'apparaître. Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'adresse e-mail de ce compte, un bandeau **Ma présence** vous dit où vous en êtes et vous laisse changer d'avis d'un clic ([Ma présence](#ma-présence--apparaître-ou-non)).
 - **Chacun corrige sa propre fiche.** Quand l'annuaire vous reconnaît, un bouton **✎ Modifier** apparaît sur votre carte et un bouton **Modifier mon profil** dans le bandeau : vous changez votre nom, votre fonction, l'adresse e-mail que montre votre carte, votre téléphone, votre rôle, vos listes et votre photo de profil, vous relisez votre carte avant et après, puis vous validez ([Modifier ma fiche](#modifier-ma-fiche)). L'enregistrement est direct : aucun administrateur ne valide et l'annuaire ne tient aucun historique. L'adresse e-mail de votre compte, l'établissement et le périmètre ne se changent pas sur sa propre fiche : adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist. Les administrateurs, eux, allument un **mode admin** pour modifier la fiche des autres, e-mail et établissement compris.
 - **Pas encore de fiche ? Créez-la.** Quand l'annuaire vous reconnaît mais qu'aucune fiche ne porte l'adresse de votre compte, le bandeau propose **Créer ma fiche** : vous remplissez la même fenêtre, vous choisissez votre établissement, vous relisez votre carte, et votre fiche apparaît tout de suite dans l'annuaire quand rien ne la masque ([Créer ma fiche](#créer-ma-fiche)).
@@ -66,15 +66,15 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 | Élément | À quoi il sert |
 |---|---|
-| **Titre et compteur** (en haut à gauche, « PUI Bordeaux » et « 14 contacts ») | Le compteur indique combien de cartes sont affichées avec la recherche et les filtres actuels (« 1 234 contacts » : une espace sépare les milliers) ; tant que Grist n'a pas répondu, il dit « Chargement… » |
+| **Titre et compteur** (en haut à gauche, « PUI Bordeaux » et « 14 contacts ») | Le compteur indique combien de cartes sont affichées avec la recherche et les filtres actuels (« 1 234 contacts » : une espace sépare les milliers). Dès qu'une recherche ou un filtre écarte des contacts, il dit **sur combien** : « 3 sur 14 contacts ». Le second nombre est celui des contacts que les interrupteurs Fondateurs et Partenaires laissent voir ([Fondateurs et Partenaires](#fondateurs-et-partenaires)), pas celui de tout l'annuaire : activer Partenaires compte les contacts des deux statuts, sans « sur ». Tant que Grist n'a pas répondu, il dit « Chargement… » |
 | **Financeurs** (au centre de l'en-tête) | La phrase de financement et les logos des financeurs ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)). Les responsables d'un établissement y trouvent aussi le bouton **Mon établissement** ([La fiche de mon établissement](#la-fiche-de-mon-établissement)), les administrateurs le bouton **Mode admin** ([Pour les administrateurs](#pour-les-administrateurs)). Si aucune fiche ne porte l'adresse de votre compte, il le dit, n'a ni interrupteur ni bouton « Modifier mon profil » et propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
 | **Actions, Tâches, Communautés, GT, Compétences, Instances, Établissement, Rôle PUI** | Huit filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine, et le menu **Tâches** par action. Le menu **Rôle PUI** liste les rôles de la table `Role_Dans_le_PUI` |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
-| **Réinitialiser** | Efface la recherche et décoche tous les filtres |
-| **Cartes** | Une carte par personne, trois par ligne, triées par nom de famille puis par prénom (ordre alphabétique) |
-| **Pastille « N contacts · Haut de page »** (en bas à droite, seulement quand la page a défilé) | Rappelle le nombre de contacts et remonte tout en haut d'un clic |
+| **Réinitialiser** | Efface la recherche et décoche tous les filtres. Il est grisé quand il n'y a rien à effacer ([Réinitialiser](#réinitialiser)) |
+| **Cartes** | Une carte par personne, trois par ligne (quatre ou cinq à partir de 1 670 px de large), triées par nom de famille puis par prénom (ordre alphabétique) |
+| **Pastille « N contacts · Haut de page »** (en bas à droite, seulement quand la page a défilé) | Rappelle le nombre de contacts, écrit comme dans l'en-tête (« 40 sur 44 contacts » quand une recherche ou un filtre en écarte), et remonte tout en haut d'un clic. Quand le nombre et le bouton ne tiennent pas côte à côte, le bouton passe sous le nombre |
 | **Lien « Aller aux résultats »** (invisible, premier arrêt du clavier) | Au clavier, mène directement à la première carte, sans passer par l'en-tête ni par la barre d'outils |
 | **Bandeau des fondateurs** (tout en bas de la page, sous les cartes) | Les logos des établissements fondateurs, le rond « France 2030 » et la phrase de financement ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Numéro de version** (tout en bas de la page, en petit) | « Version x.y.z » : la version de l'annuaire qui s'affiche chez vous. À citer quand vous signalez un problème |
@@ -143,13 +143,13 @@ Un logo absent ou mal affiché se corrige par le responsable de l'établissement
 
 Tapez dans **Rechercher par nom ou prénom…** : les cartes se mettent à jour dès que vous marquez une courte pause dans la frappe (une fraction de seconde), et réapparaissent toutes aussitôt que vous videz le champ.
 
-![Recherche « elise » : une seule carte, Élise Marchetti](images/recherche.png)
+![Recherche « elise » : une seule carte, Élise Marchetti, et le compteur « 1 sur 14 contacts »](images/recherche.png)
 
 - La recherche ignore les **majuscules** et les **accents** : « elise » trouve « Élise ».
 - Elle porte sur le **prénom et le nom**, pas sur la fonction ni sur l'établissement (pour l'établissement, utilisez le filtre Établissement). Tapez l'un, l'autre ou les deux, dans l'ordre que vous voulez : « Élise », « Marchetti », « Élise Marchetti » et « Marchetti Élise » trouvent tous la carte, et quelques lettres de chaque mot suffisent (« eli mar »). Chaque mot tapé doit se trouver dans le prénom ou dans le nom : « Élise Garnier » ne trouve personne si nul ne porte ces deux mots.
 - Les **tirets, les apostrophes et les points** ne comptent pas, et « œ » s'écrit comme on le tape : « marie christine » trouve « Marie-Christine », « darcy » trouve « D'Arcy » et « coeur » trouve « Cœur ».
 - Elle se combine avec les filtres : seules les personnes qui satisfont les deux restent affichées.
-- **Réinitialiser** vide le champ.
+- **Réinitialiser** vide le champ ([Réinitialiser](#réinitialiser)). Le bouton s'allume dès la première lettre tapée, avant même que les cartes se mettent à jour.
 
 ## Filtrer
 
@@ -161,18 +161,18 @@ Un clic sur un bouton de filtre ouvre son menu ; ouvrir un menu referme les autr
 - Dans un **même** menu, les valeurs s'additionnent (**ou**) : cocher deux instances affiche les personnes qui sont dans l'une *ou* l'autre.
 - Entre **plusieurs** menus, les critères se cumulent (**et**) : cocher une instance et un établissement ne garde que les personnes qui ont les deux.
 - Le **nombre à droite** de chaque option est le nombre de cartes qui portent cette valeur, compte tenu de la recherche, des interrupteurs et des autres menus (pas du menu lui-même). Cocher une valeur de plus **ajoute** donc ses cartes à celles déjà affichées. Une option à **0** n'a aucune carte avec le reste des critères : par exemple, une compétence que seuls des partenaires portent tant que Partenaires est désactivé.
-- Le **champ de recherche** en haut du menu réduit la liste d'options (sans tenir compte des accents ni des majuscules). Il ne coche rien.
+- Le **champ de recherche** en haut du menu réduit la liste d'options (sans tenir compte des accents ni des majuscules). Il ne coche rien. Il reste **collé en haut** du menu, sur un fond opaque, quand la liste défile : on affine sans remonter, et, au clavier, la case qu'on atteint s'arrête sous le champ, jamais cachée derrière.
 - Les valeurs cochées **remontent en tête** du menu, et un **chiffre** sur le bouton indique combien de valeurs sont cochées.
 
-![Communautés Santé numérique et Établissement CHD cochés : trois contacts](images/filtres-combines.png)
+![Communautés Santé numérique et Établissement CHD cochés : trois contacts, et le compteur « 3 sur 14 contacts »](images/filtres-combines.png)
 
-Ici, la communauté « Santé numérique » **et** l'établissement « CHD » sont cochés : seules les trois personnes du CHD qui font partie de la communauté Santé numérique restent affichées, et le compteur passe à « 3 contacts ».
+Ici, la communauté « Santé numérique » **et** l'établissement « CHD » sont cochés : seules les trois personnes du CHD qui font partie de la communauté Santé numérique restent affichées, et le compteur passe à « 3 sur 14 contacts ».
 
 ### Domaines et compétences
 
 Le menu **Compétences** range les compétences par **domaine** (on parle aussi de *compétences macro*) et se cherche à deux niveaux : par domaine, quand on ne connaît pas chaque compétence, ou par compétence, quand on sait laquelle on veut. Un seul bouton sert aux deux : il n'y a pas de filtre « Domaines » à part.
 
-![Le menu Compétences ouvert : le domaine « Recherche clinique » est coché, « Santé numérique et données » est coché en partie (« Open science » seule), le bouton affiche 2 et trois contacts restent affichés](images/filtre-competences.png)
+![Le menu Compétences ouvert : le domaine « Recherche clinique » est coché, « Santé numérique et données » est coché en partie (« Open science » seule), le bouton affiche 2 et le compteur dit « 3 sur 14 contacts » ; sous le champ de recherche, la ligne d'aide du menu](images/filtre-competences.png)
 
 - Chaque ligne en violet est un **domaine**. Le nombre à sa droite est celui des cartes qui ont **au moins une compétence** dans ce domaine : une personne qui en a deux n'est comptée qu'une fois.
 - **Cocher un domaine** coche d'un coup toutes ses compétences : les personnes qui ont l'une d'elles restent affichées, sans avoir à connaître chacune.
@@ -180,6 +180,7 @@ Le menu **Compétences** range les compétences par **domaine** (on parle aussi 
 - Tout s'additionne (**ou**), comme dans tout menu : avec « Recherche clinique » et « Open science » cochés, on voit les personnes de l'un ou de l'autre. Le chiffre du bouton compte un domaine coché en entier pour **un**, quel que soit le nombre de ses compétences.
 - Les domaines et les compétences cochés **remontent en tête** quand on rouvre le menu, et un domaine coché en partie s'ouvre de lui-même, pour montrer lesquelles.
 - Une compétence dont le domaine n'est pas renseigné dans Grist est rangée sous **Autres**, en fin de liste : ses personnes restent ainsi trouvables.
+- Une **ligne d'aide**, sous le champ de recherche, rappelle ces gestes : « Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles ». Elle défile avec la liste et s'efface pendant une recherche, qui déplie tous les domaines et a besoin de la place. Un menu sans groupes (Instances, Établissement, GT…) n'en a pas.
 
 **La recherche du menu trouve un domaine comme une compétence.** Tapez quelques lettres, sans souci des accents ni des majuscules : le menu ne garde que ce qui correspond, et déplie les domaines concernés.
 
@@ -193,7 +194,7 @@ Le menu **Compétences** range les compétences par **domaine** (on parle aussi 
 
 Le menu **Tâches** range lui aussi ses valeurs par groupe, ici par **action**. Il fonctionne comme le menu Compétences ([Domaines et compétences](#domaines-et-compétences)) : par action, quand on ne connaît pas chaque tâche, ou par tâche, quand on sait laquelle on veut. Un seul bouton sert aux deux.
 
-![Le menu Tâches ouvert : l'action « Action 2: Maturation de projets » est cochée, l'action « Action 1: Valorisation de la recherche » est cochée en partie (« 1.1 Animation de réseau » seule), le bouton affiche 2 et neuf contacts restent affichés](images/filtre-taches.png)
+![Le menu Tâches ouvert : l'action « Action 2: Maturation de projets » est cochée, l'action « Action 1: Valorisation de la recherche » est cochée en partie (« 1.1 Animation de réseau » seule), le bouton affiche 2 et le compteur dit « 9 sur 14 contacts » ; sous le champ de recherche, la ligne d'aide du menu](images/filtre-taches.png)
 
 - Chaque ligne en brun orangé est une **action**. Le nombre à sa droite est celui des cartes qui ont **au moins une tâche** de cette action : une personne qui en a deux n'est comptée qu'une fois.
 - **Cocher une action** coche d'un coup toutes ses tâches. La **flèche** déplie ses tâches : cochez-en une, et la case de l'action passe à moitié cochée (un tiret). Un clic sur la case d'une action à moitié cochée la complète, un clic de plus décoche tout.
@@ -201,6 +202,7 @@ Le menu **Tâches** range lui aussi ses valeurs par groupe, ici par **action**. 
 - **Le numéro d'une tâche donne son action.** Une tâche dont le libellé commence par « 2.1 » est rangée sous l'action dont le libellé commence par « Action 2 » : le chiffre avant le point est celui de l'action.
 - Une tâche sans numéro, ou dont le numéro ne correspond à aucune action, est rangée sous **Sans action**, en fin de liste : ses personnes restent ainsi trouvables. Une action qui n'a aucune tâche ne figure pas dans le menu.
 - Si aucune tâche ne peut être rangée (aucune n'a de numéro, ou aucun de ces numéros n'est celui d'une action), le menu reste une simple liste de tâches, sans actions.
+- Comme le menu Compétences, il a une **ligne d'aide** sous le champ de recherche : « Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi elles ». Elle manque quand le menu est une simple liste de tâches.
 
 **La recherche du menu trouve une action comme une tâche, et un numéro aussi.** Elle se comporte comme celle du menu Compétences : le nom d'une action garde l'action avec **toutes** ses tâches, le nom d'une tâche garde cette tâche sous son action, et « 2.1 » retrouve la tâche qui porte ce numéro.
 
@@ -230,9 +232,18 @@ Deux interrupteurs choisissent les établissements dont les contacts sont affich
 
 Le bouton **Réinitialiser** efface la recherche, décoche tous les filtres et vide les champs de recherche des menus. Il laisse en l'état les interrupteurs Fondateurs et Partenaires.
 
-Quand rien ne correspond, l'annuaire affiche « Aucun contact trouvé » : modifiez la recherche ou réinitialisez les filtres.
+Il est **grisé** tant qu'il n'y a rien à réinitialiser : le champ de recherche est vide et aucune case n'est cochée. Il s'allume dès la première lettre tapée, avant même que les cartes se mettent à jour, ou à la première case cochée, et se grise de nouveau quand tout est effacé. Un clic sur le bouton grisé ne fait rien, et un lecteur d'écran le lit « indisponible ». Il garde le focus quand il se grise, pour que le clavier ne reparte pas du haut de la page. Les interrupteurs Fondateurs et Partenaires ne l'allument pas : il n'y touche pas.
 
-![État vide : « Aucun contact trouvé. Modifiez votre recherche ou réinitialisez les filtres. »](images/etat-vide.png)
+Quand rien ne correspond, l'écran dit **pourquoi** :
+
+| Ce que dit l'écran | Ce que cela veut dire |
+|---|---|
+| « Aucun contact trouvé. Modifiez votre recherche ou réinitialisez les filtres. » | La recherche et les filtres ne donnent rien, même avec l'autre interrupteur. Modifiez-les, ou cliquez sur **Réinitialiser** |
+| « Aucun contact trouvé. Parmi les fondateurs, aucun contact ne correspond. Activez “Partenaires” pour voir 1 résultat. » (ou « Parmi les partenaires … Activez “Fondateurs” … » ; le nombre de résultats varie) | Des personnes correspondent, mais elles sont derrière l'interrupteur éteint : il suffit de l'activer |
+| « Aucun contact affiché. Ni “Fondateurs” ni “Partenaires” n'est activé : activez-en un pour voir des contacts. » | Les deux interrupteurs sont éteints, et **Réinitialiser** n'y touche pas : activez-en un |
+| « Aucun contact à afficher. L'annuaire ne contient aucun contact pour le moment. » | Aucune fiche ne peut s'afficher : le bandeau rouge qui est au-dessus en donne la raison ([Messages du bandeau rouge](#messages-du-bandeau-rouge)) |
+
+![État vide après la recherche « zzz » : le compteur dit « 0 sur 14 contacts », « Réinitialiser » est allumé, et l'écran dit « Aucun contact trouvé. Modifiez votre recherche ou réinitialisez les filtres. »](images/etat-vide.png)
 
 ## Ma présence : apparaître ou non
 
@@ -253,13 +264,13 @@ Si vous ouvrez l'annuaire depuis votre compte Grist et que votre fiche porte l'a
 | « Vous apparaissez dans l'annuaire. » | Vous avez donné votre accord et rien ne vous masque | Rien. Désactivez l'interrupteur pour vous retirer |
 | « Vous apparaissez dans l'annuaire (visible avec l'interrupteur « Partenaires »). » | Votre établissement est partenaire : votre carte s'affiche quand **Partenaires** est activé | Rien |
 | « Vous n'apparaissez pas dans l'annuaire. » | Vous n'avez pas donné votre accord, ou vous l'avez retiré | Activez l'interrupteur pour apparaître |
-| « Vous avez accepté d'apparaître, mais votre fiche reste masquée : … Contactez un administrateur. » | Votre accord est donné, mais une autre condition manque. La raison suit les deux-points (voir plus bas) | Transmettez le message à l'administrateur des données : cela se corrige dans Grist |
+| « Vous avez accepté d'apparaître, mais votre fiche reste masquée : … » | Votre accord est donné, mais une autre condition manque. La raison suit les deux-points (voir plus bas) | Transmettez la raison à l'administrateur des données, la personne qui gère le contenu du document Grist : cela se corrige dans Grist |
 | « Vous n'avez accepté d'apparaître que sur une partie de vos fiches. » | Plusieurs fiches portent votre adresse, et seules certaines ont votre accord | Un clic sur l'interrupteur donne votre accord à toutes ; prévenez l'administrateur des données pour qu'il supprime les doublons |
 | « 2 fiches portent votre adresse : votre choix s'applique à toutes. » | Plusieurs fiches portent votre adresse (le chiffre varie). Votre choix, dans un sens comme dans l'autre, vaut pour chacune | Prévenez l'administrateur des données pour qu'il supprime les doublons |
 | « Connecté avec … : cette adresse ne figure pas dans l'annuaire, il n'y a donc pas de fiche à modifier. » (titre « Compte absent de l'annuaire ») | Aucune fiche ne porte l'adresse de votre compte Grist : le bandeau n'a ni interrupteur ni bouton « Modifier mon profil », mais un bouton **Créer ma fiche**. Un administrateur y lit « Administrateur » et garde son bouton **Mode admin** ; un responsable d'établissement garde son bouton **Mon établissement** | Si vous n'avez pas de fiche, **Créer ma fiche** en ouvre une ([Créer ma fiche](#créer-ma-fiche)). Si vous en avez une, prévenez l'administrateur des données : l'adresse de votre fiche n'est pas celle de votre compte |
 | « Le widget ne peut pas retrouver votre fiche : la colonne « email » n'existe pas dans BDD. Contactez un administrateur. » (titre « Fiche introuvable ») | La table `BDD` du document n'a pas de colonne `email` : l'annuaire ne peut relier personne à sa fiche | Prévenez l'administrateur des données : c'est un réglage du document Grist |
 
-![L'en-tête de Sarah Colin : son bandeau « Ma présence » dit « Vous avez accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'a pas encore été validé. Contactez un administrateur. »](images/ma-presence-masquee.png)
+![L'en-tête de Sarah Colin : son bandeau « Ma présence » dit « Vous avez accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'a pas encore été validé. »](images/ma-presence-masquee.png)
 
 Quand votre fiche reste masquée alors que vous avez accepté d'apparaître, le message donne la ou les raisons, séparées par des points-virgules :
 
@@ -273,16 +284,19 @@ Quand votre fiche reste masquée alors que vous avez accepté d'apparaître, le 
 
 | Message | Ce que cela veut dire | Que faire |
 |---|---|---|
-| « Grist a refusé la modification : vos droits ne permettent pas de changer cette information. Contactez un administrateur. » | Les droits de votre compte ne vous permettent pas de modifier votre fiche | Contactez l'administrateur des données |
+| « Grist a refusé la modification : vos droits ne permettent pas de changer cette information. » | Les droits de votre compte ne vous permettent pas de modifier votre fiche | Contactez l'administrateur des données |
 | « Modification enregistrée ; l'annuaire n'a pas pu être rechargé. » | Votre choix est bien enregistré et l'interrupteur le montre (un deuxième clic le défait) ; ce sont les cartes et le compteur qui n'ont pas pu être relus. Le message s'efface de lui-même dès que l'annuaire se relit | Rechargez la page pour revoir les cartes à jour |
 | « La modification n'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Une panne passagère, ou un réglage à revoir | Réessayez ; si cela persiste, prévenez l'administrateur des données |
-| « La colonne Accepte_apparaitre est une colonne à formule : elle doit être une colonne de données (case à cocher). Voir GRIST_SETUP.md. » | Un réglage du document Grist est à revoir | Prévenez l'administrateur des données |
+
+Un échec d'enregistrement (la première et la dernière ligne) est annoncé **tout de suite** aux lecteurs d'écran, dans une zone d'alerte à part de celle qui dit « Enregistrement… », qui porte les confirmations et la deuxième ligne. Quand la colonne `Accepte_apparaitre` du document est une colonne à formule (un réglage de Grist à revoir), vous lisez le message général de la dernière ligne ci-dessus, sans nom de colonne : c'est la console du navigateur qui dit laquelle et renvoie à [`GRIST_SETUP.md`](../GRIST_SETUP.md) ; prévenez l'administrateur des données.
 
 **Ce que l'interrupteur change, et ce qu'il ne change pas**
 
 - Il ne change que **votre accord d'apparaître**, sur **votre** fiche. Pour corriger une autre information (fonction, adresse e-mail affichée, téléphone, listes…), utilisez [Modifier ma fiche](#modifier-ma-fiche). Pour l'adresse e-mail de votre compte, l'établissement et le périmètre, adressez-vous à l'administrateur des données.
 - Vous retirer **masque** votre carte, cela **n'efface pas** vos données : elles restent dans le document Grist, lisibles par les personnes qui y ont accès. Pour demander leur suppression, adressez-vous à l'administrateur des données.
 - Vous pouvez changer d'avis à tout moment. Personne ne devrait changer votre choix à votre place : le formulaire de modification ne le touche jamais, et un administrateur ne coche votre case, dans Grist, qu'avec votre accord.
+
+**En attendant d'être reconnu.** Le bandeau n'apparaît qu'une fois votre compte reconnu, ce qui peut prendre un instant après l'affichage des cartes. Pour que les cartes ne sautent pas quand il arrive, une **copie grisée** du bandeau, sans texte lisible, tient sa place pendant l'attente : le clavier et les lecteurs d'écran l'ignorent, et elle disparaît quand le vrai bandeau paraît, ou quand il est sûr qu'il ne paraîtra pas (compte non reconnu, annuaire illisible). Un compte Lecteur n'en a jamais, ni de copie ni de bandeau. Un bandeau plus haut que le cas courant (plusieurs raisons de masquage, un administrateur ou un responsable avec leurs boutons) pousse encore les cartes de la différence.
 
 **Pas de bandeau ?** C'est normal quand l'annuaire ne peut pas vous reconnaître : vous n'êtes pas connecté à Grist, votre compte ne peut que consulter le document (rôle Lecteur), ou l'annuaire n'a pas encore été réglé pour cela. L'annuaire s'affiche alors comme d'habitude, sans bandeau ni bouton « Modifier mon profil » (voir la question **Pourquoi n'ai-je pas de bouton Modifier ?** des [Questions fréquentes](#questions-fréquentes)). Pour apparaître ou ne plus apparaître, ou pour corriger votre fiche, adressez-vous à l'administrateur des données.
 
@@ -639,7 +653,7 @@ Dans tous ces cas, le logo se change aussi directement dans Grist (colonne `logo
 
 **D'abord, côté écran**
 
-1. Une **recherche** ou un **filtre** est actif : cliquez sur **Réinitialiser**.
+1. Une **recherche** ou un **filtre** est actif : le compteur dit alors « N sur M contacts » et **Réinitialiser** est allumé ; cliquez dessus.
 2. L'interrupteur qui correspond au statut de son établissement est **désactivé** : vérifiez Fondateurs et Partenaires.
 3. Le nom est mal orthographié (les accents et les majuscules, eux, sont sans effet).
 4. La donnée vient d'être modifiée dans Grist, dans une table autre que la liste des contacts (par exemple la validation d'un établissement) : **rechargez la page**. Grist ne prévient l'annuaire que des changements de la liste des contacts.
@@ -667,23 +681,23 @@ Les deux accords sont indépendants : celui de l'établissement ne remplace pas 
 
 ## Messages du bandeau rouge
 
-Un bandeau rouge apparaît sous la barre d'outils quand l'annuaire n'a pas pu être lu entièrement, ou n'a pas pu démarrer. Son but : qu'un annuaire incomplet ou absent ne soit jamais pris pour un annuaire vide.
+Un bandeau rouge apparaît sous la barre d'outils quand l'annuaire n'a pas pu être lu entièrement, ou n'a pas pu démarrer. Son but : qu'un annuaire incomplet ou absent ne soit jamais pris pour un annuaire vide. Quand l'annuaire ne se charge pas, il porte un bouton **Réessayer** (ou **Recharger la page** si le script de Grist ne s'est pas chargé). Ses messages disent ce qui manque et qui prévenir, sans nom de colonne : le détail, à l'usage de l'administrateur des données, est dans la console du navigateur.
 
-![Bandeau « Impossible de charger l'annuaire depuis Grist » et compteur « Chargement impossible »](images/bandeau-panne.png)
+![Bandeau rouge « Impossible de charger l'annuaire depuis Grist (table “Etablissements” illisible). Cliquez sur “Réessayer” ; si le problème persiste, prévenez la personne qui gère l'annuaire (le détail est dans la console du navigateur). », avec le bouton « Réessayer » à droite, et compteur « Chargement impossible »](images/bandeau-panne.png)
 
 ![Bandeau « Tables illisibles (Actions) » avec les cartes toujours affichées](images/bandeau-donnees-partielles.png)
 
 | Message | Signification | Que faire |
 |---|---|---|
-| « Impossible de charger l'annuaire depuis Grist (table “…” illisible) » ou « Impossible de charger l'annuaire depuis Grist (colonne “…” absente de la table …) » | Une donnée indispensable n'a pas pu être lue. Les cartes déjà affichées restent en place | Rechargez la page. Si le message persiste, notez-le et transmettez-le à l'administrateur des données |
-| « Impossible de joindre Grist : le script de son API (docs.getgrist.com) ne s'est pas chargé… » | Le script que Grist fournit aux widgets n'a pas pu être chargé (connexion coupée, pare-feu, extension qui le bloque) : l'annuaire ne peut pas démarrer, et le compteur dit « Chargement impossible » | Vérifiez la connexion, puis rechargez la page. Si le message persiste, transmettez-le à l'administrateur des données : la console du navigateur en donne la cause |
+| « Impossible de charger l'annuaire depuis Grist (table “…” illisible). Cliquez sur “Réessayer” ; si le problème persiste, prévenez la personne qui gère l'annuaire (le détail est dans la console du navigateur). » ou la même phrase avec « (colonne “…” absente de la table …) » | Une donnée indispensable n'a pas pu être lue. Les cartes déjà affichées restent en place | Cliquez sur **Réessayer** : le bouton dit « Nouvelle tentative… » pendant l'essai ; si l'essai échoue, le message ajoute « La nouvelle tentative a échoué. » et le bouton revient ; s'il réussit, le bandeau disparaît et le focus passe au compteur. Si le message persiste, notez-le et transmettez-le à l'administrateur des données |
+| « Impossible de joindre Grist : le script de son API (docs.getgrist.com) ne s'est pas chargé… » | Le script que Grist fournit aux widgets n'a pas pu être chargé (connexion coupée, pare-feu, extension qui le bloque) : l'annuaire ne peut pas démarrer, et le compteur dit « Chargement impossible » | Vérifiez la connexion, puis cliquez sur **Recharger la page**. Si le message persiste, transmettez-le à l'administrateur des données : la console du navigateur en donne la cause |
 | « Tables illisibles (…) : des libellés ou des tags peuvent manquer » | Les cartes s'affichent, mais certains libellés ou « tags » (les étiquettes colorées des cartes) et certaines valeurs de filtre peuvent manquer | Rechargez la page, puis prévenez l'administrateur des données si le message revient |
 | « Colonne de libellé introuvable : … Les tags et le filtre correspondants restent vides » | Une table de référence se lit, mais la colonne qui porte les libellés n'existe plus (renommée ou supprimée) | À corriger dans Grist par l'administrateur des données |
 | « Acronymes en double dans Etablissements (…) avec des statuts différents » | Cas rare : deux établissements portent le même acronyme avec des statuts contradictoires et Grist a transmis l'établissement sous forme de texte. Le statut le plus strict est retenu : leurs contacts sont masqués s'il ne les rend plus éligibles | À corriger dans Grist par l'administrateur des données |
-| « Etablissement est vide… », « Aucun contact affichable… » | Les données sont présentes mais aucune ne remplit les conditions d'affichage | À vérifier dans Grist par l'administrateur des données |
-| « Personne n'a accepté d'apparaître : Accepte_apparaitre n'est coché pour aucun contact… » | Personne n'a donné son accord d'apparaître (ou la case n'est plus renseignée) : l'annuaire est vide faute d'accord, pas faute de données | À vérifier dans Grist par l'administrateur des données. Que quelques personnes seulement aient refusé n'est pas une anomalie : aucun bandeau ne le signale |
+| « Aucun contact ne peut s'afficher : aucun n'est rattaché à un établissement. Prévenez la personne qui gère l'annuaire. » ou « Aucun contact ne remplit les conditions pour s'afficher (un nom, un établissement validé, fondateur ou partenaire). Prévenez la personne qui gère l'annuaire. » | Les données sont présentes mais aucune ne remplit les conditions d'affichage. L'écran « Aucun contact à afficher » ([Réinitialiser](#réinitialiser)) se lit sous le bandeau | À vérifier dans Grist par l'administrateur des données ; la console du navigateur nomme la colonne en cause (`[GRIST] …`) |
+| « Personne n'a encore accepté d'apparaître dans l'annuaire. » | Personne n'a donné son accord d'apparaître (ou la case n'est plus renseignée) : l'annuaire est vide faute d'accord, pas faute de données | À vérifier dans Grist par l'administrateur des données ; la console du navigateur dit la colonne (`Accepte_apparaitre n'est coché pour aucun contact`). Que quelques personnes seulement aient refusé n'est pas une anomalie : aucun bandeau ne le signale |
 
-Le bandeau ne signale pas « aucun résultat pour ma recherche » : c'est le rôle de l'écran « Aucun contact trouvé ».
+Le bandeau ne signale pas « aucun résultat pour ma recherche » : c'est le rôle de l'écran « Aucun contact trouvé », qui dit pourquoi ([Réinitialiser](#réinitialiser)).
 
 ## Questions fréquentes
 
@@ -753,7 +767,11 @@ Oui : l'annuaire s'adapte à la largeur de la zone que Grist lui donne. Sur un p
 
 **Puis-je utiliser l'annuaire au clavier, ou avec un lecteur d'écran ?**
 
-Oui, en grande partie. La touche **Tab** passe d'un contrôle au suivant et **Maj+Tab** revient en arrière. Le premier arrêt est un lien « **Aller aux résultats** », invisible tant qu'il n'a pas le focus : **Entrée** amène à la première carte sans passer par l'en-tête ni par la barre d'outils. Viennent ensuite l'interrupteur de « Ma présence », la recherche, les boutons de filtre, Fondateurs et Partenaires, Réinitialiser, puis, pour chaque carte, ses boutons et liens (la photo quand il y en a une, le logo de l'établissement, l'e-mail, les boutons « Modifier ») et **un seul arrêt pour toutes ses étiquettes**, que les flèches **gauche** et **droite** parcourent. **Entrée** ou **Espace** active le contrôle, y compris le bouton d'un filtre, qui ouvre ou referme son menu. Chaque bouton de filtre annonce s'il est ouvert et combien de valeurs sont choisies (« Compétences (2 sélectionnés) ») ; **Échap** referme le menu ouvert et rend le focus à son bouton, et en sortir à la tabulation le referme aussi. Quand la liste des cartes se redessine (une recherche, un filtre posé depuis une étiquette), le focus reste sur le même contrôle, ou revient au compteur de contacts, où la liste commence. Un **anneau violet** entoure le contrôle sur lequel on se trouve, et quand la barre de recherche et de filtres reste en haut de l'écran, il s'arrête sous elle, jamais caché derrière. Le champ de recherche est annoncé « Rechercher par nom ou prénom ». L'interrupteur de « Ma présence » garde le focus pendant et après l'enregistrement et le résultat est annoncé ; il reste lisible en mode contraste élevé et sans animation si votre système demande de les réduire. Le texte des cartes fait 12 px au moins et les étiquettes 24 px de haut, pour se lire et se viser plus facilement à la souris. Le compteur de contacts est la seule zone que le lecteur d'écran annonce quand elle change (« 3 contacts » après une recherche) : la liste des cartes n'est pas relue. Pour un lecteur d'écran, chaque carte est une fiche nommée d'après la personne, la liste des cartes est une zone nommée « Contacts », et les groupes d'étiquettes (Instances, Actions, GT, Compétences…) sont des groupes nommés plutôt que des titres : le plan de la page n'en compte plus des centaines. Les symboles qui ornent un texte (☎ devant un numéro, ✓ d'une confirmation) ne sont pas lus, et un numéro qui est un lien s'annonce « Téléphone : 05 36 49 90 12 ». Ces points sont vérifiés par des tests automatiques dans un navigateur de bureau, pas encore avec un lecteur d'écran réel. Signalez à l'administrateur des données ce qui vous gênerait.
+Oui, en grande partie. La touche **Tab** passe d'un contrôle au suivant et **Maj+Tab** revient en arrière. Le premier arrêt est un lien « **Aller aux résultats** », invisible tant qu'il n'a pas le focus : **Entrée** amène à la première carte sans passer par l'en-tête ni par la barre d'outils. Viennent ensuite l'interrupteur de « Ma présence », la recherche, les boutons de filtre, Fondateurs et Partenaires, Réinitialiser, puis, pour chaque carte, ses boutons et liens (la photo quand il y en a une, le logo de l'établissement, l'e-mail, les boutons « Modifier ») et **un seul arrêt pour toutes ses étiquettes**, que les flèches **gauche** et **droite** parcourent. **Entrée** ou **Espace** active le contrôle, y compris le bouton d'un filtre, qui ouvre ou referme son menu. Chaque bouton de filtre annonce s'il est ouvert et combien de valeurs sont choisies (« Compétences (2 sélectionnés) ») ; **Échap** referme le menu ouvert et rend le focus à son bouton, et en sortir à la tabulation le referme aussi. La recherche d'un menu reste collée en haut quand la liste défile, et ce que **Tab** amène à l'écran s'arrête sous elle, jamais caché derrière ; un menu rangé par groupe (Compétences, Tâches) a une ligne d'aide, que le lecteur d'écran lit à l'ouverture. « Réinitialiser » grisé reste dans l'ordre du clavier, se lit « indisponible » et ne fait perdre le focus à personne quand il se grise. Quand la liste des cartes se redessine (une recherche, un filtre posé depuis une étiquette), le focus reste sur le même contrôle, ou revient au compteur de contacts, où la liste commence. Quand l'annuaire ne se charge pas, le bandeau rouge est annoncé tout de suite, et « Réessayer » rend le focus au compteur quand l'essai réussit. Un **anneau violet** entoure le contrôle sur lequel on se trouve, et quand la barre de recherche et de filtres reste en haut de l'écran, il s'arrête sous elle, jamais caché derrière. Le champ de recherche est annoncé « Rechercher par nom ou prénom ». L'interrupteur de « Ma présence » garde le focus pendant et après l'enregistrement et le résultat est annoncé ; il reste lisible en mode contraste élevé et sans animation si votre système demande de les réduire. Le texte des cartes fait 12 px au moins et les étiquettes 24 px de haut, pour se lire et se viser plus facilement à la souris. Le compteur de contacts est la seule zone que le lecteur d'écran annonce quand elle change (« 3 sur 14 contacts » après une recherche) : la liste des cartes n'est pas relue. Pour un lecteur d'écran, chaque carte est une fiche nommée d'après la personne, la liste des cartes est une zone nommée « Contacts », et les groupes d'étiquettes (Instances, Actions, GT, Compétences…) sont des groupes nommés plutôt que des titres : le plan de la page n'en compte plus des centaines. Les symboles qui ornent un texte (☎ devant un numéro, ✓ d'une confirmation) ne sont pas lus, et un numéro qui est un lien s'annonce « Téléphone : 05 36 49 90 12 ». Ces points sont vérifiés par des tests automatiques dans un navigateur de bureau, pas encore avec un lecteur d'écran réel. Signalez à l'administrateur des données ce qui vous gênerait.
+
+**Puis-je imprimer l'annuaire ?**
+
+Oui, avec la commande d'impression de votre navigateur, ou son « Enregistrer au format PDF ». Sur le papier, la page ne garde que ce qui s'imprime utilement : plus de barre de recherche ni de filtres, plus de bandeau « Ma présence », de bouton « Modifier » ou « Réessayer », de pastille « Haut de page », de fond de page ni d'ombre. Chaque carte reste **entière** sur sa page, toutes les cartes sont dessinées, et les marges sont de 12 mm. Les pastilles (instances, actions, compétences…), les initiales et les badges d'établissement sont écrits en **texte foncé avec un bord**, sans fond de couleur, que les navigateurs n'impriment pas par défaut : leur couleur est perdue sur le papier, les titres de groupe gardent la leur. Cela ne change rien à l'écran. Cette mise en page a été vérifiée dans Chromium (styles calculés en mode impression, PDF en A4 portrait et paysage), pas dans Firefox ni dans Safari, ni sur une imprimante : signalez à l'administrateur des données ce qui s'imprimerait mal.
 
 **Mes coordonnées sont-elles visibles par tout le monde ?**
 

@@ -6,7 +6,7 @@ la faire et comment vérifier qu'elle a marché.
 
 | Étape | Quoi | Sans elle |
 |---|---|---|
-| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** | l'interrupteur « Ma présence », l'enregistrement ou la création d'une fiche échoue, avec un message qui renvoie ici |
+| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** | l'interrupteur « Ma présence » échoue (la console dit la colonne et renvoie ici), de même que l'enregistrement ou la création d'une fiche, avec un message qui renvoie ici |
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement : **le widget la crée lui-même** au premier chargement, ouvert par un compte qui peut modifier la structure du document | si le widget n'a pas pu la créer, personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, depuis la 1.17.0 une fiche d'établissement aussi, et depuis la 1.18.0 une personne crée elle-même sa fiche |
@@ -85,10 +85,12 @@ export de structure la montre alors comme une colonne à formule `return False` 
 que personne n'a rien saisi : c'est normal, et c'est pour cela que cette étape existe.
 
 Vérifier : cochez une case dans Grist, la carte de la personne apparaît dans le widget
-(au besoin, rechargez-le). Si l'interrupteur « Ma présence » affiche « La colonne
-Accepte_apparaitre est une colonne à formule », ou si l'enregistrement d'une fiche
-affiche « Une colonne de la fiche est une colonne à formule », reprenez l'étape pour
-la colonne concernée.
+(au besoin, rechargez-le). Si l'interrupteur « Ma présence » affiche « La modification
+n'a pas pu être enregistrée. Réessayez… » à chaque clic, ouvrez la console du navigateur :
+la ligne `[PRESENCE] La colonne Accepte_apparaitre est une colonne à formule…` dit qu'il
+faut reprendre cette étape (depuis la 1.35.0, la personne ne lit que le message général ;
+seule la console nomme la colonne). Si l'enregistrement d'une fiche affiche « Une colonne
+de la fiche est une colonne à formule », reprenez l'étape pour la colonne concernée.
 
 ## 2. La table `Annuaire_Sonde` : qui est connecté ?
 
