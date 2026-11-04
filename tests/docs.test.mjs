@@ -227,6 +227,14 @@ test('le serveur de démonstration sert le widget avec l\'API Grist simulée, et
     assert.equal((await fetch(`${url}/__grist-simule.js`)).status, 200);
     assert.equal((await fetch(`${url}/main.js`)).status, 200);
 
+    // Les quatre fichiers de la police Inter (1.36.0) sont servis comme polices : sans eux la démonstration, et les captures du guide
+    // qu'elle sert, retomberaient sur la police du système (le navigateur ne la reçoit pas, et le dit par l'état « error » de la police).
+    for (const weight of [400, 600, 700, 800]) {
+      const font = await fetch(`${url}/assets/fonts/inter-${weight}.woff2`);
+      assert.equal(font.status, 200, `inter-${weight}.woff2`);
+      assert.equal(font.headers.get('content-type'), 'font/woff2', `inter-${weight}.woff2`);
+    }
+
     // L'historique Git et les documents restent inaccessibles.
     for (const forbidden of ['/.git/HEAD', '/README.md', '/grist_structure.txt']) {
       assert.equal((await fetch(`${url}${forbidden}`)).status, 404, `${forbidden} ne doit pas être servi`);

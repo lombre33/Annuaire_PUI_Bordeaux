@@ -10,13 +10,15 @@
        style-src 'unsafe-inline' : l'API de Grist ajoute une balise style au document.
        img-src, connect-src : les pièces jointes viennent de l'instance Grist du document, dont l'adresse n'est pas connue
          d'avance (https:) ; data: et blob: pour les aperçus et les copies de logos ; la boucle locale pour un Grist de test.
-       Le reste est fermé (default-src 'none' : ni cadre, ni police, ni média, ni travailleur), sans balise base, objet ni
+       font-src : la police Inter, embarquée dans le dépôt (assets/fonts).
+       Le reste est fermé (default-src 'none' : ni cadre, ni média, ni travailleur), sans balise base, objet ni
        formulaire. docs/securite.md (« Politique de sécurité de contenu ») donne le détail ; tests/csp.test.mjs et
        tests/e2e-csp.test.mjs la gardent. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
     script-src 'self' https://docs.getgrist.com 'unsafe-eval';
     style-src 'self' 'unsafe-inline';
+    font-src 'self';
     img-src 'self' data: blob: https: http://127.0.0.1:* http://localhost:*;
     connect-src 'self' https: http://127.0.0.1:* http://localhost:*;
     object-src 'none';
@@ -26,6 +28,13 @@
   <title>Annuaire PUI Bordeaux</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="dialogs.css">
+  <!-- Les quatre fichiers de la police Inter (style.css, @font-face) sont demandés dès l'en-tête, en même temps que les feuilles de
+       style : sans cela le navigateur ne les découvrirait qu'une fois le texte mis en page. Le préchargement d'une police est
+       toujours en CORS, d'où `crossorigin`, même pour un fichier du dépôt. tests/fonts.test.mjs garde cette liste d'accord avec style.css. -->
+  <link rel="preload" href="assets/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/inter-800.woff2" as="font" type="font/woff2" crossorigin>
   <!-- Les modules du widget sont demandés tous ensemble, dès l'en-tête : sinon le navigateur ne découvre chaque niveau
        d'import qu'en lisant le précédent, quatre allers-retours de suite avant que le widget ne s'exécute.
        tests/index-html.test.mjs garde cette liste d'accord avec les import du code. -->

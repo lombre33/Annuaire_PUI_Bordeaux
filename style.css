@@ -1,3 +1,40 @@
+/* La police du widget : Inter, embarquée (1.36.0, audit U41). Elle était la première de la pile sans être chargée nulle part : le rendu
+   dépendait de sa présence sur le poste, et un poste sans elle retombait sur la police du système, aux lettres plus larges ou plus
+   étroites, donc avec d'autres coupures et d'autres troncatures que celles qu'on avait mesurées. Quatre graisses, un sous-ensemble
+   latin de chacune (Inter 4.0, licence SIL OFL : assets/fonts/LICENSE.txt), 21 Ko environ le fichier. La graisse 700 est déclarée de
+   650 à 750 : les graisses intermédiaires que cette feuille demande (650, 750) y tombent, comme avec la police installée sur la machine
+   de l'audit, au lieu de passer à 800 (la règle des polices du web va vers le plus gras). `swap` : le texte s'affiche tout de suite
+   dans la police du système et passe à Inter dès qu'elle est là ; index.html la fait demander dès l'en-tête, bien avant que les
+   cartes n'existent. */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("assets/fonts/inter-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("assets/fonts/inter-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 650 750;
+  font-display: swap;
+  src: url("assets/fonts/inter-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("assets/fonts/inter-800.woff2") format("woff2");
+}
+
 /* Variables et base */
 :root {
   /* Le widget n'a qu'un thème, clair : les contrôles natifs (cases, champs, défilement) ne suivent pas
@@ -6,6 +43,10 @@
   --ink: #172033;
   --muted: #636e85; /* le gris des textes secondaires : 4,7:1 au moins sur nos fonds clairs, 4,5:1 exigés (WCAG 1.4.3) */
   --line: #e4e8f0;
+  /* Le bord d'un champ, d'un menu déroulant et de l'interrupteur Fondateurs/Partenaires (1.36.0, audit U25) : 3,6:1 sur blanc, 3,4:1 sur
+     le fond des champs (#f7f8fc), 3:1 exigés pour reconnaître un champ (WCAG 1.4.11). `--line`, à 1,2:1, reste celle des filets et des
+     cartes, que rien n'oblige à voir. */
+  --field-line: #7d879c;
   --paper: #fff;
   --wash: #f4f6fb;
   --violet: #6257d9;
@@ -377,7 +418,7 @@ h1 {
   height: 46px;
   padding: 0 14px;
   background: #f7f8fc;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 12px;
 }
 .search-box input {
@@ -415,7 +456,7 @@ h1 {
   padding: 0 14px;
   color: var(--ink);
   background: var(--paper);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 12px;
   cursor: pointer;
   font-size: 13px;
@@ -513,6 +554,18 @@ h1 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-top: 44px;
+}
+/* Très grand écran (1.36.0, audit U12) : jusque-là la page s'arrêtait à 1 480 px et la grille à 3 colonnes de 484 px, avec 220 px de marge de
+   chaque côté à 1 920 px et 540 px à 2 560 px. À partir de 1 670 px (de quoi tenir 4 cartes de 390 px, la largeur d'une carte à 1 280 px),
+   la page s'élargit jusqu'à 2 200 px et la grille compte autant de colonnes que de cartes de 390 px qui y tiennent : 4 à 1 920 px, 5 dès
+   2 074 px. En dessous de 1 670 px rien ne change. */
+@media (min-width: 1670px) {
+  .widget-shell {
+    max-width: 2200px;
+  }
+  .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(390px, 1fr));
+  }
 }
 .contact-card {
   /* La place du logo d'établissement se mesure sur la carte (cqw, voir .logo-img plus bas) */
@@ -950,7 +1003,7 @@ button.avatar:hover {
   width: 100%;
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 8px;
   font-size: 12px;
   background: #f7f8fc;
@@ -1085,7 +1138,7 @@ button.avatar:hover {
   height: 46px;
   padding: 4px;
   background: #f7f8fc;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 12px;
 }
 .scope-btn {
@@ -1103,10 +1156,12 @@ button.avatar:hover {
 .scope-btn:hover {
   color: #443aaf;
 }
+/* Le bouton allumé a un contour (1.36.0, audit U25) : son blanc sur le fond du boîtier, à 1,06:1, et la couleur de son texte ne suffisent
+   pas à dire l'état ; le contour violet est à 8,5:1. */
 .scope-btn.active {
   color: #443aaf;
   background: #fff;
-  box-shadow: 0 2px 6px #1b203d1f;
+  box-shadow: inset 0 0 0 1.5px #443aaf, 0 2px 6px #1b203d1f;
 }
 
 /* Actions d'une carte que la personne connectée peut modifier : la sienne (« Votre
@@ -1324,7 +1379,7 @@ button.avatar:hover {
 @media (hover: none) {
   .filter:not(.open) .filter-button:hover {
     color: var(--ink);
-    border-color: var(--line);
+    border-color: var(--field-line);
   }
   .filter-option:not(.checked):hover,
   .group-option:hover,
@@ -1807,7 +1862,7 @@ button.avatar:hover {
 .admin-strip:not([hidden]) ~ .cards-grid {
   margin-top: 14px;
 }
-/* Sur un téléphone, la pastille se cale sur la gouttière de la page. À l'impression, ni le lien d'évitement ni la pastille n'ont de sens. */
+/* Sur un téléphone, la pastille se cale sur la gouttière de la page. */
 @media (max-width: 599px) {
   .scroll-tools {
     right: 12px;
@@ -1815,9 +1870,50 @@ button.avatar:hover {
     max-width: calc(100% - 24px);
   }
 }
+/* Impression (1.36.0, audit U11). Sans règle d'impression, la page sortait en 3 à 4 pages avec sa barre d'outils (recherche, filtres,
+   interrupteurs), des cartes coupées en deux entre deux pages, et, sans « graphiques d'arrière-plan » (le réglage par défaut des
+   navigateurs), des pastilles, des initiales et des badges au texte blanc sur fond blanc, donc illisibles. Sur le papier : ni commande
+   (barre d'outils, « Ma présence », boutons « Modifier », lien d'évitement, pastille « Haut de page »), ni fond ; une carte reste entière
+   sur sa page ; les pastilles, les initiales et les badges ont un texte foncé et un bord, qui s'impriment toujours. */
+@page {
+  margin: 12mm;
+}
 @media print {
   .skip-link,
-  .scroll-tools {
-    display: none;
+  .scroll-tools,
+  .toolbar-sentinel,
+  .toolbar,
+  .account-bar,
+  .admin-strip,
+  .card-actions,
+  .status-action {
+    display: none !important; /* plusieurs de ces règles d'affichage sont plus précises que celle-ci (`.page-header > .account-bar`) */
+  }
+  body {
+    padding: 0;
+    background: none;
+  }
+  .cards-grid {
+    margin-top: 16px;
+  }
+  /* Toutes les cartes sont dessinées : `content-visibility: auto` en laisserait certaines à leur hauteur estimée (480 px), du blanc sous leur texte. */
+  .cards-grid > .contact-card {
+    content-visibility: visible;
+    break-inside: avoid;
+    box-shadow: none;
+    border-color: var(--field-line);
+  }
+  .avatar:not(.has-photo),
+  .tag:not(.role-tag),
+  .etablissement-tag {
+    color: var(--ink);
+  }
+  /* `!important` : la couleur d'une pastille est écrite sur l'élément lui-même (render.js). Le rôle PUI est un texte violet sans fond :
+     il s'imprime tel quel. */
+  .avatar,
+  .tag:not(.role-tag),
+  .etablissement-tag:not(.has-logo) {
+    background: #fff !important;
+    border: 1px solid #636e85;
   }
 }

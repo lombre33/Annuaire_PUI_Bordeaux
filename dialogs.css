@@ -303,7 +303,7 @@ textarea {
   padding: 0 12px;
   color: var(--ink);
   background: var(--field);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 12px;
   font-size: 14px;
 }
@@ -353,7 +353,7 @@ textarea {
   padding: 0 12px;
   color: var(--ink);
   background: var(--field);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 12px;
   cursor: pointer;
   font-size: 14px;
@@ -517,7 +517,7 @@ textarea {
   margin-bottom: 4px;
   padding: 0 12px;
   background: var(--field);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 10px;
   font-size: 13px;
 }
@@ -1098,7 +1098,7 @@ textarea {
   padding: 0 12px;
   color: var(--ink);
   background: var(--field);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 12px;
   font-size: 13.5px;
 }
