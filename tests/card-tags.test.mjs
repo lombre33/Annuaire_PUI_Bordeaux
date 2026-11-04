@@ -162,7 +162,7 @@ test('Entrée sur une pastille filtre, et le focus reste dans la barre d\'outils
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Enter'); // « Action 2 » : filtre Actions
-    await page.waitForFunction(() => document.getElementById('resultCount').textContent === '1 contact');
+    await page.waitForFunction(() => document.getElementById('resultCount').textContent === '1 sur 4 contacts');
     assert.equal(await page.evaluate(() => document.activeElement.firstChild.textContent), 'Action 2', 'le focus est resté sur la pastille');
     assert.equal(await page.evaluate(() => Boolean(document.activeElement.closest('.card-tags[role="toolbar"]'))), true);
     assert.equal(await tabbablePills(ana()).count(), 1);

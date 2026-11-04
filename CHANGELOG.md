@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.34.0 — Audit UI/UX : la recherche d'un menu reste en haut, le compteur dit « N sur M », « Réinitialiser » grisé au repos, l'aide des menus rangés par groupe
+
+Deuxième lot de la réponse d'Antoine du 3 novembre 2026 (« Les seize »), le premier des **onze constats qui changent un peu l'écran** (U37, U36, U27) ; les autres (U30, U51, U52, U50, puis U25, U12, U11, U41) suivent
+en 1.35.0 et 1.36.0. Comme convenu, chacun est montré en images avant/après à Antoine avant d'être fusionné, et il peut en refuser un (comme les « +N » des pastilles). Rien à régler dans Grist.
+
+- **U37, la recherche d'un menu reste en haut quand la liste défile.** Avec une trentaine d'options un menu fait environ mille pixels de haut pour trois cents visibles, et le champ de recherche sortait de la vue au premier
+  coup de molette : pour affiner il fallait remonter. `buildMenuHead()` (`filter-menus.js`) le range dans un en-tête `position: sticky` collé au bord haut du menu, opaque (les cases qui passent dessous ne se voient pas à côté du champ) ;
+  le menu perd sa marge du haut, que l'en-tête porte, et garde `scroll-padding-top` : au clavier, la case qu'on atteint s'arrête sous le champ au lieu de passer dessous (WCAG 2.4.11), anneau de focus compris. Sur écran tactile,
+  où le champ fait 40 px de haut et non 32, la réserve suit (`--menu-head`). Rien ne change à l'ouverture d'un menu court.
+- **U36, le compteur dit ce que la recherche et les filtres écartent, et « Réinitialiser » dit s'il y a quelque chose à réinitialiser.** Le compteur disait « 12 contacts » sans dire sur combien : il dit maintenant « 12 sur 245 contacts »
+  dès qu'une recherche ou un filtre écarte des contacts (`contactCountText()`, `grist-data.js`), et reste « 245 contacts » sinon, comme dans la maquette v5. **Le « 245 » est ce que les interrupteurs Fondateurs/Partenaires laissent
+  voir** (`countInScope()`, `filters.js`) : un interrupteur est une commande à part, à côté du compteur, qui change l'ensemble dont on part, il ne compte pas parmi les contacts « écartés ». Écrire « 245 sur 400 » dès l'arrivée aurait
+  changé la vue que tout le monde voit en premier et contredit « Réinitialiser » grisé ; si Antoine préfère l'autre lecture (tout l'annuaire, interrupteurs compris), c'est une ligne de `main.js`. La pastille « Haut de page »
+  dit la même chose. « Réinitialiser » est grisé tant que la recherche est vide et qu'aucune case n'est cochée (`syncResetButton()`, `main.js`) ; il s'allume à la première lettre tapée, avant même que la recherche soit appliquée, ou à la
+  première case. **Grisé, pas désactivé** : `aria-disabled` et non `disabled`, comme l'interrupteur de présence, pour que le bouton garde le focus quand les filtres sont retirés (un bouton désactivé le perdrait et le clavier repartirait du haut
+  de la page) ; un lecteur d'écran le lit « indisponible » et le clic grisé ne fait rien. Les interrupteurs Fondateurs/Partenaires ne l'allument pas : « Réinitialiser » n'y touche pas.
+- **U27, l'aide des menus rangés par groupe est écrite dans le menu.** « Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles » n'était que l'infobulle (`title`) du bouton « Compétences », que ni le toucher ni
+  le clavier ne montrent. `buildMenuHelp()` l'écrit sous la recherche (12 px, gris des textes secondaires), liée au menu par `aria-describedby` pour qu'un lecteur d'écran la lise à l'ouverture ; elle défile avec la liste et s'efface
+  pendant une recherche, qui déplie tous les groupes et a besoin de la place. Même chose pour « Tâches » (« action »). Un menu à plat (Instances, Établissement, GT, ou un regroupement absent de Grist) n'a pas de ligne d'aide, et l'infobulle du
+  bouton reste.
+- **La pastille « Haut de page » ne sort plus de l'écran.** Le nombre de contacts s'allonge (« 40 sur 44 contacts », et « 1 234 sur 45 000 contacts » pour un annuaire national) : avec la police du système, plus large qu'Inter que le poste d'audit a
+  installée, la pastille de 252 px pouvait dépasser 340 px et sortir par la gauche sur un téléphone de 320 à 360 px (le test de taille de la pastille l'a vu sur la CI, dont les polices sont celles du système). `.scroll-tools` passe à la ligne
+  (`flex-wrap`, `max-width`) : le bouton se place sous le nombre quand les deux ne tiennent pas côte à côte. Rien ne change quand ils tiennent.
+- **Écarts avec la maquette v5, à signaler à Antoine.** Le compteur écrit « N sur M contacts » quand la recherche ou un filtre écarte des contacts ; « Réinitialiser » est grisé au repos ; les menus « Compétences » et « Tâches » ont une ligne d'aide de plus
+  (environ 24 px de haut) ; la recherche d'un menu est collée en haut. Le reste de la barre d'outils, les cartes et les menus courts sont inchangés.
+- **`main.js` repasse sous les 600 lignes de code** (GWaudit le comptait à 603 avec les ajouts ci-dessus, et le score global passait de 90 à 89 ; 577 maintenant). Sans rien ajouter à la liste des modules : `userFacing()` et
+  `userFacingEtab()`, copies l'une de l'autre, sont deux appels d'une même fabrique (`userFacingError()`) ; les six `try`/`catch` qui les appelaient passent par un seul `speaking()` ; les deux phrases « Le fichier … reste dans les pièces
+  jointes du document sans servir. », écrites chacune deux fois, le sont une fois (`PHOTO_LEFTOVER`, `LOGO_LEFTOVER`). **Aucun message ne change** : `tests/e2e-avatar.test.mjs` et `tests/e2e-etablissement.test.mjs` les lisent mot pour mot.
+- Tests : 10 de plus (1 106 en tout), dont 8 dans un vrai navigateur (455 en tout) (`tests/toolbar-feedback.test.mjs` : la recherche collante et son opacité, le clavier qui n'atteint pas une case cachée, l'aide écrite, lue et effacée, le compteur
+  `contactCountText` et `countInScope`, le compteur après un interrupteur, une recherche ou un filtre, « Réinitialiser » grisé, allumé et rendu au focus, la pastille « Haut de page » à 320, 360, 390 et 1 280 px). Les tests qui lisaient « 1 contact » après une recherche lisent « 1 sur 4 contacts ».
+  Neuf des dix échouent sur le code de la 1.33.0 (le dixième est une garde : un menu à plat n'a pas de ligne d'aide). **Non essayé** dans le vrai Grist d'Antoine, ni avec un vrai lecteur d'écran. Revenir en arrière : `git revert` de la fusion.
+
 ## 1.33.1 — Relecture : les titres de groupe des cartes retrouvent leurs 8 px
 
 Correctif d'une régression de la 1.33.0, signalée par le fil documentation en mesurant la fenêtre de relecture. Rien à régler dans Grist.

@@ -427,6 +427,14 @@ export function mailtoHref(email) {
 const COUNT_FORMAT = new Intl.NumberFormat('fr-FR');
 export const formatCount = count => COUNT_FORMAT.format(count);
 
+// Le compteur de contacts : « 12 contacts », ou « 12 sur 245 contacts » quand la recherche ou un filtre écarte des contacts : il dit
+// combien sont masqués (audit UI/UX, U36). `total` : ce que les interrupteurs Fondateurs/Partenaires laissent voir (countInScope,
+// filters.js), si bien que la vue d'arrivée, sans recherche ni filtre, reste « 245 contacts » comme dans la maquette.
+export function contactCountText(shown, total) {
+  if (shown >= total) return `${formatCount(shown)} contact${shown > 1 ? 's' : ''}`;
+  return `${formatCount(shown)} sur ${formatCount(total)} contacts`;
+}
+
 // ===== LIEN TEL =====
 // Le numéro que montre la carte (formatPhone) devient un lien `tel:` quand il se compose sans équivoque : des chiffres, des
 // séparateurs usuels (espace, point, tiret) et un « + » devant pour un numéro international. Une saisie libre (« poste 23 »,

@@ -11,8 +11,8 @@
 // avatar-ui.js (les photos de profil).
 
 import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
-import { loadDirectory, DirectoryLoadError, debounce, filterVisibleEstablishments, createRequestSequencer, formatCount, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
-import { createEmptyFilterState, filterContacts, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
+import { loadDirectory, DirectoryLoadError, debounce, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
+import { createEmptyFilterState, filterContacts, countInScope, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
 import { attachTagNavigation, attachTagNotes, focusFirstResult, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
 import { createScrollTools } from './scroll-tools.js';
@@ -189,17 +189,28 @@ function refreshFilterMenus() {
   if (menusChanged) rebuildFilterUI();
 }
 
+// « Réinitialiser » n'a rien à faire tant qu'aucun filtre n'est coché et que la recherche est vide (les interrupteurs Fondateurs/
+// Partenaires n'en dépendent pas) : il se grise (audit UI/UX, U36). `aria-disabled` et non `disabled` : un bouton désactivé perd le
+// focus, et le clavier repartirait du haut de la page (comme l'interrupteur de présence, account-ui.js). La frappe compte dès la
+// première lettre, avant que la recherche soit appliquée.
+function syncResetButton() {
+  const idle = elements.searchInput.value.trim() === '' && Object.values(state.activeFilters).every(set => set.size === 0);
+  if (idle) elements.resetFilters.setAttribute('aria-disabled', 'true');
+  else elements.resetFilters.removeAttribute('aria-disabled');
+}
+
 function refreshCards() {
   if (!state.loaded) return; // la frappe est gardée (state.searchTerm) : elle s'applique à l'arrivée de l'annuaire
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
   keepFocus(elements.grid, elements.resultCount, () =>
     renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights));
   elements.grid.removeAttribute('aria-busy');
-  const count = `${formatCount(filtered.length)} contact${filtered.length > 1 ? 's' : ''}`;
+  const count = contactCountText(filtered.length, countInScope(state.allContacts, state.scope));
   elements.resultCount.textContent = count;
   scrollTools.setCount(count);
   elements.emptyState.hidden = filtered.length !== 0;
   updateFilterCounts(elements.filtersContainer, currentCounts());
+  syncResetButton();
   reportLogosLater();
 }
 
@@ -247,6 +258,7 @@ function applySearch() {
 }
 
 elements.searchInput.addEventListener('input', () => {
+  syncResetButton();
   clearTimeout(searchTimer);
   if (elements.searchInput.value.trim() === '') applySearch();
   else searchTimer = setTimeout(applySearch, SEARCH_DELAY_MS);
@@ -264,6 +276,7 @@ elements.scopeButtons.forEach(button => {
 });
 
 elements.resetFilters.addEventListener('click', () => {
+  if (elements.resetFilters.getAttribute('aria-disabled') === 'true') return;
   Object.values(state.activeFilters).forEach(set => set.clear());
   clearTimeout(searchTimer);
   state.searchTerm = '';
@@ -466,15 +479,26 @@ readIdentity(window.grist.docApi, { readOnly: isReadOnlyAddress(window.location.
 
 // ===== Modifier une fiche =====
 
-// Une erreur attendue (ProfileSaveError) porte une phrase française ; toute autre est
-// consignée dans la console et remplacée par une phrase générale.
-function userFacing(error) {
-  if (error instanceof ProfileSaveError) {
-    if (!error.leftover) return error;
-    return new Error(`${error.message} Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.`);
-  }
-  console.error('[PROFIL] Erreur inattendue :', error);
+// Ce que la personne lit d'une erreur d'une fenêtre : une erreur attendue (`Expected`, ProfileSaveError ou EtablissementSaveError) porte une
+// phrase française ; toute autre est consignée dans la console (`[tag]`) et remplacée par une phrase générale. Un fichier envoyé à Grist
+// pour rien (`leftover`) est dit, à la suite de la phrase.
+const PHOTO_LEFTOVER = 'Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.';
+const LOGO_LEFTOVER = 'Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.';
+const userFacingError = (Expected, tag, leftover) => error => {
+  if (error instanceof Expected) return error.leftover ? new Error(`${error.message} ${leftover}`) : error;
+  console.error(`[${tag}] Erreur inattendue :`, error);
   return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
+};
+const userFacing = userFacingError(ProfileSaveError, 'PROFIL', PHOTO_LEFTOVER);
+const userFacingEtab = userFacingError(EtablissementSaveError, 'FICHE-ETAB', LOGO_LEFTOVER);
+
+// Lance une opération d'une fenêtre (`run`) ; ses erreurs deviennent des phrases pour la personne (`toSentence` : userFacing, userFacingEtab).
+async function speaking(toSentence, run) {
+  try {
+    return await run();
+  } catch (error) {
+    throw toSentence(error);
+  }
 }
 
 // Une adresse e-mail qu'une AUTRE fiche que `rowId` porte déjà (d'après l'annuaire lu) :
@@ -527,32 +551,24 @@ function evaluateDraft(row, draft, admin, creating = false) {
 
 // Prépare la relecture (profile-save.js) : rien n'est écrit. `row` est la fiche telle que
 // le formulaire l'a montrée.
-async function reviewProfile(row, draft, admin) {
-  try {
-    return await prepareReview(window.grist.docApi, row, draft, { referenceMaps: state.referenceMaps, etabFlags: state.etabFlags, admin });
-  } catch (error) {
-    throw userFacing(error);
-  }
+function reviewProfile(row, draft, admin) {
+  return speaking(userFacing, () =>
+    prepareReview(window.grist.docApi, row, draft, { referenceMaps: state.referenceMaps, etabFlags: state.etabFlags, admin }));
 }
 
 // Écrit ce que la personne a relu. Si la fiche a changé dans Grist depuis la relecture,
 // rien n'est écrit : la personne relit d'abord ce qui s'y trouve. Sinon l'annuaire est
 // relu, et on vérifie que Grist a gardé ce qu'on lui a demandé.
 async function saveReviewed(row, review, draft, admin) {
-  let result;
-  try {
-    result = await saveProfile(window.grist.docApi, review, {
-      upload: file => uploadAttachment(window.grist.docApi, file, { hint: PHOTO_UPLOAD_HINT })
-    });
-  } catch (error) {
-    throw userFacing(error);
-  }
+  const result = await speaking(userFacing, () => saveProfile(window.grist.docApi, review, {
+    upload: file => uploadAttachment(window.grist.docApi, file, { hint: PHOTO_UPLOAD_HINT })
+  }));
   if (result.status === 'changed') {
     return {
       status: 'changed',
       review: await reviewProfile(row, draft, admin),
       notice: 'La fiche a changé dans Grist pendant la relecture. Relisez ce qui suit, puis validez à nouveau.'
-        + (result.leftover ? ' Le fichier de la nouvelle photo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.' : '')
+        + (result.leftover ? ` ${PHOTO_LEFTOVER}` : '')
     };
   }
   const outcome = await reloadDirectory();
@@ -630,26 +646,17 @@ function openOwnProfile() {
 
 // Prépare la relecture de la fiche à créer (profile-save.js) : rien n'est écrit. `blank` : la fiche vide
 // que le formulaire a montrée.
-async function reviewCreation(blank, draft) {
-  try {
-    return await prepareCreation(window.grist.docApi, blank, draft, {
-      email: state.identity.email, referenceMaps: state.referenceMaps, etabFlags: state.etabFlags
-    });
-  } catch (error) {
-    throw userFacing(error);
-  }
+function reviewCreation(blank, draft) {
+  return speaking(userFacing, () => prepareCreation(window.grist.docApi, blank, draft, {
+    email: state.identity.email, referenceMaps: state.referenceMaps, etabFlags: state.etabFlags
+  }));
 }
 
 // Ajoute la fiche à BDD, puis relit l'annuaire : le bandeau montre alors l'interrupteur et « Modifier mon
 // profil », on vérifie que Grist a gardé ce qu'on lui a demandé, et le message de fin dit si la fiche apparaît
 // (publier n'est pas afficher : voir describeCreated).
 async function saveCreation(review) {
-  let result;
-  try {
-    result = await createProfile(window.grist.docApi, review);
-  } catch (error) {
-    throw userFacing(error);
-  }
+  const result = await speaking(userFacing, () => createProfile(window.grist.docApi, review));
   const outcome = await reloadDirectory();
   const saved = outcome === 'applied' && result.rowId !== null ? state.people?.findById(result.rowId) : null;
   const leftovers = saved ? unsavedLabels(review, saved.row, state.referenceMaps) : [];
@@ -693,17 +700,6 @@ function openCreation() {
 
 // ===== Modifier un établissement =====
 
-// Une erreur attendue (EtablissementSaveError) porte une phrase française ; toute autre est consignée
-// dans la console et remplacée par une phrase générale. Un fichier de logo envoyé pour rien est dit.
-function userFacingEtab(error) {
-  if (error instanceof EtablissementSaveError) {
-    if (!error.leftover) return error;
-    return new Error(`${error.message} Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.`);
-  }
-  console.error('[FICHE-ETAB] Erreur inattendue :', error);
-  return new Error('L\'opération n\'a pas pu aboutir. Le détail est dans la console du navigateur.');
-}
-
 // La personne qui porte cette adresse, pour la liste des responsables : son nom seulement si sa fiche
 // figure dans l'annuaire (un nom qu'on voit déjà ne dévoile rien), sinon on dit juste qu'elle existe.
 function lookupPerson(email) {
@@ -728,13 +724,7 @@ function ficheOf({ row, etablissement, responsables }) {
   };
 }
 
-async function loadFiche(id) {
-  try {
-    return ficheOf(await readEtablissement(window.grist.docApi, id));
-  } catch (error) {
-    throw userFacingEtab(error);
-  }
-}
+const loadFiche = id => speaking(userFacingEtab, async () => ficheOf(await readEtablissement(window.grist.docApi, id)));
 
 // Le logo actuel de l'établissement, comme sur ses cartes ; le sigle en pastille quand le fichier ne
 // se charge pas.
@@ -765,12 +755,8 @@ async function saveFiche(draft, fiche) {
   }
   const file = draft.logo.action === 'replace' ? draft.logo.file : null;
   const plan = savePlanOf(fiche.row, diff.champs, { file, responsable: state.etabRights(id) });
-  let result;
-  try {
-    result = await saveEtablissement(window.grist.docApi, plan, { upload: sent => uploadAttachment(window.grist.docApi, sent) });
-  } catch (error) {
-    throw userFacingEtab(error);
-  }
+  const result = await speaking(userFacingEtab, () =>
+    saveEtablissement(window.grist.docApi, plan, { upload: sent => uploadAttachment(window.grist.docApi, sent) }));
   if (result.status === 'changed') {
     const { row, acl } = result.state;
     return {
@@ -778,7 +764,7 @@ async function saveFiche(draft, fiche) {
       fiche: ficheOf({ row, etablissement: etablissementOf(row), responsables: acl === null ? null : responsablesOf(acl, id) }),
       notice: `La fiche a changé dans Grist pendant que la fenêtre était ouverte (${result.moved.join(', ')}). `
         + 'Ce que vous avez saisi est conservé : relisez-le, puis enregistrez à nouveau.'
-        + (result.leftover ? ' Le fichier du nouveau logo, déjà envoyé à Grist, reste dans les pièces jointes du document sans servir.' : '')
+        + (result.leftover ? ` ${LOGO_LEFTOVER}` : '')
     };
   }
   if (diff.champs.responsables) await refreshIdentity();

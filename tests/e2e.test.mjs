@@ -235,7 +235,10 @@ test('Partenaires révèle les contacts partenaires ; Réinitialiser ne touche p
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Bob Durand']);
 
+    await page.fill('#searchInput', 'Zzz'); // une recherche allume « Réinitialiser » (grisé au repos, audit U36)
+    await waitForCards(page, 0);
     await page.click('#resetFilters');
+    await waitForCards(page, 1);
     assert.equal(await cardCount(page), 1, 'le choix Partenaires seuls survit à « Réinitialiser »');
   }));
 
@@ -305,7 +308,9 @@ test('la recherche trouve « prénom nom » dans n\'importe quel ordre, les noms
     const search = async (term, names) => {
       await page.fill('#searchInput', term);
       await waitForNames(page, names);
-      assert.equal(await resultCount(page), `${names.length} contact${names.length > 1 ? 's' : ''}`, term);
+      // audit U36 : « N sur M » dit ce que la recherche écarte, et rien quand elle n'écarte personne
+      const everyone = names.length === SORTED_NAMES.length;
+      assert.equal(await resultCount(page), everyone ? `${names.length} contacts` : `${names.length} sur ${SORTED_NAMES.length} contacts`, term);
     };
     await search('karim benali', ['Karim Benali']);
     await search('benali karim', ['Karim Benali']);
