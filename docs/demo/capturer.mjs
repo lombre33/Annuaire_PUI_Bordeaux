@@ -58,15 +58,23 @@ const attendreLogos = page =>
       return image.checkVisibility({ contentVisibilityAuto: true }) && (image.loading === 'eager' || (boite.bottom > 0 && boite.top < window.innerHeight));
     })
     .every(image => image.classList.contains('loaded') && getComputedStyle(image).opacity === '1'), null, { timeout: 10_000 });
+// Tant que le widget ne sait pas qui est connecté, une copie grisée du bandeau « Ma présence » tient sa place (1.35.0, `[data-pending]`) :
+// une capture prise avant qu'elle disparaisse la montrerait, là où l'écran définitif n'a pas de bandeau.
+const attendreSansReserve = page =>
+  page.waitForFunction(() => !document.querySelector('[data-pending]:not([hidden])'), null, { timeout: 10_000 });
 const attendreCartes = async (page, nombre) => {
   await page.waitForFunction(attendu => document.querySelectorAll('.contact-card').length === attendu, nombre, { timeout: 10_000 });
+  await attendreSansReserve(page);
   await attendreLogos(page);
 };
-const attendreBandeau = page =>
-  page.waitForFunction(() => !document.getElementById('statusBanner').hidden, null, { timeout: 10_000 });
+const attendreBandeau = async page => {
+  await page.waitForFunction(() => !document.getElementById('statusBanner').hidden, null, { timeout: 10_000 });
+  await attendreSansReserve(page);
+};
 // Le bandeau « Ma présence » est affiché, dit `extrait` et n'a plus de message passager à
 // l'écran (« Enregistrement… » après un clic). L'annonce d'une réussite (data-tone="done") est
-// réservée aux lecteurs d'écran : elle ne se voit pas, donc ne compte pas. Le widget met une espace insécable
+// réservée aux lecteurs d'écran : elle ne se voit pas, donc ne compte pas. Un échec d'écriture a sa propre région
+// (`.account-error`, 1.35.0), que cette attente ne regarde pas : aucune scène n'en montre. Le widget met une espace insécable
 // devant « : ; ? ! » (1.33.0) ; les textes attendus ici s'écrivent avec des espaces ordinaires.
 const attendrePresence = (page, extrait) =>
   page.waitForFunction(attendu => {
@@ -106,6 +114,9 @@ async function cocherUnGroupeEtUnElement(page, cle, { entier, partiel, element, 
   await attendreCartes(page, cartes);
   await page.mouse.click(5, 5);
   await menu.locator('.filter-button').click();
+  // Cocher une case à demi visible fait défiler le menu de quelques pixels (Playwright l'amène à l'écran) et le menu garde son
+  // défilement à la réouverture : la ligne d'aide (1.34.0), qui défile avec la liste, serait rognée sous la recherche collée en haut.
+  await menu.locator('.filter-menu').evaluate(liste => { liste.scrollTop = 0; });
   return { menu, detail, noms: await nomsDesRubriques(page, cle) };
 }
 

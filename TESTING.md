@@ -163,7 +163,9 @@ Sans dépendance, un fichier de tests par module :
   changement de largeur, ce qui faisait échouer par intermittence deux mesures de
   `tests/branding-layout.test.mjs` (1.29.1). Depuis la 1.30.0, deux options simulent un Grist lent ou
   absent : `holdReads` retient les lectures de Grist jusqu'à `window.__releaseReads()` (le faux Grist les
-  attend par son option `readGate`), et `apiBlocked` empêche le script de l'API de se charger.
+  attend par son option `readGate`), et `apiBlocked` empêche le script de l'API de se charger. Depuis la 1.36.0, il sert aussi les
+  fichiers `.woff2` et chaque ouverture de page attend que les quatre fichiers de la police Inter soient chargés (`fontsLoaded`) : un
+  texte mesuré avant leur arrivée n'aurait pas la largeur qu'il aura une fois la page posée.
 - `tests/support/browser.mjs` — l'outillage des tests navigateur : ce harnais, et les attentes
   que ces tests partagent (cartes, bandeau, message, focus rendu, sa propre fiche ouverte,
   actions envoyées à `BDD`, ni jeton ni adresse du document dans la console, aucune violation de la
@@ -218,6 +220,10 @@ Sans dépendance, un fichier de tests par module :
 - `tests/support/card-metrics.mjs` — la taille du texte et des cibles des cartes sur la page rendue
   (`measureCards` : texte sous 12px, pastilles ou boutons sous 24px de haut, petites cibles trop près
   d'une autre), pour `tests/responsive.test.mjs` et `tests/accessibility.test.mjs`.
+- `tests/support/css.mjs` — les feuilles de style du dépôt lues sans navigateur (1.36.0, tirée de `tests/accessibility.test.mjs`) :
+  `readCss` (le texte sans ses commentaires), `cssRules` (ses règles `{ selector, body }`) et `cssValue` (la valeur qu'une règle donne à
+  une propriété), pour les tests qui vérifient ce que `style.css` et `dialogs.css` déclarent (`tests/accessibility.test.mjs`,
+  `tests/field-borders.test.mjs`).
 - `tests/support/accessibility-tree.mjs` — l'arbre d'accessibilité de Chromium, nœud par nœud
   (`accessibilityTree`, `accessibleNode` : rôle, nom, description, états ARIA), tel qu'un lecteur d'écran
   le lit et non le seul HTML, pour `tests/accessibility-filters.test.mjs` (1.30.0).
@@ -444,6 +450,26 @@ lecteur de code, vérifié par ses propres cas, lit chaque texte des modules du 
 ordinaire devant « : ; ? ! » ou dans « » ; le compteur dit « 1 234 contacts » avec l'espace insécable fine. Les tests comparent sans
 tenir compte de l'espace insécable (`tests/support/assert.mjs`). Rien n'y est joué dans un vrai Grist, avec un vrai lecteur d'écran ni
 sur un vrai téléphone : c'est la section 25.
+`tests/toolbar-feedback.test.mjs` (10 scénarios, 8 dans Chromium), `tests/account-room.test.mjs` (5, tous dans Chromium),
+`tests/status-feedback.test.mjs` (11, 7 dans Chromium), `tests/field-borders.test.mjs` (9, 4 dans Chromium),
+`tests/wide-grid.test.mjs` (3, tous dans Chromium), `tests/print.test.mjs` (5, tous dans Chromium) et `tests/fonts.test.mjs` (10, 4 dans
+Chromium) y ajoutent, de la 1.34.0 à la 1.36.0, les onze constats mineurs de l'audit UI/UX qui changent un peu l'écran (la 1.33.1 ajoute
+une vérification à `tests/e2e-profile.test.mjs` : 8 px entre un titre de groupe et ses pastilles dans la fenêtre de relecture).
+1.34.0 : la recherche d'un menu long qui reste en haut et recouvre les cases qui passent dessous, le clavier qui n'atteint pas une case
+cachée derrière elle, l'aide écrite des menus rangés par groupe (liée au menu, lue puis effacée pendant une recherche, absente d'un menu à
+plat), le compteur « N sur M contacts » (`contactCountText` et `countInScope` testés à part, sans navigateur), « Réinitialiser » grisé au
+repos, allumé à la première lettre ou à la première case, rendu au focus et sans effet quand il est grisé, et la pastille « Haut de page »
+à 320, 360, 390 et 1 280 px. 1.35.0 : la première carte qui ne bouge pas quand le bandeau « Ma présence » arrive après elle (sonde
+ralentie), la copie grisée qui garde sa place (ni lue ni atteignable, jamais en double, jamais pour un compte Lecteur, rendue quand
+personne n'est identifié ou que l'annuaire est illisible), `describeEmptyResults` dans ses quatre cas, l'écran vide selon la cause,
+« Réessayer » du premier clic à la réussite en passant par une panne et par un essai lent, le focus gardé, « Recharger la page » quand le
+script de Grist manque, et les nouvelles phrases (`tests/presence.test.mjs`, `tests/load-directory.test.mjs`, `tests/e2e.test.mjs`).
+1.36.0 : le bord des champs à 3:1 au moins avec ce qu'il touche et les gardes (les cartes, les filets et les cadres gardent leur bord clair),
+la grille (trois colonnes jusqu'à 1 669 px, quatre puis cinq de 1 700 à 3 440 px, rien ne déborde), l'impression en média « print »
+(aucune commande, une carte entière, du texte lisible sans graphiques d'arrière-plan, un bord aux pastilles, un PDF A4 portrait et paysage) et
+la police Inter (quatre `@font-face`, quatre fichiers WOFF2, préchargement exact, `font-src 'self'`, licence, quatre graisses chargées dans la
+page, texte dessiné par la police du site, tout le français dans le sous-ensemble). Rien n'y est joué dans un vrai Grist, avec un vrai
+lecteur d'écran, sur un vrai grand écran, une imprimante, Firefox ou Safari : c'est la section 26.
 
 Limite assumée : l'API Grist y est simulée (`tests/support/fake-grist.js` :
 `docApi.fetchTable` sur des données aux encodages observés en production, et des
@@ -454,8 +480,8 @@ il ne garantit pas que Grist envoie toujours ces formes — d'où le protocole
 manuel ci-dessous, à jouer dans un vrai document avant déploiement. Ce que Grist accepte d'écrire ou de
 lire ne l'est pas davantage : la ligne d'une fiche créée par une personne ordinaire et la table-sonde que
 crée le widget (sections 11 et 19), la colonne `Taches_role` (section 20), l'envoi d'un logo ou d'une
-photo (sections 17 et 18), l'affichage des logos (section 14) et la politique de sécurité de contenu, dont le Grist
-simulé ne demande rien qu'elle refuse (section 22).
+photo (sections 17 et 18), l'affichage des logos (section 14), la politique de sécurité de contenu, dont le Grist
+simulé ne demande rien qu'elle refuse (section 22), et les polices, la sonde et l'impression des versions 1.34.0 à 1.36.0 (section 26).
 
 Si vous ajoutez une fonction à `grist-data.js` ou `filters.js` : ajoutez son
 test dans le fichier de `tests/` qui correspond à son rôle (liste ci-dessus).
@@ -521,7 +547,11 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
       nouveau en 1.4.0, strictement plus permissif qu'avant.
 - [ ] Recherche vide → tous les contacts affichés réapparaissent.
 - [ ] Recherche sans aucun résultat → état vide (`#emptyState`) affiché,
-      grille de cartes vide.
+      grille de cartes vide, avec « Aucun contact trouvé » et « Modifiez votre recherche ou réinitialisez les
+      filtres. » (depuis la 1.35.0 l'écran dit pourquoi quand la cause est autre : section 26).
+- [ ] **Le compteur dit sur combien** (1.34.0) : sans recherche ni filtre, « 245 contacts » (le nombre dépend des
+      interrupteurs Fondateurs et Partenaires) ; après une recherche ou un filtre, « 3 sur 245 contacts », et « 1 sur 245
+      contacts » pour un seul résultat ; effacer la recherche rend « 245 contacts ».
 
 ## 3. Chaque filtre, seul
 
@@ -685,6 +715,11 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       "Réinitialiser" vide la recherche, décoche tous les filtres, **vide
       aussi les champs de recherche internes aux menus** (pas seulement les
       cases), et réaffiche tous les contacts affichés.
+- [ ] **« Réinitialiser » est grisé quand il n'y a rien à effacer** (1.34.0) : recherche vide et aucune case cochée → le
+      bouton est grisé et un clic ne fait rien. Il s'allume dès la première lettre tapée (avant même que la liste se filtre)
+      ou à la première case cochée, et se grise de nouveau une fois tout effacé. Au clavier, il garde le focus après un
+      clic ou Entrée. Allumer ou éteindre « Fondateurs » ou « Partenaires » ne l'allume pas. Avec un lecteur d'écran, il est
+      lu « indisponible » quand il est grisé.
 
 ## 7. Scénarios de non-régression spécifiques à la 1.4.0
 
@@ -759,8 +794,10 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 - [ ] Chargement normal : aucun bandeau rouge sous la barre d'outils.
 - [ ] Renommer temporairement la table `Etablissements`, recharger le widget :
       bandeau « Impossible de charger l'annuaire depuis Grist (table
-      « Etablissements » illisible) », compteur « Chargement impossible ». Une
-      fois la table remise sous son nom, recharger : le bandeau disparaît.
+      « Etablissements » illisible). Cliquez sur « Réessayer »… » avec son bouton, compteur « Chargement impossible ».
+      « Réessayer » avec la table sous un autre nom : « Nouvelle tentative… », puis le bandeau revient avec « La nouvelle
+      tentative a échoué. ». Une fois la table remise sous son nom, « Réessayer » (ou recharger) fait disparaître le bandeau et
+      le focus passe au compteur (1.35.0).
 - [ ] Renommer temporairement la table `Actions`, recharger : les cartes
       restent affichées et le bandeau signale « Tables illisibles (Actions) ».
 - [ ] Renommer temporairement la colonne `ok_pour_apparaitre` d'`Etablissements`,
@@ -768,8 +805,11 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
       « ok_pour_apparaitre » absente de la table Etablissements »), pas un
       annuaire vide. Remettre son nom ensuite.
 - [ ] Décocher `Accepte_apparaitre` pour tout le monde, recharger : bandeau
-      « Personne n'a accepté d'apparaître… » et aucune carte. Renommer
-      temporairement la colonne : bandeau d'erreur qui la nomme, aucune carte.
+      « Personne n'a encore accepté d'apparaître dans l'annuaire. » et aucune carte (la console, `[GRIST] Personne n'a
+      accepté d'apparaître : …`, nomme la colonne ; l'écran « Aucun contact à afficher » le répète dessous). Renommer
+      temporairement la colonne : bandeau d'erreur qui la nomme, aucune carte. Vider `Etablissement` pour toute la table :
+      bandeau « Aucun contact ne peut s'afficher : aucun n'est rattaché à un établissement. Prévenez la personne qui gère
+      l'annuaire. » (depuis la 1.35.0 l'écran ne nomme plus la colonne : la console la garde).
 - [ ] Après modification de `ok_pour_apparaitre` dans `Etablissements`,
       **recharger le widget** (Grist ne le prévient pas, voir README « Limites
       connues ») puis vérifier le nombre de contacts et le badge de chaque carte.
@@ -814,11 +854,12 @@ console du navigateur ouverte.
       absent de l'annuaire » sans interrupteur, avec un seul bouton « Créer ma fiche » (section 19) ;
       la console l'explique sans citer d'adresse.
 - [ ] Règle d'accès qui refuse la modification de `BDD` pour ce compte : l'interrupteur
-      affiche « Grist a refusé la modification… » et reste dans son état réel.
+      affiche « Grist a refusé la modification : vos droits ne permettent pas de changer cette information. » (sans « Contactez
+      un administrateur » depuis la 1.35.0) et reste dans son état réel ; un lecteur d'écran l'annonce tout de suite (section 26).
 - [ ] Deux comptes dans deux navigateurs, widgets ouverts en même temps : chacun voit
       son propre nom.
 - [ ] Établissement non validé : la personne qui a accepté voit pourquoi sa fiche
-      reste masquée.
+      reste masquée (« … votre établissement n'a pas encore été validé. »).
 
 ## 12. Largeur du cadre (1.9.1)
 
@@ -828,7 +869,7 @@ iOS, Chrome Android) que les tests ne couvrent pas :
 
 - [ ] Largeur d'au moins 1400px : une seule rangée dans la barre d'outils
       (recherche, filtres, interrupteurs), trois colonnes de cartes, comme avant
-      la 1.9.1.
+      la 1.9.1 (jusqu'à 1 669 px ; à partir de 1 670 px, quatre ou cinq colonnes : section 26).
 - [ ] Réduire la section du widget (poignée entre deux sections de Grist) sous
       1400px : la recherche, les interrupteurs et « Réinitialiser » passent sur
       une première rangée, les filtres sur la largeur dessous.
@@ -1617,19 +1658,19 @@ Grist ne se charge pas ; le reste se lit ou se tabule.
       bouge pas sous le doigt. Dans un menu par groupe (Compétences, Tâches), rien ne bouge pendant qu'on coche, au
       clavier comme à la souris : les cases cochées passent devant à l'ouverture suivante.
 - [ ] **Une seule zone annoncée.** Avec un lecteur d'écran, taper un nom dans la recherche : il annonce le nombre de
-      contacts (« 3 contacts »), pas la liste des cartes.
+      contacts (« 3 sur 245 contacts » depuis la 1.34.0), pas la liste des cartes.
 - [ ] **Chargement.** Recharger la page de Grist en ralentissant le réseau (outils de développement, onglet « Réseau »,
       limitation) : tant que Grist n'a pas répondu, le compteur dit « Chargement… », sans « 0 contact » ni « Aucun
       contact trouvé », même si l'on tape dans la recherche ou si l'on change Fondateurs et Partenaires ; à l'arrivée de
       l'annuaire, la recherche tapée s'applique.
 - [ ] **Première lecture en échec** (sur une copie du document, section 10 : renommer `Etablissements`) : le bandeau rouge
-      s'affiche, le compteur dit « Chargement impossible » et taper une recherche ne fait pas apparaître « Aucun contact
-      trouvé » sous le message d'erreur.
+      s'affiche avec son bouton « Réessayer » (1.35.0), le compteur dit « Chargement impossible » et taper une recherche ne
+      fait pas apparaître « Aucun contact trouvé » sous le message d'erreur.
 - [ ] **Script de l'API de Grist bloqué.** Dans les outils de développement, onglet « Réseau », bloquer l'adresse
       `docs.getgrist.com` (si le Grist du document n'est pas sur ce domaine : sinon, bloquer seulement le script
       `grist-plugin-api.js`), puis recharger le widget : le bandeau rouge dit « Impossible de joindre Grist : le script de
-      son API (docs.getgrist.com) ne s'est pas chargé… », le compteur « Chargement impossible », et la console porte une
-      seule ligne `[GRIST] window.grist est absent`. Débloquer et recharger : tout revient.
+      son API (docs.getgrist.com) ne s'est pas chargé… » et le bouton « Recharger la page » (1.35.0), le compteur « Chargement impossible », et la console
+      porte une seule ligne `[GRIST] window.grist est absent`. Débloquer puis cliquer sur « Recharger la page » : tout revient.
 - [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles. Safari ne donne pas le focus à un bouton
       cliqué : un menu doit pourtant s'y refermer d'un clic ailleurs.
 
@@ -1656,7 +1697,8 @@ contient le cadre, et non le cadre, la barre ne restera pas en haut (premier poi
       560 px de haut), ou passer le zoom du navigateur à 200 % : la barre défile avec la page comme avant la 1.31.0 et ne
       cache rien au passage.
 - [ ] **La pastille « Haut de page ».** Dès que la place de la barre est passée, une pastille apparaît en bas à droite :
-      « N contacts » et un bouton « ↑ Haut de page ». Le nombre suit la recherche et les filtres. Le bouton remonte tout en
+      « N contacts » (« N sur M contacts » quand une recherche ou un filtre en écarte, 1.34.0) et un bouton « ↑ Haut de page » ; si les
+      deux ne tiennent pas côte à côte, le bouton passe sous le nombre. Le nombre suit la recherche et les filtres. Le bouton remonte tout en
       haut de la page (pas seulement jusqu'au compteur) et le focus du clavier revient au compteur ; de retour en haut, la
       pastille disparaît. Elle apparaît aussi dans un cadre étroit, sur une tablette et sur un téléphone (où la barre ne
       reste pas en haut), à 12 px des bords sur un téléphone. À regarder aussi, en bas de la liste : elle ne cache aucun
@@ -1678,7 +1720,8 @@ contient le cadre, et non le cadre, la barre ne restera pas en haut (premier poi
       Lecteur d'écran : il est annoncé comme un lien, en premier.
 - [ ] **La pastille, au lecteur d'écran.** Elle est lue comme un seul bouton « Haut de page » : le nombre de contacts qu'elle
       répète n'est pas lu une seconde fois (le compteur de la page reste la seule zone annoncée).
-- [ ] **Impression** (aperçu avant impression du navigateur) : ni la pastille ni le lien d'évitement n'apparaissent.
+- [ ] **Impression** (aperçu avant impression du navigateur) : ni la pastille ni le lien d'évitement n'apparaissent. Le reste de la
+      page imprimée est à la section 26.
 - [ ] **Toutes les étiquettes sont montrées.** La carte d'une personne qui a beaucoup de compétences ou d'actions les montre
       toutes : ni plafond, ni bouton « +N » (le plafond, constat U35, a été écarté par Antoine le 20 octobre 2026).
 - [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles. Ce sont eux qui disent si la barre fixe, la
@@ -1717,3 +1760,86 @@ l'écriture ; `tests/e2e.test.mjs` le joue sur le Grist simulé.
       Si le document a mille contacts ou plus, le compteur dit « 1 234 contacts » et ne se coupe pas au milieu du nombre.
 - [ ] **Firefox mobile et Safari (iPhone)** : les mêmes contrôles. Ce sont eux qui disent si le lien d'appel et les repères pour
       lecteur d'écran se comportent comme dans Chromium.
+
+## 26. Compteur, menus, bandeaux, grands écrans, impression et police (1.34.0 à 1.36.0)
+
+Réglages d'abord : aucun. À jouer dans le vrai Grist (d'abord sur une copie du document), au clavier seul puis avec un lecteur
+d'écran (NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkBack sous Android), sur un ordinateur, un très grand écran et un
+téléphone, puis avec une imprimante. **Ce protocole est le seul contrôle de ces points dans un vrai Grist, sur un vrai grand écran, une
+imprimante, Firefox, Safari, avec un vrai lecteur d'écran et sur un vrai téléphone : les tests des versions 1.34.0 à 1.36.0 jouent la
+page dans Chromium, sur un Grist simulé.** Ces onze constats mineurs de l'audit UI/UX ont été montrés en images avant/après à Antoine avant
+d'être fusionnés. À comparer avec `docs/images/filtre-competences.png`, `docs/images/recherche.png`, `docs/images/etat-vide.png` et
+`docs/images/bandeau-panne.png`.
+
+**Menus et compteur (1.34.0)**
+
+- [ ] **La recherche d'un menu reste en haut.** Ouvrir « Compétences », puis faire défiler la liste à la molette ou au doigt : le champ
+      de recherche reste collé en haut du menu, et le texte des cases qui passent dessous ne se lit pas à côté de lui. Même chose dans
+      un menu à plat assez long pour défiler (« Établissement », selon le nombre de lignes). Un menu court s'ouvre comme avant.
+- [ ] **Le clavier ne se cache pas sous elle.** Menu long ouvert, descendre de case en case avec Tab, puis remonter avec Maj+Tab :
+      la case qui a le focus n'est jamais cachée par le champ de recherche, anneau de focus compris.
+- [ ] **L'aide est écrite dans le menu.** « Compétences » : sous la recherche, « Cochez un domaine pour toutes ses compétences, ou
+      dépliez-le pour choisir parmi elles » ; « Tâches » : « Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi
+      elles ». Elle défile avec la liste, disparaît dès qu'on tape dans la recherche du menu et revient quand on l'efface ; un menu à
+      plat (Instances, Établissement, GT) n'en a pas. Avec un lecteur d'écran, elle est lue à l'ouverture du menu.
+- [ ] **Le compteur dit sur combien.** « 245 contacts » sans recherche ni filtre ; « 3 sur 245 contacts » dès qu'une recherche ou un
+      filtre en écarte ; éteindre « Partenaires » change le « 245 » (c'est ce que les interrupteurs laissent voir) sans changer la forme
+      du texte. Avec un lecteur d'écran, le nouveau nombre est annoncé à chaque recherche, une seule fois.
+- [ ] **« Réinitialiser » grisé.** Voir la section 6 : grisé au repos et sans effet, allumé dès la première lettre ou la première case,
+      grisé de nouveau une fois tout effacé, focus gardé, lu « indisponible » par le lecteur d'écran.
+- [ ] **La pastille « Haut de page » tient à l'écran.** Dans le cadre le plus étroit (320 à 360 px), avec « N sur M contacts », la
+      pastille reste entièrement à l'écran : le bouton passe sous le nombre quand les deux ne tiennent pas côte à côte.
+
+**Bandeaux et écrans vides (1.35.0)**
+
+- [ ] **Le bandeau « Ma présence » ne repousse pas les cartes.** Avec un compte identifié, recharger la page de Grist plusieurs fois,
+      dont une fois en ralentissant le réseau (outils de développement, onglet « Réseau », limitation), à plusieurs largeurs (section
+      étroite, tablette, téléphone, grand écran) : regarder la première carte pendant le chargement. Une copie grisée du bandeau, sans
+      texte lisible, tient sa place, puis le vrai bandeau la remplace sans que les cartes bougent. **Relever combien de temps la sonde
+      met dans ce Grist** (la copie grisée reste visible tant que l'identité est inconnue) et si les cartes sautent quand même : c'est le
+      point que les tests ne peuvent pas dire. Un bandeau plus haut que le cas courant (trois raisons de masquage, un administrateur ou un
+      responsable avec leurs boutons) repousse encore les cartes de la différence : c'est attendu.
+- [ ] **Pas de copie grisée quand elle n'a pas de sens.** Avec un compte Lecteur, rien n'apparaît puis ne disparaît ; avec un compte non
+      identifié, ou si l'annuaire ne se charge pas, la place est rendue. Au clavier, Tab ne s'arrête jamais sur la copie ; un lecteur
+      d'écran ne la lit pas.
+- [ ] **Les messages de « Ma présence » sont en clair.** Établissement non validé : « Vous avez accepté d'apparaître, mais votre fiche
+      reste masquée : votre établissement n'a pas encore été validé. » (sans « Contactez un administrateur »). Règle d'accès qui refuse la
+      modification : « Grist a refusé la modification : vos droits ne permettent pas de changer cette information. ». Colonne
+      `Accepte_apparaitre` devenue une formule (sur une copie) : « La modification n'a pas pu être enregistrée. Réessayez ; … » à l'écran,
+      et la console dit `[PRESENCE] La colonne Accepte_apparaitre est une colonne à formule…`.
+- [ ] **Un échec d'écriture est annoncé tout de suite.** Avec un lecteur d'écran, provoquer un refus (règle d'accès) : le message est
+      annoncé aussitôt, alors que « Enregistrement… » et les confirmations sont annoncés poliment, à la fin de la phrase en cours.
+- [ ] **« Réessayer » (section 10).** Au clavier : Tab jusqu'au bouton, Entrée ; il dit « Nouvelle tentative… » et garde le focus ; si
+      l'essai échoue, le message ajoute « La nouvelle tentative a échoué. » et le focus est encore sur le bouton ; si l'essai réussit, le
+      bandeau part et le focus est sur le compteur. Un lecteur d'écran annonce le bandeau quand il apparaît.
+- [ ] **« Recharger la page »** (script de l'API de Grist bloqué, section 23) : le bouton recharge le widget.
+- [ ] **L'écran « Aucun contact » dit pourquoi.** (a) Annuaire sans contact (copie du document, `Accepte_apparaitre` décoché pour tous) :
+      « Aucun contact à afficher » et « L'annuaire ne contient aucun contact pour le moment. », sous le bandeau qui l'explique ;
+      (b) « Fondateurs » et « Partenaires » éteints : « Aucun contact affiché » et « Ni « Fondateurs » ni « Partenaires » n'est activé :
+      activez-en un pour voir des contacts. » ; (c) le nom d'un contact d'un partenaire, cherché avec « Partenaires » éteint : « Aucun
+      contact trouvé » et « Parmi les fondateurs, aucun contact ne correspond. Activez « Partenaires » pour voir 1 résultat. » ; (d) un nom
+      qui n'existe pas : « Aucun contact trouvé » et « Modifiez votre recherche ou réinitialisez les filtres. ».
+
+**Bord des champs, très grand écran, impression et police (1.36.0)**
+
+- [ ] **Le bord des champs se voit.** Sur le fond blanc de la page : le champ de recherche vide, les boutons de filtre, le champ de
+      recherche d'un menu, l'interrupteur Fondateurs/Partenaires et, dans les fenêtres de modification, les champs, les listes
+      déroulantes et leurs recherches ont un bord gris-bleu net, que l'on repère sans le chercher ; le bouton allumé de l'interrupteur
+      a un contour violet intérieur. Les cartes, les filets et les cadres des menus et des fenêtres gardent leur bord pâle. À regarder
+      sur un écran peu lumineux ou en plein jour.
+- [ ] **Très grand écran.** Dans une section du widget d'au moins 1 670 px de large (écran 4K ou plein écran) : quatre colonnes à
+      1 920 px, cinq à partir de 2 090 px environ, des cartes de 393 à 487 px environ ; la page garde ses marges et rien ne déborde.
+      Sous 1 670 px, rien n'a changé : trois colonnes (section 12).
+- [ ] **Impression** (aperçu avant impression, ou « Enregistrer au format PDF », dans Chromium, Firefox et Safari ; puis sur une vraie
+      imprimante) : ni barre d'outils, ni bandeau « Ma présence », ni bande du mode admin, ni boutons « Modifier » ou « Réessayer », ni
+      lien d'évitement, ni pastille « Haut de page » ; pas de fond de page ni d'ombre ; chaque carte entière sur sa page, jamais coupée,
+      et dessinée en entier (aucune carte vide sous son texte) ; les pastilles, les initiales et les badges d'établissement sans logo en
+      texte foncé sur blanc avec un bord ; marges de 12 mm. **Relever** si le résultat se lit en noir et blanc et si les pastilles, qui
+      perdent leur couleur sur le papier (même avec l'option « graphiques d'arrière-plan »), restent distinguables.
+- [ ] **La police Inter se charge.** Outils de développement, onglet « Réseau », filtre « Polices » : les quatre fichiers
+      `inter-400.woff2`, `inter-600.woff2`, `inter-700.woff2` et `inter-800.woff2` arrivent de l'adresse du widget (statut 200), sans
+      appel à un service de polices, et la console n'a aucune violation de la politique de sécurité de contenu (section 22). Le texte
+      est dessiné en Inter (titre, noms, libellés des filtres). **Dans le vrai Grist** (le widget est dans un cadre `sandbox`), les
+      quatre fichiers doivent se charger aussi : un refus apparaît dans l'onglet « Réseau », et le texte reste alors lisible dans la police
+      du système (retour en arrière : retirer les quatre `@font-face` de `style.css`).
+- [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles, impression comprise.
