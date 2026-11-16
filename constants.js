@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.41.1';
+export const VERSION = '1.41.2';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -133,12 +133,11 @@ export const DOCS_URL = 'https://github.com/lombre33/Annuaire_PUI_Bordeaux#docum
 //   optional      sur un regroupement : sa colonne est facultative. Absente ou
 //                 vide dans Grist, le menu n'a pas cet onglet, sans bandeau
 //                 d'erreur ni avertissement (la console le dit)
-//   referential   sur un regroupement : sa colonne porte les codes d'un référentiel
-//                 (des numéros, « — aucune correspondance — »), pas des noms de
-//                 groupe. Une valeur qui dit « rien » (vide, 0, « aucune
-//                 correspondance », « n/a »…) n'est pas un groupe : la ligne reste
-//                 hors de ce rangement. Un numéro se lit « N° 13 », jamais « 13 »
-//                 seul (voir referentialLabel dans grist-data.js)
+//   referential   sur un regroupement : sa colonne est une Référence vers une table de référentiel, { table, field } (1.41.2) : la table
+//                 qui nomme les groupes et sa colonne de libellé. Grist n'envoie que le numéro de ligne de cette table (3, 13…), jamais son
+//                 libellé : le groupe prend le libellé de cette ligne. Une valeur qui ne nomme rien n'est pas un groupe : 0 (une Référence
+//                 vide), le texte « — aucune correspondance — » qu'une Référence invalide garde, une ligne introuvable ou sans libellé.
+//                 La ligne reste alors hors de ce rangement. Jamais de numéro nu comme titre (voir referentialLabel dans grist-data.js)
 //   numberedIn    sur un regroupement sans colonne à lire (ses `field` sont ceux
 //                 des lignes qu'il range, qu'on ne relit pas) : le numéro avant
 //                 le point du libellé d'une ligne (« 1.3 Animer le réseau ») est
@@ -173,12 +172,14 @@ export const CATEGORIES = {
   },
   // Le rangement des compétences par le référentiel C.U.R.I.E (colonne facultative `referenciel_C_U_R_I_E` de la table Competences, 1.38.0) :
   // le second onglet du menu Compétences. Même table, même colonne de BDD et mêmes valeurs que le rangement par domaine, seul le groupe change.
-  // Un groupe par valeur de la colonne, sans rien inventer : dans le document d'Antoine (capture du 16 novembre 2026) elle porte des numéros
-  // (0, 3, 13…) et « — aucune correspondance — », d'où `referential` ; sans `fallback`, une compétence que le référentiel ne classe pas
-  // n'est pas montrée sous cet onglet (1.41.1), elle l'est sous « Classique ».
+  // Un groupe par ligne du référentiel : dans le document d'Antoine, `referenciel_C_U_R_I_E` est une Référence vers la table
+  // `Referentiel_competences_CURIE` (colonne `Competence`), et Grist n'envoie que le numéro de ligne (3, 13…) : la 1.38.0 et la 1.41.1 le
+  // montraient tel quel (« 13 », puis « N° 13 »), ce qui ne dit rien à personne (1.41.2). Sans `fallback`, une compétence que le référentiel
+  // ne classe pas n'est pas montrée sous cet onglet (1.41.1), elle l'est sous « Classique ».
   curie: {
     label: 'C.U.R.I.E', color: '#00697f', table: 'Competences', field: ['referenciel_C_U_R_I_E'], column: 'Competences',
-    groups: 'competences', tab: 'C.U.R.I.E', optional: true, referential: true,
+    groups: 'competences', tab: 'C.U.R.I.E', optional: true,
+    referential: { table: 'Referentiel_competences_CURIE', field: ['Competence'] },
     hint: 'Cochez un groupe C.U.R.I.E pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
     placeholder: 'Groupe ou compétence…'
   },
@@ -242,11 +243,12 @@ export const TAG_GROUPS = TAG_KEYS.map(withKey);
 
 // Tables de référence à lire, chacune une seule fois même si plusieurs
 // catégories s'y appuient.
-export const REFERENCE_TABLES = [...new Set(Object.values(CATEGORIES).map(({ table }) => table))];
+// Celle d'un référentiel (`referential`) se lit aussi : c'est elle qui nomme les groupes.
+export const REFERENCE_TABLES = [...new Set(Object.values(CATEGORIES).flatMap(({ table, referential }) => (referential ? [table, referential.table] : [table])))];
 
 // Un libellé à lire par catégorie : { key, table, field } avec `corrected` si sa première colonne est
 // le libellé corrigé et, pour un regroupement, { groups, fallback } avec, s'il se déduit des numéros,
-// numberedIn, si sa colonne est facultative, optional, et si elle porte des codes de référentiel, referential.
+// numberedIn, si sa colonne est facultative, optional, et si c'est une Référence vers une table de référentiel, referential ({ table, field }).
 export const REFERENCE_SOURCES = Object.entries(CATEGORIES)
   .map(([key, { table, field, corrected, groups, fallback, numberedIn, optional, referential }]) => ({
     key, table, field, ...(corrected && { corrected }),

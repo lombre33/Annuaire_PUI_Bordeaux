@@ -4,7 +4,7 @@ import { loadDirectory, DirectoryLoadError, describeLoadFailure } from '../grist
 import { FILTERS } from '../constants.js';
 import { computeFilterCounts, createEmptyFilterState, filterContacts, menuGroups, menuViews } from '../filters.js';
 import {
-  sampleTables, unrankableTaskTables, withCurie, withCurieCodes, withDuplicateCHU, withoutOptionalColumns, withTaskActions, DEFAULT_CARD_NAMES,
+  CURIE, NO_CURIE_MATCH, sampleTables, unrankableTaskTables, withCurie, withCurieCodes, withDuplicateCHU, withoutOptionalColumns, withTaskActions, DEFAULT_CARD_NAMES,
   HOSTILE_FIRST_NAME
 } from './fixtures.mjs';
 
@@ -64,8 +64,9 @@ test('loadDirectory reads the tables of the new structure and none of the old on
   const docApi = fakeDocApi(sampleTables());
   await loadDirectory(docApi, { log: recordingLog() });
   assert.deepEqual(Object.keys(docApi.calls).sort(), [
-    'Actions', 'BDD', 'Communautes', 'Competences', 'Etablissements', 'GT', 'INSTANCES', 'Role_Dans_le_PUI', 'Taches'
+    'Actions', 'BDD', 'Communautes', 'Competences', 'Etablissements', 'GT', 'INSTANCES', 'Referentiel_competences_CURIE', 'Role_Dans_le_PUI', 'Taches'
   ]);
+  // La table du référentiel C.U.R.I.E est demandée même quand le document n'en a pas : facultative, sa lecture ratée ne dit rien au bandeau.
 });
 
 test('loadDirectory resolves reference tables, preferring the corrected label over the raw one', async () => {
@@ -380,13 +381,13 @@ test('loadDirectory gives each contact the C.U.R.I.E groups of its skills, once 
   const log = recordingLog();
   const { contacts, referenceMaps, issues } = await loadDirectory(docApi, { log });
   assert.equal(docApi.calls.Competences, 1, 'la même table, lue une seule fois');
-  assert.deepEqual(referenceMaps.curie, { 1: 'N° 3', 2: 'N° 13', 3: 'N° 13' },
-    'un numéro se lit « N° 13 », pas « 13 » ; « — aucune correspondance — » n\'est pas un groupe : la compétence 4 n\'en a pas');
+  assert.deepEqual(referenceMaps.curie, { 1: CURIE.projet, 2: CURIE.innovation, 3: CURIE.innovation },
+    'le groupe porte le libellé de la ligne du référentiel que la colonne désigne (3, 13), pas son numéro ; « — aucune correspondance — » n\'est pas un groupe : la compétence 4 n\'en a pas');
   assert.deepEqual(referenceMaps.macro, { 1: 'Cancérologie', 2: 'Cancérologie', 3: 'Pharmacie', 4: 'Autres' }, 'les domaines restent ceux d\'avant');
   const byName = Object.fromEntries(contacts.map(c => [c.nom, c.labels]));
-  assert.deepEqual(byName.Martin.curie, ['N° 3', 'N° 13'], 'Ana : une compétence dans chaque groupe');
+  assert.deepEqual(byName.Martin.curie, [CURIE.projet, CURIE.innovation], 'Ana : une compétence dans chaque groupe');
   assert.deepEqual(byName.Martin.macro, ['Cancérologie'], 'les mêmes deux compétences sont d\'un seul domaine');
-  assert.deepEqual(byName.Durand.curie, ['N° 13']);
+  assert.deepEqual(byName.Durand.curie, [CURIE.innovation]);
   assert.deepEqual(byName['Bergonié'].curie, [], 'sa seule compétence n\'a pas de correspondance : aucun groupe C.U.R.I.E (elle reste sous « Autres »)');
   assert.deepEqual(byName['Bergonié'].macro, ['Autres']);
   assert.deepEqual(byName.Bernard.curie, [], 'aucune compétence : aucun groupe');
@@ -401,7 +402,7 @@ test('loadDirectory offers the skills menu both rankings once the column is fill
   const { referenceMaps } = await load(withCurie());
   const skills = FILTERS.find(filter => filter.key === 'competences');
   assert.deepEqual(menuViews(skills, referenceMaps).map(view => view.grouping), ['macro', 'curie']);
-  assert.deepEqual(menuGroups(skills, referenceMaps, 'curie').map(group => group.label), ['N° 3', 'N° 13'], 'dans l\'ordre des numéros, sans groupe pour ce que la colonne ne classe pas');
+  assert.deepEqual(menuGroups(skills, referenceMaps, 'curie').map(group => group.label), [CURIE.projet, CURIE.innovation], 'dans l\'ordre alphabétique des libellés, sans groupe pour ce que la colonne ne classe pas');
 });
 
 test('loadDirectory without the referenciel_C_U_R_I_E column offers no C.U.R.I.E ranking: no banner, no warning, only a line in the console', async () => {
@@ -448,36 +449,69 @@ test('loadDirectory keeps the C.U.R.I.E groups with the skills when the Competen
   assert.deepEqual(stillWithout.referenceMaps.curie, {}, 'une lecture ratée n\'invente aucun groupe');
 });
 
-// Les valeurs du vrai document (capture d'Antoine, 16 novembre 2026) : des numéros et « — aucune correspondance — », pas des noms de groupe.
-// La 1.38.0 en faisait des groupes « — aucune correspondance — », « 0 », « 3 », « 13 » ; elle passait ses tests, parce qu'ils avaient des
-// noms imaginés (« Groupe C »).
-test('loadDirectory with the codes of the real referenciel_C_U_R_I_E column: a number is « N° 3 », nothing (« — aucune correspondance — », 0) is not a group', async () => {
+// Le vrai document (structure et capture d'Antoine, 16 novembre 2026) : `referenciel_C_U_R_I_E` est une Référence vers `Referentiel_competences_CURIE`,
+// Grist envoie des numéros de ligne (3, 13…), 0 pour une Référence vide et « — aucune correspondance — » pour une Référence invalide. La 1.38.0
+// en faisait des groupes « — aucune correspondance — », « 0 », « 3 », « 13 » ; la 1.41.1 des « N° 3 » : Antoine n'y comprenait rien. Elles
+// passaient leurs tests, qui avaient des noms imaginés (« Groupe C ») puis des numéros pris pour les groupes eux-mêmes.
+test('loadDirectory with the real referenciel_C_U_R_I_E Reference: a group is named by the row of the referential, nothing (« — aucune correspondance — », 0) is not a group', async () => {
   const log = recordingLog();
   const { referenceMaps, contacts, issues } = await loadDirectory(fakeDocApi(withCurieCodes()), { log });
   assert.deepEqual(referenceMaps.curie, {
-    7: 'N° 3', 8: 'N° 3', 9: 'N° 3', 10: 'N° 13', 11: 'N° 13', 12: 'N° 7', 13: 'N° 7', 14: 'N° 12'
-  }, 'les compétences 1 à 4 (« — aucune correspondance — ») et 5 et 6 (« 0 ») n\'ont pas de groupe');
+    7: CURIE.projet, 8: CURIE.projet, 9: CURIE.projet, 10: CURIE.innovation, 11: CURIE.innovation, 12: CURIE.animation, 13: CURIE.animation, 14: CURIE.donnees
+  }, 'les compétences 1 à 4 (« — aucune correspondance — ») et 5 et 6 (0) n\'ont pas de groupe');
   const skills = FILTERS.find(filter => filter.key === 'competences');
   const groups = menuGroups(skills, referenceMaps, 'curie');
-  assert.deepEqual(groups.map(group => group.label), ['N° 3', 'N° 7', 'N° 12', 'N° 13'], 'dans l\'ordre des numéros, pas des chiffres');
-  assert.deepEqual(groups[0].values, ['Compétence 7', 'Compétence 8', 'Compétence 9']);
-  assert.ok(groups.every(group => !/^\d+$/.test(group.label)), 'aucun titre n\'est un numéro nu');
+  assert.deepEqual(groups.map(group => group.label), [CURIE.animation, CURIE.projet, CURIE.innovation, CURIE.donnees], 'dans l\'ordre alphabétique des libellés');
+  assert.ok(!groups.some(group => group.label === CURIE.collaboration), 'la ligne 16 du référentiel n\'a aucune compétence : pas de groupe vide');
+  assert.deepEqual(groups[0].values, ['Compétence 12', 'Compétence 13']);
+  assert.deepEqual(groups[1].values, ['Compétence 7', 'Compétence 8', 'Compétence 9']);
+  assert.ok(groups.every(group => !/^(?:N° )?\d+$/.test(group.label)), 'aucun titre n\'est un numéro, nu ou « N° 13 »');
   assert.ok(groups.every(group => !/aucun/i.test(group.label)), 'aucun titre ne dit « aucun »');
   const domains = menuGroups(skills, referenceMaps);
   assert.equal(domains.length, 3, 'le rangement par domaine garde toutes les compétences, celles que C.U.R.I.E ne classe pas aussi');
   assert.ok(domains.flatMap(group => group.values).includes('Compétence 1'), 'une compétence sans correspondance reste trouvable sous « Classique »');
   const byName = Object.fromEntries(contacts.map(c => [c.nom, c.labels.curie]));
-  assert.deepEqual(byName.Martin, ['N° 3', 'N° 13'], 'Ana : les compétences 7 et 10 (les 1 et 5 n\'ont pas de groupe)');
-  assert.deepEqual(byName['Bergonié'], ['N° 3'], 'Gina : la compétence 9 (la 3 n\'a pas de groupe)');
+  assert.deepEqual(byName.Martin, [CURIE.projet, CURIE.innovation], 'Ana : les compétences 7 et 10 (les 1 et 5 n\'ont pas de groupe)');
+  assert.deepEqual(byName['Bergonié'], [CURIE.projet], 'Gina : la compétence 9 (la 3 n\'a pas de groupe)');
   assert.deepEqual(issues, []);
   assert.deepEqual(aboutSkills(log.warnings), []);
-  const read = log.infos.find(args => String(args[0]).startsWith('[REFS] curie'));
+  const read = log.infos.find(args => String(args[0]).startsWith('[REFS] curie (Competences)'));
   assert.ok(read && String(read[0]).includes('6 ligne(s) sans referenciel_C_U_R_I_E'), 'la console dit combien de compétences la colonne laisse de côté');
+  assert.ok(log.infos.some(args => String(args[0]).startsWith('[REFS] curie (Referentiel_competences_CURIE)') && String(args[0]).includes('5 libellé(s)')), 'et combien de lignes du référentiel ont un libellé');
+});
+
+test('loadDirectory never makes a group of a number the referential does not name: a row it lacks, a row without a label', async () => {
+  const tables = withCurie();
+  tables.Referentiel_competences_CURIE.Competence[1] = ''; // la ligne 13 n'a pas de libellé
+  tables.Competences.referenciel_C_U_R_I_E = [3, 13, 99, 3]; // 13 : sans libellé ; 99 : une ligne que le référentiel n'a pas
+  const { referenceMaps, issues } = await load(tables);
+  assert.deepEqual(referenceMaps.curie, { 1: CURIE.projet, 4: CURIE.projet }, 'ni « 13 », ni « N° 13 », ni « 99 » : ces compétences n\'ont pas de groupe');
+  assert.deepEqual(issues, []);
+});
+
+test('loadDirectory without the table of the referential cannot name the numbers: no C.U.R.I.E ranking, no banner, the console says why', async () => {
+  const tables = withCurie();
+  delete tables.Referentiel_competences_CURIE;
+  const log = recordingLog();
+  const { contacts, referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
+  assert.deepEqual(referenceMaps.curie, {}, 'des numéros qu\'aucune table ne nomme ne font pas de groupe');
+  assert.deepEqual(issues, [], 'la table du référentiel est facultative comme sa colonne : aucun bandeau');
+  assert.deepEqual(aboutSkills(log.warnings), []);
+  assert.ok(log.infos.some(args => String(args[0]).includes('Referentiel_competences_CURIE')), 'mais la console le dit');
+  assert.ok(contacts.every(c => c.labels.curie.length === 0));
+  const skills = FILTERS.find(filter => filter.key === 'competences');
+  assert.deepEqual(menuViews(skills, referenceMaps).map(view => view.grouping), ['macro'], 'le menu reste celui d\'avant, sans onglets');
+});
+
+test('loadDirectory with a table of the referential that Grist cannot read: same, and no banner', async () => {
+  const { referenceMaps, issues } = await load(withCurie(), { docApi: { failing: ['Referentiel_competences_CURIE'] } });
+  assert.deepEqual(referenceMaps.curie, {});
+  assert.deepEqual(issues, []);
 });
 
 test('loadDirectory with a referenciel_C_U_R_I_E column that only says « no match » offers no C.U.R.I.E ranking, like an empty one', async () => {
   const tables = withCurie();
-  tables.Competences.referenciel_C_U_R_I_E = ['— aucune correspondance —', '0', ' aucune correspondance ', 'N/A'];
+  tables.Competences.referenciel_C_U_R_I_E = [NO_CURIE_MATCH, 0, ' aucune correspondance ', 'N/A'];
   const log = recordingLog();
   const { contacts, referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
   assert.deepEqual(referenceMaps.curie, {});

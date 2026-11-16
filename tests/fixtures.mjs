@@ -98,31 +98,53 @@ export function withoutOptionalColumns(tables) {
 }
 
 // Le référentiel C.U.R.I.E (1.38.0) : la colonne facultative `referenciel_C_U_R_I_E` de Competences, qui range les compétences d'une autre
-// façon que les domaines. Ses valeurs sont celles du VRAI document (capture d'Antoine du 16 novembre 2026, 1.41.1) : du texte, des numéros
-// (« 3 », « 13 ») et « — aucune correspondance — », pas des noms de groupe. Les tests de la 1.38.0 avaient des noms que j'avais imaginés
-// (« Groupe C », « Groupe U ») : ils passaient, et le menu montrait des numéros nus et un « — aucune correspondance — » en tête.
+// façon que les domaines. Comme dans le VRAI document (structure et capture d'Antoine du 16 novembre 2026, 1.41.2), c'est une Référence vers la
+// table `Referentiel_competences_CURIE` (colonne `Competence`) : Grist n'envoie que le numéro de ligne de cette table (3, 13…), 0 quand la
+// Référence est vide, et le texte « — aucune correspondance — » quand elle est invalide. Les tests de la 1.38.0 avaient des noms de groupe que
+// j'avais imaginés (« Groupe C ») ; ceux de la 1.41.1 avaient des numéros qu'ils croyaient être les groupes : le menu montrait « N° 13 ».
+// Les libellés des lignes sont ceux de sa capture, avec ses numéros de ligne (3, 13, 15, 16, 18).
+export const CURIE = {
+  projet: 'Compétences en gestion de projet.', // ligne 3
+  innovation: 'Connaissance de l’écosystème d’innovation.', // ligne 13
+  donnees: 'Maîtrise des outils de visualisation et de traitement de données.', // ligne 15
+  collaboration: 'Connaissance des dispositifs de collaboration public/privé.', // ligne 16 : aucune compétence ne l'a
+  animation: 'Animation de sessions collectives ou d’accompagnement individuel.' // ligne 18
+};
+export const NO_CURIE_MATCH = '— aucune correspondance —';
+
+// La table du référentiel, telle que Grist l'envoie.
+export function curieTable() {
+  return {
+    id: [3, 13, 15, 16, 18],
+    Competence: [CURIE.projet, CURIE.innovation, CURIE.donnees, CURIE.collaboration, CURIE.animation]
+  };
+}
+
 // Avec ces données (périmètre par défaut ; Bob est partenaire) :
-//   N° 3   → Oncologie (Ana)
-//   N° 13  → Hématologie (Ana) et Pharmacovigilance (Bob)
+//   « Compétences en gestion de projet. »         → Oncologie (Ana)
+//   « Connaissance de l’écosystème d’innovation. » → Hématologie (Ana) et Pharmacovigilance (Bob)
 //   (rien) → Divers (Gina) : « — aucune correspondance — » n'est pas un groupe, la compétence reste sous « Classique »
 // Les domaines restent ceux de la base (Cancérologie : Oncologie, Hématologie ; Pharmacie : Pharmacovigilance ; Autres : Divers), de quoi
 // voir qu'un groupe C.U.R.I.E coupe un domaine en deux.
 export function withCurie(tables = sampleTables()) {
   const copy = structuredClone(tables);
-  copy.Competences.referenciel_C_U_R_I_E = ['3', '13', '13', '— aucune correspondance —'];
+  copy.Referentiel_competences_CURIE = curieTable();
+  copy.Competences.referenciel_C_U_R_I_E = [3, 13, 13, NO_CURIE_MATCH];
   return copy;
 }
 
 // Le même référentiel avec de quoi remplir un menu, comme dans le document d'Antoine : quatorze compétences (« Compétence 1 » à
-// « Compétence 14 ») dont la colonne dit, dans l'ordre, quatre fois « — aucune correspondance — », « 0 » deux fois, « 3 » trois fois,
-// « 13 » deux fois, « 7 » deux fois et « 12 », dans le désordre des numéros. Ana porte les compétences 1, 5, 7 et 10, Bob les 2, 8 et 12 et
-// Gina les 3 et 9. Groupes attendus sous « C.U.R.I.E », dans l'ordre des numéros : N° 3 (compétences 7, 8, 9), N° 7 (12, 13), N° 12 (14),
-// N° 13 (10, 11) ; « 0 » et « — aucune correspondance — » (compétences 1 à 6) n'y sont pas, et restent sous « Classique ».
+// « Compétence 14 ») dont la colonne dit, dans l'ordre, quatre fois « — aucune correspondance — », 0 deux fois (la Référence vide), la ligne 3
+// trois fois, la 13 deux fois, la 18 deux fois et la 15 une fois, dans le désordre des numéros ; la ligne 16 du référentiel n'a aucune
+// compétence. Ana porte les compétences 1, 5, 7 et 10, Bob les 2, 8 et 12 et Gina les 3 et 9. Groupes attendus sous « C.U.R.I.E », dans l'ordre
+// alphabétique de leur libellé : Animation (compétences 12, 13), Compétences en gestion de projet (7, 8, 9), Connaissance de l’écosystème
+// d’innovation (10, 11), Maîtrise des outils (14) ; la compétence 1 à 6 (« — aucune correspondance — » et 0) n'y est pas, et reste sous
+// « Classique ».
 export function withCurieCodes(tables = sampleTables()) {
   const copy = structuredClone(tables);
   const values = [
-    '— aucune correspondance —', '— aucune correspondance —', '— aucune correspondance —', '— aucune correspondance —',
-    '0', '0', '3', '3', '3', '13', '13', '7', '7', '12'
+    NO_CURIE_MATCH, NO_CURIE_MATCH, NO_CURIE_MATCH, NO_CURIE_MATCH,
+    0, 0, 3, 3, 3, 13, 13, 18, 18, 15
   ];
   const domains = ['Cancérologie', 'Pharmacie', 'Autres'];
   copy.Competences = {
@@ -132,6 +154,7 @@ export function withCurieCodes(tables = sampleTables()) {
     Macro_competences: values.map((_, index) => domains[index % domains.length]),
     referenciel_C_U_R_I_E: values
   };
+  copy.Referentiel_competences_CURIE = curieTable();
   copy.BDD.Competences[0] = ['L', 1, 5, 7, 10]; // Ana
   copy.BDD.Competences[1] = ['L', 2, 8, 12]; // Bob
   copy.BDD.Competences[8] = ['L', 3, 9]; // Gina

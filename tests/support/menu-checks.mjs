@@ -15,13 +15,13 @@ export async function menuLabels(filter) {
   });
 }
 
-// Un menu lisible : aucun libellé vide, aucun libellé qui ne soit qu'un nombre (un titre « 13 » ne dit rien à personne), aucun qui dise « rien »
+// Un menu lisible : aucun libellé vide, aucun libellé qui ne soit qu'un numéro (un titre « 13 » ou « N° 13 » ne dit rien à personne), aucun qui dise « rien »
 // (« — aucune correspondance — », « 0 », « n/a » : ce n'est pas un choix), aucun qui commence ou finisse par un tiret, et un groupe n'apparaît
 // qu'une fois. Une valeur peut figurer sous deux groupes (la même compétence sous deux domaines) mais pas deux fois sous le même.
 export function assertReadableMenu({ groups, options }, where) {
   [...groups, ...options].forEach(label => {
     assert.ok(label !== '', `${where} : un libellé est vide`);
-    assert.ok(!/^\d+$/.test(label), `${where} : « ${label} » n'est qu'un nombre, il ne dit pas ce qu'il désigne`);
+    assert.ok(!/^(?:N°\s*)?\d+$/.test(label), `${where} : « ${label} » n'est qu'un numéro, il ne dit pas ce qu'il désigne`);
     assert.ok(!isNoMatch(label), `${where} : « ${label} » dit « rien » : ce n'est pas un choix à montrer`);
     assert.ok(!/^[-–—]|[-–—]$/.test(label), `${where} : « ${label} » commence ou finit par un tiret`);
   });
