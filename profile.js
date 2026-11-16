@@ -236,7 +236,7 @@ export function profileFormModel(row, referenceMaps, { admin = false, creating =
     const base = {
       key: field.key, label: field.label, kind: field.kind,
       ...(field.category && { category: field.category }), ...(field.required && { required: true }),
-      ...(field.optional && { optional: true })
+      ...(field.optional && { optional: true }), ...(field.companionOf && { companionOf: field.companionOf })
     };
     if (field.kind === 'text' || field.kind === 'email') return { ...base, value: text(row[field.key]) };
     if (field.kind === 'image') return { ...base, value: avatarIdOf(row[field.key]) };

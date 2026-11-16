@@ -534,6 +534,40 @@ textarea {
   font-size: 11.5px;
   font-weight: 800;
 }
+/* « Responsable de » (1.40.0) : une case par action que la personne a choisie, sous la liste des actions. */
+.resp-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.resp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+}
+.resp-row[hidden] {
+  display: none;
+}
+.resp-row input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  --check-color: var(--c);
+}
+.resp-row:has(input:checked) {
+  border-color: var(--c);
+}
+.resp-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
 /* Relecture : la carte avant, la carte après, les changements repérés sur « Après ». La
    fenêtre s'élargit pour que les deux cartes tiennent côte à côte. */

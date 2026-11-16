@@ -2,7 +2,7 @@
 // filter-menus.js.
 
 import { ETABLISSEMENT_TABLE, TAG_GROUPS, FILTERS } from './constants.js';
-import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, normalize, ownValue, refId, shownEmail, taskActionNumber, telHref } from './grist-data.js';
+import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, normalize, ownValue, refId, shownEmail, tagText, taskActionNumber, telHref } from './grist-data.js';
 import { el, glyph, isFocusVisible } from './dom.js';
 import { createLogoImage, fitCardLogo } from './branding-ui.js';
 import { createAvatar } from './avatar-ui.js';
@@ -151,14 +151,16 @@ function fillEmail(link, email, linked) {
 const roleNote = roles => `${roles.length > 1 ? 'Rôles' : 'Rôle'} : ${roles.join(', ')}`;
 
 // Un tag d'une catégorie sans filtre serait fait de <span> non cliquables : un bouton qui ne
-// filtre rien induirait en erreur. Il en va de même sans `onToggle` (carte de relecture).
-function buildTag(group, value, onToggle, isNew, roles) {
+// filtre rien induirait en erreur. Il en va de même sans `onToggle` (carte de relecture). `value` est ce que le
+// filtre lit au clic ; `shown`, ce que la pastille écrit quand ce n'est pas le même texte (« Responsable de
+// l'action 1.2 » pour le rôle « Responsable d'une action », voir tagText).
+function buildTag(group, value, onToggle, isNew, roles, shown = value) {
   const filterable = Boolean(onToggle) && FILTERABLE_KEYS.has(group.key);
   const tag = document.createElement(filterable ? 'button' : 'span');
   if (filterable) tag.type = 'button';
   tag.className = filterable ? `tag tag-${group.key}` : `tag tag-${group.key} tag-static`;
   tag.style.backgroundColor = group.color;
-  tag.textContent = value;
+  tag.textContent = shown;
   if (roles?.length) {
     tag.classList.add('has-note');
     tag.append(' ', el('span', 'tag-note', roleNote(roles)));
@@ -200,6 +202,7 @@ function actionRows(entries) {
 // Un groupe nommé et non un titre : chaque carte comptait jusqu'à six titres de niveau 3, des centaines de titres de plus dans le plan
 // de la page (audit UI/UX, U23). Le titre reste à l'écran ; un lecteur d'écran entend le nom du groupe en y entrant, pas deux fois.
 function buildTagGroup(group, labels, onToggle, change, roles) {
+  // `labels` : { label, text } pour chaque valeur de la personne, `change` ce que la relecture y repère (des textes, voir diffContacts).
   const section = el('div', 'tag-group');
   section.setAttribute('role', 'group');
   section.setAttribute('aria-label', group.label);
@@ -212,7 +215,7 @@ function buildTagGroup(group, labels, onToggle, change, roles) {
   const values = document.createElement('div');
   values.className = 'tag-group-values';
   const entries = [
-    ...labels.map(value => ({ value, tag: buildTag(group, value, onToggle, added.has(normalize(value)), ownValue(roles, normalize(value))) })),
+    ...labels.map(({ label, text }) => ({ value: label, tag: buildTag(group, label, onToggle, added.has(normalize(text)), ownValue(roles, normalize(label)), text) })),
     ...(change?.removed ?? []).map(value => ({ value, tag: buildRemovedTag(group, value) }))
   ];
   if (group.key === 'taches') {
@@ -243,7 +246,7 @@ function makeToolbar(container, contact) {
 
 function fillTags(container, contact, onToggle, changes) {
   TAG_GROUPS.forEach(group => {
-    const labels = labelsOf(contact, group.key);
+    const labels = labelsOf(contact, group.key).map(label => ({ label, text: tagText(contact, group.key, label) }));
     const change = changes?.[group.key];
     if (labels.length > 0 || change?.removed.length > 0) {
       // Le rôle dans une tâche ne se lit que dans l'annuaire, pas sur une carte de relecture (sans `onToggle`).

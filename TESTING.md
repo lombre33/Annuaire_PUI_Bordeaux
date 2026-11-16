@@ -303,6 +303,16 @@ et Tabulation, onglet gardé quand le menu est reconstruit, aucun onglet ni band
 vide (la console le dit), le menu rangé par C.U.R.I.E seul sans la colonne des domaines, arbre d'accessibilité (liste d'onglets, onglet
 sélectionné, panneau nommé), et la mise en page de 280 à 1 200 px, au doigt aussi.
 
+`tests/e2e-responsible.test.mjs` y ajoute 14 scénarios sur « Responsable de l'action x.y » (1.40.0, `withResponsibleColumn` dans
+`tests/fixtures.mjs` : la colonne `Taches_responsable` de `BDD`) : le rôle écrit sur la carte (une action, plusieurs), le menu du rôle qui
+compte la personne une seule fois, le bloc « Responsable de » de la fenêtre de profil (une case par action choisie, nom de chaque case,
+clavier, tenue de 320 à 1 200 px), la relecture « avant » et « après » puis l'écriture, une action décochée dans la liste qui retire sa
+case et sa responsabilité, un administrateur sur la fiche d'une autre personne, la colonne créée par un administrateur (une seule demande,
+vide, la case ensuite), un compte qui n'est pas administrateur (aucune demande), la structure refusée par Grist (une phrase dans la
+console, pas de case, le reste comme avant) et un document sans action. `tests/responsible.test.mjs` (14 tests, sans navigateur) couvre
+les fonctions (`responsibleActions()`, `responsibleText()`, `taskCode()`, `tagText()`, le delta de `Taches_responsable`,
+`createResponsibleColumn()`).
+
 `tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
 (au-dessus, dans le cadre, refermée en la quittant), au clavier (Échap, cartes redessinées) et, sur un écran
@@ -1934,3 +1944,39 @@ compte le voit. En cas de désaccord, le vrai compte fait foi.
 - [ ] **Surveillance.** L'onglet Activité du document, la table `Annuaire_Sonde` (vide au repos), le nombre de lignes de `BDD` (un filtre
       sur les adresses en double repère les créations en rafale), et un coup d'œil par jour la première semaine. Si quelque chose
       tourne mal, désactiver le partage public referme tout d'un coup.
+
+## 28. « Responsable de l'action x.y » et la colonne `Taches_responsable` (1.40.0)
+
+Réglages d'abord : aucun si vous laissez le widget créer la colonne (premier point) ; sinon `GRIST_SETUP.md`, étape 1 (colonne
+`Taches_responsable` de `BDD`, liste de références vers `Taches`, colonne de données). À jouer sur une **copie** du document, console
+ouverte (F12), avec un compte **administrateur** (case `admin` d'`ACL`) dont la fiche porte au moins deux actions, et un compte qui n'est
+pas administrateur. **Ce protocole est le seul contrôle de la création de la colonne et de l'écriture de `Taches_responsable` dans un vrai
+Grist : les tests automatiques simulent `applyUserActions`.**
+
+- [ ] **Création par un administrateur.** Sans la colonne dans `BDD` (données brutes), ouvrir l'annuaire avec le compte administrateur :
+      la colonne `Taches_responsable` apparaît dans `BDD` (liste de références vers `Taches`, colonne de données, vide), la console écrit
+      une ligne `[SCHEMA] colonne « Taches_responsable » absente de BDD : créée…`, et « Modifier mon profil » montre, sous les actions, le
+      bloc « Responsable de » sans qu'on recharge la page. Recharger : pas de seconde colonne (`Taches_responsable2`), pas de nouvelle
+      ligne `[SCHEMA]`.
+- [ ] **Pas de création par un autre compte.** Supprimer la colonne puis ouvrir l'annuaire avec un compte qui n'est pas administrateur :
+      rien n'est créé, aucun bloc « Responsable de ». Rouvrir avec l'administrateur : la colonne revient, une seule fois.
+- [ ] **Structure verrouillée** (« Allow Editors to edit structure » décoché, `GRIST_SETUP.md` étape 4, « Le jeu complet »). Colonne
+      supprimée, un administrateur qui n'est qu'Éditeur du document ouvre l'annuaire : Grist refuse ; la console le dit en une ligne
+      (`[SCHEMA] la colonne « Taches_responsable » manque dans BDD et Grist n'a pas permis de la créer…`), le bloc n'est pas proposé et
+      le reste de la fenêtre, comme l'annuaire, est comme avant. Avec un propriétaire du document qui est aussi administrateur : la
+      colonne est créée.
+- [ ] **Cocher.** Compte avec au moins deux actions, « Modifier mon profil » : le bloc « Responsable de » porte une case par action
+      choisie, aucune cochée d'avance. Cocher une action, « Relire mes modifications » : la carte « Après » ajoute « Responsable de
+      l'action 1.2 » (repérée) ; « Valider ». Dans Grist, `BDD.Taches_responsable` de la ligne contient l'action cochée (une seule
+      action Grist : « Annuler » défait tout) et la carte lit « Responsable de l'action 1.2 », dernier rôle de la première section.
+- [ ] **Plusieurs actions.** Cocher une seconde action : la pastille devient « Responsable des actions 1.2, 1.3 », l'ancienne est
+      barrée dans la relecture.
+- [ ] **Le filtre.** Un clic sur la pastille coche « Responsable d'une action » dans le menu « Rôle dans le PUI » (une seule option,
+      avec son nombre de cartes) et la grille se réduit aux personnes responsables.
+- [ ] **Action perdue.** Décocher l'action dans la liste « Actions » du profil (ou la retirer de `BDD.Taches` dans Grist) : la pastille
+      « Responsable de l'action … » disparaît, même si la case reste cochée dans `Taches_responsable`.
+- [ ] **Un administrateur sur la fiche d'une autre personne** (mode admin) : même bloc, aide « cette personne » ; ce qui est coché va
+      dans la ligne de cette personne, pas dans la sienne. Avec les règles d'accès de l'étape 4, une personne qui n'est pas
+      administrateur ne peut pas écrire `Taches_responsable` sur la ligne d'une autre (essai depuis la console : **refusé**).
+- [ ] **Rien d'autre ne bouge.** `Taches_role`, `Role_dans_le_PUI` et la table `Taches` sont inchangés ; le nombre de contacts affiché est
+      le même qu'avant et aucune fiche n'apparaît ni ne disparaît.
