@@ -155,16 +155,41 @@ export function isEmptyReference(value) {
 
 // id → libellé d'une table de référence. `labelFields` : une colonne, ou
 // plusieurs essayées dans l'ordre (acronyme, sinon nom complet). Les lignes sans
-// libellé sont ignorées.
-export function labelMapFromRows(rows, labelFields) {
+// libellé sont ignorées. `format` : ce que devient le libellé lu (un libellé vide
+// le retire : voir referentialLabel).
+export function labelMapFromRows(rows, labelFields, format = label => label) {
   const fields = [].concat(labelFields);
   const map = {};
   rows.forEach(row => {
     if (row.id === null || row.id === undefined) return;
-    const label = pickLabel(row, fields);
+    const label = format(pickLabel(row, fields));
     if (label) map[String(row.id)] = label;
   });
   return map;
+}
+
+// ===== COLONNE D'UN RÉFÉRENTIEL (C.U.R.I.E) =====
+// Une colonne de regroupement qui porte les codes d'un référentiel (`referential` dans constants.js) n'a pas de noms de groupe à lire :
+// dans le document d'Antoine elle contient des numéros (0, 3, 13…) et « — aucune correspondance — » (capture du 16 novembre 2026). Un
+// groupe par valeur, sans en inventer, mais jamais le signe du vide comme groupe, ni un numéro nu comme titre.
+
+// Une valeur qui dit « rien » : vide, 0, ou un texte qui le dit (« — aucune correspondance — », « Aucun », « n/a », « néant », « sans
+// objet », « - »…), sans tenir compte de la casse, des accents ni de la ponctuation autour. Ce n'est pas un groupe. 0 est lu comme Grist
+// lit un nombre ou une référence sans valeur (voir isBlank) : si c'est un vrai numéro du référentiel, c'est à Antoine de le dire.
+const NO_MATCH = /^(?:0+|aucune?(?: [\p{L}']+){0,3}|pas de [\p{L}]+|neant|vide|n ?[./]? ?a|sans (?:objet|correspondance|valeur|reponse)|non (?:applicable|renseigne|defini|classe))$/u;
+const AROUND = /^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu;
+export function isNoMatch(value) {
+  const bare = normalize(value).replace(AROUND, '').replace(/\s+/g, ' ');
+  return bare === '' || NO_MATCH.test(bare);
+}
+
+// Le libellé d'un groupe d'après la valeur de la colonne d'un référentiel : '' quand la valeur dit « rien » (la ligne n'a pas de groupe),
+// « N° 13 » pour un numéro (« 03 » et « 3 » sont le même groupe ; une espace ordinaire, que la recherche d'un menu retrouve quand on
+// tape « n° 13 »), le texte sinon, tel quel.
+export function referentialLabel(value) {
+  const label = text(value);
+  if (isNoMatch(label)) return '';
+  return /^\d+$/.test(label) ? `N° ${Number(label)}` : label;
 }
 
 // `fn` ne s'exécute qu'après `wait` ms sans nouvel appel, avec les arguments du dernier : une rafale d'appels (les éditions d'un
@@ -662,11 +687,11 @@ export function groupLabelMap(groupMap, detailMap, fallback) {
 // seraient vides en silence). Une catégorie `corrected` (voir constants.js) lit sa seule
 // colonne corrigée dès que la table en remplit au moins une : une ligne qui n'en a pas est
 // laissée de côté, la console dit combien, au lieu d'être montrée avec son libellé brut.
-function readReferenceMap({ key, table, field, corrected, optional }, result, log) {
+function readReferenceMap({ key, table, field, corrected, optional, referential }, result, log) {
   const rows = tableToRows(result.value);
   const labelFields = [].concat(field);
   const correctedOnly = corrected === true && rows.some(row => text(row[labelFields[0]]));
-  const map = labelMapFromRows(rows, correctedOnly ? labelFields.slice(0, 1) : labelFields);
+  const map = labelMapFromRows(rows, correctedOnly ? labelFields.slice(0, 1) : labelFields, referential ? referentialLabel : undefined);
   const withoutLabel = rows.length - Object.keys(map).length;
   log.info(`[REFS] ${key} (${table}): ${Object.keys(map).length} entrées`
     + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${correctedOnly ? `${labelFields[0]}, ignorée(s)` : labelFields.join('/')})` : ''));
@@ -757,7 +782,8 @@ function completeGroupMap({ key, table, groups, fallback, numberedIn }, referenc
   }
   if (unclassified.length) {
     log.info(`[REFS] ${table}: ${unclassified.length} ligne(s) sans regroupement pour ${key}, `
-      + `classées sous « ${fallback} » (identifiants de ligne) :`, unclassified.slice(0, 20));
+      + `${fallback ? `classées sous « ${fallback} »` : 'laissées de côté (elles restent dans les autres rangements)'} (identifiants de ligne) :`,
+    unclassified.slice(0, 20));
   }
   return groupLabelMap(groupMap, detailMap, fallback);
 }

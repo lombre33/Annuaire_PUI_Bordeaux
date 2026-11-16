@@ -4,9 +4,11 @@
 //
 // Avec withCurie (tests/fixtures.mjs), périmètre par défaut (Bob est partenaire) :
 //   Classique      → Cancérologie : Oncologie, Hématologie (Ana) ; Pharmacie : Pharmacovigilance (Bob) ; Autres : Divers (Gina)
-//   C.U.R.I.E      → Groupe C : Oncologie (Ana) ; Groupe U : Hématologie (Ana), Pharmacovigilance (Bob) ; Hors C.U.R.I.E : Divers (Gina)
+//   C.U.R.I.E      → N° 3 : Oncologie (Ana) ; N° 13 : Hématologie (Ana), Pharmacovigilance (Bob) ; Divers (Gina) n'a pas de correspondance : absente
 // Les mêmes quatre compétences, rangées de deux façons : un groupe C.U.R.I.E coupe un domaine en deux, et la sélection ne change pas d'un
-// onglet à l'autre.
+// onglet à l'autre. Les valeurs de la colonne sont celles du vrai document (des numéros, « — aucune correspondance — »), pas des noms que
+// j'aurais imaginés : c'est ce qui manquait en 1.38.0, où le menu montrait des numéros nus. Ce que le menu AFFICHE, avec le document tel
+// qu'il est, est dans tests/e2e-curie-affichage.test.mjs.
 
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
@@ -26,7 +28,9 @@ const focused = page => page.evaluate(() => {
 });
 
 const DOMAINS = ['Cancérologie', 'Pharmacie', 'Autres'];
-const GROUPS = ['Groupe C', 'Groupe U', 'Hors C.U.R.I.E'];
+const N3 = 'N° 3';
+const N13 = 'N° 13';
+const GROUPS = [N3, N13];
 
 // ===== Les onglets =====
 
@@ -88,11 +92,11 @@ test('un clic sur « C.U.R.I.E » range les mêmes compétences par groupe, avec
     await skills.open(page);
     await tab(page, 'curie').click();
     assert.deepEqual(await shownTab(page), ['C.U.R.I.E']);
-    assert.deepEqual(await skills.groupNames(page), GROUPS, '« Hors C.U.R.I.E » en dernier, comme « Autres »');
-    assert.deepEqual(await skills.groupCounts(page), { 'Groupe C': '1', 'Groupe U': '1', 'Hors C.U.R.I.E': '1' },
-      'Ana compte une fois pour chaque groupe ; Bob (Groupe U) est masqué par défaut');
-    assert.equal(await menu(page).locator('.filter-group').count(), 3, 'les domaines ne restent pas dans le menu : un onglet ne double pas les cases');
-    assert.equal(await menu(page).locator('.filter-option').count(), 4, 'les quatre compétences, chacune dans son groupe');
+    assert.deepEqual(await skills.groupNames(page), GROUPS, 'dans l\'ordre des numéros, et rien pour « — aucune correspondance — »');
+    assert.deepEqual(await skills.groupCounts(page), { [N3]: '1', [N13]: '1' },
+      'Ana compte une fois pour chaque groupe ; Bob (N° 13) est masqué par défaut');
+    assert.equal(await menu(page).locator('.filter-group').count(), 2, 'les domaines ne restent pas dans le menu : un onglet ne double pas les cases');
+    assert.equal(await menu(page).locator('.filter-option').count(), 3, 'les trois compétences que C.U.R.I.E classe, chacune dans son groupe');
     assert.equal(await skills.search(page).getAttribute('placeholder'), 'Groupe ou compétence…');
     assert.match(await menu(page).locator('.filter-help').textContent(), /C\.U\.R\.I\.E/);
     assert.match(await menu(page).locator('.filter-button').getAttribute('title'), /C\.U\.R\.I\.E/, 'l\'infobulle du bouton suit l\'onglet');
@@ -101,9 +105,9 @@ test('un clic sur « C.U.R.I.E » range les mêmes compétences par groupe, avec
     assert.equal(await menu(page).locator('.filter-groups').getAttribute('aria-labelledby'), await tab(page, 'curie').getAttribute('id'));
     assert.deepEqual(await Promise.all(['macro', 'curie'].map(grouping => tab(page, grouping).getAttribute('tabindex'))), ['-1', '0']);
 
-    await skills.toggle(page, 'Groupe U').click();
+    await skills.toggle(page, N13).click();
     assert.deepEqual(await skills.visibleItems(page), ['Hématologie', 'Pharmacovigilance']);
-    assert.deepEqual(await optionCounts(skills.group(page, 'Groupe U')), { Hématologie: '1', Pharmacovigilance: '0' });
+    assert.deepEqual(await optionCounts(skills.group(page, N13)), { Hématologie: '1', Pharmacovigilance: '0' });
 
     await tab(page, 'macro').click();
     assert.deepEqual(await shownTab(page), ['Classique']);
@@ -122,7 +126,7 @@ test('la sélection est la même dans les deux onglets : un groupe C.U.R.I.E coc
     await waitForCards(page, 4);
     await skills.open(page);
     await tab(page, 'curie').click();
-    await skills.box(page, 'Groupe U').check(); // Hématologie et Pharmacovigilance
+    await skills.box(page, N13).check(); // Hématologie et Pharmacovigilance
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin'], 'Bob, qui a Pharmacovigilance, est un partenaire : masqué par défaut');
     assert.equal(await skills.badge(page).textContent(), '1', 'un groupe entier compte pour 1, comme un domaine');
@@ -140,13 +144,12 @@ test('la sélection est la même dans les deux onglets : un groupe C.U.R.I.E coc
 
     await skills.item(page, 'Oncologie').locator('input').check();
     await tab(page, 'curie').click();
-    assert.equal(await skills.box(page, 'Groupe C').isChecked(), true);
-    assert.equal(await skills.box(page, 'Groupe U').isChecked(), true);
-    assert.equal(await skills.box(page, 'Hors C.U.R.I.E').isChecked(), false);
+    assert.equal(await skills.box(page, N3).isChecked(), true);
+    assert.equal(await skills.box(page, N13).isChecked(), true);
     assert.equal(await skills.badge(page).textContent(), '2', 'deux groupes entiers');
     assert.equal(await menu(page).locator('.filter-button').getAttribute('aria-label'), 'Compétences (2 sélectionnés)');
 
-    await skills.box(page, 'Groupe U').uncheck();
+    await skills.box(page, N13).uncheck();
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin'], 'Oncologie reste cochée');
     await tab(page, 'macro').click();
@@ -162,17 +165,17 @@ test('les nombres des groupes C.U.R.I.E tiennent compte de l\'interrupteur Parte
     await page.mouse.click(5, 5);
     await page.click('[data-scope="partenaire"]');
     await waitForCards(page, 5);
-    assert.deepEqual(await skills.groupCounts(page), { 'Groupe C': '1', 'Groupe U': '2', 'Hors C.U.R.I.E': '1' }, 'Bob, partenaire, compte pour le Groupe U');
+    assert.deepEqual(await skills.groupCounts(page), { [N3]: '1', [N13]: '2' }, 'Bob, partenaire, compte pour N° 13');
 
     await skills.open(page);
-    await skills.box(page, 'Groupe C').check();
+    await skills.box(page, N3).check();
     await waitForCards(page, 1);
-    assert.deepEqual(await skills.groupCounts(page), { 'Groupe C': '1', 'Groupe U': '2', 'Hors C.U.R.I.E': '1' },
+    assert.deepEqual(await skills.groupCounts(page), { [N3]: '1', [N13]: '2' },
       'cocher un groupe ne vide pas le nombre des autres : ce nombre dit ce que donnerait chaque case');
     await page.mouse.click(5, 5);
     await page.locator('.contact-card').first().locator('.etablissement-tag').click(); // Établissement : CHU
     await waitForCards(page, 1);
-    assert.deepEqual(await skills.groupCounts(page), { 'Groupe C': '1', 'Groupe U': '1', 'Hors C.U.R.I.E': '0' }, 'un autre filtre s\'applique aux groupes');
+    assert.deepEqual(await skills.groupCounts(page), { [N3]: '1', [N13]: '1' }, 'un autre filtre s\'applique aux groupes');
   }));
 
 test('un tag de carte coche la compétence dans l\'onglet montré, et à l\'ouverture suivante son groupe passe devant', { skip }, () =>
@@ -186,12 +189,12 @@ test('un tag de carte coche la compétence dans l\'onglet montré, et à l\'ouve
     await page.locator('.contact-card', { hasText: 'Bob Durand' }).locator('.tag-competences').click(); // Pharmacovigilance
     await waitForCards(page, 1);
     assert.equal(await skills.badge(page).textContent(), '1');
-    assert.equal(await skills.box(page, 'Groupe U').evaluate(box => box.indeterminate), true, 'Pharmacovigilance est l\'une des deux compétences du groupe');
-    assert.equal(await skills.box(page, 'Groupe U').isChecked(), false);
+    assert.equal(await skills.box(page, N13).evaluate(box => box.indeterminate), true, 'Pharmacovigilance est l\'une des deux compétences du groupe');
+    assert.equal(await skills.box(page, N13).isChecked(), false);
 
     await skills.open(page);
-    assert.deepEqual(await skills.groupNames(page), ['Groupe U', 'Groupe C', 'Hors C.U.R.I.E'], 'le groupe qui contient une coche passe devant');
-    assert.equal(await skills.toggle(page, 'Groupe U').getAttribute('aria-expanded'), 'true', 'à moitié coché : déplié pour montrer laquelle');
+    assert.deepEqual(await skills.groupNames(page), [N13, N3], 'le groupe qui contient une coche passe devant');
+    assert.equal(await skills.toggle(page, N13).getAttribute('aria-expanded'), 'true', 'à moitié coché : déplié pour montrer laquelle');
     assert.deepEqual(await skills.visibleItems(page), ['Pharmacovigilance', 'Hématologie'], 'la compétence cochée passe devant l\'autre');
   }));
 
@@ -208,12 +211,12 @@ test('la recherche déjà tapée s\'applique à l\'autre onglet : un groupe qui 
 
     await tab(page, 'curie').click();
     assert.equal(await search.inputValue(), 'hemato', 'ce qui est tapé reste dans le champ');
-    assert.deepEqual(await skills.visibleGroups(page), ['Groupe U']);
+    assert.deepEqual(await skills.visibleGroups(page), [N13]);
     assert.deepEqual(await skills.visibleItems(page), ['Hématologie'], 'le groupe situe la compétence, seule elle reste');
     assert.equal(await menu(page).locator('.filter-menu').evaluate(element => element.classList.contains('searching')), true);
 
-    await search.fill('groupe c'); // le nom d'un groupe : il garde toutes ses compétences
-    assert.deepEqual(await skills.visibleGroups(page), ['Groupe C']);
+    await search.fill('n° 3'); // le nom d'un groupe, tapé avec une espace ordinaire : il garde toutes ses compétences
+    assert.deepEqual(await skills.visibleGroups(page), [N3]);
     assert.deepEqual(await skills.visibleItems(page), ['Oncologie']);
 
     await tab(page, 'macro').click();
@@ -253,7 +256,7 @@ test('au clavier, les flèches, Début et Fin passent d\'un onglet à l\'autre e
     assert.deepEqual([(await focused(page)).role, (await focused(page)).text], ['tab', 'C.U.R.I.E'], 'Maj+Tab revient à l\'onglet montré');
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.closest('.filter-group')?.dataset.value), 'Groupe C', 'puis la case du premier groupe de l\'onglet');
+    assert.equal(await page.evaluate(() => document.activeElement.closest('.filter-group')?.dataset.value), N3, 'puis la case du premier groupe de l\'onglet');
     await page.keyboard.press('Space');
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
@@ -282,7 +285,7 @@ test('un menu reconstruit s\'ouvre sur l\'onglet que la personne avait choisi, e
     await waitForCards(page, 4);
     await skills.open(page);
     await tab(page, 'curie').click();
-    await skills.box(page, 'Groupe C').check();
+    await skills.box(page, N3).check();
     await waitForCards(page, 1);
     await page.mouse.click(5, 5);
 
@@ -293,7 +296,7 @@ test('un menu reconstruit s\'ouvre sur l\'onglet que la personne avait choisi, e
     assert.deepEqual(await shownTab(page), ['C.U.R.I.E'], 'le menu reconstruit revient sur le même onglet, pas sur le premier');
     assert.deepEqual(await skills.groupNames(page), GROUPS);
     assert.equal(await skills.badge(page).isHidden(), true);
-    assert.equal(await skills.box(page, 'Groupe C').isChecked(), false);
+    assert.equal(await skills.box(page, N3).isChecked(), false);
 
     await tab(page, 'macro').click();
     await page.mouse.click(5, 5);
@@ -337,19 +340,19 @@ test('la colonne referenciel_C_U_R_I_E laissée vide ne donne pas d\'onglets non
   });
 });
 
-test('sans la colonne des domaines, le menu Compétences se range par groupe C.U.R.I.E, sans onglets : un seul rangement', { skip }, () => {
+test('sans la colonne des domaines, C.U.R.I.E ne devient pas tout le menu : il laisse des compétences de côté, le menu reste à plat avec toutes les compétences', { skip }, () => {
   const tables = withCurie();
   delete tables.Competences.Macro_competences;
   return withWidget({ tables }, async ({ page }) => {
     await waitForCards(page, 4);
     await skills.open(page);
     assert.equal(await page.locator('.view-tab').count(), 0, 'un onglet seul ne choisit rien');
-    assert.deepEqual(await skills.groupNames(page), GROUPS);
-    assert.equal(await skills.search(page).getAttribute('placeholder'), 'Groupe ou compétence…');
-    await skills.box(page, 'Groupe C').check();
+    assert.equal(await menu(page).locator('.filter-group').count(), 0, 'pas de groupes : un menu rangé par C.U.R.I.E seul perdrait Divers');
+    assert.deepEqual(await menu(page).locator('.filter-option .option-label').allTextContents(),
+      ['Divers', 'Hématologie', 'Oncologie', 'Pharmacovigilance'], 'les quatre compétences, dont celle que C.U.R.I.E ne classe pas');
+    await menu(page).locator('.filter-option', { hasText: 'Divers' }).locator('input').check();
     await waitForCards(page, 1);
-    assert.deepEqual(await cardNames(page), ['Ana Martin']);
-    assert.equal(await skills.badge(page).textContent(), '1');
+    assert.deepEqual(await cardNames(page), ['Gina Bergonié'], 'et on peut la cocher');
   });
 });
 
