@@ -148,9 +148,11 @@ export function computeFilterCounts(contacts, activeFilters, searchTerm, scope) 
 // groupe de repli (« Autres ») en dernier, chaque groupe avec ses valeurs triées. Une
 // valeur figure dans le groupe de sa ligne de Grist ; écrite sur deux lignes de groupes
 // différents, elle figure dans les deux. Un groupe se reconnaît à son libellé normalisé
-// (casse, accents), comme son compteur, et garde la première écriture. `null` quand le
-// menu reste plat : la catégorie n'a pas de regroupement, ou Grist n'en donne aucun
-// (colonne de regroupement absente, libellés d'une table illisible). `groupingKey` : celui des
+// (casse, accents), comme son compteur, et garde la première écriture. Une valeur sans groupe
+// prend le libellé de repli du regroupement ; sans libellé de repli (C.U.R.I.E), elle est hors de
+// ce rangement. `null` quand le menu reste plat : la catégorie n'a pas de regroupement, ou Grist
+// n'en donne aucun (colonne de regroupement absente, libellés d'une table illisible, aucune
+// valeur du menu qui ait un groupe). `groupingKey` : celui des
 // regroupements du menu (CATEGORIES.*.groupings) qui range les valeurs, le premier par défaut.
 export function menuGroups(filter, referenceMaps, groupingKey = filter.groupings?.[0]) {
   const grouping = groupingKey && CATEGORIES[groupingKey];
@@ -160,11 +162,13 @@ export function menuGroups(filter, referenceMaps, groupingKey = filter.groupings
   const byGroup = new Map();
   Object.entries(referenceMaps[filter.key] || {}).forEach(([id, value]) => {
     const label = groupOf[id] || grouping.fallback;
+    if (!label) return; // pas de groupe et pas de libellé de repli (C.U.R.I.E) : la valeur est hors de ce rangement, les autres la montrent
     const key = normalize(label);
     if (!byGroup.has(key)) byGroup.set(key, { label, values: new Map() });
     const values = byGroup.get(key).values;
     if (!values.has(normalize(value))) values.set(normalize(value), value); // une écriture par valeur, à la casse près
   });
+  if (byGroup.size === 0) return null; // aucune valeur du menu n'a de groupe : un rangement vide n'aiderait personne
   const fallbackKey = normalize(grouping.fallback);
   const rank = key => (key === fallbackKey ? 1 : 0);
   return [...byGroup]
@@ -174,11 +178,14 @@ export function menuGroups(filter, referenceMaps, groupingKey = filter.groupings
 
 // Les rangements qu'un menu peut montrer : [{ grouping, groups }], dans l'ordre de CATEGORIES.*.groupings, sans ceux que Grist ne
 // remplit pas (menuGroups rend null). Vide : le menu reste à plat ; un seul : un menu par groupe sans onglets ; deux ou plus : des
-// onglets en haut du menu (le premier est le rangement de départ).
+// onglets en haut du menu (le premier est le rangement de départ). Un rangement sans libellé de repli (C.U.R.I.E) laisse de côté les
+// valeurs qu'il ne classe pas : il peut être un onglet de plus, jamais le seul menu, où ces valeurs ne se cocheraient plus (sans lui,
+// le menu reste à plat et les montre toutes).
 export function menuViews(filter, referenceMaps) {
-  return (filter.groupings ?? [])
+  const views = (filter.groupings ?? [])
     .map(grouping => ({ grouping, groups: menuGroups(filter, referenceMaps, grouping) }))
     .filter(view => view.groups !== null);
+  return views.some(({ grouping }) => CATEGORIES[grouping].fallback) ? views : [];
 }
 
 // Où en est un groupe : 'none', 'some' ou 'all' de ses valeurs sont cochées.

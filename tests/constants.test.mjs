@@ -67,13 +67,19 @@ test('the macro skills are a grouping of the detailed skills: same table and BDD
   assert.equal(macro.numberedIn, undefined, 'Macro_competences est une colonne : le domaine ne se déduit d\'aucun numéro');
 });
 
-test('the C.U.R.I.E groups are a second grouping of the same skills: an optional column of Competences of their own, « Hors C.U.R.I.E » for the rest', () => {
+test('the C.U.R.I.E groups are a second grouping of the same skills: an optional column of Competences of their own, and a skill it does not classify is left out of it', () => {
   const { competences, macro, curie } = CATEGORIES;
   assert.equal(curie.table, competences.table);
   assert.equal(curie.column, competences.column, 'les compétences de la personne se lisent dans la même colonne de BDD');
   assert.deepEqual(curie.field, ['referenciel_C_U_R_I_E']);
   assert.equal(curie.groups, 'competences');
-  assert.equal(curie.fallback, 'Hors C.U.R.I.E');
+  assert.equal(curie.fallback, undefined, 'pas de groupe « Hors C.U.R.I.E » : une compétence que la colonne ne classe pas n\'est pas montrée sous cet onglet (1.41.1)');
+  assert.equal(curie.referential, true, 'la colonne porte les codes d\'un référentiel (des numéros, « — aucune correspondance — »), pas des noms de groupe');
+  assert.equal(macro.referential, undefined, 'les domaines sont des noms : rien n\'y est écarté ni renommé');
+  const source = key => REFERENCE_SOURCES.find(entry => entry.key === key);
+  assert.equal(source('curie').referential, true, 'la lecture des libellés le sait');
+  assert.equal(source('macro').referential, undefined);
+  assert.equal(macro.fallback, 'Autres', 'le rangement de départ garde son groupe de repli : personne n\'y devient introuvable');
   assert.equal(curie.optional, true, 'la colonne est facultative : sans elle, pas d\'onglet, ni bandeau ni avertissement');
   assert.equal(curie.numberedIn, undefined);
   assert.equal(macro.optional, undefined, 'la colonne des domaines reste attendue');

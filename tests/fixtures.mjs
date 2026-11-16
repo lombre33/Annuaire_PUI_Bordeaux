@@ -99,15 +99,43 @@ export function withoutOptionalColumns(tables) {
 }
 
 // Le référentiel C.U.R.I.E (1.38.0) : la colonne facultative `referenciel_C_U_R_I_E` de Competences, qui range les compétences d'une autre
-// façon que les domaines. Avec ces données (périmètre par défaut ; Bob est partenaire) :
-//   Groupe C        → Oncologie (Ana)
-//   Groupe U        → Hématologie (Ana) et Pharmacovigilance (Bob), la seconde écrite « groupe u » : les deux orthographes n'en font qu'un
-//   Hors C.U.R.I.E  → Divers (Gina), que la colonne ne classe pas
+// façon que les domaines. Ses valeurs sont celles du VRAI document (capture d'Antoine du 16 novembre 2026, 1.41.1) : du texte, des numéros
+// (« 3 », « 13 ») et « — aucune correspondance — », pas des noms de groupe. Les tests de la 1.38.0 avaient des noms que j'avais imaginés
+// (« Groupe C », « Groupe U ») : ils passaient, et le menu montrait des numéros nus et un « — aucune correspondance — » en tête.
+// Avec ces données (périmètre par défaut ; Bob est partenaire) :
+//   N° 3   → Oncologie (Ana)
+//   N° 13  → Hématologie (Ana) et Pharmacovigilance (Bob)
+//   (rien) → Divers (Gina) : « — aucune correspondance — » n'est pas un groupe, la compétence reste sous « Classique »
 // Les domaines restent ceux de la base (Cancérologie : Oncologie, Hématologie ; Pharmacie : Pharmacovigilance ; Autres : Divers), de quoi
 // voir qu'un groupe C.U.R.I.E coupe un domaine en deux.
 export function withCurie(tables = sampleTables()) {
   const copy = structuredClone(tables);
-  copy.Competences.referenciel_C_U_R_I_E = ['Groupe C', 'Groupe U', 'groupe u', ''];
+  copy.Competences.referenciel_C_U_R_I_E = ['3', '13', '13', '— aucune correspondance —'];
+  return copy;
+}
+
+// Le même référentiel avec de quoi remplir un menu, comme dans le document d'Antoine : quatorze compétences (« Compétence 1 » à
+// « Compétence 14 ») dont la colonne dit, dans l'ordre, quatre fois « — aucune correspondance — », « 0 » deux fois, « 3 » trois fois,
+// « 13 » deux fois, « 7 » deux fois et « 12 », dans le désordre des numéros. Ana porte les compétences 1, 5, 7 et 10, Bob les 2, 8 et 12 et
+// Gina les 3 et 9. Groupes attendus sous « C.U.R.I.E », dans l'ordre des numéros : N° 3 (compétences 7, 8, 9), N° 7 (12, 13), N° 12 (14),
+// N° 13 (10, 11) ; « 0 » et « — aucune correspondance — » (compétences 1 à 6) n'y sont pas, et restent sous « Classique ».
+export function withCurieCodes(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  const values = [
+    '— aucune correspondance —', '— aucune correspondance —', '— aucune correspondance —', '— aucune correspondance —',
+    '0', '0', '3', '3', '3', '13', '13', '7', '7', '12'
+  ];
+  const domains = ['Cancérologie', 'Pharmacie', 'Autres'];
+  copy.Competences = {
+    id: values.map((_, index) => index + 1),
+    Competences: values.map((_, index) => `compétence ${index + 1}`),
+    Competences_corrigees: values.map((_, index) => `Compétence ${index + 1}`),
+    Macro_competences: values.map((_, index) => domains[index % domains.length]),
+    referenciel_C_U_R_I_E: values
+  };
+  copy.BDD.Competences[0] = ['L', 1, 5, 7, 10]; // Ana
+  copy.BDD.Competences[1] = ['L', 2, 8, 12]; // Bob
+  copy.BDD.Competences[8] = ['L', 3, 9]; // Gina
   return copy;
 }
 
