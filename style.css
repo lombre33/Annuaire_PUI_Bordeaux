@@ -203,6 +203,28 @@ h1 {
   font-weight: 700;
   font-style: italic;
 }
+/* « Documentation » (1.37.0) : un petit bouton sous le slogan, qui ouvre la documentation du dépôt dans un autre onglet (DOCS_URL,
+   constants.js). Même teinte que « Réinitialiser ». Il tient dans la largeur du slogan : il ne change pas celle du bloc du titre, dont
+   dépend le centrage des financeurs (voir plus bas). Caché tant que main.js ne lui a pas donné son adresse. */
+.doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  color: #443aaf;
+  border: 1px solid #c9c5f7;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.doc-link[hidden] {
+  display: none;
+}
+.doc-link:hover {
+  border-color: var(--violet);
+}
 .result-count {
   padding: 10px 16px;
   color: #443aaf;
@@ -1389,6 +1411,9 @@ button.avatar:hover {
   .scope-btn:not(.active):hover {
     color: var(--muted);
   }
+  .doc-link:hover {
+    border-color: #c9c5f7;
+  }
 }
 .status-banner {
   display: flex;
@@ -1886,7 +1911,8 @@ button.avatar:hover {
   .account-bar,
   .admin-strip,
   .card-actions,
-  .status-action {
+  .status-action,
+  .doc-link {
     display: none !important; /* plusieurs de ces règles d'affichage sont plus précises que celle-ci (`.page-header > .account-bar`) */
   }
   body {

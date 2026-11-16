@@ -857,17 +857,21 @@ test('les pages décrivent tous les préfixes de la console, et leur nombre', ()
 test('la page de sécurité nomme chaque adresse web écrite en dur dans le code du widget', () => {
   const literal = /(['"`])(https?:\/\/[^'"`\s]+)\1/g;
   const found = WIDGET_SOURCES().flatMap(({ name, code }) => [...code.matchAll(literal)].map(match => ({ name, url: match[2] })));
-  assert.deepEqual(found.map(({ name }) => name), ['constants.js'],
+  // Deux adresses, toutes deux dans constants.js : PUI_URL (le bandeau du bas) et DOCS_URL (le lien « Documentation » de l'en-tête).
+  assert.deepEqual(found.map(({ name }) => name), ['constants.js', 'constants.js'],
     'Une adresse web a été ajoutée au code (ou retirée de constants.js) : décrivez-la dans docs/securite.md (puce « Réseau »), puis ce test.');
   const security = read('docs/securite.md');
   const unnamed = found.map(({ url }) => new URL(url).hostname).filter(host => !security.includes(host));
   assert.deepEqual(unnamed, [], 'docs/securite.md (puce « Réseau ») doit nommer le serveur de chaque adresse écrite en dur.');
 
-  // Le lien s'ouvre dans un autre onglet sans transmettre la page du widget, comme la page le dit.
-  const link = read('index.html').match(/<a\b[^>]*\bid="bandLink"[^>]*>/)?.[0] ?? '';
-  assert.match(link, /\btarget="_blank"/, 'Le lien du bandeau du bas doit s\'ouvrir dans un nouvel onglet.');
-  assert.match(link, /\brel="noopener noreferrer"/, 'Le lien du bandeau du bas doit porter rel="noopener noreferrer".');
-  assert.ok(security.includes('rel="noopener noreferrer"'), 'docs/securite.md doit dire que ce lien porte rel="noopener noreferrer".');
+  // Les deux liens s'ouvrent dans un autre onglet sans transmettre la page du widget, comme la page le dit.
+  for (const [id, where] of [['bandLink', 'du bandeau du bas'], ['docLink', '« Documentation » de l\'en-tête']]) {
+    const link = read('index.html').match(new RegExp(`<a\\b[^>]*\\bid="${id}"[^>]*>`))?.[0] ?? '';
+    assert.match(link, /\btarget="_blank"/, `Le lien ${where} doit s'ouvrir dans un nouvel onglet.`);
+    assert.match(link, /\brel="noopener noreferrer"/, `Le lien ${where} doit porter rel="noopener noreferrer".`);
+  }
+  assert.ok(security.includes('rel="noopener noreferrer"'), 'docs/securite.md doit dire que ces liens portent rel="noopener noreferrer".');
+  assert.ok(security.includes('DOCS_URL'), 'docs/securite.md doit nommer DOCS_URL (le lien « Documentation » de l\'en-tête).');
 });
 
 // Le widget écrit (la sonde, le choix de présence) : une page qui le dit « en lecture seule »

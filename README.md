@@ -107,6 +107,8 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 
 ## Documentation
 
+Le bouton « Documentation » de l'en-tête du widget ouvre cette section.
+
 | Pour… | Lire |
 |---|---|
 | **Utiliser l'annuaire** : rechercher, filtrer, modifier sa fiche, comprendre un message, vocabulaire du PUI | [Guide utilisateur](docs/utilisateurs.md) |
