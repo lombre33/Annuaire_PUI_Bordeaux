@@ -26,8 +26,7 @@ const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 // (tests/support/fake-grist.js, `export` retiré), branché sur des variables que le
 // test pose avant le chargement et peut modifier ensuite (relues à chaque appel) :
 // __tables, __failTables, __user (la personne connectée), __denyWrites (tables dont
-// l'écriture est refusée), __denyRows (lignes protégées), __denyStructure (la structure du document ne
-// se change pas : AddTable, AddColumn…), __delay, __readGate (la promesse
+// l'écriture est refusée), __denyRows (lignes protégées), __delay, __readGate (la promesse
 // que toute lecture attend), __accessToken (la réponse de getAccessToken), __withoutMethods
 // (méthodes que cette version de Grist n'a pas). __triggerRecords rejoue un onRecords (édition
 // Grist) ; __fake.calls liste les actions envoyées à Grist, __fake.tokenRequests les demandes
@@ -40,7 +39,6 @@ window.__fake = createFakeGrist({
   user: () => window.__user,
   denyWrites: () => window.__denyWrites,
   denyRows: () => window.__denyRows,
-  denyStructure: () => window.__denyStructure,
   delay: () => window.__delay,
   readGate: () => window.__readGate,
   accessToken: () => window.__accessToken
@@ -156,8 +154,7 @@ export async function createHarness({ keepScrollbars = false } = {}) {
   });
 
   // `user` : l'adresse de la personne connectée (null : compte anonyme) ; `readOnly` :
-  // le cadre d'un compte Lecteur (?readonly=true) ; `denyRows` : { table: [identifiants] } ; `denyStructure` : vrai, Grist refuse de changer
-  // la structure du document (un éditeur sans ce droit : AddTable, AddColumn…).
+  // le cadre d'un compte Lecteur (?readonly=true) ; `denyRows` : { table: [identifiants] }.
   // Les logos sont des pièces jointes : `files` (tests/support/fake-attachments.mjs) compte les
   // fichiers qui ont été téléchargés et les jetons employés ; `accessToken` est la réponse de
   // getAccessToken (null : Grist refuse), `withoutMethods` les méthodes de docApi qu'une
@@ -171,7 +168,7 @@ export async function createHarness({ keepScrollbars = false } = {}) {
   // n'aboutit avant `window.__releaseReads()` (un document lent à répondre) ; `apiBlocked` : le script de l'API de Grist ne se charge
   // pas (réseau coupé, pare-feu, extension), `window.grist` n'existe pas.
   async function openWidget({
-    tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, denyStructure = false, delay = 0, readOnly = false,
+    tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, delay = 0, readOnly = false,
     accessToken, withoutMethods = [], downloadCors = true, downloadHold = false, downloadFirst = null, initScript = null,
     contextOptions = {}, holdReads = false, apiBlocked = false
   } = {}) {
@@ -224,12 +221,11 @@ export async function createHarness({ keepScrollbars = false } = {}) {
       window.__user = values.user;
       window.__denyWrites = values.denyWrites;
       window.__denyRows = values.denyRows;
-      window.__denyStructure = values.denyStructure;
       window.__delay = values.delay;
       window.__readGate = values.holdReads ? new Promise(resolve => { window.__releaseReads = resolve; }) : null;
       window.__accessToken = values.accessToken;
       window.__withoutMethods = values.withoutMethods;
-    }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, denyStructure, delay, accessToken, withoutMethods, holdReads });
+    }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, delay, accessToken, withoutMethods, holdReads });
     if (initScript) await page.addInitScript(initScript);
     // Le widget lit Grist dès son démarrage : ses cartes et leurs logos sont dans la page avant l'événement « load », qui attend les
     // images. Quand un fichier est retenu ou ne reçoit jamais de réponse, il ne viendrait pas : la navigation n'attend alors que le document.

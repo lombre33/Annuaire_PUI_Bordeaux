@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
+import { CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -293,95 +293,6 @@ function taskRolesOf(contact, referenceMaps) {
   return Object.fromEntries([...byLabel].map(([label, list]) => [label, list.length > 1 ? uniqueLabels(list) : list]));
 }
 
-// ===== RÔLES DANS LE PUI =====
-// Le rôle que la personne a choisi (BDD.Role_dans_le_PUI, un seul) ne dit pas tout : une personne qui a au moins une action est « Membre
-// d'une action », qu'elle ait aussi un autre rôle ou non (demande d'Antoine du 16 novembre 2026 : « le widget le met et le retire »). Ce rôle-là
-// n'est écrit nulle part : il se calcule à chaque lecture d'après les actions de la personne (BDD.Taches). Une personne qui perd sa dernière
-// action le perd donc d'elle-même, et celle dont Grist, un import ou un administrateur change les actions n'attend personne. Si la table des
-// rôles le porte déjà (« Membre d'une action »), sa valeur écrite dans BDD est ignorée : seul le calcul compte. Il se lit comme les autres
-// rôles (filtre, pastille de carte) ; un rôle de la table qui ne porte pas ce nom (« Coordinateur de communauté ») reste tel quel.
-//
-// « Responsable d'une action » se calcule de la même façon (1.40.0) d'après les actions que la personne a cochées « Responsable de » dans son
-// profil (BDD.Taches_responsable, voir responsibleActions) : le rôle reste celui du filtre, mais la carte l'écrit avec les actions, « Responsable
-// de l'action 1.2 » (`roleTexts`, tagText).
-//
-// Le nom d'un rôle calculé est celui que la table des rôles porte quand elle en a un qui lui ressemble (casse, accents, apostrophes et tournure
-// ignorés : « Membre de l'action » vaut « Membre d'une action »), sinon celui-ci ; `known` et `responsibleKnown` disent si la table l'a (le menu
-// du filtre les propose aussi quand elle ne l'a pas : main.js, refreshFilterMenus).
-export const MEMBER_ROLE = 'Membre d’une action';
-export const RESPONSIBLE_ROLE = 'Responsable d’une action';
-const MEMBER_ROLE_PATTERN = /^membre\b.*\baction/;
-const RESPONSIBLE_ROLE_PATTERN = /^responsable\b.*\b(?:action|tache)/;
-// Les mots d'un rôle, sans casse, accents ni ponctuation : « Membre d'une action » et « membre d’une  Action » s'écrivent pareil.
-const roleWords = value => normalize(value).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-
-const automaticRolesOf = new WeakMap();
-export function automaticRoles(roleMap) {
-  if (!roleMap || typeof roleMap !== 'object') {
-    return { member: MEMBER_ROLE, known: false, responsible: RESPONSIBLE_ROLE, responsibleKnown: false };
-  }
-  if (!automaticRolesOf.has(roleMap)) {
-    const labels = Object.entries(roleMap).sort(([a], [b]) => Number(a) - Number(b)).map(([, known]) => known);
-    const member = labels.find(known => MEMBER_ROLE_PATTERN.test(roleWords(known)));
-    const responsible = labels.find(known => RESPONSIBLE_ROLE_PATTERN.test(roleWords(known)));
-    automaticRolesOf.set(roleMap, {
-      member: member ?? MEMBER_ROLE, known: member !== undefined,
-      responsible: responsible ?? RESPONSIBLE_ROLE, responsibleKnown: responsible !== undefined
-    });
-  }
-  return automaticRolesOf.get(roleMap);
-}
-
-// Les rôles que le menu du filtre propose : ceux de la table, plus les rôles calculés quand elle ne les a pas (une personne les a, calculés,
-// même si aucune ligne de la table ne les porte). Leur clé n'est pas un identifiant de ligne : ces rôles n'en ont pas, et la liste de la
-// fenêtre de profil, elle, ne lit que la table. « Responsable d'une action » n'est proposé que si le document a la colonne qui le fait
-// exister (`responsible` : BDD.Taches_responsable est là) : sans elle personne ne peut l'avoir, et l'option ne filtrerait rien.
-export function filterableRoles(roleMap, { responsible: columnExists = false } = {}) {
-  const { member, known, responsible, responsibleKnown } = automaticRoles(roleMap);
-  const addResponsible = columnExists && !responsibleKnown;
-  if (known && !addResponsible) return roleMap;
-  return { ...roleMap, ...(known ? {} : { membre: member }), ...(addResponsible ? { responsable: responsible } : {}) };
-}
-
-// Les rôles d'une personne, dans l'ordre où la carte les écrit : celui qu'elle a choisi (sauf les rôles calculés, que le calcul seul décide),
-// puis « Membre d'une action » si elle a au moins une action, puis « Responsable d'une action » si elle en a coché au moins une dont elle est
-// responsable. `stored` : le libellé de BDD.Role_dans_le_PUI ; `hasActions` : la personne a au moins une action ; `roleMap` : les libellés de
-// la table des rôles ; `isResponsible` : elle est responsable d'au moins une de ses actions (responsibleActions). Un « Responsable d'une
-// action » choisi à la main reste tel quel tant que la personne n'a coché aucune action : il ne dit alors rien de plus.
-export function roleEntries(stored, hasActions, roleMap, isResponsible = false) {
-  const { member, responsible } = automaticRoles(roleMap);
-  const own = stored ? roleWords(stored) : '';
-  const chosen = own && own !== roleWords(member) && !(isResponsible && own === roleWords(responsible)) ? [stored] : [];
-  return [...chosen, ...(hasActions ? [member] : []), ...(isResponsible ? [responsible] : [])];
-}
-
-// Les actions dont la personne est responsable : celles de BDD.Taches_responsable (une liste de lignes de Taches, comme BDD.Taches) qu'elle a
-// aussi, comparées par libellé corrigé (plusieurs lignes brutes de Taches peuvent le partager : celle qu'elle a cochée dans « Responsable de »
-// n'est pas forcément celle de ses actions). Une action cochée qu'elle n'a plus ne compte pas. Triées dans l'ordre des numéros. `held` : les
-// libellés de ses actions (listLabels). La colonne absente de BDD (le widget la crée, schema.js) ou vide : aucune.
-export function responsibleActions(contact, referenceMaps, held) {
-  const flagged = safeValues(contact[RESPONSIBLE_COLUMN]);
-  if (flagged.length === 0 || held.length === 0) return [];
-  const heldKeys = new Set(held.map(normalize));
-  const labels = flagged.map(item => resolveListItem(item, referenceMaps.taches)).filter(label => label && heldKeys.has(normalize(label)));
-  return uniqueLabels(labels).sort(compareLabels);
-}
-
-// Le texte de la pastille « Responsable d'une action » d'une personne : « Responsable de l'action 1.2 », ou « Responsable des actions 1.2, 1.3 »
-// (demande d'Antoine du 16 novembre 2026 : « Responsable de l'action x.y »). Le numéro d'une action est celui de son libellé (taskCode) ; une
-// action sans numéro s'écrit par son libellé.
-export function responsibleText(actions) {
-  const codes = [...new Set(actions.map(label => taskCode(label) ?? label))];
-  return codes.length === 1 ? `Responsable de l’action ${codes[0]}` : `Responsable des actions ${codes.join(', ')}`;
-}
-
-// Le texte d'une pastille de la carte : son libellé, sauf pour le rôle « Responsable d'une action », qui dit de quelles actions (`roleTexts`,
-// calculé par enrich). Le libellé reste ce que le filtre, les compteurs et les clics lisent ; le texte, lui, est ce qu'on affiche et ce que la
-// relecture compare.
-export function tagText(contact, key, label) {
-  return (key === 'role' ? ownValue(contact.roleTexts, normalize(label)) : undefined) ?? label;
-}
-
 // Ajoute à un contact `labels` (pour chaque catégorie, la liste de ses libellés), `taskRoles`
 // et les indicateurs de son établissement. `etabFlags` est optionnel : sans lui,
 // aucun indicateur n'est vrai et le contact n'est pas éligible.
@@ -390,24 +301,20 @@ export function enrich(contact, referenceMaps, etabFlags) {
   // (jamais le nom de domaine de l'e-mail). refLabel() en gère les formes
   // possibles : identifiant de ligne, ['R', table, id] ou texte déjà résolu.
   const etablissement = refLabel(contact.Etablissement, referenceMaps.etablissement);
-  const lists = listLabels(contact, referenceMaps);
-  const actions = responsibleActions(contact, referenceMaps, lists.taches);
-  const roles = roleEntries(refLabel(contact.Role_dans_le_PUI, referenceMaps.role), lists.taches.length > 0, referenceMaps.role, actions.length > 0);
+  const role = refLabel(contact.Role_dans_le_PUI, referenceMaps.role);
   const flags = etablissementFlags(contact, etabFlags);
 
   return {
     ...contact,
-    // L'établissement n'a qu'une valeur mais prend la même forme de liste que les autres
-    // catégories : filters.js et render.js n'ont ainsi pas de cas particulier (le badge de la
-    // carte utilise `etablissement_label`). Le rôle en a plusieurs (voir roleEntries).
+    // Établissement et Rôle n'ont qu'une valeur mais prennent la même forme de
+    // liste que les autres catégories : filters.js et render.js n'ont ainsi pas
+    // de cas particulier (le badge de la carte utilise `etablissement_label`).
     labels: {
-      ...lists,
+      ...listLabels(contact, referenceMaps),
       etablissement: etablissement ? [etablissement] : [],
-      role: roles
+      role: role ? [role] : []
     },
     taskRoles: taskRolesOf(contact, referenceMaps),
-    // Le texte de la pastille du rôle « Responsable d'une action » (tagText) ; rien pour une personne qui n'en est pas responsable.
-    roleTexts: actions.length > 0 ? { [normalize(automaticRoles(referenceMaps.role).responsible)]: responsibleText(actions) } : {},
     etablissement_label: etablissement,
     etablissement_fondateur: flags?.fondateur === true,
     etablissement_partenaire: flags?.partenaire === true,
@@ -804,14 +711,6 @@ const numberIn = (pattern, label) => {
 // Le numéro de l'action d'une tâche d'après son libellé ; null sans numéro.
 export const taskActionNumber = label => numberIn(TASK_ACTION_NUMBER, label);
 
-// Le numéro complet d'une tâche d'après son libellé : « 1.3 Animer le réseau », « T1.3 » et « Tâche n° 1.3 : … » → « 1.3 » ; null sans
-// numéro de la forme 1.3. C'est ce que la pastille « Responsable de l'action 1.3 » écrit.
-const TASK_CODE = /^\s*(?:t(?:[aâ]che)?\.?\s*)?(?:n\s*°\s*)?(\d+)\s*\.\s*(\d+)/i;
-export function taskCode(label) {
-  const match = TASK_CODE.exec(text(label).replace(LEADING_BRACKETS, ''));
-  return match ? `${Number(match[1])}.${Number(match[2])}` : null;
-}
-
 // Le numéro d'une action d'après son libellé ; null sans numéro.
 export const actionNumber = label => numberIn(ACTION_NUMBER, label);
 
@@ -915,16 +814,6 @@ function warnAboutMissingEtablissement(rows, log) {
     + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
 }
 
-// Depuis la 1.39.0 les actions d'une personne sont ses tâches (BDD.Taches) : la colonne BDD.Actions n'est plus lue. Une personne affichée qui
-// n'a une action que dans cette ancienne colonne n'en a donc plus aucune à l'écran : la console le dit, sans la nommer.
-function warnAboutActionsWithoutTasks(contacts, log) {
-  const count = contacts.filter(contact => safeValues(contact.Actions).length > 0 && safeValues(contact.Taches).length === 0).length;
-  if (count) {
-    log.info(`[REFS] ${count} contact(s) affichable(s) ont une ligne dans la colonne Actions de BDD mais aucune dans la colonne Taches : `
-      + 'le widget ne lit plus la colonne Actions (1.39.0), ils n\'ont donc aucune action à l\'écran. Les ajouter à Taches les y rend visibles.');
-  }
-}
-
 // Les personnes qui n'ont pas accepté d'apparaître sont normales, pas une anomalie : la console en
 // donne seulement le nombre (jamais leurs noms).
 function logWithoutConsent(rows, log) {
@@ -981,7 +870,6 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const contacts = buildContacts(rows, referenceMaps, etabFlags);
   log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
-  warnAboutActionsWithoutTasks(contacts, log);
   warnAboutMissingEtablissement(rows, log);
   logWithoutConsent(rows, log);
 

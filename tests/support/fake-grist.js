@@ -4,8 +4,8 @@
 //
 // Il reproduit ce dont le widget dépend, pas Grist en entier :
 //   - fetchTable / listTables, avec des tables en colonnes ({ id: [...], nom: [...] }) ;
-//   - applyUserActions pour AddRecord, UpdateRecord, RemoveRecord, BulkRemoveRecord, AddTable et AddColumn (l'identifiant
-//     est numéroté s'il est pris, comme Grist), RemoveTable et RemoveColumn, atomique (un lot refusé ne
+//   - applyUserActions pour AddRecord, UpdateRecord, RemoveRecord, BulkRemoveRecord, AddTable (l'identifiant
+//     est numéroté s'il est pris, comme Grist) et RemoveTable, atomique (un lot refusé ne
 //     change rien) et qui renvoie retValues comme Grist ;
 //   - les formules déclenchées de la table-sonde (GRIST_SETUP.md) : Email prend
 //     l'adresse de la personne connectée, Admin et Responsable_de se déduisent de la
@@ -24,8 +24,6 @@
 //   denyWrites  noms des tables où toute écriture est refusée
 //   denyRows    lignes protégées { table: [identifiants] } : toute modification ou
 //               suppression d'une de ces lignes est refusée (une règle d'accès par ligne)
-//   denyStructure  vrai : toute action sur la structure (AddTable, AddColumn, RemoveTable, RemoveColumn) est
-//               refusée, comme pour un éditeur à qui les règles d'accès ne laissent pas changer la structure
 //   triggers    formules déclenchées en plus de celles de la sonde :
 //               { table: { colonne: ({ user, tables }) => valeur } }
 //   delay       millisecondes d'attente avant chaque écriture (une écriture lente)
@@ -137,26 +135,10 @@ export function createFakeGrist(options = {}) {
       requireTable(all, tableName);
       delete all[tableName];
       return null;
-    },
-    // Comme Grist : un identifiant déjà pris est numéroté (« Taches_responsable2 »), la colonne existante reste
-    // intacte ; la valeur renvoyée porte l'identifiant obtenu. Les lignes déjà là reçoivent une cellule vide.
-    AddColumn(all, tableName, colId, info = {}) {
-      const table = requireTable(all, tableName);
-      let id = colId;
-      for (let number = 2; id in table; number += 1) id = `${colId}${number}`;
-      table[id] = table.id.map(() => (info.isFormula ? undefined : null));
-      return { colRef: Object.keys(table).length, colId: id };
-    },
-    RemoveColumn(all, tableName, colId) {
-      const table = requireTable(all, tableName);
-      if (colId === 'id' || !(colId in table)) throw new Error(`Invalid column '${colId}' dans ${tableName}`);
-      delete table[colId];
-      return null;
     }
   };
 
-  const verbs = { AddRecord: 'add', UpdateRecord: 'update', RemoveRecord: 'remove', BulkRemoveRecord: 'remove', AddTable: 'create', RemoveTable: 'remove', AddColumn: 'create', RemoveColumn: 'remove' };
-  const STRUCTURE_ACTIONS = ['AddTable', 'RemoveTable', 'AddColumn', 'RemoveColumn'];
+  const verbs = { AddRecord: 'add', UpdateRecord: 'update', RemoveRecord: 'remove', BulkRemoveRecord: 'remove', AddTable: 'create', RemoveTable: 'remove' };
 
   const docApi = {
     async fetchTable(name) {
@@ -190,9 +172,6 @@ export function createFakeGrist(options = {}) {
       try {
         retValues = actions.map(([action, tableName, rowId, values = {}]) => {
           if (!applyers[action]) throw new Error(`Action non gérée par le faux Grist : ${action}`);
-          if (read(options.denyStructure) === true && STRUCTURE_ACTIONS.includes(action)) {
-            throw new Error('Blocked by table structure access rules');
-          }
           if ((read(options.denyWrites) || []).includes(tableName)) {
             throw new Error(`Blocked by table ${verbs[action]} access rules`);
           }

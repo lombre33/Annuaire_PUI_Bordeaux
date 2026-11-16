@@ -10,14 +10,13 @@
 // et logos-report.js (les logos : cartes, fondateurs, bilan de la console) et
 // avatar-ui.js (les photos de profil), status-ui.js (le bandeau d'état et l'écran « Aucun contact »).
 
-import { CATEGORIES, CONSENT_COLUMN, DOCS_URL, ETABLISSEMENT_NAMES, RESPONSIBLE_COLUMN, SEARCH_DELAY_MS, VERSION } from './constants.js';
-import { loadDirectory, describeLoadFailure, debounce, filterableRoles, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
+import { CONSENT_COLUMN, DOCS_URL, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
+import { loadDirectory, describeLoadFailure, debounce, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, describeEmptyResults, filterContacts, countInScope, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
 import { attachTagNavigation, attachTagNotes, focusFirstResult, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
 import { createScrollTools } from './scroll-tools.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
-import { createResponsibleColumn } from './schema.js';
 import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
 import { createEmptyState, createStatusBanner } from './status-ui.js';
@@ -199,8 +198,7 @@ function refreshFilterMenus() {
   if (!state.etabFlags) return; // l'annuaire n'est pas encore lu : pas de menu à tenir à jour
   const filterReferenceMaps = {
     ...state.referenceMaps,
-    etablissement: filterVisibleEstablishments(state.referenceMaps.etablissement, state.etabFlags, state.scope),
-    role: filterableRoles(state.referenceMaps.role, { responsible: state.people?.columns.includes(RESPONSIBLE_COLUMN) === true })
+    etablissement: filterVisibleEstablishments(state.referenceMaps.etablissement, state.etabFlags, state.scope)
   };
   const menusChanged = !referenceMapsEqual(state.filterReferenceMaps, filterReferenceMaps);
   state.filterReferenceMaps = filterReferenceMaps;
@@ -365,7 +363,6 @@ function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissem
   refreshCards();
   refreshAccount();
   accountBar.clearStale();
-  ensureResponsibleColumn();
 }
 
 // Relit Grist et met l'affichage à jour. Renvoie 'applied', 'stale' (une lecture
@@ -410,22 +407,6 @@ function warnOnce(key, message) {
 }
 
 const isAdmin = () => state.identity?.status === 'ready' && state.identity.admin === true;
-
-// La colonne `Taches_responsable` de BDD (1.40.0) : la case « Responsable de » de la fenêtre de profil n'existe que si elle est là. Quand
-// elle manque, le widget la crée, une seule fois par chargement et seulement quand un administrateur a ouvert l'annuaire (c'est lui qui a le
-// droit de changer la structure du document, voir GRIST_SETUP.md étape 1) et que BDD et Taches ont de quoi la remplir. Grist la refuse-t-il,
-// la console le dit et la case n'est pas proposée ; l'annuaire, lui, ne change pas. L'annuaire est relu une fois la colonne créée.
-let responsibleColumnTried = false;
-async function ensureResponsibleColumn() {
-  if (responsibleColumnTried || !isAdmin() || !state.people) return;
-  const columns = state.people.columns;
-  if (columns.includes(RESPONSIBLE_COLUMN) || !columns.includes(CATEGORIES.taches.column)) return;
-  if (Object.keys(state.referenceMaps?.taches ?? {}).length === 0) return;
-  responsibleColumnTried = true;
-  const failure = await createResponsibleColumn(window.grist.docApi);
-  if (failure) console.info(`[SCHEMA] ${failure}`);
-  else await reloadDirectory();
-}
 
 // Les établissements dont la personne connectée est responsable (identifiants de ligne).
 const myEtablissements = () => (state.identity?.status === 'ready' ? state.identity.etablissements : []);
@@ -517,7 +498,6 @@ function applyIdentity(identity) {
   state.etabRights = etablissementRightsFor(identity);
   refreshAccount();
   refreshCards(); // les boutons « Modifier » apparaissent sur les cartes concernées
-  ensureResponsibleColumn();
 }
 
 readIdentity(window.grist.docApi, { readOnly: READ_ONLY }).then(applyIdentity);

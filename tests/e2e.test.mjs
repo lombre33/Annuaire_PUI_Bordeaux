@@ -99,7 +99,7 @@ test('colonne Accepte_apparaitre absente de BDD : erreur explicite, jamais l\'an
   });
 });
 
-test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés), rôle dans le PUI en tête', { skip }, () =>
+test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, tags (libellés corrigés) et rôle PUI (du texte à part, sur la ligne de l\'e-mail)', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const ana = cardNamed(page, 'Ana Martin');
@@ -110,18 +110,18 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
       groups.map(group => [group.querySelector('.tag-group-title').textContent,
         [...group.querySelectorAll('.tag')].map(tag => tag.textContent)]));
     assert.deepEqual(tagsByGroup, [
-      ['Rôle dans le PUI', ['Référent qualité']],
       ['Instances', ['CME']],
+      ['Actions', ['Vaccination']],
       ['Compétences', ['Oncologie', 'Hématologie']],
       ['Communautés', ['Réseau douleur']]
     ]);
     assert.equal(await ana.locator('.tel').textContent(), '☎ 05 36 49 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
-    const role = ana.locator('.tag-role');
-    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est une pastille, la première section du bas de la carte (1.39.0)');
+    const role = ana.locator('.role-col .role-tag');
+    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est un texte à part (.role-col), plus une section du bas de la carte');
     assert.equal(await role.evaluate(tag => tag.tagName), 'BUTTON', 'il filtre comme les autres tags');
-    assert.equal(await ana.locator('.role-col, .role-tag, .role-text').count(), 0, 'plus de rôle écrit sur la ligne de l\'e-mail');
+    assert.equal(await role.getAttribute('title'), 'Référent qualité', 'le rôle entier est en infobulle : coupé par « … » sur une ligne trop courte');
     assert.equal(await ana.locator('.tag-static').count(), 0);
-    assert.equal(await cardNamed(page, 'Hugo Bernard').locator('.tag-role').count(), 0, 'pas de rôle : pas de pastille de rôle');
+    assert.equal(await cardNamed(page, 'Hugo Bernard').locator('.role-tag').count(), 0, 'pas de rôle : pas de tag de rôle');
 
     const hugo = cardNamed(page, 'Hugo Bernard');
     assert.equal(await hugo.locator('.email.visible').count(), 0, 'pas de ligne email vide');
@@ -398,21 +398,19 @@ test('cliquer un tag de carte coche le filtre, met à jour le menu et le badge ;
     assert.equal(await page.locator('.filter-count:not([hidden])').count(), 0);
   }));
 
-test('le filtre Rôle dans le PUI propose les rôles de la table Role_Dans_le_PUI, plus « Membre d\'une action » ; la pastille de rôle d\'une carte le coche, et il filtre', { skip }, () =>
+test('le filtre Rôle PUI propose les rôles de la table Role_Dans_le_PUI ; le rôle d\'une carte le coche, et il filtre', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     const filter = page.locator('.filter[data-filter-key="role"]');
     await filter.locator('.filter-button').click();
-    assert.deepEqual(await filter.locator('.filter-option .option-label').allTextContents(), ['Membre d’une action', 'Référent qualité'],
-      'la table n\'a que « Référent qualité » ; « Membre d\'une action » s\'y ajoute, calculé d\'après les actions');
-    assert.deepEqual(await filter.locator('.filter-option .option-count').allTextContents(), ['0', '1'], 'personne n\'a d\'action dans le jeu de base ; une personne a le rôle choisi');
+    assert.deepEqual(await filter.locator('.filter-option .option-label').allTextContents(), ['Référent qualité']);
+    assert.equal(await filter.locator('.filter-option .option-count').textContent(), '1', 'une seule personne a ce rôle');
 
-    await cardNamed(page, 'Ana Martin').locator('.tag-role').click();
+    await cardNamed(page, 'Ana Martin').locator('.role-col .role-tag').click();
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
     assert.equal(await filter.locator('.filter-count').textContent(), '1');
-    assert.equal(await filter.locator('.filter-option', { hasText: 'Référent qualité' }).locator('input').isChecked(), true);
-    assert.equal(await filter.locator('.filter-option', { hasText: 'Membre d’une action' }).locator('input').isChecked(), false);
+    assert.equal(await filter.locator('.filter-option input').isChecked(), true);
 
     await page.click('#resetFilters');
     await waitForCards(page, 4);
@@ -449,11 +447,11 @@ test('le filtre Compétences propose le libellé corrigé de la table Competence
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
   }));
 
-test('la barre de filtres compte sept boutons : « Domaines » n\'a plus le sien, ses domaines rangent le menu Compétences', { skip }, () =>
+test('la barre de filtres compte huit boutons : « Domaines » n\'a plus le sien, ses domaines rangent le menu Compétences', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await page.locator('.filter-button > span:nth-child(2)').allTextContents(),
-      ['Actions', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement', 'Rôle dans le PUI']);
+      ['Actions', 'Tâches', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement', 'Rôle PUI']);
     assert.equal(await page.locator('.filter[data-filter-key="macro"]').count(), 0);
     assert.match(await skillsFilter(page).locator('.filter-button').getAttribute('title'), /domaine/);
     assert.equal(await skillsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Domaine ou compétence…');
@@ -869,18 +867,18 @@ test('panne après un chargement réussi : les cartes restent, le bandeau appara
 test('table de référence illisible : données partielles signalées, filtres et menus conservés', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    const filter = page.locator('.filter[data-filter-key="instances"]');
+    const filter = page.locator('.filter[data-filter-key="actions"]');
     await filter.locator('.filter-button').click();
-    await filter.locator('.filter-option', { hasText: 'CME' }).locator('input').check();
+    await filter.locator('.filter-option', { hasText: 'Vaccination' }).locator('input').check();
     await waitForCards(page, 1);
 
-    await page.evaluate(() => { window.__failTables = ['INSTANCES']; });
+    await page.evaluate(() => { window.__failTables = ['Actions']; });
     await reload(page);
     await waitForBanner(page);
-    assert.match(await bannerText(page), /INSTANCES/);
-    assert.equal(await cardCount(page), 1, 'la sélection CME n\'est pas effacée par la panne');
+    assert.match(await bannerText(page), /Actions/);
+    assert.equal(await cardCount(page), 1, 'la sélection Vaccination n\'est pas effacée par la panne');
     assert.equal(await filter.locator('.filter-count').textContent(), '1');
-    assert.equal(await filter.locator('.filter-option', { hasText: 'CME' }).count(), 1, 'le menu garde ses options');
+    assert.equal(await filter.locator('.filter-option', { hasText: 'Vaccination' }).count(), 1, 'le menu garde ses options');
   }));
 
 test('acronymes en double : chaque contact garde le statut de sa propre ligne d\'Etablissements, sans bandeau', { skip }, () => {
@@ -1020,11 +1018,8 @@ test('l\'identification laisse le document propre : la ligne de la sonde est ret
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForAccountBar(page);
     await probeRemoved(page);
-    // Ana est administratrice : en ouvrant l'annuaire, elle fait ajouter la colonne Taches_responsable (1.40.0), la seule structure que le
-    // widget touche ; l'identification, elle, n'écrit que la ligne de la sonde.
-    assert.deepEqual((await grist(page)).filter(call => !/Column$/.test(call.action)).map(call => [call.action, call.table]),
+    assert.deepEqual((await grist(page)).map(call => [call.action, call.table]),
       [['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
-    assert.deepEqual((await grist(page)).filter(call => /Column$/.test(call.action)).map(call => [call.action, call.table, call.rowId]), [['AddColumn', 'BDD', 'Taches_responsable']]);
     assert.deepEqual(await page.evaluate(() => window.__tables.Annuaire_Sonde.id), []);
   }));
 
