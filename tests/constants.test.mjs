@@ -156,7 +156,7 @@ test('a category and its groupings point at each other, and only the grouped cat
 test('the button of a grouped menu says what it offers: groups to tick whole, and a search over both levels', () => {
   const grouped = [
     ['macro', /domaine/i, /domaine/i, /compétence/i],
-    ['curie', /C\.U\.R\.I\.E/, /groupe/i, /compétence/i],
+    ['curie', /C\.U\.R\.I\.E/, /C\.U\.R\.I\.E/, /compétence/i], // à plat (1.43.2) : une compétence du référentiel par ligne, pas de groupe
     ['macroTaches', /action/i, /action/i, /tâche/i]
   ];
   grouped.forEach(([key, hintNoun, placeholderNoun, detail]) => {

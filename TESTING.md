@@ -703,8 +703,8 @@ et être remplie (sur une copie du document pour l'essai).
       recherche ; le menu s'ouvre sur « Classique », inchangé.
 - [ ] Les onglets n'ont aucun cadre : deux mots, un filet dessous et un trait sous l'onglet affiché (le menu et la recherche gardent le
       leur).
-- [ ] Un clic sur « C.U.R.I.E » range les mêmes compétences par groupe : l'aide, le champ de recherche (« Groupe ou compétence… ») et
-      l'infobulle du bouton changent. Chaque groupe porte le libellé de la ligne du référentiel (« Compétences en gestion de projet. »), dans l'ordre alphabétique ;
+- [ ] Un clic sur « C.U.R.I.E » montre la liste à plat des compétences du référentiel (aucune flèche, rien dessous) : l'aide, le champ de recherche (« Compétence C.U.R.I.E… ») et
+      l'infobulle du bouton changent. Chaque ligne porte le libellé de la compétence du référentiel (« Compétences en gestion de projet. »), dans l'ordre alphabétique ;
       une compétence que la colonne ne classe pas (référence vide, « — aucune correspondance — ») n'est **pas** sous cet onglet (elle est sous
       « Classique »), et aucun titre n'est un numéro, ni « N° 13 », ni « aucun… ».
 - [ ] Cocher un groupe C.U.R.I.E, puis revenir sous « Classique » : les mêmes compétences sont cochées, leurs domaines complets ou à moitié

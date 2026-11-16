@@ -1079,6 +1079,17 @@ button.avatar:hover {
 .filter-menu.searching .group-options {
   display: block;
 }
+/* Un rangement à plat (C.U.R.I.E) : chaque ligne est une compétence, au poids et à la couleur d'une case ordinaire ; le détail caché ne s'ouvre jamais, même en cherchant. */
+.filter-group.flat .group-option {
+  font-weight: 400;
+}
+.filter-group.flat .group-option .option-label {
+  color: inherit;
+}
+.filter-group.flat .group-options,
+.filter-menu.searching .filter-group.flat .group-options {
+  display: none;
+}
 /* Tant qu'on cherche, tout est déplié : le bouton n'a plus d'effet, il disparaît. */
 .filter-menu.searching .group-toggle {
   visibility: hidden;

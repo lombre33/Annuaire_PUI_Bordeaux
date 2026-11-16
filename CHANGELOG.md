@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.43.2 — Onglet « C.U.R.I.E » : une liste plate des compétences du référentiel, sans regroupement ni compétences classiques dessous
+
+Retour d'Antoine du 16 novembre 2026 (14:50 UTC), devant l'onglet de la 1.43.1 : « je ne comprends pas le regroupement par plus grosse catégorie ? il n'y a pas ce lien hiérarchique pour C.U.R.I.E ? tu l'as construit comment ? […] le référentiel C.U.R.I.E c'est juste un seul niveau de compétences, pas de catégories ».
+
+- **Ce qui était faux.** La 1.43.1 rangeait les compétences « classiques » (table `Competences`) sous la ligne du référentiel qu'elles désignent : un titre, des cases dessous, une flèche. C'était mon interprétation de la demande du 1.38.0, jamais validée, et elle fabriquait des « catégories » que le référentiel n'a pas.
+- **Ce qui change.** Sous « C.U.R.I.E », **une ligne par compétence du référentiel** (`Referentiel_competences_CURIE.Competence`) : une case, son libellé, le nombre de personnes qui l'ont. Plus de flèche, plus de compétences dessous. Cocher une ligne garde les personnes dont **au moins une** compétence pointe vers elle (le filtre ne connaît toujours que les compétences, la ligne les coche toutes d'un clic, la case est partielle quand une partie seulement l'est, le badge compte une ligne cochée pour un). La recherche ne lit que le libellé des lignes. Option `flat: true` de `CATEGORIES.curie` (`constants.js`).
+- **Ce qui ne change pas.** L'onglet « Classique » (domaines, flèches, compétences), la sélection commune aux deux onglets, la table du référentiel facultative, les onglets sans cadre.
+- **Tests.** `tests/e2e-curie.test.mjs` : sous « C.U.R.I.E », aucune compétence visible sous une ligne, aucune flèche, recherche limitée aux libellés, case partielle sans dépliage. Rien n'a été essayé dans le vrai Grist d'Antoine.
+- Fichiers : `constants.js` (`flat`, aide, texte de recherche, version), `filter-menus.js` (`buildGroup()`, `setGroupOpen()`, `searchGroups()`), `style.css` (`.filter-group.flat`), `tests/e2e-curie.test.mjs`, docs.
+
 ## 1.43.1 — Onglet « C.U.R.I.E » : chaque groupe porte le libellé de la ligne du référentiel, plus de « N° 13 »
 
 Retour d'Antoine du 16 novembre 2026, avec une capture de l'onglet sous la 1.41.1 (« N° 3 », « N° 13 », « N° 15 », « N° 16 », « N° 18 ») : « que sont ces chiffres ?? ça n'a AUCUN SENS ». Rien à régler dans Grist, sauf si le widget ne peut pas lire la table `Referentiel_competences_CURIE` (règles d'accès : voir plus bas).

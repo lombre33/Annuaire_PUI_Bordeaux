@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.43.1';
+export const VERSION = '1.43.2';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -179,10 +179,10 @@ export const CATEGORIES = {
   // ne classe pas n'est pas montrée sous cet onglet (1.41.1), elle l'est sous « Classique ».
   curie: {
     label: 'C.U.R.I.E', color: '#00697f', table: 'Competences', field: ['referenciel_C_U_R_I_E'], column: 'Competences',
-    groups: 'competences', tab: 'C.U.R.I.E', optional: true,
+    groups: 'competences', tab: 'C.U.R.I.E', optional: true, flat: true,
     referential: { table: 'Referentiel_competences_CURIE', field: ['Competence'] },
-    hint: 'Cochez un groupe C.U.R.I.E pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
-    placeholder: 'Groupe ou compétence…'
+    hint: 'Cochez une compétence C.U.R.I.E pour garder les personnes qui l’ont',
+    placeholder: 'Compétence C.U.R.I.E…'
   },
   macroTaches: {
     label: 'Groupes d’actions', color: '#9a3412', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
