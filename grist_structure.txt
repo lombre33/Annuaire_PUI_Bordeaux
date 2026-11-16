@@ -129,6 +129,15 @@ Tables de référence (id -> libellé, chargées via fetchTable)
                        accents) n'en font qu'un. Le widget n'utilise pas
                        BDD.Comptetences_macr : le domaine d'un contact se déduit
                        de ses BDD.Competences.
+                       + referenciel_C_U_R_I_E (Text ou Choice, facultative) : le groupe
+                       du référentiel C.U.R.I.E de chaque compétence. Un second
+                       rangement des mêmes compétences, qui donne au menu
+                       « Compétences » un onglet « C.U.R.I.E » à côté de « Classique »
+                       (les domaines). Absente ou vide : pas d'onglet, sans bandeau ni
+                       avertissement. Une compétence sans groupe est classée sous
+                       « Hors C.U.R.I.E ». Une valeur par compétence (une liste de choix
+                       est lue comme un seul texte) ; pas de type Référence. Le widget
+                       ne crée pas cette colonne.
   INSTANCES          : Instances_Corrigees (Choice)   puis Instances (Text)
                        (le nom de la table est en majuscules)
   Etablissements     : acronyme (Text), nom_complet (Text),

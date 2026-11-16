@@ -516,6 +516,104 @@ test('unsavedLabels notices an e-mail or an établissement that Grist did not ke
   assert.deepEqual(unsavedLabels(next, { ...saved, Etablissement: 4 }, w.referenceMaps), ['Établissement']);
 });
 
+// ===== L'administrateur qui règle « Accepte d'apparaître » sur la fiche d'une autre personne (1.38.0) =====
+
+const CONSENT = 'Accepte_apparaitre';
+const CONSENT_LINE_LABEL = 'Accepte d’apparaître dans l’annuaire';
+
+test('buildRowUpdate writes the choice to appear as a true or a false, never as a text, a number or an empty cell', async () => {
+  const w = await world();
+  assert.deepEqual(buildRowUpdate({ [CONSENT]: { avant: true, apres: false } }, w.row(2)).values, { [CONSENT]: false });
+  assert.deepEqual(buildRowUpdate({ [CONSENT]: { avant: false, apres: true } }, w.row(11)).values, { [CONSENT]: true });
+  assert.deepEqual(buildRowUpdate({ [CONSENT]: { avant: false, apres: 'true' } }, w.row(11)).values, { [CONSENT]: false }, 'seul `true` vaut accord');
+  const { [CONSENT]: _omitted, ...withoutColumn } = w.row(2);
+  assert.match(buildRowUpdate({ [CONSENT]: { avant: true, apres: false } }, withoutColumn).error, /Accepte d’apparaître dans l’annuaire : la colonne Accepte_apparaitre n'existe pas dans BDD/);
+});
+
+test('prepareReview of an unticked box says the fiche leaves the directory, and what the administrator then loses', async () => {
+  const w = await world();
+  const next = await review(w, 2, { [CONSENT]: false }, { admin: true });
+  assert.deepEqual(Object.keys(next.champs), [CONSENT]);
+  assert.deepEqual(next.lines, [{ key: CONSENT, label: CONSENT_LINE_LABEL, kind: 'consent', before: 'Oui', after: 'Non' }]);
+  assert.deepEqual([next.visibility.accepted, next.visibility.visible], [false, false], 'la carte « Après » n\'est plus dans l\'annuaire');
+  assert.deepEqual(next.marks.texts, {}, 'aucune ligne de la carte ne change : seule sa présence');
+  assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien');
+});
+
+test('prepareReview of a ticked box for a person who refused, or never answered, says the fiche comes back', async () => {
+  const w = await world();
+  for (const id of [11, 12]) {
+    const next = await review(w, id, { [CONSENT]: true }, { admin: true });
+    assert.deepEqual(next.lines.map(line => [line.before, line.after]), [['Non', 'Oui']], String(id));
+    assert.equal(next.visibility.accepted, true);
+  }
+  assert.equal((await review(w, 11, { [CONSENT]: true }, { admin: true })).visibility.visible, true, 'Iris est au CHU, fondateur et validé');
+});
+
+test('prepareReview does not read the choice to appear of a draft unless an administrator is at work', async () => {
+  const w = await world();
+  const { row, draft } = w.form(2);
+  await assert.rejects(prepareReview(w.docApi, row, { ...draft, [CONSENT]: false }, w.context),
+    error => error instanceof ProfileSaveError && /rien à relire/.test(error.message));
+  const beside = await prepareReview(w.docApi, row, { ...draft, [CONSENT]: false, Fonction: 'Chef' }, w.context);
+  assert.deepEqual(Object.keys(beside.champs), ['Fonction'], 'ce champ est écarté, le reste passe');
+});
+
+test('saveProfile writes the choice to appear in one single UpdateRecord of the fiche, with the other columns, and the directory then hides it', async () => {
+  const w = await world();
+  const next = await review(w, 2, { [CONSENT]: false, Fonction: 'Chef' }, { admin: true });
+  const result = await saveProfile(w.docApi, next, { log: quiet });
+  assert.equal(result.status, 'saved');
+  assert.deepEqual(writes(w), [{ action: 'UpdateRecord', table: 'BDD', rowId: 2, ok: true, values: { [CONSENT]: false, Fonction: 'Chef' } }]);
+  assert.equal(w.tables.BDD[CONSENT][1], false);
+  assert.equal(w.tables.BDD[CONSENT][0], true, 'les autres fiches gardent leur choix');
+  const { contacts } = await loadDirectory(w.docApi, { log: quiet });
+  assert.ok(!contacts.some(contact => contact.id === 2), 'la fiche n\'est plus dans l\'annuaire');
+  assert.ok(contacts.some(contact => contact.id === 1), 'les autres y sont encore');
+  assert.deepEqual(unsavedLabels(next, tableToRows(w.tables.BDD).find(candidate => candidate.id === 2), w.referenceMaps), []);
+});
+
+test('saveProfile brings back a fiche whose box is ticked, and writes nothing more when the person ticked it herself meanwhile', async () => {
+  const w = await world();
+  await saveProfile(w.docApi, await review(w, 11, { [CONSENT]: true }, { admin: true }), { log: quiet });
+  assert.equal(w.tables.BDD[CONSENT][10], true);
+  assert.deepEqual(writes(w).map(call => [call.rowId, call.values]), [[11, { [CONSENT]: true }]]);
+  assert.ok((await loadDirectory(w.docApi, { log: quiet })).contacts.some(contact => contact.id === 11), 'Iris est de retour dans l\'annuaire');
+  // La personne a coché l'interrupteur de son bandeau pendant que l'administrateur relisait : la fiche a changé, on relit.
+  const next = await review(w, 12, { [CONSENT]: true }, { admin: true });
+  w.tables.BDD[CONSENT][11] = true;
+  assert.equal((await saveProfile(w.docApi, next, { log: quiet })).status, 'changed');
+  assert.equal(writes(w).length, 1, 'rien de plus n\'est écrit sur une fiche qui a changé depuis la relecture');
+});
+
+test('saveProfile gives the review back when somebody changed the choice to appear since it was read', async () => {
+  const w = await world();
+  const next = await review(w, 2, { [CONSENT]: false }, { admin: true });
+  w.tables.BDD[CONSENT][1] = false; // la personne l'a décochée elle-même entre-temps
+  const result = await saveProfile(w.docApi, next, { log: quiet });
+  assert.equal(result.status, 'changed', 'la signature couvre le choix d\'apparaître');
+  assert.deepEqual(writes(w), []);
+});
+
+test('saveProfile closed by default: a review that was not prepared for an administrator cannot write the choice to appear', async () => {
+  const w = await world();
+  const next = await review(w, 2, { [CONSENT]: false }, { admin: true });
+  for (const admin of [false, undefined, 'oui', 1]) {
+    await assert.rejects(saveProfile(w.docApi, { ...next, admin }, { log: quiet }),
+      error => error instanceof ProfileSaveError && /réservés à un administrateur/.test(error.message) && /le choix d'apparaître/.test(readable(error.message)), JSON.stringify(admin));
+  }
+  assert.deepEqual(writes(w), []);
+  assert.equal(w.tables.BDD[CONSENT][1], true);
+});
+
+test('unsavedLabels notices a choice to appear that Grist did not keep', async () => {
+  const w = await world();
+  const next = await review(w, 2, { [CONSENT]: false }, { admin: true });
+  assert.deepEqual(unsavedLabels(next, w.row(2), w.referenceMaps), [CONSENT_LINE_LABEL], 'Grist a gardé l\'ancien choix');
+  await saveProfile(w.docApi, next, { log: quiet });
+  assert.deepEqual(unsavedLabels(next, tableToRows(w.tables.BDD).find(candidate => candidate.id === 2), w.referenceMaps), []);
+});
+
 // ===== La photo de profil (colonne Avatar de BDD, pièce jointe) =====
 
 // Ana a la photo 501, Bob la 502, Hostile le fichier 998 ; Dan (4), Hugo (10) et les autres n'en ont pas.

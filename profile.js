@@ -137,8 +137,12 @@ export function blankFiche(columns, email = '') {
 
 // ===== Le formulaire =====
 
-// La catégorie qui regroupe celle-ci (les domaines regroupent les compétences), ou null.
-const groupingOf = category => Object.entries(CATEGORIES).find(([, other]) => other.groups === category) || null;
+// La catégorie qui regroupe celle-ci (les domaines regroupent les compétences), ou null. Le formulaire range par le premier regroupement du
+// menu (le rangement de départ), jamais par un onglet de plus comme C.U.R.I.E.
+const groupingOf = category => {
+  const key = CATEGORIES[category]?.groupings?.[0];
+  return key ? [key, CATEGORIES[key]] : null;
+};
 
 // Les valeurs qu'une table de référence propose : [{ id, label }] triées. Quand un
 // regroupement est connu (les domaines des compétences), chaque valeur porte aussi son
@@ -222,6 +226,7 @@ export function profileFormModel(row, referenceMaps, { admin = false, creating =
     if (field.kind === 'text' || field.kind === 'email') return { ...base, value: text(row[field.key]) };
     if (field.kind === 'image') return { ...base, value: avatarIdOf(row[field.key]) };
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
+    if (field.kind === 'consent') return { ...base, value: row[field.key] === true };
     const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: field.kind === 'list' });
     if (field.kind === 'reference') {
       const choices = field.category === 'etablissement' ? choosableEtablissements(options, row, etabFlags) : options;
@@ -241,6 +246,8 @@ export function draftOf(model) {
 // ===== Ce qui change =====
 
 const labelOf = (options, id) => options.find(option => option.id === id)?.label || '';
+
+const yesNo = value => (value ? 'Oui' : 'Non');
 
 // Une valeur d'une liste, telle que `champs` la garde : son identifiant, son libellé et, pour une entrée
 // qui en réunit plusieurs, les identifiants de toutes ses lignes.
@@ -325,8 +332,16 @@ function diffList(field, input, row, { referenceMaps }) {
   };
 }
 
+// La case « accepte d'apparaître » : vrai ou faux, rien d'autre. Seul `true` vaut accord, comme partout (hasAccepted) : une cellule vide
+// ou d'un autre type vaut « non ». Un brouillon d'un autre type est une erreur, jamais « décoché ».
+function diffConsent(field, input, row) {
+  if (typeof input !== 'boolean') return { fault: 'Valeur illisible.' };
+  const before = row[field.key] === true;
+  return input === before ? null : { change: { avant: before, apres: input } };
+}
+
 // Les listes sont le cas par défaut.
-const DIFFERS = { image: diffImage, email: diffEmail, text: diffText, phone: diffPhone, reference: diffReference };
+const DIFFERS = { image: diffImage, email: diffEmail, text: diffText, phone: diffPhone, reference: diffReference, consent: diffConsent };
 
 // Une fiche garde un prénom ou un nom : une fiche qu'on crée le réclame sous les deux champs, une fiche qu'on modifie
 // sous celui qu'on vient de vider.
@@ -395,6 +410,8 @@ const rebaseText = (field, change, row) => rebaseValue(text(row[field.key]), cha
 
 const rebasePhone = (field, change, row) => rebaseValue(frenchPhoneDigits(formatPhone(row[field.key])) || '', change);
 
+const rebaseConsent = (field, change, row) => rebaseValue(row[field.key] === true, change);
+
 function rebaseReference(field, change, row, referenceMaps) {
   const current = refId(row[field.key]) || 0;
   if (current === change.apres.id) return null;
@@ -411,7 +428,7 @@ function rebaseList(field, change, row) {
   return ajout.length + retrait.length > 0 ? { change: { ajout, retrait }, moved: false } : null;
 }
 
-const REBASERS = { image: rebaseImage, email: rebaseText, text: rebaseText, phone: rebasePhone, reference: rebaseReference };
+const REBASERS = { image: rebaseImage, email: rebaseText, text: rebaseText, phone: rebasePhone, reference: rebaseReference, consent: rebaseConsent };
 
 // Ramène les changements (calculés sur la fiche telle que le formulaire l'a montrée)
 // sur la fiche telle qu'elle est maintenant dans Grist : { champs, moved }.
@@ -439,6 +456,7 @@ export function rebaseChanges(champs, row, referenceMaps, { admin = false, creat
 // Une ligne par champ modifié : le champ, ce qu'il valait, ce qu'il vaudra. `champs` a
 // la forme de diffProfile(), dans l'ordre du formulaire.
 //   texte, téléphone, référence   { key, label, kind, before, after }
+//   case « accepte d'apparaître » { key, label, kind: 'consent', before, after } : « Oui » ou « Non »
 //   photo                         { key, label, kind: 'image', before, after } : `before`, l'identifiant de
 //                                 la photo actuelle (0 : aucune) ; `after`, 'replace' ou 'remove'
 //   liste                         { key, label, kind, added, removed } (des libellés)
@@ -451,6 +469,7 @@ export function describeChanges(champs) {
     if (field.kind === 'list') return { ...base, added: change.ajout.map(label), removed: change.retrait.map(label) };
     if (field.kind === 'reference') return { ...base, before: change.avant.label, after: change.apres.label };
     if (field.kind === 'phone') return { ...base, before: formatPhone(change.avant), after: formatPhone(change.apres) };
+    if (field.kind === 'consent') return { ...base, before: yesNo(change.avant), after: yesNo(change.apres) };
     return { ...base, before: change.avant, after: change.apres };
   });
 }
