@@ -565,7 +565,7 @@ const widgetCode = () => fs.readdirSync(ROOT).filter(name => name.endsWith('.js'
   .replace(/['`]\s*\+\s*['`]/g, '')   // une phrase écrite en plusieurs morceaux
   .replaceAll('${MAX_TEXT_LENGTH}', String(MAX_TEXT_LENGTH))   // « 200 caractères au plus. »
   // le passage du guide que certains messages citent (doc-refs.js) : « (voir le guide d'installation Grist, étape 4 « Règles d'accès »). »
-  .replace(/\$\{DOC_REFS\.(\w+)\.text\}/g, (whole, name) => DOC_REFS[name]?.text ?? whole)
+  .replace(/\$\{DOC_REFS\.(\w+)\.text\}/g, (whole, name) => plain(DOC_REFS[name]?.text ?? whole))
   .replaceAll('\\\'', '\'');
 
 // Les messages d'échec d'un envoi sont composés dans upload.js : une consigne (`hint`), écrite par
