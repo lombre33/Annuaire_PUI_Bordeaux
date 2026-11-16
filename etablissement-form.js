@@ -13,17 +13,18 @@
 //   shell                               le cadre commun des fenêtres (dialog-shell.js)
 
 import { IMAGE_RULES } from './constants.js';
-import { button, dropdown, el, notice } from './dom.js';
+import { DOC_REFS } from './doc-refs.js';
+import { button, dropdown, el, messageNodes, notice } from './dom.js';
 import { KEEP_ONE, diffEtablissement, nominate, summaryOf, toggleResponsable, visibilityWarning } from './etablissement.js';
 import { imageFaultMessage, megabytes, prepareImage } from './image-prep.js';
 
 const LOGO_HELP = {
   with: `Il apparaît sur les cartes de l’établissement et dans le bandeau du bas. PNG, JPG, WebP ou SVG, ${megabytes(IMAGE_RULES.logo.maxBytes)} au maximum, ramené à ${IMAGE_RULES.logo.maxSide} px de large.`,
   without: `Sans logo, les cartes affichent le sigle de l’établissement et le bandeau du bas son nom. PNG, JPG, WebP ou SVG, ${megabytes(IMAGE_RULES.logo.maxBytes)} au maximum.`,
-  noColumn: 'Le logo ne peut pas être modifié d’ici : la colonne « logo » n’existe pas dans la table Etablissements (GRIST_SETUP.md, étape 5).'
+  noColumn: `Le logo ne peut pas être modifié d’ici : la colonne « logo » n’existe pas dans la table Etablissements (voir le ${DOC_REFS.logos.text}).`
 };
 const NO_LIST = 'La liste des responsables n’a pas pu être lue : elle n’est ni affichée ni modifiable d’ici. '
-  + 'Les règles d’accès de Grist doivent laisser un responsable lire la table ACL pour son établissement (GRIST_SETUP.md).';
+  + `Les règles d’accès de Grist doivent laisser un responsable lire la table ACL pour son établissement (voir le ${DOC_REFS.access.text}).`;
 const SELF_REMOVAL = 'Vous retirez votre propre accès : une fois enregistré, vous ne pourrez plus modifier cette fiche.';
 const PICK_ONE = 'Choisir une personne';
 
@@ -125,7 +126,8 @@ function logoSection(ctx) {
   const box = el('section', 'es-logo');
   ui.tile = el('div', 'es-tile');
   const info = el('div', 'es-logo-info');
-  ui.logoHelp = el('p', 'es-logo-help', etablissement.logoColumn ? '' : LOGO_HELP.noColumn);
+  ui.logoHelp = el('p', 'es-logo-help');
+  if (!etablissement.logoColumn) ui.logoHelp.append(...messageNodes(LOGO_HELP.noColumn));
   ui.logoHelp.id = 'etabLogoHelp';
   info.append(el('h3', 'es-logo-title', 'Logo'), ui.logoHelp);
 

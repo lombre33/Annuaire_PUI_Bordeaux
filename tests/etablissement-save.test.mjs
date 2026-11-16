@@ -288,7 +288,7 @@ test('saveEtablissement writes the establishment and its responsables in ONE ato
 test('saveEtablissement turns an access rule, a formula column and any other failure into a sentence, and logs the cause', async () => {
   for (const [cause, expected] of [
     ['Blocked by table update access rules', /Grist a refusé la modification : vos droits ne permettent pas/],
-    ['Cannot modify formula column nom_complet', /colonne à formule.*GRIST_SETUP\.md/],
+    ['Cannot modify formula column nom_complet', /colonne à formule.*guide d’installation Grist, étape 1/],
     ['socket hang up', /La modification n’a pas pu être enregistrée/]
   ]) {
     const w = world();
@@ -463,7 +463,7 @@ test('saveEtablissement points at the setup step when the logo column does not e
   const opened = await readEtablissement(w.docApi, CHU, { log: quiet });
   const plan = savePlanOf(opened.row, { logo: { action: 'remove' } }, { responsable: true });
   const error = await rejection(save(w, plan));
-  assert.match(error.message, /la colonne logo n’existe pas dans Etablissements \(GRIST_SETUP\.md, étape 5\)/);
+  assert.match(error.message, /la colonne logo n’existe pas dans Etablissements \(voir le guide d’installation Grist, étape 5 « Les logos des établissements »\)/);
 });
 
 // ----- Le plan -----

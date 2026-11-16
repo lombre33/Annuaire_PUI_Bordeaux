@@ -1320,3 +1320,294 @@ textarea {
     border-radius: 18px;
   }
 }
+
+/* ===== Documentation (1.39.0) : la fenêtre qui lit les documents du dépôt (docs-ui.js) et le Markdown qu'elle dessine
+   (markdown-dom.js, classes « md-… ») ===== */
+.dlg.doc-dlg {
+  width: min(1040px, calc(100vw - 32px));
+  height: min(92vh, 980px); /* une hauteur fixe : la fenêtre ne saute pas quand un document remplace l'autre */
+  max-height: none;
+}
+.doc-nav {
+  padding: 10px 22px;
+  background: var(--field);
+  border-bottom: 1px solid var(--line);
+}
+.doc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.doc-tab {
+  height: 32px;
+  padding: 0 11px;
+  color: var(--violet-ink);
+  background: #fff;
+  border: 1px solid var(--violet-line);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.doc-tab:hover {
+  border-color: var(--violet);
+}
+.doc-tab[aria-current="page"] {
+  color: #fff;
+  background: var(--violet);
+  border-color: var(--violet);
+}
+.doc-body {
+  padding: 18px 28px 28px;
+}
+.doc-fail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.md {
+  max-width: 80ch;
+  margin: 0 auto;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md .md-scroll,
+.md pre,
+.md details,
+.md .md-html {
+  margin: 0 0 12px;
+}
+.md-h {
+  margin: 26px 0 10px;
+  line-height: 1.25;
+  font-weight: 800;
+}
+.md-h:focus {
+  outline: none; /* un lien du document y met le focus pour l'annoncer : ce n'est pas un contrôle */
+}
+.md-h1 {
+  margin-top: 0;
+  font-size: 26px;
+}
+.md-h2 {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  font-size: 20px;
+}
+.md-h3 {
+  font-size: 16.5px;
+}
+.md-h4,
+.md-h5,
+.md-h6 {
+  font-size: 14.5px;
+}
+.md ul,
+.md ol {
+  padding-left: 24px;
+}
+.md li {
+  margin: 3px 0;
+}
+.md li > p {
+  margin-bottom: 6px;
+}
+.md li > ul,
+.md li > ol {
+  margin: 4px 0 0;
+}
+.md-loose > li {
+  margin: 10px 0;
+}
+.md-task {
+  display: flex;
+  gap: 8px;
+  margin-left: -22px;
+  list-style: none;
+}
+.md-box {
+  flex: none;
+  color: var(--muted);
+}
+.md-task-body {
+  flex: 1;
+  min-width: 0;
+}
+.md-task-body > p:last-child {
+  margin-bottom: 0;
+}
+.md code,
+.md kbd {
+  padding: 1px 5px;
+  background: var(--wash);
+  border-radius: 5px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.md kbd {
+  border: 1px solid var(--line);
+}
+.md pre {
+  padding: 12px 14px;
+  overflow: auto;
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  line-height: 1.5;
+}
+.md pre code {
+  padding: 0;
+  background: none;
+  font-size: 12.5px;
+  white-space: pre;
+}
+.md-diagram {
+  padding: 8px 12px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.md-diagram summary {
+  margin-bottom: 8px;
+  color: var(--violet-ink);
+  cursor: pointer;
+  font-weight: 700;
+}
+.md blockquote {
+  padding: 2px 14px;
+  color: var(--muted);
+  border-left: 3px solid var(--violet-line);
+}
+.md hr {
+  margin: 20px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.md a {
+  color: var(--violet-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md-ext::after {
+  content: " ↗";
+  font-size: 0.85em;
+}
+.md-img {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+/* Une image qui ne vient pas (la pastille d'un autre site, qu'on ne charge pas, ou une image qui manque) : son texte, en pastille. */
+.md-img-alt {
+  display: inline-block;
+  margin: 0 4px 4px 0;
+  padding: 1px 9px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-style: normal;
+}
+.md-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.md-scroll-plain {
+  border: 0;
+}
+.md-table {
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.md-table th,
+.md-table td {
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: normal;
+}
+.md-table th {
+  background: var(--wash);
+  font-weight: 800;
+  white-space: nowrap;
+}
+.md-table tr:last-child td {
+  border-bottom: 0;
+}
+.md-table-html th,
+.md-table-html td {
+  border: 0;
+  overflow-wrap: anywhere;
+}
+.md-table-html td {
+  width: 50%;
+  padding: 6px;
+}
+.md-align-center {
+  text-align: center !important;
+}
+.md-align-right {
+  text-align: right !important;
+}
+.md sub {
+  font-size: 12px;
+}
+@media (max-width: 560px) {
+  /* Comme les autres fenêtres de saisie sur un téléphone : tout l'écran (la règle « .dlg » plus haut est moins précise que « .dlg.doc-dlg »). */
+  .dlg.doc-dlg {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+  .doc-dlg .dlg-actions {
+    flex: 1 1 100%;
+  }
+  .doc-dlg .dlg-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .doc-nav {
+    padding: 8px 14px;
+  }
+  .doc-tabs {
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    overflow-x: auto;
+  }
+  .doc-body {
+    padding: 14px 14px 22px;
+  }
+  .md-h1 {
+    font-size: 22px;
+  }
+  .md-table-html td {
+    display: block;
+    width: auto;
+  }
+}
