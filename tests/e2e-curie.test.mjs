@@ -97,18 +97,15 @@ test('un clic sur « C.U.R.I.E » range les mêmes compétences par groupe, avec
     assert.deepEqual(await skills.groupCounts(page), { [PROJET]: '1', [INNOVATION]: '1' },
       'Ana compte une fois pour chaque groupe ; Bob (groupe « innovation ») est masqué par défaut');
     assert.equal(await menu(page).locator('.filter-group').count(), 2, 'les domaines ne restent pas dans le menu : un onglet ne double pas les cases');
-    assert.equal(await menu(page).locator('.filter-option').count(), 3, 'les trois compétences que C.U.R.I.E classe, chacune dans son groupe');
-    assert.equal(await skills.search(page).getAttribute('placeholder'), 'Groupe ou compétence…');
+    assert.deepEqual(await skills.visibleItems(page), [], 'C.U.R.I.E n\'a qu\'un niveau : aucune compétence « classique » ne se voit sous une ligne du référentiel');
+    assert.equal(await menu(page).locator('.group-toggle').count(), 0, 'et aucune flèche ne déplie quoi que ce soit');
+    assert.equal(await skills.search(page).getAttribute('placeholder'), 'Compétence C.U.R.I.E…');
     assert.match(await menu(page).locator('.filter-help').textContent(), /C\.U\.R\.I\.E/);
     assert.match(await menu(page).locator('.filter-button').getAttribute('title'), /C\.U\.R\.I\.E/, 'l\'infobulle du bouton suit l\'onglet');
     assert.equal(await menu(page).evaluate(filter => filter.classList.contains('open')), true, 'changer d\'onglet ne ferme pas le menu');
     assert.equal(await menu(page).locator('.filter-menu').getAttribute('data-grouping'), 'curie');
     assert.equal(await menu(page).locator('.filter-groups').getAttribute('aria-labelledby'), await tab(page, 'curie').getAttribute('id'));
     assert.deepEqual(await Promise.all(['macro', 'curie'].map(grouping => tab(page, grouping).getAttribute('tabindex'))), ['-1', '0']);
-
-    await skills.toggle(page, INNOVATION).click();
-    assert.deepEqual(await skills.visibleItems(page), ['Hématologie', 'Pharmacovigilance']);
-    assert.deepEqual(await optionCounts(skills.group(page, INNOVATION)), { Hématologie: '1', Pharmacovigilance: '0' });
 
     await tab(page, 'macro').click();
     assert.deepEqual(await shownTab(page), ['Classique']);
@@ -195,8 +192,7 @@ test('un tag de carte coche la compétence dans l\'onglet montré, et à l\'ouve
 
     await skills.open(page);
     assert.deepEqual(await skills.groupNames(page), [INNOVATION, PROJET], 'le groupe qui contient une coche passe devant');
-    assert.equal(await skills.toggle(page, INNOVATION).getAttribute('aria-expanded'), 'true', 'à moitié coché : déplié pour montrer laquelle');
-    assert.deepEqual(await skills.visibleItems(page), ['Pharmacovigilance', 'Hématologie'], 'la compétence cochée passe devant l\'autre');
+    assert.deepEqual(await skills.visibleItems(page), [], 'une ligne du référentiel ne se déplie pas : la case partielle dit que la compétence est cochée');
   }));
 
 // ===== La recherche, le clavier, la mémoire du menu =====
@@ -212,13 +208,13 @@ test('la recherche déjà tapée s\'applique à l\'autre onglet : un groupe qui 
 
     await tab(page, 'curie').click();
     assert.equal(await search.inputValue(), 'hemato', 'ce qui est tapé reste dans le champ');
-    assert.deepEqual(await skills.visibleGroups(page), [INNOVATION]);
-    assert.deepEqual(await skills.visibleItems(page), ['Hématologie'], 'le groupe situe la compétence, seule elle reste');
+    assert.deepEqual(await skills.visibleGroups(page), [], 'la recherche ne lit que les lignes du référentiel : « hemato » n\'y figure pas, même si une compétence « classique » le contient');
+    assert.deepEqual(await skills.visibleItems(page), []);
     assert.equal(await menu(page).locator('.filter-menu').evaluate(element => element.classList.contains('searching')), true);
 
-    await search.fill('gestion de projet'); // le nom d'un groupe : il garde toutes ses compétences
+    await search.fill('gestion de projet'); // le nom d'une ligne du référentiel
     assert.deepEqual(await skills.visibleGroups(page), [PROJET]);
-    assert.deepEqual(await skills.visibleItems(page), ['Oncologie']);
+    assert.deepEqual(await skills.visibleItems(page), [], 'sans rien dessous');
 
     await tab(page, 'macro').click();
     assert.deepEqual(await skills.visibleGroups(page), [], 'aucun domaine ni compétence ne s\'appelle ainsi');

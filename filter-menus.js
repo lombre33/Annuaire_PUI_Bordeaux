@@ -98,6 +98,10 @@ function searchGroups(menu, term) {
   menu.classList.toggle('searching', term !== '');
   menu.querySelectorAll('.filter-group').forEach(section => {
     const wholeGroup = term === '' || normalize(section.dataset.value).includes(term);
+    if (section.classList.contains('flat')) { // une ligne à plat : seul son nom compte, les compétences cachées dessous n'y sont pour rien
+      section.hidden = !wholeGroup;
+      return;
+    }
     let shown = 0;
     section.querySelectorAll('.filter-option').forEach(option => {
       option.hidden = !wholeGroup && !normalize(optionValue(option)).includes(term);
@@ -232,8 +236,10 @@ function buildFilterMenu(filter, referenceMaps, selected, counts, onToggle) {
 let groupSequence = 0;
 
 function setGroupOpen(section, open) {
+  const toggle = section.querySelector('.group-toggle');
+  if (!toggle) return; // un rangement à plat (C.U.R.I.E) n'a rien à déplier
   section.classList.toggle('open', open);
-  section.querySelector('.group-toggle').setAttribute('aria-expanded', String(open));
+  toggle.setAttribute('aria-expanded', String(open));
 }
 
 // La case d'un groupe est cochée quand toutes ses valeurs le sont, partielle quand
@@ -252,7 +258,7 @@ function paintGroup(section, state) {
 // bouton qui déplie le détail. Replié au départ. `index` est sa place d'origine.
 function buildGroup(filter, grouping, group, index, selected, counts, { onToggle, onToggleGroup }) {
   const section = document.createElement('div');
-  section.className = 'filter-group';
+  section.className = CATEGORIES[grouping].flat ? 'filter-group flat' : 'filter-group';
   section.dataset.value = group.label;
   section.dataset.grouping = grouping;
   section.dataset.index = String(index);
@@ -283,16 +289,22 @@ function buildGroup(filter, grouping, group, index, selected, counts, { onToggle
     list.appendChild(entry);
   });
 
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.className = 'group-toggle';
-  toggle.textContent = '▾';
-  toggle.title = 'Afficher ou masquer le détail';
-  toggle.setAttribute('aria-label', `Détail de ${group.label}`);
-  toggle.setAttribute('aria-controls', list.id);
-  toggle.addEventListener('click', () => setGroupOpen(section, !section.classList.contains('open')));
-
-  head.append(option, toggle);
+  if (CATEGORIES[grouping].flat) {
+    // Un rangement à plat : la ligne est la compétence du référentiel, sans détail dessous. Les valeurs restent dans le DOM, cachées,
+    // pour que la case, l'état et le badge se calculent comme pour un groupe ; leur détail n'existe ni pour la vue ni pour le clavier.
+    list.hidden = true;
+    head.append(option);
+  } else {
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'group-toggle';
+    toggle.textContent = '▾';
+    toggle.title = 'Afficher ou masquer le détail';
+    toggle.setAttribute('aria-label', `Détail de ${group.label}`);
+    toggle.setAttribute('aria-controls', list.id);
+    toggle.addEventListener('click', () => setGroupOpen(section, !section.classList.contains('open')));
+    head.append(option, toggle);
+  }
   section.append(head, list);
   setGroupOpen(section, false);
   paintGroup(section, groupState(selected, group.values));
