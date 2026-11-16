@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.41.1';
+export const VERSION = '1.42.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -215,6 +215,10 @@ export const TASK_ROLES = 'tachesRole';
 // que là n'avaient plus rien sur leur carte (retour d'Antoine du 16 novembre 2026, la 1.39.0 a été retirée le jour même).
 export const ACTIONS_COLUMN = 'Actions';
 
+// La colonne de BDD qui porte les rôles de la personne dans le PUI (une liste de références vers `Role_Dans_le_PUI` depuis la 1.42.0 ; une référence
+// simple avant, que le widget lit toujours).
+export const ROLE_COLUMN = 'Role_dans_le_PUI';
+
 // La colonne de BDD où la personne dit de quelles actions elle est responsable (1.40.0, demande d'Antoine du 16 novembre 2026 : « sur le profil,
 // sur chaque tâche, pouvoir cocher si on est responsable »). Une liste de références vers les lignes de `Taches`, comme `BDD.Taches` : le widget
 // la crée quand elle manque (schema.js, createResponsibleColumn) et la personne n'écrit que sa propre ligne, comme pour le reste de sa fiche. Elle
@@ -297,7 +301,9 @@ export const PROFILE_FIELDS = [
   // L'adresse que la carte montre à la place de `email` quand elle n'est pas vide (colonne facultative).
   { key: 'email_affiche', label: 'E-mail affiché', kind: 'email', optional: true },
   { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
-  { key: 'Role_dans_le_PUI', label: 'Rôle dans le PUI', kind: 'reference', category: 'role' },
+  // Plusieurs rôles se cumulent (1.42.0, Antoine, 16 novembre 2026) : la colonne est une liste de références. Une colonne qui est encore une
+  // référence simple se lit toujours, et n'accepte qu'un seul rôle à l'écriture (profile-save.js).
+  { key: ROLE_COLUMN, label: 'Rôle dans le PUI', kind: 'list', category: 'role' },
   ...LIST_FIELD_KEYS.flatMap(category => {
     const field = { key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category };
     // Sous les actions, de quelles actions la personne est responsable (colonne facultative : absente de BDD, le formulaire ne la propose pas).

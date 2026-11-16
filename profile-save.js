@@ -64,7 +64,7 @@ const writeReference = (field, change) => ({ value: change.apres.id });
 const writeConsent = (field, change) => ({ value: change.apres === true });
 
 // Une liste se calcule sur les valeurs ACTUELLES de la fiche.
-function writeList(field, change, row) {
+function writeList(field, change, row, columnTypes = {}) {
   const current = safeValues(row[field.key]);
   if (current.some(item => !Number.isSafeInteger(item))) {
     return { error: `${field.label} : la fiche contient des valeurs que le widget ne sait pas modifier, à corriger dans Grist` };
@@ -75,6 +75,13 @@ function writeList(field, change, row) {
   const removed = new Set(change.retrait.flatMap(rowsOf));
   const kept = current.filter(id => !removed.has(id));
   const added = change.ajout.filter(entry => !rowsOf(entry).some(id => kept.includes(id))).map(entry => entry.id);
+  // Une colonne qui est encore une Référence simple (BDD.Role_dans_le_PUI avant qu'on la passe en liste, 1.42.0) n'a de place que pour une valeur :
+  // écrire une liste dedans serait refusé par Grist, et deux rôles ne tiendraient pas.
+  if (typeof columnTypes[field.key] === 'string' && columnTypes[field.key].startsWith('Ref:')) {
+    const ids = [...kept, ...added];
+    if (ids.length > 1) return { error: `${field.label} : la colonne ${field.key} n'accepte qu'une valeur ; passez-la en liste de références dans Grist pour en cumuler plusieurs` };
+    return { value: ids[0] ?? 0 };
+  }
   return { value: ['L', ...kept, ...added] };
 }
 

@@ -102,10 +102,11 @@ test('dans la page : la recherche d\'un menu de filtre a le même bord', { skip 
     assert.ok(outside >= MIN_CONTRAST && inside >= MIN_CONTRAST, `${outside.toFixed(2)}:1 dehors, ${inside.toFixed(2)}:1 dedans`);
   }));
 
-test('dans la page : les champs et la liste déroulante de la fenêtre de modification ont le même bord', { skip }, () =>
+test('dans la page : les champs et la recherche d\'une liste à cocher de la fenêtre de modification ont le même bord', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
-    for (const selector of ['#profileDialog .fld input', '#profileDialog .dd-trigger']) {
+    // Depuis la 1.42.0 le rôle est une liste à cocher (ses rôles se cumulent) : la liste déroulante n'est plus que dans « Créer ma fiche ».
+    for (const selector of ['#profileDialog .fld input', '#profileDialog .pick-search']) {
       const { outside, inside } = ratiosOf(await bordersOf(page, selector));
       assert.ok(outside >= MIN_CONTRAST && inside >= MIN_CONTRAST, `${selector} : ${outside.toFixed(2)}:1 dehors, ${inside.toFixed(2)}:1 dedans`);
     }
