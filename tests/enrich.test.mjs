@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
-import { enrich, labelsOf } from '../grist-data.js';
+import { automaticRoles, enrich, filterableRoles, labelsOf, MEMBER_ROLE, roleEntries } from '../grist-data.js';
 
 test('enrich: etablissement_label resolves BDD.Etablissement, a direct Reference, in any of the shapes Grist can send', () => {
   const referenceMaps = { etablissement: { 2: 'UBM' } };
@@ -27,7 +27,7 @@ test('enrich: labels.role resolves Role_dans_le_PUI as an array, like every othe
   assert.deepEqual(enrich({ Role_dans_le_PUI: 999 }, referenceMaps).labels.role, [], 'référence introuvable: liste vide, pas de valeur fantôme');
 });
 
-test('enrich: list-reference categories (Instances/Actions/GT/Communautés/Tâches/Compétences) drop ids that fail to resolve, instead of leaking the raw numeric id as a fake label', () => {
+test('enrich: list-reference categories (Instances/GT/Communautés/Actions/Compétences) drop ids that fail to resolve, instead of leaking the raw numeric id as a fake label', () => {
   const referenceMaps = { instances: { 7: 'CME' } };
   assert.deepEqual(enrich({ Instances: ['L', 7, 999] }, referenceMaps).labels.instances, ['CME'],
     'id 999 introuvable dans la table de référence: ignoré, pas affiché comme "999"');
@@ -44,7 +44,6 @@ test('enrich: list-reference categories resolve correctly when Grist sends pre-r
 test('enrich: each list-reference category reads its own BDD column and its own reference table, not another\'s', () => {
   const referenceMaps = {
     instances: { 1: 'Instance A' },
-    actions: { 2: 'Action B' },
     gt: { 3: 'GT C' },
     communautes: { 4: 'Communauté D' },
     taches: { 5: 'Tâche E' },
@@ -52,7 +51,6 @@ test('enrich: each list-reference category reads its own BDD column and its own 
   };
   const contact = {
     Instances: ['L', 1],
-    Actions: ['L', 2],
     GT: ['L', 3],
     Communautes: ['L', 4],
     Taches: ['L', 5],
@@ -60,11 +58,18 @@ test('enrich: each list-reference category reads its own BDD column and its own 
   };
   const result = enrich(contact, referenceMaps);
   assert.deepEqual(result.labels.instances, ['Instance A']);
-  assert.deepEqual(result.labels.actions, ['Action B']);
   assert.deepEqual(result.labels.gt, ['GT C']);
   assert.deepEqual(result.labels.communautes, ['Communauté D']);
   assert.deepEqual(result.labels.taches, ['Tâche E']);
   assert.deepEqual(result.labels.competences, ['Compétence F']);
+});
+
+test('enrich: the actions of a person are her tasks: the old BDD.Actions column is no longer read (1.39.0)', () => {
+  const referenceMaps = { actions: { 2: 'Action B' }, taches: { 5: '1.2 Tâche E' } };
+  const result = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, referenceMaps);
+  assert.equal(result.labels.actions, undefined, 'plus de catégorie « actions » dans les libellés d\'une personne');
+  assert.deepEqual(result.labels.taches, ['1.2 Tâche E']);
+  assert.deepEqual(enrich({ Actions: ['L', 2] }, referenceMaps).labels.taches, [], 'une action de l\'ancienne colonne n\'est pas une action de la personne');
 });
 
 // Les domaines (compétences macro) se lisent depuis BDD.Competences : même
@@ -134,8 +139,60 @@ test('enrich: a task already resolved to text is found by its label, never taken
 });
 
 test('enrich: the same label twice in one category appears once (a contact is counted once per option)', () => {
-  const referenceMaps = { actions: { 1: 'Vaccination', 2: 'vaccination' } };
-  assert.deepEqual(enrich({ Actions: ['L', 1, 2] }, referenceMaps).labels.actions, ['Vaccination']);
+  const referenceMaps = { taches: { 1: '1.1 Vaccination', 2: '1.1 vaccination' } };
+  assert.deepEqual(enrich({ Taches: ['L', 1, 2] }, referenceMaps).labels.taches, ['1.1 Vaccination']);
+});
+
+// Les rôles dans le PUI (1.39.0) : celui que la personne a choisi, plus « Membre d'une action » calculé à chaque lecture d'après ses actions.
+const ROLE_MAPS = {
+  role: { 1: 'Coordinateur de communauté', 2: 'Responsable d\'une action', 3: 'Membre d\'une action' },
+  taches: { 1: '1.1 Relecture', 2: '2.1 Inspection' }
+};
+
+test('enrich: a person who has at least one action is « Membre d\'une action », whatever role she chose, and loses it with her last action', () => {
+  assert.deepEqual(enrich({ Taches: ['L', 1] }, ROLE_MAPS).labels.role, ['Membre d\'une action'], 'aucun rôle choisi : le rôle calculé seul');
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 1, Taches: ['L', 1, 2] }, ROLE_MAPS).labels.role, ['Coordinateur de communauté', 'Membre d\'une action'],
+    'le rôle choisi d\'abord, le rôle calculé ensuite, une seule fois même avec plusieurs actions');
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 1, Taches: ['L'] }, ROLE_MAPS).labels.role, ['Coordinateur de communauté'], 'plus d\'action : le rôle calculé disparaît');
+  assert.deepEqual(enrich({ Taches: ['L', 999] }, ROLE_MAPS).labels.role, [], 'une action introuvable n\'est pas une action');
+  assert.deepEqual(enrich({}, ROLE_MAPS).labels.role, []);
+});
+
+test('enrich: « Membre d\'une action » written in BDD is ignored, only the computed one counts: the person has it once, or not at all', () => {
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 3, Taches: ['L', 1] }, ROLE_MAPS).labels.role, ['Membre d\'une action']);
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 3 }, ROLE_MAPS).labels.role, [], 'écrit à la main mais aucune action : retiré');
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 'MEMBRE D’UNE ACTION', Taches: ['L', 1] }, ROLE_MAPS).labels.role, ['Membre d\'une action'],
+    'texte déjà résolu : casse et apostrophe ignorées, le rôle n\'est pas écrit deux fois');
+});
+
+test('enrich: the member role takes the name the table of the roles gives it, or « Membre d\'une action » when it has none', () => {
+  const named = { role: { 1: 'Coordinateur de communauté', 2: 'Membre de l\'action' }, taches: { 1: '1.1 Relecture' } };
+  assert.equal(automaticRoles(named.role).member, 'Membre de l\'action');
+  assert.equal(automaticRoles(named.role).known, true);
+  assert.deepEqual(enrich({ Taches: ['L', 1] }, named).labels.role, ['Membre de l\'action']);
+  const without = { role: { 1: 'Coordinateur de communauté' } };
+  assert.deepEqual([automaticRoles(without.role).member, automaticRoles(without.role).known], [MEMBER_ROLE, false]);
+  assert.deepEqual(automaticRoles(undefined), { member: MEMBER_ROLE, known: false }, 'table des rôles illisible : le nom par défaut');
+  assert.equal(MEMBER_ROLE, 'Membre d’une action');
+});
+
+test('roleEntries: the stored role first, then the member role if the person has an action; a stored role that is the member role is not repeated', () => {
+  const roleMap = { 1: 'Membre d\'une action' };
+  assert.deepEqual(roleEntries('Référent qualité', true, roleMap), ['Référent qualité', 'Membre d\'une action']);
+  assert.deepEqual(roleEntries('Référent qualité', false, roleMap), ['Référent qualité']);
+  assert.deepEqual(roleEntries('Membre d\'une action', true, roleMap), ['Membre d\'une action']);
+  assert.deepEqual(roleEntries('Membre d\'une action', false, roleMap), []);
+  assert.deepEqual(roleEntries('', true, roleMap), ['Membre d\'une action']);
+  assert.deepEqual(roleEntries('', false, roleMap), []);
+});
+
+test('filterableRoles: the roles table, plus « Membre d\'une action » when the table does not have it, so the filter can offer it', () => {
+  const roleMap = { 1: 'Coordinateur de communauté' };
+  assert.deepEqual(Object.values(filterableRoles(roleMap)), ['Coordinateur de communauté', 'Membre d’une action']);
+  assert.deepEqual(roleMap, { 1: 'Coordinateur de communauté' }, 'la table lue n\'est pas modifiée');
+  const has = { 1: 'Coordinateur de communauté', 2: 'Membre d\'une action' };
+  assert.equal(filterableRoles(has), has, 'la table qui l\'a déjà reste telle quelle');
+  assert.deepEqual(Object.values(filterableRoles(undefined)), ['Membre d’une action']);
 });
 
 test('enrich: the old columns of the Annuaire table (competences_1..15, Communautee_s_, Etablissement2) are no longer read', () => {

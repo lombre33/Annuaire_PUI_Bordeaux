@@ -31,8 +31,8 @@ Le widget écrit dans `BDD` dans quatre cas :
   `Accepte_apparaitre` ;
 - quand elle enregistre la modification de sa fiche : `prenom`, `nom`, `Fonction`,
   `email_affiche` (si la colonne existe, voir plus bas), `numero_de_telephone`,
-  `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`,
-  `Taches` et, si elle existe (étape 6), `Avatar` ;
+  `Role_dans_le_PUI`, `Instances`, `GT`, `Competences`, `Communautes`,
+  `Taches` (les « actions » de la personne depuis la 1.39.0) et, si elle existe (étape 6), `Avatar` ;
 - quand une personne dont l'adresse ne figure dans aucune fiche clique sur
   « Créer ma fiche » (1.18.0) : il **ajoute une ligne**, c'est la seule fois où le widget
   crée une fiche. Elle porte l'adresse du compte (`email`, en minuscules), l'établissement
@@ -72,9 +72,17 @@ la colonne (il lit son type dans les métadonnées du document).
 3. Pour `Accepte_apparaitre`, type **Case à cocher** ; cochez la case des personnes
    qui ont déjà donné leur accord. Une case vide ou décochée masque la personne.
 4. Pour `Role_dans_le_PUI`, type **Référence** vers la table `Role_Dans_le_PUI` (colonne
-   affichée `Role`) : c'est elle qui alimente le filtre « Rôle PUI » et le rôle de la carte
+   affichée `Role`) : c'est elle qui alimente le filtre « Rôle dans le PUI » et le rôle de la carte
    (1.24.0). Une colonne à formule qui la remplit se convertit en colonne de données pour que
-   la personne puisse la changer depuis « Modifier mon profil ».
+   la personne puisse la changer depuis « Modifier mon profil ». Depuis la 1.39.0, le rôle
+   « Membre d'une action » n'a pas besoin d'y être écrit : le widget le donne de lui-même à toute personne qui
+   a au moins une action (`BDD.Taches`) et le retire avec la dernière ; une ligne de ce nom dans
+   `Role_Dans_le_PUI`, si vous en avez une, donne son libellé, et ce qui en est écrit dans `BDD` est ignoré.
+5. Pour `Taches`, type **Liste de références** vers la table `Taches` : ce sont les **actions** de la
+   personne (1.39.0). La colonne `Actions` de `BDD` n'est plus lue ni écrite : une personne qui n'a une
+   action que là n'en a plus à l'écran, et la console du navigateur le dit. Une colonne à formule qui
+   remplit `Taches` se convertit en colonne de données pour que la personne puisse changer ses actions
+   depuis « Modifier mon profil ».
 
 Depuis la 1.17.0, le widget écrit aussi, quand un responsable enregistre la fiche de
 son établissement, dans trois colonnes d'`Etablissements` (`nom_complet`,

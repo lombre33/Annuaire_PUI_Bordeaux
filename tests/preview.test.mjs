@@ -54,11 +54,11 @@ test('diffContacts reads the phone as the card shows it: the same number in two 
 
 test('diffContacts lists the tags added and removed, category by category', () => {
   const before = card({ labels: { instances: ['CME', 'COVIRIS'], competences: ['Oncologie'], role: ['Référent qualité'] } });
-  const after = card({ labels: { instances: ['CME', 'CLIN'], competences: ['Oncologie', 'Hématologie'], actions: ['Audit'] } });
+  const after = card({ labels: { instances: ['CME', 'CLIN'], competences: ['Oncologie', 'Hématologie'], taches: ['1.1 Audit'] } });
   const { tags, texts } = diffContacts(before, after);
   assert.deepEqual(tags, {
     instances: { added: ['CLIN'], removed: ['COVIRIS'] },
-    actions: { added: ['Audit'], removed: [] },
+    taches: { added: ['1.1 Audit'], removed: [] },
     competences: { added: ['Hématologie'], removed: [] },
     role: { added: [], removed: ['Référent qualité'] }
   });
@@ -75,7 +75,7 @@ test('diffContacts only looks at the groups of tags the card shows', () => {
   const marks = diffContacts(card({ labels: { etablissement: ['CHU'], macro: ['Cancérologie'] } }),
     card({ labels: { etablissement: ['UBM'], macro: ['Pharmacie'] } }));
   assert.deepEqual(marks, { texts: {}, tags: {} });
-  assert.deepEqual(TAG_GROUPS.map(group => group.key), ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role']);
+  assert.deepEqual(TAG_GROUPS.map(group => group.key), ['role', 'instances', 'taches', 'gt', 'competences', 'communautes']);
 });
 
 test('diffContacts keeps the labels of the card, in the order the card shows them', () => {

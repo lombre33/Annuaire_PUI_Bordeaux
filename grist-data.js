@@ -293,6 +293,50 @@ function taskRolesOf(contact, referenceMaps) {
   return Object.fromEntries([...byLabel].map(([label, list]) => [label, list.length > 1 ? uniqueLabels(list) : list]));
 }
 
+// ===== RÔLES DANS LE PUI =====
+// Le rôle que la personne a choisi (BDD.Role_dans_le_PUI, un seul) ne dit pas tout : une personne qui a au moins une action est « Membre
+// d'une action », qu'elle ait aussi un autre rôle ou non (demande d'Antoine du 16 novembre 2026 : « le widget le met et le retire »). Ce rôle-là
+// n'est écrit nulle part : il se calcule à chaque lecture d'après les actions de la personne (BDD.Taches). Une personne qui perd sa dernière
+// action le perd donc d'elle-même, et celle dont Grist, un import ou un administrateur change les actions n'attend personne. Si la table des
+// rôles le porte déjà (« Membre d'une action »), sa valeur écrite dans BDD est ignorée : seul le calcul compte. Il se lit comme les autres
+// rôles (filtre, pastille de carte) ; un rôle de la table qui ne porte pas ce nom (« Coordinateur de communauté ») reste tel quel.
+//
+// Le nom du rôle est celui que la table des rôles porte quand elle en a un qui lui ressemble (casse, accents, apostrophes et tournure
+// ignorés : « Membre de l'action » vaut « Membre d'une action »), sinon celui-ci ; `known` dit si la table l'a (le menu du filtre le
+// propose aussi quand elle ne l'a pas : main.js, refreshFilterMenus).
+export const MEMBER_ROLE = 'Membre d’une action';
+const MEMBER_ROLE_PATTERN = /^membre\b.*\baction/;
+// Les mots d'un rôle, sans casse, accents ni ponctuation : « Membre d'une action » et « membre d’une  Action » s'écrivent pareil.
+const roleWords = value => normalize(value).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+const automaticRolesOf = new WeakMap();
+export function automaticRoles(roleMap) {
+  if (!roleMap || typeof roleMap !== 'object') return { member: MEMBER_ROLE, known: false };
+  if (!automaticRolesOf.has(roleMap)) {
+    const label = Object.entries(roleMap).sort(([a], [b]) => Number(a) - Number(b))
+      .map(([, known]) => known).find(known => MEMBER_ROLE_PATTERN.test(roleWords(known)));
+    automaticRolesOf.set(roleMap, { member: label ?? MEMBER_ROLE, known: label !== undefined });
+  }
+  return automaticRolesOf.get(roleMap);
+}
+
+// Les rôles que le menu du filtre propose : ceux de la table, plus « Membre d'une action » quand elle ne l'a pas (une personne l'a, calculé,
+// même si aucune ligne de la table ne le porte). La clé n'est pas un identifiant de ligne : ce rôle n'en a pas, et la liste de la fenêtre de
+// profil, elle, ne lit que la table.
+export function filterableRoles(roleMap) {
+  const { member, known } = automaticRoles(roleMap);
+  return known ? roleMap : { ...roleMap, membre: member };
+}
+
+// Les rôles d'une personne, dans l'ordre où la carte les écrit : celui qu'elle a choisi (sauf « Membre d'une action », calculé), puis
+// « Membre d'une action » si elle a au moins une action. `stored` : le libellé de BDD.Role_dans_le_PUI ; `hasActions` : la personne a
+// au moins une action ; `roleMap` : les libellés de la table des rôles.
+export function roleEntries(stored, hasActions, roleMap) {
+  const { member } = automaticRoles(roleMap);
+  const roles = stored && roleWords(stored) !== roleWords(member) ? [stored] : [];
+  return hasActions ? [...roles, member] : roles;
+}
+
 // Ajoute à un contact `labels` (pour chaque catégorie, la liste de ses libellés), `taskRoles`
 // et les indicateurs de son établissement. `etabFlags` est optionnel : sans lui,
 // aucun indicateur n'est vrai et le contact n'est pas éligible.
@@ -301,18 +345,19 @@ export function enrich(contact, referenceMaps, etabFlags) {
   // (jamais le nom de domaine de l'e-mail). refLabel() en gère les formes
   // possibles : identifiant de ligne, ['R', table, id] ou texte déjà résolu.
   const etablissement = refLabel(contact.Etablissement, referenceMaps.etablissement);
-  const role = refLabel(contact.Role_dans_le_PUI, referenceMaps.role);
+  const lists = listLabels(contact, referenceMaps);
+  const roles = roleEntries(refLabel(contact.Role_dans_le_PUI, referenceMaps.role), lists.taches.length > 0, referenceMaps.role);
   const flags = etablissementFlags(contact, etabFlags);
 
   return {
     ...contact,
-    // Établissement et Rôle n'ont qu'une valeur mais prennent la même forme de
-    // liste que les autres catégories : filters.js et render.js n'ont ainsi pas
-    // de cas particulier (le badge de la carte utilise `etablissement_label`).
+    // L'établissement n'a qu'une valeur mais prend la même forme de liste que les autres
+    // catégories : filters.js et render.js n'ont ainsi pas de cas particulier (le badge de la
+    // carte utilise `etablissement_label`). Le rôle en a plusieurs (voir roleEntries).
     labels: {
-      ...listLabels(contact, referenceMaps),
+      ...lists,
       etablissement: etablissement ? [etablissement] : [],
-      role: role ? [role] : []
+      role: roles
     },
     taskRoles: taskRolesOf(contact, referenceMaps),
     etablissement_label: etablissement,
@@ -814,6 +859,16 @@ function warnAboutMissingEtablissement(rows, log) {
     + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
 }
 
+// Depuis la 1.39.0 les actions d'une personne sont ses tâches (BDD.Taches) : la colonne BDD.Actions n'est plus lue. Une personne affichée qui
+// n'a une action que dans cette ancienne colonne n'en a donc plus aucune à l'écran : la console le dit, sans la nommer.
+function warnAboutActionsWithoutTasks(contacts, log) {
+  const count = contacts.filter(contact => safeValues(contact.Actions).length > 0 && safeValues(contact.Taches).length === 0).length;
+  if (count) {
+    log.info(`[REFS] ${count} contact(s) affichable(s) ont une ligne dans la colonne Actions de BDD mais aucune dans la colonne Taches : `
+      + 'le widget ne lit plus la colonne Actions (1.39.0), ils n\'ont donc aucune action à l\'écran. Les ajouter à Taches les y rend visibles.');
+  }
+}
+
 // Les personnes qui n'ont pas accepté d'apparaître sont normales, pas une anomalie : la console en
 // donne seulement le nombre (jamais leurs noms).
 function logWithoutConsent(rows, log) {
@@ -870,6 +925,7 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const contacts = buildContacts(rows, referenceMaps, etabFlags);
   log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
+  warnAboutActionsWithoutTasks(contacts, log);
   warnAboutMissingEtablissement(rows, log);
   logWithoutConsent(rows, log);
 
