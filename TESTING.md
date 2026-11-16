@@ -1877,3 +1877,60 @@ d'être fusionnés. À comparer avec `docs/images/filtre-competences.png`, `docs
       quatre fichiers doivent se charger aussi : un refus apparaît dans l'onglet « Réseau », et le texte reste alors lisible dans la police
       du système (retour en arrière : retirer les quatre `@font-face` de `style.css`).
 - [ ] **Firefox et Safari** (ordinateur et téléphone) : les mêmes contrôles, impression comprise.
+
+## 27. Règles d'accès, liste blanche et lien public (16 novembre 2026)
+
+Réglages d'abord : `GRIST_SETUP.md`, étape 4, « Le jeu complet » (structure verrouillée, attribut `Acl`, règles de chaque
+table, règles par défaut **en dernier**). À jouer sur une **copie complète** du document, console ouverte (F12), avec :
+
+- un compte **propriétaire** (le vôtre) ;
+- un **second compte réel** invité en Éditeur (une autre adresse à vous, dans un autre navigateur ou un autre profil), qui a une
+  fiche dans `BDD` à son adresse, écrite **en minuscules** ;
+- un Éditeur **sans fiche** (la même adresse avant de créer sa fiche, ou une troisième) ;
+- un compte **référent** (une ligne d'`ACL` avec un établissement) et un compte **administrateur** (case `admin`) ;
+- une **fenêtre privée sans connexion**, seulement une fois le lien public ouvert sur la copie.
+
+**Ce protocole est le seul contrôle de ces règles : elles viennent de la documentation et du code de Grist et n'ont jamais été
+jouées dans un vrai document.** L'aperçu « Voir en tant que » est commode mais moins fiable qu'un vrai compte : pour une adresse
+qui n'a pas de compte Grist, il peut ne pas simuler la connexion (`user.IsLoggedIn`) et montrer un annuaire vide alors qu'un vrai
+compte le voit. En cas de désaccord, le vrai compte fait foi.
+
+**Avant la saisie**
+
+- [ ] **Sauvegarde.** Télécharger une copie `.grist` du document (menu du document) et noter l'heure.
+- [ ] **Adresses.** Les adresses de `BDD.email` et d'`ACL.email` sont en minuscules, sans espace avant ni après : le widget les compare
+      sans tenir compte de la casse, les règles de Grist non. Un contrôle : une colonne temporaire à formule
+      `$email != ($email or "").strip().lower()`, filtrée sur vrai, dans `BDD` puis dans `ACL`, à supprimer ensuite.
+- [ ] **Pas de ligne « Tous les autres » refusée dans une table**, et la ligne des propriétaires gardée là où il y en a une.
+
+**Après la saisie**
+
+- [ ] **Éditeur avec fiche : ouvrir le document.** L'annuaire s'affiche avec le même nombre de cartes qu'avant ; les données brutes
+      ne listent que les onze tables de la liste blanche (`BDD`, `Etablissements`, `ACL` selon les droits, `Annuaire_Sonde`, les
+      sept tables de référence). Avec la lecture simple, toutes les fiches ; avec la lecture stricte, celles qui apparaissent et la sienne.
+- [ ] **Éditeur avec fiche : « Ma présence ».** Décocher puis recocher : accepté. Modifier son téléphone : accepté. Changer à la main,
+      dans les données brutes, son `email` ou son `Etablissement` : **refusé**.
+- [ ] **Éditeur : la fiche d'un autre.** Dans les données brutes de `BDD`, modifier une cellule d'une autre fiche, ou supprimer une
+      ligne : **refusé**.
+- [ ] **Éditeur : la structure.** Ajouter une colonne, renommer une table, écrire une formule : **refusé** (« Blocked by table
+      structure access rules »). Essayer aussi de changer l'adresse du widget : si cela réussit, la structure n'est pas verrouillée,
+      ou cette modification n'en fait pas partie (à noter dans `GRIST_SETUP.md`).
+- [ ] **Éditeur sans fiche : « Créer ma fiche ».** Accepté ; une seule ligne à son adresse, et la fiche apparaît. Une seconde ligne
+      portant l'adresse d'une autre personne (depuis la console) : **refusée**.
+- [ ] **Référent : « Mon établissement ».** Changer le nom, la visibilité et le logo de son établissement, nommer et retirer un
+      responsable (une adresse nouvelle) : accepté. L'établissement d'un autre : **refusé**. Retirer un responsable qui est aussi
+      administrateur, ou nommer une adresse déjà dans `ACL` sans établissement : **refusé** (réservé aux administrateurs).
+- [ ] **Administrateur, mode admin.** Corriger l'e-mail et l'établissement d'une autre fiche : accepté. Lire toute la table `ACL` : oui.
+      Un administrateur qui n'est pas propriétaire ne voit pas les tables techniques.
+- [ ] **Propriétaire.** Tout comme avant ; les logos et les photos s'affichent (le jeton en lecture seule du widget compte comme un
+      Lecteur : si des logos ou des photos manquent, la console du widget le dit et renvoie à l'étape 5 de `GRIST_SETUP.md`).
+- [ ] **Sans connexion** (lien public ouvert sur la copie, fenêtre privée). Rien à lire, rien à écrire, `Annuaire_Sonde` toujours
+      vide ; aucune ligne créée dans `BDD`. Noter ce que le widget affiche (annuaire vide, erreur de lecture).
+- [ ] **Retour en arrière.** Supprimer les deux règles par défaut rend à Grist son repli (les Éditeurs voient tout) : vérifier que
+      c'est bien ce qui se passe, pour savoir revenir en cas de blocage.
+
+**Après l'ouverture du lien public**
+
+- [ ] **Surveillance.** L'onglet Activité du document, la table `Annuaire_Sonde` (vide au repos), le nombre de lignes de `BDD` (un filtre
+      sur les adresses en double repère les créations en rafale), et un coup d'œil par jour la première semaine. Si quelque chose
+      tourne mal, désactiver le partage public referme tout d'un coup.

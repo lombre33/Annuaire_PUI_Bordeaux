@@ -42,6 +42,15 @@ test('realLookingCoordinates lit aussi une expression régulière, un modèle de
   assert.deepEqual(realLookingCoordinates(String.raw`05\.${pairs.join(String.raw`\.`)}`), [`05.${pairs.join('.')}`]);
 });
 
+test('realLookingCoordinates laisse passer l\'adresse que Grist donne à un visiteur sans compte, celle d\'aucune personne, et elle seule', () => {
+  const anonymous = ['anon', 'getgrist.com'].join('@');
+  const sameDomain = ['anon.martin', 'getgrist.com'].join('@'); // une autre adresse du même domaine : celle d'une personne possible
+  const longerDomain = ['anon', 'getgrist.com.fr'].join('@');
+  assert.deepEqual(realLookingCoordinates(`Un visiteur sans compte a pour adresse « ${anonymous} », la même pour tous.`), []);
+  assert.deepEqual(realLookingCoordinates(anonymous.toUpperCase()), [], 'la casse ne change pas l\'adresse');
+  assert.deepEqual(realLookingCoordinates(`${sameDomain}, ${longerDomain}`), [sameDomain, longerDomain]);
+});
+
 test('aucun texte du dépôt ne contient d\'adresse ni de numéro qui pourrait être réel : .example pour les adresses, 05 36 49 xx xx ou 06 39 98 xx xx pour les numéros', () => {
   const texts = REPOSITORY_TEXTS();
   assert.ok(texts.length > 80, `le dépôt est parcouru (${texts.length} fichiers)`);
