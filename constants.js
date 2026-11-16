@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.39.0';
+export const VERSION = '1.40.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -196,6 +196,14 @@ export const ETABLISSEMENT_NAMES = 'etablissementNom';
 export const TASK_ROLE_COLUMN = 'Taches_role';
 export const TASK_ROLES = 'tachesRole';
 
+// La colonne de BDD où la personne dit de quelles actions elle est responsable (1.40.0, demande d'Antoine du 16 novembre 2026 : « sur le profil,
+// sur chaque tâche, pouvoir cocher si on est responsable »). Une liste de références vers les lignes de `Taches`, comme `BDD.Taches` : le widget
+// la crée quand elle manque (schema.js, createResponsibleColumn) et la personne n'écrit que sa propre ligne, comme pour le reste de sa fiche. Elle
+// ne compte que pour les actions que la personne a aussi : le rôle « Responsable de l'action 1.2 » se calcule à chaque lecture (grist-data.js,
+// responsibleActions), comme « Membre d'une action », et n'est écrit nulle part. `RESPONSIBLE_LABEL` : le titre du bloc de la fenêtre de profil.
+export const RESPONSIBLE_COLUMN = 'Taches_responsable';
+export const RESPONSIBLE_LABEL = 'Responsable de';
+
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
 // groupes du menu Compétences, les actions (les intitulés de la table `Actions`) ceux du menu Actions. Rôle dans
 // le PUI en a un depuis la 1.24.0 (demande d'Antoine du 13 octobre 2026). Il n'y a plus de bouton « Actions » à part
@@ -252,6 +260,8 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 //             peuvent la porter, contrairement à `email`
 //   labelsFrom  la table de libellés à proposer, quand ce n'est pas celle de la catégorie
 //   required  une référence qu'on ne peut pas vider
+//   companionOf  une liste qui complète celle de la colonne nommée : le formulaire la montre sous elle (« Responsable de », sous les actions),
+//             à cocher parmi les valeurs que la personne a choisies, et la retire d'elle-même d'une valeur qu'on décoche
 const LIST_FIELD_KEYS = ['instances', 'gt', 'competences', 'communautes', 'taches'];
 
 export const PROFILE_FIELDS = [
@@ -268,7 +278,11 @@ export const PROFILE_FIELDS = [
   { key: 'email_affiche', label: 'E-mail affiché', kind: 'email', optional: true },
   { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
   { key: 'Role_dans_le_PUI', label: 'Rôle dans le PUI', kind: 'reference', category: 'role' },
-  ...LIST_FIELD_KEYS.map(category => ({ key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category }))
+  ...LIST_FIELD_KEYS.flatMap(category => {
+    const field = { key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category };
+    // Sous les actions, de quelles actions la personne est responsable (colonne facultative : absente de BDD, le formulaire ne la propose pas).
+    return category === 'taches' ? [field, { key: RESPONSIBLE_COLUMN, label: RESPONSIBLE_LABEL, kind: 'list', category, companionOf: field.key }] : [field];
+  })
 ];
 
 // Les champs que le formulaire propose : ceux de tout le monde, plus ceux de l'administrateur

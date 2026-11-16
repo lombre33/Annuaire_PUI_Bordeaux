@@ -190,6 +190,14 @@ export function withTaskActions(tables = sampleTables()) {
   return copy;
 }
 
+// La colonne `Taches_responsable` de BDD (1.40.0) : les actions dont chaque personne est responsable, parmi celles qu'elle a. `flags` : { identifiant
+// de ligne de BDD → cellule } ; par défaut Ana (1) est responsable de « 1.1 Relecture » (tâche 1), personne d'autre ne l'est.
+export function withResponsibleColumn(tables = withTaskActions(), flags = { 1: ['L', 1] }) {
+  const copy = structuredClone(tables);
+  copy.BDD.Taches_responsable = copy.BDD.id.map(id => flags[id] || ['L']);
+  return copy;
+}
+
 // Les trois façons de ne rien pouvoir ranger par action : aucune action numérotée, aucune tâche numérotée, aucun numéro en commun
 // entre les tâches et les actions. Le menu des tâches reste alors à plat.
 export function unrankableTaskTables() {

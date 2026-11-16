@@ -1020,8 +1020,11 @@ test('l\'identification laisse le document propre : la ligne de la sonde est ret
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForAccountBar(page);
     await probeRemoved(page);
-    assert.deepEqual((await grist(page)).map(call => [call.action, call.table]),
+    // Ana est administratrice : en ouvrant l'annuaire, elle fait ajouter la colonne Taches_responsable (1.40.0), la seule structure que le
+    // widget touche ; l'identification, elle, n'écrit que la ligne de la sonde.
+    assert.deepEqual((await grist(page)).filter(call => !/Column$/.test(call.action)).map(call => [call.action, call.table]),
       [['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
+    assert.deepEqual((await grist(page)).filter(call => /Column$/.test(call.action)).map(call => [call.action, call.table, call.rowId]), [['AddColumn', 'BDD', 'Taches_responsable']]);
     assert.deepEqual(await page.evaluate(() => window.__tables.Annuaire_Sonde.id), []);
   }));
 
