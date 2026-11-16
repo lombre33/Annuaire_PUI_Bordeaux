@@ -11,7 +11,7 @@
 // avatar-ui.js (les photos de profil), status-ui.js (le bandeau d'état et l'écran « Aucun contact »).
 
 import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
-import { loadDirectory, describeLoadFailure, debounce, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
+import { loadDirectory, describeLoadFailure, debounce, filterableRoles, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, describeEmptyResults, filterContacts, countInScope, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
 import { attachTagNavigation, attachTagNotes, focusFirstResult, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
@@ -189,7 +189,8 @@ function refreshFilterMenus() {
   if (!state.etabFlags) return; // l'annuaire n'est pas encore lu : pas de menu à tenir à jour
   const filterReferenceMaps = {
     ...state.referenceMaps,
-    etablissement: filterVisibleEstablishments(state.referenceMaps.etablissement, state.etabFlags, state.scope)
+    etablissement: filterVisibleEstablishments(state.referenceMaps.etablissement, state.etabFlags, state.scope),
+    role: filterableRoles(state.referenceMaps.role)
   };
   const menusChanged = !referenceMapsEqual(state.filterReferenceMaps, filterReferenceMaps);
   state.filterReferenceMaps = filterReferenceMaps;

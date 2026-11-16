@@ -387,8 +387,8 @@ logos s'afficher), console qui dit la version et ce que Grist donne des logos, a
 refuse (1.28.2), aucune trace du jeton dans la console, relecture d'une fiche.
 `tests/branding-layout.test.mjs` y ajoute 19 scénarios sur la mise en page de l'habillage, de
 320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case et à la même
-surface visuelle (marges transparentes retirées), rôle PUI à droite de la ligne de l'e-mail, bandeau du
-bas qui se replie, rien qui dépasse du cadre.
+surface visuelle (marges transparentes retirées), rôle dans le PUI en première section de pastilles (même très long, il reste dans
+la carte), bandeau du bas qui se replie, rien qui dépasse du cadre.
 
 `tests/logos-preload-e2e.test.mjs` y ajoute 8 scénarios sur le chargement des logos, avec un Grist
 capricieux servi par `tests/support/fake-attachments.mjs` (réponses retenues puis libérées, première demande
@@ -510,9 +510,10 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
       inférieur ou égal à N (les personnes qui n'ont pas accepté d'apparaître, ou dont
       l'établissement n'est pas validé, fondateur ou partenaire, ne s'affichent pas ;
       `perimetre` ne compte plus depuis la 1.27.0).
-- [ ] Les 8 boutons de filtre (Actions, Tâches, Communautés, GT, Compétences,
-      Instances, Établissement, Rôle PUI) sont présents dans la barre d'outils. Il n'y a
-      pas de bouton « Domaines » : les domaines sont dans le menu Compétences.
+- [ ] Les 7 boutons de filtre (Actions, Communautés, GT, Compétences,
+      Instances, Établissement, Rôle dans le PUI) sont présents dans la barre d'outils. Il n'y a
+      pas de bouton « Domaines » : les domaines sont dans le menu Compétences ; ni de bouton « Tâches » (1.37.0) : les tâches
+      s'appellent « Actions », rangées par groupe d'actions dans le menu Actions.
 - [ ] Sur une carte avec toutes les infos renseignées : initiales correctes
       dans l'avatar, nom + prénom, fonction visible, logo (ou pastille)
       de l'établissement en haut à droite, email en lien `mailto:`, téléphone visible.
@@ -555,8 +556,8 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 
 ## 3. Chaque filtre, seul
 
-Pour chacun des 8 filtres (Actions, Tâches, Communautés, GT, Compétences,
-Instances, Établissement, Rôle PUI) :
+Pour chacun des 7 filtres (Actions, Communautés, GT, Compétences,
+Instances, Établissement, Rôle dans le PUI) :
 
 - [ ] Ouvrir le menu (clic sur le bouton) → seul ce menu est ouvert (les
       autres se ferment).
@@ -699,14 +700,10 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       case est bien cochée (pas seulement mise en évidence visuellement), et
       le badge de comptage sur le bouton du filtre est à jour — même
       résultat qu'en cochant la case directement dans le menu.
-- [ ] **Le rôle PUI d'une carte (du texte violet, comme la fonction, à droite de la ligne de l'e-mail) est cliquable** (1.24.0, 1.27.1) :
-      curseur "main" au survol, le rôle souligné ; un clic coche la valeur
-      dans le filtre « Rôle PUI » et la grille se filtre ; un second clic la
-      décoche. Il reste sur la ligne de l'e-mail à toute largeur, sans la
-      faire passer à la ligne ni agrandir la carte : un rôle long
-      (« Référent innovation et valorisation ») est coupé par « … » et le
-      rôle entier s'affiche au survol ; il disparaît quand l'e-mail prend
-      presque toute la ligne (téléphone étroit, e-mail très long).
+- [ ] **Le rôle dans le PUI d'une carte (la première section de pastilles) est cliquable** (1.24.0, 1.37.0) :
+      un clic coche la valeur dans le filtre « Rôle dans le PUI » et la grille se filtre ; un second clic la
+      décoche. Une personne qui a au moins une action porte aussi la pastille « Membre d'une action »
+      (le widget la met et la retire d'après ses actions : l'ajouter ou retirer une action dans Grist suffit).
 
 ## 6. Bouton Réinitialiser
 
@@ -730,10 +727,12 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 - [ ] **Téléphone** : repérer un contact dont le téléphone commence par 0
       dans Grist (la quasi-totalité) → la carte affiche bien le 0 initial,
       formaté par paires (`05 36 49 90 12`), pas un nombre à 9 chiffres.
-- [ ] **Rôle PUI** : un contact avec `Role_dans_le_PUI` renseigné affiche
-      bien son rôle en petite pastille (à droite de la fonction et de l'e-mail sur
-      une carte de 480 px ou plus, sous l'e-mail sur une carte plus étroite), et le menu
-      du filtre « Rôle PUI » liste les valeurs de la table `Role_Dans_le_PUI`.
+- [ ] **Rôle dans le PUI** : un contact avec `Role_dans_le_PUI` renseigné affiche
+      bien son rôle en pastille, première section de la carte, et le menu du filtre « Rôle dans le PUI »
+      liste les valeurs de la table `Role_Dans_le_PUI` plus « Membre d'une action ».
+- [ ] **Actions rangées sur la carte** (1.37.0) : la section « Actions » d'une personne qui a des actions numérotées
+      (« 1.2 », « 1.3 », « 3.5 ») les range par numéro d'action, avec un retour à la ligne à chaque nouveau numéro
+      (« 1.2 1.3 » puis « 3.5 »), et les actions sans numéro sur la dernière ligne.
 - [ ] **Renommage de libellé** : dans Grist, cocher un filtre (ex.
       Établissement sur une valeur), puis renommer cette valeur dans la
       table de référence correspondante (ex. `Etablissements.acronyme`).
@@ -1078,7 +1077,7 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
 - [ ] Zoom du navigateur à 200 % : l'anneau n'est coupé par aucun bord (ni celui de la barre d'outils, ni celui
       d'une carte, ni celui d'un menu).
 - [ ] **Couleurs des étiquettes** (1.16.2) : sur une carte qui en porte plusieurs, le texte blanc des
-      pastilles (Instances, Actions, GT, Compétences, Communautés, Tâches, Rôle PUI) se lit sans effort à la
+      pastilles (Rôle dans le PUI, Instances, Actions, GT, Compétences, Communautés) se lit sans effort à la
       taille normale, comme les titres de groupe et l'adresse e-mail ; on distingue encore les catégories
       d'un coup d'œil, et le point de chaque bouton de filtre a la couleur des pastilles de sa catégorie.
       À comparer avec `docs/images/carte-anatomie.png`.

@@ -35,6 +35,15 @@ async function world(options = {}) {
 
 const writes = w => w.calls.filter(call => ['AddRecord', 'UpdateRecord', 'RemoveRecord'].includes(call.action));
 
+// Le document où Ana porte une action déjà résolue en texte (Taches ['L', 'Relecture'], ce que Grist envoie quand la table a une colonne visible
+// configurée) : le widget ne sait pas réécrire cette liste. La table des actions a une 2e ligne, à ajouter.
+function withResolvedAction() {
+  const tables = withSchema(withIdentity());
+  tables.Taches = { id: [1, 2], Taches: ['Relecture', 'Veille'], Taches_corrige: ['', ''], Taches_role: ['', ''] };
+  tables.BDD.Taches[0] = ['L', 'Relecture'];
+  return tables;
+}
+
 // Ouvre le formulaire d'une fiche, y saisit `changes`, prépare la relecture. `admin` : un
 // administrateur modifie la fiche d'une autre personne (e-mail et établissement compris).
 async function review(w, id, changes, { admin = false } = {}) {
@@ -67,9 +76,9 @@ test('buildRowUpdate writes an emptied list in the Grist encoding', async () => 
 });
 
 test('buildRowUpdate refuses to rewrite a list that holds values it cannot represent', async () => {
-  const w = await world();
-  // Ana : Actions ['L', 'Vaccination'] (déjà résolu en texte).
-  const change = { Actions: { ajout: [{ id: 2, label: 'Audit' }], retrait: [] } };
+  const w = await world({ tables: withResolvedAction() });
+  // Ana : Taches ['L', 'Relecture'] (déjà résolu en texte).
+  const change = { Taches: { ajout: [{ id: 2, label: 'Veille' }], retrait: [] } };
   assert.match(buildRowUpdate(change, w.row(1)).error, /Actions : la fiche contient des valeurs que le widget ne sait pas modifier/);
 });
 
@@ -228,10 +237,10 @@ test('prepareReview writes the phone in the form of the column the document decl
 });
 
 test('prepareReview keeps the unnamed values of a list and refuses to rewrite a list it cannot read', async () => {
-  const w = await world();
+  const w = await world({ tables: withResolvedAction() });
   const hugo = await review(w, 10, { Instances: [1] }); // Hugo : Instances ['L', 999], valeur que le formulaire ne montre pas
   assert.deepEqual(hugo.champs.Instances.ajout, [{ id: 1, label: 'CME' }]);
-  await assert.rejects(review(w, 1, { Actions: [1, 2] }), /Actions : la fiche contient des valeurs que le widget ne sait pas modifier/);
+  await assert.rejects(review(w, 1, { Taches: [1, 2] }), /Actions : la fiche contient des valeurs que le widget ne sait pas modifier/);
 });
 
 // ===== saveProfile =====

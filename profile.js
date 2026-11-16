@@ -9,7 +9,7 @@
 
 import { avatarIdOf } from './attachments.js';
 import { CATEGORIES, PROFILE_FIELDS, fieldsFor } from './constants.js';
-import { compareLabels, formatPhone, normalize, normalizeEmail, refId, safeValues, text } from './grist-data.js';
+import { automaticRoles, compareLabels, formatPhone, normalize, normalizeEmail, refId, safeValues, text } from './grist-data.js';
 
 export const MAX_TEXT_LENGTH = 200;
 
@@ -205,6 +205,21 @@ function choosableEtablissements(options, row, etabFlags) {
   });
 }
 
+// Les rôles qu'une fiche peut choisir : ceux de la table des rôles, sauf « Membre d'une action », que les actions de la personne lui donnent
+// d'office (roleEntries, grist-data.js) : le choisir n'aurait aucun effet. Celui que la fiche porte déjà reste dans la liste, pour qu'elle
+// le montre.
+function choosableRoles(options, row, referenceMaps) {
+  const { member } = automaticRoles(referenceMaps.role);
+  const current = refId(row.Role_dans_le_PUI);
+  return options.filter(option => option.id === current || normalize(option.label) !== normalize(member));
+}
+
+// Ce qu'une référence propose : les établissements et les rôles se restreignent (voir plus haut), les autres références proposent tout.
+function choosable(field, options, row, referenceMaps, etabFlags) {
+  if (field.category === 'etablissement') return choosableEtablissements(options, row, etabFlags);
+  return field.category === 'role' ? choosableRoles(options, row, referenceMaps) : options;
+}
+
 // Le formulaire de modification d'une fiche : un champ par PROFILE_FIELDS, avec la
 // valeur actuelle de la fiche (`value`) et, pour une référence ou une liste, sa
 // `category` et les valeurs proposées (`options`). `admin` : un administrateur modifie la
@@ -224,8 +239,7 @@ export function profileFormModel(row, referenceMaps, { admin = false, creating =
     if (field.kind === 'phone') return { ...base, value: formatPhone(row[field.key]) };
     const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: field.kind === 'list' });
     if (field.kind === 'reference') {
-      const choices = field.category === 'etablissement' ? choosableEtablissements(options, row, etabFlags) : options;
-      return { ...base, options: choices, value: refId(row[field.key]) || 0 };
+      return { ...base, options: choosable(field, options, row, referenceMaps, etabFlags), value: refId(row[field.key]) || 0 };
     }
     return { ...base, options, value: knownIds(row[field.key], options) };
   });

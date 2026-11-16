@@ -2,7 +2,7 @@
 // filter-menus.js.
 
 import { ETABLISSEMENT_TABLE, TAG_GROUPS, FILTERS } from './constants.js';
-import { displayName, formatPhone, labelsOf, mailtoHref, normalize, ownValue, refId, shownEmail, telHref } from './grist-data.js';
+import { compareLabels, displayName, formatPhone, labelsOf, mailtoHref, normalize, ownValue, refId, shownEmail, taskActionNumber, telHref } from './grist-data.js';
 import { el, glyph, isFocusVisible } from './dom.js';
 import { createLogoImage, fitCardLogo } from './branding-ui.js';
 import { createAvatar } from './avatar-ui.js';
@@ -10,10 +10,6 @@ import { avatarIdOf } from './attachments.js';
 
 // Catégories qui ont un menu : seules leurs bulles de carte sont cliquables.
 const FILTERABLE_KEYS = new Set(FILTERS.map(filter => filter.key));
-
-// Le rôle dans le PUI n'est pas une section du bas de la carte : c'est un texte à droite de la ligne de l'e-mail,
-// hors de la colonne du logo.
-const ROLE_GROUP = TAG_GROUPS.find(group => group.key === 'role');
 
 // ===== Cartes de contact =====
 
@@ -185,6 +181,22 @@ function buildRemovedTag(group, value) {
   return tag;
 }
 
+// Les actions d'une carte rangées par action (1.37.0, demande d'Antoine du 16 novembre 2026) : une rangée par numéro d'action, si bien que « 1.2 »
+// et « 1.3 » se suivent et que « 3.5 » passe à la ligne. Les actions sans numéro font la dernière rangée. `entries` : { value, tag }, le libellé
+// de l'action (dont on lit le numéro, voir taskActionNumber) et sa pastille.
+function actionRows(entries) {
+  const byNumber = new Map();
+  [...entries].sort((a, b) => compareLabels(a.value, b.value)).forEach(({ value, tag }) => {
+    const number = taskActionNumber(value);
+    byNumber.set(number, [...(byNumber.get(number) ?? []), tag]);
+  });
+  return [...byNumber].sort(([a], [b]) => (a ?? Infinity) - (b ?? Infinity)).map(([, tags]) => {
+    const row = el('div', 'tag-row');
+    row.append(...tags);
+    return row;
+  });
+}
+
 // Un groupe nommé et non un titre : chaque carte comptait jusqu'à six titres de niveau 3, des centaines de titres de plus dans le plan
 // de la page (audit UI/UX, U23). Le titre reste à l'écran ; un lecteur d'écran entend le nom du groupe en y entrant, pas deux fois.
 function buildTagGroup(group, labels, onToggle, change, roles) {
@@ -199,51 +211,25 @@ function buildTagGroup(group, labels, onToggle, change, roles) {
   const added = new Set((change?.added ?? []).map(normalize));
   const values = document.createElement('div');
   values.className = 'tag-group-values';
-  values.append(
-    ...labels.map(value => {
-      const key = normalize(value);
-      return buildTag(group, value, onToggle, added.has(key), ownValue(roles, key));
-    }),
-    ...(change?.removed ?? []).map(value => buildRemovedTag(group, value))
-  );
+  const entries = [
+    ...labels.map(value => ({ value, tag: buildTag(group, value, onToggle, added.has(normalize(value)), ownValue(roles, normalize(value))) })),
+    ...(change?.removed ?? []).map(value => ({ value, tag: buildRemovedTag(group, value) }))
+  ];
+  if (group.key === 'taches') {
+    values.classList.add('by-action');
+    values.append(...actionRows(entries));
+  } else {
+    values.append(...entries.map(({ tag }) => tag));
+  }
 
   section.append(title, values);
   return section;
 }
 
-// Le rôle dans le PUI : du texte, comme la fonction (ni pastille ni fond), qui filtre comme les autres tags. Il est à droite
-// de la ligne de l'e-mail (style.css) et ne la fait jamais passer à la ligne : trop long pour la place que l'e-mail lui
-// laisse, il est coupé par une ellipse, et `title` donne le rôle entier au survol. Il n'est pas dans la colonne du logo
-// (sa hauteur écarterait le nom de l'avatar). Sur la carte « Après » d'une relecture, un rôle ajouté porte son contour,
-// un rôle retiré reste barré (`change` : { added, removed }).
-function fillRole(details, contact, onToggle, change) {
-  const added = new Set((change?.added ?? []).map(normalize));
-  const tags = [
-    ...labelsOf(contact, ROLE_GROUP.key).map(value => roleTag(buildTag(ROLE_GROUP, value, onToggle, added.has(normalize(value))), value)),
-    ...(change?.removed ?? []).map(value => roleTag(buildRemovedTag(ROLE_GROUP, value), value))
-  ];
-  if (tags.length === 0) return;
-  const line = el('div', 'role-col');
-  line.append(...tags);
-  // Juste après l'e-mail : l'ordre de lecture et de tabulation est celui de l'écran (l'e-mail, son rôle, puis le téléphone).
-  details.querySelector('.email').after(line);
-  details.classList.add('has-role');
-}
-
-// Un tag de rôle sans la couleur de sa catégorie, son texte dans un bloc à lui (c'est lui que style.css coupe par une
-// ellipse : un bouton n'en fait pas partout) et le rôle entier en infobulle.
-function roleTag(tag, value) {
-  tag.style.backgroundColor = '';
-  tag.classList.add('role-tag');
-  tag.title = value;
-  tag.firstChild.replaceWith(el('span', 'role-text', value));
-  return tag;
-}
-
 // Les pastilles d'une carte de l'annuaire sont un seul arrêt de tabulation (1.31.0, audit U22 : douze arrêts par carte rendaient une
 // carte lointaine presque inatteignable au clavier) : une barre d'outils à tabulation itinérante, que les flèches parcourent
 // (attachTagNavigation). Seule la première pastille se tabule au départ ; celle qui reçoit le focus prend la place. Une carte de
-// relecture n'a pas de bouton (des pastilles sans `onToggle`) : rien à faire. Le rôle n'en fait pas partie (il est dans `.role-col`).
+// relecture n'a pas de bouton (des pastilles sans `onToggle`) : rien à faire.
 const TAG = '.card-tags button.tag';
 const tagButtons = container => [...container.querySelectorAll('button.tag')];
 
@@ -256,7 +242,7 @@ function makeToolbar(container, contact) {
 }
 
 function fillTags(container, contact, onToggle, changes) {
-  TAG_GROUPS.filter(group => group !== ROLE_GROUP).forEach(group => {
+  TAG_GROUPS.forEach(group => {
     const labels = labelsOf(contact, group.key);
     const change = changes?.[group.key];
     if (labels.length > 0 || change?.removed.length > 0) {
@@ -385,7 +371,6 @@ function buildCard(template, contact, onToggle, view = {}) {
   fillAvatar(card, contact, onToggle, shown);
   fillName(card.querySelector('.name'), contact, marks);
   fillTexts(card, contact, onToggle, shown);
-  fillRole(card.querySelector('.details'), contact, onToggle, marks?.tags.role);
   fillTags(card.querySelector('.card-tags'), contact, onToggle, marks?.tags);
   if (rights) fillActions(card.querySelector('.card-actions'), contact, rights);
   // Fermé par défaut : seul un établissement dont la personne est responsable (et dont la carte

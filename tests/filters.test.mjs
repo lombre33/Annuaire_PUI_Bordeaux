@@ -282,7 +282,7 @@ const SKILLS = {
 
 test('createEmptyFilterState has no filter of its own for the domains: they are groups of the skills menu', () => {
   assert.deepEqual(Object.keys(createEmptyFilterState()),
-    ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role']);
+    ['taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role']);
 });
 
 test('ticking a domain keeps the contacts with at least one skill in it, exactly like the former « Domaines » filter', () => {
@@ -427,8 +427,8 @@ test('menuGroups lists a skill once per domain, and twice when its label is writ
 });
 
 test('menuGroups leaves a menu flat when the category has no grouping, or Grist gives none', () => {
-  const maps = { actions: { 1: 'Vaccination' }, competences: { 1: 'Oncologie' }, macro: { 1: 'Cancérologie' } };
-  assert.equal(menuGroups(FILTERS.find(filter => filter.key === 'actions'), maps), null, 'Actions n\'a pas de regroupement');
+  const maps = { gt: { 1: 'Qualité' }, competences: { 1: 'Oncologie' }, macro: { 1: 'Cancérologie' } };
+  assert.equal(menuGroups(FILTERS.find(filter => filter.key === 'gt'), maps), null, 'Groupes de travail n\'a pas de regroupement');
   assert.equal(menuGroups(competencesFilter, { competences: { 1: 'Oncologie' }, macro: {} }), null, 'colonne de domaine absente : menu plat');
   assert.equal(menuGroups(competencesFilter, { competences: { 1: 'Oncologie' } }), null, 'aucune lecture du regroupement');
   assert.equal(menuGroups(competencesFilter, { competences: {}, macro: {} }), null);
@@ -479,9 +479,9 @@ test('selectionCount counts a skill written under two domains once', () => {
   assert.equal(selectionCount(new Set(['Droit', 'Gestion']), groups), 2, 'Achats et Pilotage entiers');
 });
 
-// ===== Tâches et actions : le même menu par groupe, pour les tâches =====
-// Les actions rangent le menu Tâches comme les domaines rangent le menu Compétences :
-// cocher une action coche toutes ses tâches. Le filtre Actions, lui, reste un menu à plat.
+// ===== Actions et tâches : le même menu par groupe, pour les tâches =====
+// Les groupes (une action et ses tâches, par numéro) rangent le menu Actions comme les domaines rangent le menu Compétences :
+// cocher un groupe coche toutes ses tâches. Depuis la 1.37.0 le bouton « Actions » de ce menu est celui des tâches, et il n'y en a plus d'autre.
 
 const tachesFilter = FILTERS.find(filter => filter.key === 'taches');
 
@@ -502,8 +502,9 @@ test('the filter bar has no filter of its own for the actions of the tasks: they
   const state = createEmptyFilterState();
   assert.ok(!('macroTaches' in state));
   assert.ok(!FILTERS.some(filter => filter.key === 'macroTaches'));
-  assert.equal(tachesFilter.grouping, 'macroTaches', 'le menu Tâches connaît son regroupement');
-  assert.equal(FILTERS.find(filter => filter.key === 'actions').grouping, undefined, 'le filtre Actions reste à plat');
+  assert.equal(tachesFilter.grouping, 'macroTaches', 'le menu Actions connaît son regroupement');
+  assert.equal(tachesFilter.label, 'Actions', 'les tâches se lisent « Actions » depuis la 1.37.0');
+  assert.ok(!FILTERS.some(filter => filter.key === 'actions'), 'plus de filtre Actions à plat : les groupes du menu le remplacent');
 });
 
 test('ticking an action keeps the contacts with at least one task in it', () => {
