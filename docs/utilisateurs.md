@@ -17,7 +17,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 - [Fondateurs et Partenaires](#fondateurs-et-partenaires)
 - [Réinitialiser](#réinitialiser)
 - [Ma présence : apparaître ou non](#ma-présence--apparaître-ou-non)
-- [Modifier ma fiche](#modifier-ma-fiche), dont [L'adresse e-mail affichée](#ladresse-e-mail-affichée), [Ma photo de profil](#ma-photo-de-profil), [Quand l'enregistrement échoue](#quand-lenregistrement-échoue), [Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique) et [Pour les administrateurs](#pour-les-administrateurs)
+- [Modifier ma fiche](#modifier-ma-fiche), dont [Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable), [L'adresse e-mail affichée](#ladresse-e-mail-affichée), [Ma photo de profil](#ma-photo-de-profil), [Quand l'enregistrement échoue](#quand-lenregistrement-échoue), [Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique) et [Pour les administrateurs](#pour-les-administrateurs)
 - [Créer ma fiche](#créer-ma-fiche), dont [Si la création échoue](#si-la-création-échoue)
 - [La fiche de mon établissement](#la-fiche-de-mon-établissement), dont [Les responsables](#les-responsables) et [Si l'enregistrement de la fiche échoue](#si-lenregistrement-de-la-fiche-échoue)
 - [Pourquoi une personne n'apparaît-elle pas ?](#pourquoi-une-personne-napparaît-elle-pas-)
@@ -28,7 +28,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 
 L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa promesse : *pas de mauvaise porte, toujours le bon interlocuteur*.
 
-- Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (instances, actions, groupes de travail ou GT, communautés, tâches, compétences, rôle) et, si elle l'a ajoutée, sa **photo de profil** à la place de ses initiales ([La photo de profil](#la-photo-de-profil)).
+- Chaque personne est une **carte** : coordonnées, établissement et tout ce à quoi elle participe (rôle dans le PUI, instances, actions, groupes de travail ou GT, communautés, compétences) et, si elle l'a ajoutée, sa **photo de profil** à la place de ses initiales ([La photo de profil](#la-photo-de-profil)).
 - On retrouve quelqu'un par son **nom** ou, grâce aux **filtres**, par ce qu'il fait.
 - L'annuaire porte les **logos** du PUI : celui de chaque établissement sur ses cartes, ceux des financeurs au centre de l'en-tête et ceux des établissements fondateurs dans un bandeau tout en bas ([Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)).
 - L'annuaire s'ouvre dans Grist et **s'adapte à la place qu'on lui donne** : trois colonnes de cartes sur un écran de PC, quatre ou cinq sur un très grand écran (à partir de 1 670 px de large), une seule sur un téléphone ou dans un panneau étroit. Les captures de ce guide sont prises sur un grand écran.
@@ -50,20 +50,20 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Structure « autres »** | Une structure extérieure au PUI, qui a collaboré à certaines tâches. Son statut est « autres » : ses contacts n'apparaissent pas dans l'annuaire |
 | **Domaine (compétences macro)** | Un regroupement de compétences. Le menu Compétences range les compétences par domaine ([Domaines et compétences](#domaines-et-compétences)) |
 | **C.U.R.I.E** | Un référentiel de compétences, que le document Grist peut renseigner (colonne `referenciel_C_U_R_I_E` de la table `Competences`). Le menu Compétences peut alors ranger les compétences par groupe de ce référentiel, dans un second onglet ([Deux rangements](#domaines-et-compétences)). *Sens du sigle à compléter* |
-| **Action d'une tâche** | L'action dont une tâche porte le numéro : « 2.1 Suivi de projets » est une tâche de l'« Action 2 ». Le menu Tâches range les tâches par action ([Actions et tâches](#actions-et-tâches)) |
+| **Action d'une tâche** | L'action dont une tâche porte le numéro : « 2.1 Suivi de projets » est une tâche de l'« Action 2 ». Le menu Actions range les tâches par action ([Actions et tâches](#actions-et-tâches)) |
 | **Responsable d'établissement** | Une personne nommée dans la table `ACL` de Grist pour tenir la fiche de son établissement : son logo, son nom complet, sa visibilité dans l'annuaire et la liste des responsables ([La fiche de mon établissement](#la-fiche-de-mon-établissement)) |
 | **Photo de profil** | La photo, facultative, qu'une personne ajoute à sa fiche : elle remplace ses initiales sur sa carte et s'agrandit au clic (colonne `Avatar` de `BDD`, une pièce jointe du document Grist) ([La photo de profil](#la-photo-de-profil)) |
 | **Accord d'apparaître** | Le choix de chaque personne de figurer ou non dans l'annuaire. Sans son accord, une personne n'apparaît pas, même si son établissement a validé son apparition |
 | **Instances** | *À compléter* |
-| **Actions** | *À compléter* |
+| **Actions** | *À compléter.* Depuis la 1.39.0, ce que le widget appelait « Tâches » s'appelle « Actions » (la colonne `Taches` de la fiche) |
 | **Communautés** | *À compléter* |
-| **Tâches** | *À compléter* |
-| **Rôle PUI** | *À compléter* |
+| **Rôle dans le PUI** | *À compléter.* Un rôle choisi sur la fiche (« Coordinateur de communauté »…), plus « Membre d'une action », que les actions de la personne lui donnent, et « Responsable d'une action », que la personne coche elle-même ([Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable)) |
+| **Responsable d'une action** | Une personne qui a coché, dans « Modifier mon profil », une action dont elle est responsable. Sa carte écrit « Responsable de l'action 1.2 » (ou « Responsable des actions 1.2, 1.3 ») dans la section Rôle dans le PUI. C'est une déclaration de la personne : le widget ne la vérifie pas |
 | **Périmètre** | *À compléter.* Colonne `perimetre` de la table des contacts : depuis la 1.27.0, elle ne décide plus de qui apparaît |
 
 ## Découvrir l'écran
 
-![Vue d'ensemble de l'annuaire : en-tête, barre de recherche, huit filtres, interrupteurs Fondateurs et Partenaires, bouton Réinitialiser et cartes de contact](images/apercu.png)
+![Vue d'ensemble de l'annuaire : en-tête, barre de recherche, sept filtres, interrupteurs Fondateurs et Partenaires, bouton Réinitialiser et cartes de contact](images/apercu.png)
 
 | Élément | À quoi il sert |
 |---|---|
@@ -72,7 +72,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Financeurs** (au centre de l'en-tête) | La phrase de financement et les logos des financeurs ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)). Les responsables d'un établissement y trouvent aussi le bouton **Mon établissement** ([La fiche de mon établissement](#la-fiche-de-mon-établissement)), les administrateurs le bouton **Mode admin** ([Pour les administrateurs](#pour-les-administrateurs)). Si aucune fiche ne porte l'adresse de votre compte, il le dit, n'a ni interrupteur ni bouton « Modifier mon profil » et propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
-| **Actions, Tâches, Communautés, GT, Compétences, Instances, Établissement, Rôle PUI** | Huit filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine, et le menu **Tâches** par action. Le menu **Rôle PUI** liste les rôles de la table `Role_Dans_le_PUI` |
+| **Actions, Communautés, GT, Compétences, Instances, Établissement, Rôle dans le PUI** | Sept filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine, et le menu **Actions** par action. Le menu **Rôle dans le PUI** liste les rôles de la table `Role_Dans_le_PUI`, plus « Membre d'une action » et, quand le document Grist a la colonne `Taches_responsable`, « Responsable d'une action » |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
 | **Réinitialiser** | Efface la recherche et décoche tous les filtres. Il est grisé quand il n'y a rien à effacer ([Réinitialiser](#réinitialiser)) |
 | **Cartes** | Une carte par personne, trois par ligne (quatre ou cinq à partir de 1 670 px de large), triées par nom de famille puis par prénom (ordre alphabétique) |
@@ -97,13 +97,13 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 4. **Établissement** (en haut à droite) : son logo, seul, ou sa pastille s'il n'a pas de logo dans Grist ([Les logos](#les-logos-et-le-bandeau-du-bas)). Un clic filtre sur cet établissement.
 5. **Adresse e-mail** : c'est un lien, et un clic ouvre un nouveau message dans votre messagerie, si votre navigateur le permet. Une adresse saisie sous une forme inhabituelle (plusieurs destinataires, paramètres) reste affichée en texte, sans lien. C'est l'adresse que la personne a choisi de montrer (champ « E-mail affiché » de sa fiche, voir [L'adresse e-mail affichée](#ladresse-e-mail-affichée)), à défaut celle de son compte.
 6. **Téléphone**, s'il est renseigné, présenté par paires de chiffres. Sur un **écran tactile** (téléphone, tablette), c'est un **lien** : un appui propose d'appeler ce numéro, à condition qu'il se compose sans équivoque (de 6 à 15 chiffres, séparés au besoin par des espaces, des points ou des tirets, avec un « + » devant pour un numéro international). Une saisie libre (« poste 23 », deux numéros, « +33 (0)5… ») reste du texte, et **sur un ordinateur le numéro est toujours du texte**. Le lien garde l'aspect d'une ligne de texte, sans soulignement.
-7. **Titres de section** : Instances, Actions, GT, Compétences, Communautés, Tâches. Une section n'apparaît que si la personne y a au moins une valeur.
-8. **Étiquettes colorées** : un clic filtre sur cette valeur (voir [Gagner du temps](#gagner-du-temps--cliquer-sur-une-étiquette)). Sur l'étiquette d'une **tâche**, le **rôle** de la personne dans cette tâche, quand Grist le connaît, se lit dans une bulle (« Rôle : Pilote ») au survol de l'étiquette ou, au clavier, quand elle a le focus (**Échap** ferme la bulle) ; sur un téléphone, qui ne survole pas, il s'écrit sous le nom de la tâche, dans l'étiquette. Une personne qui a la même tâche sous plusieurs lignes dans Grist y lit tous ses rôles (« Rôles : Pilote, Contributeur »). Sans rôle dans Grist, rien ne s'affiche. Au clavier, les étiquettes d'une carte ne sont qu'un seul arrêt de **Tab** : les flèches **gauche** et **droite** passent de l'une à l'autre.
-9. **Rôle PUI** : un texte violet, comme la fonction (sans pastille ni fond), seulement si la personne a un rôle dans le PUI. Il se lit à droite de la ligne de l'e-mail, sans jamais la faire passer à la ligne ni agrandir la carte : trop long pour la place que l'e-mail lui laisse, il est coupé par « … » (le rôle entier s'affiche en passant la souris dessus, pas sur un téléphone), et il disparaît quand l'e-mail prend presque toute la ligne. Un clic filtre sur ce rôle.
+7. **Titres de section** : Rôle dans le PUI, Instances, Actions, GT, Compétences, Communautés. Une section n'apparaît que si la personne y a au moins une valeur. Les actions s'y lisent **rangées par numéro** : une ligne par action du menu, « 1.2 1.3 » sur la même ligne, « 3.5 » à la ligne, et les actions sans numéro sur la dernière ligne.
+8. **Étiquettes colorées** : un clic filtre sur cette valeur (voir [Gagner du temps](#gagner-du-temps--cliquer-sur-une-étiquette)). Sur l'étiquette d'une **action**, le **rôle** de la personne dans cette action, quand Grist le connaît, se lit dans une bulle (« Rôle : Pilote ») au survol de l'étiquette ou, au clavier, quand elle a le focus (**Échap** ferme la bulle) ; sur un téléphone, qui ne survole pas, il s'écrit sous le nom de l'action, dans l'étiquette. Une personne qui a la même action sous plusieurs lignes dans Grist y lit tous ses rôles (« Rôles : Pilote, Contributeur »). Sans rôle dans Grist, rien ne s'affiche. Au clavier, les étiquettes d'une carte ne sont qu'un seul arrêt de **Tab** : les flèches **gauche** et **droite** passent de l'une à l'autre.
+9. **Rôle dans le PUI** : la première section de pastilles, seulement si la personne a un rôle (celui qu'elle a choisi sur sa fiche) ou au moins une action : le rôle « **Membre d'une action** » vient alors de lui-même, le widget le met et le retire d'après ses actions, sans que personne ne l'écrive dans Grist. Une personne qui a coché des actions dont elle est responsable lit aussi « **Responsable de l'action 1.2** » (ou « **Responsable des actions 1.2, 1.3** », voir [Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable)). Un clic filtre sur ce rôle ; le menu du filtre n'a qu'une option « Responsable d'une action », quel que soit le nombre d'actions (il ne la propose que si le document Grist a la colonne `Taches_responsable`).
 
 Sur une carte que vous pouvez modifier, une ligne s'ajoute sous la fonction : la mention **Votre fiche** (sur la vôtre) et le bouton **✎ Modifier** ([Modifier ma fiche](#modifier-ma-fiche)) ; sur la carte d'une autre personne, un administrateur en mode admin lit **✎ Modifier la fiche**. Si vous êtes responsable de l'établissement, un second bouton **✎ Modifier** se lit sous le logo de l'établissement : il ouvre la fiche de l'**établissement**, pas celle de la personne ([La fiche de mon établissement](#la-fiche-de-mon-établissement)).
 
-Une information absente n'est pas remplacée par une ligne vide : elle n'apparaît simplement pas. Les **domaines** de compétences et les **actions des tâches** ne figurent pas sur la carte, qui garde le détail des compétences et des tâches : ils rangent les menus Compétences et Tâches et permettent de filtrer par domaine ou par action (voir [Domaines et compétences](#domaines-et-compétences) et [Actions et tâches](#actions-et-tâches)).
+Une information absente n'est pas remplacée par une ligne vide : elle n'apparaît simplement pas. Les **domaines** de compétences et les **groupes d'actions** (« Action 1: … ») ne figurent pas sur la carte, qui garde le détail des compétences et des actions : ils rangent les menus Compétences et Actions et permettent de filtrer par domaine ou par groupe (voir [Domaines et compétences](#domaines-et-compétences) et [Actions et tâches](#actions-et-tâches)).
 
 ### La photo de profil
 
@@ -202,9 +202,9 @@ Le menu **Compétences** range les compétences par **domaine** (on parle aussi 
 
 ### Actions et tâches
 
-Le menu **Tâches** range lui aussi ses valeurs par groupe, ici par **action**. Il fonctionne comme le menu Compétences ([Domaines et compétences](#domaines-et-compétences)) : par action, quand on ne connaît pas chaque tâche, ou par tâche, quand on sait laquelle on veut. Un seul bouton sert aux deux.
+Le menu **Actions** (celui que le widget appelait « Tâches » jusqu'à la 1.38.0) range lui aussi ses valeurs par groupe, ici par **action**. Il fonctionne comme le menu Compétences ([Domaines et compétences](#domaines-et-compétences)) : par action, quand on ne connaît pas chaque tâche, ou par tâche, quand on sait laquelle on veut. Un seul bouton sert aux deux.
 
-![Le menu Tâches ouvert : l'action « Action 2: Maturation de projets » est cochée, l'action « Action 1: Valorisation de la recherche » est cochée en partie (« 1.1 Animation de réseau » seule), le bouton affiche 2 et le compteur dit « 9 sur 14 contacts » ; sous le champ de recherche, la ligne d'aide du menu](images/filtre-taches.png)
+![Le menu Actions ouvert : l'action « Action 2: Maturation de projets » est cochée, l'action « Action 1: Valorisation de la recherche » est cochée en partie (« 1.1 Animation de réseau » seule), le bouton affiche 2 et le compteur dit « 9 sur 14 contacts » ; sous le champ de recherche, la ligne d'aide du menu](images/filtre-taches.png)
 
 - Chaque ligne en brun orangé est une **action**. Le nombre à sa droite est celui des cartes qui ont **au moins une tâche** de cette action : une personne qui en a deux n'est comptée qu'une fois.
 - **Cocher une action** coche d'un coup toutes ses tâches. La **flèche** déplie ses tâches : cochez-en une, et la case de l'action passe à moitié cochée (un tiret). Un clic sur la case d'une action à moitié cochée la complète, un clic de plus décoche tout.
@@ -216,15 +216,15 @@ Le menu **Tâches** range lui aussi ses valeurs par groupe, ici par **action**. 
 
 **La recherche du menu trouve une action comme une tâche, et un numéro aussi.** Elle se comporte comme celle du menu Compétences : le nom d'une action garde l'action avec **toutes** ses tâches, le nom d'une tâche garde cette tâche sous son action, et « 2.1 » retrouve la tâche qui porte ce numéro.
 
-**Le filtre Actions ne change pas.** Il reste la liste de toutes les actions, avec le nombre de cartes de chacune, et se cumule (**et**) avec le menu Tâches : cocher une action dans le menu Tâches ne coche pas le filtre Actions, et inversement. Les deux ne disent pas la même chose : le filtre Actions retrouve les personnes qui participent à une action, le menu Tâches celles qui ont une tâche de cette action.
+**Il n'y a plus de filtre Actions à part.** Jusqu'à la 1.38.0, un bouton « Actions » (la colonne `Actions` de la fiche) précédait le menu des tâches ; depuis la 1.39.0 le menu Actions le remplace, et cocher une action (une ligne en brun orangé) retrouve les personnes qui ont au moins une de ses tâches. Une personne qui n'a qu'une action, sans le détail de ses tâches (la colonne `Actions` de sa fiche), voit cette action sur sa carte, sous « Actions », sans bouton (depuis la 1.41.0 ; la 1.39.0 les avait fait disparaître) : le menu Actions ne la retrouve pas, puisqu'il cherche des tâches. Dès qu'elle a une tâche du même numéro (« 2.1 » pour l'action 2), c'est la tâche qui s'affiche.
 
 ## Gagner du temps : cliquer sur une étiquette
 
 Cliquer sur une étiquette de carte, sur le logo ou la pastille d'établissement **coche le filtre correspondant** ; cliquer à nouveau le décoche. C'est le même résultat que cocher la case dans le menu, sans l'ouvrir.
 
-Le **rôle PUI**, le texte violet à droite de la ligne de l'e-mail, se clique de la même façon : il coche le filtre **Rôle PUI**.
+Le **rôle dans le PUI**, la première section de pastilles de la carte, se clique de la même façon : il coche le filtre **Rôle dans le PUI**.
 
-**Au clavier**, **Tab** ne s'arrête qu'une fois sur les étiquettes d'une carte, au lieu d'une fois par étiquette : sur la première au départ, puis sur la dernière que vous avez touchée. Les flèches **gauche** et **droite** passent d'une étiquette à l'autre (on s'arrête aux deux bouts), **Entrée** ou **Espace** coche le filtre, et **Tab** passe au contrôle suivant. Le rôle PUI, l'e-mail, la photo et le logo de l'établissement restent des arrêts à part.
+**Au clavier**, **Tab** ne s'arrête qu'une fois sur les étiquettes d'une carte, au lieu d'une fois par étiquette : sur la première au départ, puis sur la dernière que vous avez touchée. Les flèches **gauche** et **droite** passent d'une étiquette à l'autre (on s'arrête aux deux bouts), **Entrée** ou **Espace** coche le filtre, et **Tab** passe au contrôle suivant. L'e-mail, la photo et le logo de l'établissement restent des arrêts à part.
 
 ## Fondateurs et Partenaires
 
@@ -332,7 +332,8 @@ Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, l'adres
 |---|---|
 | Prénom, nom, fonction, téléphone | Oui, en saisissant le texte |
 | Rôle dans le PUI | Oui, dans une liste déroulante (une valeur, ou « Non renseigné ») |
-| Instances, Actions, GT, Compétences, Communautés, Tâches | Oui, en cochant ou en décochant des pastilles. Les compétences sont rangées par domaine et les tâches par action, mais seules les compétences et les tâches se cochent |
+| Instances, GT, Compétences, Communautés, Actions | Oui, en cochant ou en décochant des pastilles. Les compétences sont rangées par domaine et les tâches par action, mais seules les compétences et les tâches se cochent |
+| Les actions dont vous êtes responsable | Oui, avec les cases du bloc **Responsable de**, sous la liste des actions : une case par action que vous avez choisie. Le bloc n'existe que si le document Grist a la colonne `Taches_responsable` ([Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable)) |
 | Adresse e-mail affichée | Oui, avec le champ facultatif « E-mail affiché » : la carte montre cette adresse à la place de celle de votre compte. Le champ n'existe que si le document Grist a la colonne `email_affiche` ([L'adresse e-mail affichée](#ladresse-e-mail-affichée)) |
 | Photo de profil | Oui, avec la carte « Photo de profil » : ajouter, changer ou retirer (JPG, PNG ou WebP, 2 Mo au plus). La carte n'existe que si le document Grist a la colonne `Avatar` ([Ma photo de profil](#ma-photo-de-profil)) |
 | Adresse e-mail du compte | **Non, pas sur votre propre fiche** : c'est elle qui relie votre compte à votre fiche. Un administrateur la change sur la fiche d'une autre personne, avec le mode admin ([Pour les administrateurs](#pour-les-administrateurs)) ; sinon c'est à l'administrateur des données de la corriger dans Grist |
@@ -352,7 +353,8 @@ Le formulaire s'ouvre avec les valeurs actuelles de la fiche. Sous le titre, une
 - **Prénom, Nom, Fonction, Téléphone** : des zones de texte.
 - **E-mail affiché** (entre la fonction et le téléphone) : une zone de texte facultative, pour montrer sur votre carte une autre adresse que celle de votre compte ([L'adresse e-mail affichée](#ladresse-e-mail-affichée)). Elle n'existe que si le document Grist a la colonne `email_affiche`.
 - **Rôle dans le PUI** : une liste déroulante. Elle s'ouvre sur une zone de recherche et les valeurs, que la saisie réduit en direct (sans tenir compte des accents ni des majuscules), comme les menus de filtre ; « Non renseigné » n'en choisit aucune : elle est la première valeur de la liste, mais n'apparaît pas parmi les résultats d'une recherche.
-- **Instances, Actions, GT, Compétences, Communautés, Tâches** : toutes les valeurs que Grist propose, en pastilles. Un clic coche ou décoche une pastille, et chaque liste dit combien de valeurs sont sélectionnées. Une zone de recherche, sous le titre de chaque liste, ne garde que les pastilles qui répondent à ce qu'on tape (sans tenir compte des accents ni des majuscules). Une valeur que Grist propose sous plusieurs lignes du même libellé n'est proposée qu'une fois : la cocher ou la décocher agit sur toutes.
+- **Instances, GT, Compétences, Communautés, Actions** : toutes les valeurs que Grist propose, en pastilles. Un clic coche ou décoche une pastille, et chaque liste dit combien de valeurs sont sélectionnées. Une zone de recherche, sous le titre de chaque liste, ne garde que les pastilles qui répondent à ce qu'on tape (sans tenir compte des accents ni des majuscules). Une valeur que Grist propose sous plusieurs lignes du même libellé n'est proposée qu'une fois : la cocher ou la décocher agit sur toutes.
+- **Responsable de** : sous la liste des actions, une case par action que vous avez choisie ([Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable)).
 - **Ce qui va changer** : sous les listes, un encadré apparaît dès que vous modifiez quelque chose et dit, champ par champ, ce qui change.
 
 **Les règles de saisie**
@@ -372,6 +374,16 @@ Un champ refusé est signalé sous le champ :
 | « Indiquez au moins un prénom ou un nom. » | Le prénom et le nom seraient tous deux vides (le message s'affiche sous le ou les champs que vous avez vidés) |
 
 En bas de la fenêtre, un résumé dit où vous en êtes : « Aucune modification », le nombre de champs modifiés (par exemple : 2 champs modifiés) ou ce qu'il faut corriger : « Indiquez au moins un prénom ou un nom », « Corrigez l’adresse e-mail », « Corrigez le numéro de téléphone » ou « Corrigez les champs signalés ». Le bouton **Relire mes modifications** reste grisé tant qu'il n'y a rien à relire ou qu'un champ est refusé.
+
+### Dire de quelles actions on est responsable
+
+Sous la liste des **Actions**, un bloc **Responsable de** porte **une case par action que vous avez choisie** : cochez celles dont vous êtes responsable. Rien n'est coché d'avance, et le bloc n'apparaît qu'à partir de la première action choisie : on ne peut pas être responsable d'une action qu'on n'a pas. Décocher une action dans la liste retire aussi sa case ; si vous la reprenez, la case revient décochée.
+
+Votre carte l'écrit ensuite dans sa première section, **Rôle dans le PUI** : la pastille **Responsable de l'action 1.2** pour une action, **Responsable des actions 1.2, 1.3** pour plusieurs (le numéro est celui qui précède le libellé de l'action, comme dans le menu Actions ; sans numéro, c'est le libellé entier). Un clic sur cette pastille filtre sur le rôle **Responsable d'une action**. La relecture montre l'ancienne pastille barrée et la nouvelle repérée avant que vous validiez, et un seul enregistrement écrit vos actions et vos responsabilités ensemble.
+
+C'est une **déclaration de votre part** : personne ne la vérifie, comme le reste de votre fiche, et personne ne la remplit à votre place au départ (au début, nul n'est « Responsable »). Elle s'efface d'elle-même d'une action que vous n'avez plus, sans que vous ayez à la décocher. Un administrateur, mode admin allumé, voit le même bloc sur la fiche d'une autre personne.
+
+**Pas de bloc « Responsable de » dans votre fenêtre ?** Soit vous n'avez encore choisi aucune action, soit le document Grist n'a pas la colonne `Taches_responsable` (voir [`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 1 : l'annuaire la crée tout seul la première fois qu'un administrateur l'ouvre, si Grist le permet ; sinon, prévenez l'administrateur des données).
 
 ### L'adresse e-mail affichée
 
@@ -724,6 +736,10 @@ Le bouton **✎ Modifier** d'une carte n'apparaît que sur les cartes que vous a
 
 Oui, si l'annuaire vous reconnaît (vous êtes connecté à Grist avec une adresse qui ne figure sur aucune fiche) : le bandeau « Compte absent de l'annuaire » (ou « Administrateur ») propose **Créer ma fiche**. Vous choisissez votre établissement, vous remplissez le reste, vous relisez votre carte, puis vous cliquez sur **Publier ma fiche** : elle apparaît tout de suite dans l'annuaire, sauf si quelque chose la retient (l'établissement n'a pas validé sa présence, par exemple) ([Créer ma fiche](#créer-ma-fiche)).
 
+**Je suis responsable d'une action : comment le faire figurer sur ma carte ?**
+
+Ouvrez votre fiche (**✎ Modifier** sur votre carte, ou **Modifier mon profil** dans le bandeau), vérifiez que l'action est bien cochée dans la liste **Actions**, puis cochez-la dans le bloc **Responsable de**, juste dessous. Après la relecture, votre carte lit « Responsable de l'action 1.2 » dans sa section Rôle dans le PUI ([Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable)). Pour le retirer, décochez la case : la carte perd la pastille.
+
 **Puis-je afficher une autre adresse e-mail que celle de mon compte ?**
 
 Oui, avec le champ facultatif **E-mail affiché** de votre fiche, quand le document Grist a la colonne `email_affiche` : la carte montre cette adresse à la place de celle de votre compte, qui reste celle qui relie votre compte à votre fiche ([L'adresse e-mail affichée](#ladresse-e-mail-affichée)).
@@ -754,7 +770,7 @@ Les administrateurs, oui : avec le mode admin allumé, ils peuvent modifier les 
 
 **D'où viennent les informations ?**
 
-D'un document Grist, qui sert de base de données à l'annuaire, logos et photos de profil compris : ce sont des fichiers joints à ce document, que votre navigateur télécharge chez Grist avec une autorisation de lecture qui expire en quelques minutes ([sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes)). L'annuaire n'enregistre rien dans votre navigateur, hormis ce que celui-ci garde de lui-même des images affichées. Dans le document Grist, il n'écrit que dans cinq cas : à l'ouverture (et de nouveau après un changement de responsables), une ligne de service qui sert à vous reconnaître (ajoutée puis supprimée aussitôt, dans une table de service, `Annuaire_Sonde`, que l'annuaire crée lui-même, une seule fois, quand elle manque) ; votre choix d'apparaître ou non, quand vous cliquez sur l'interrupteur ; une fiche, quand vous cliquez sur « Valider » après une relecture : la vôtre, ou celle d'une autre personne si vous êtes administrateur et avez allumé le mode admin (avec, pour une nouvelle photo, un fichier envoyé à Grist, qui devient une pièce jointe du document) ; votre fiche, quand vous n'en avez pas et que vous cliquez sur « Publier ma fiche » ou « Créer ma fiche » après une relecture (une ligne ajoutée à `BDD`) ; la fiche de votre établissement, si vous en êtes responsable et que vous cliquez sur « Enregistrer » (avec, pour un nouveau logo, un fichier envoyé à Grist, qui devient une pièce jointe du document).
+D'un document Grist, qui sert de base de données à l'annuaire, logos et photos de profil compris : ce sont des fichiers joints à ce document, que votre navigateur télécharge chez Grist avec une autorisation de lecture qui expire en quelques minutes ([sécurité](securite.md#les-logos-et-le-jeton-daccès-aux-pièces-jointes)). L'annuaire n'enregistre rien dans votre navigateur, hormis ce que celui-ci garde de lui-même des images affichées. Dans le document Grist, il n'écrit que dans cinq cas : à l'ouverture (et de nouveau après un changement de responsables), une ligne de service qui sert à vous reconnaître (ajoutée puis supprimée aussitôt, dans une table de service, `Annuaire_Sonde`, que l'annuaire crée lui-même, une seule fois, quand elle manque ; et, quand c'est un administrateur qui l'ouvre, la colonne `Taches_responsable` de `BDD` qui porte vos responsabilités, ajoutée de la même façon quand elle manque) ; votre choix d'apparaître ou non, quand vous cliquez sur l'interrupteur ; une fiche, quand vous cliquez sur « Valider » après une relecture : la vôtre, ou celle d'une autre personne si vous êtes administrateur et avez allumé le mode admin (avec, pour une nouvelle photo, un fichier envoyé à Grist, qui devient une pièce jointe du document) ; votre fiche, quand vous n'en avez pas et que vous cliquez sur « Publier ma fiche » ou « Créer ma fiche » après une relecture (une ligne ajoutée à `BDD`) ; la fiche de votre établissement, si vous en êtes responsable et que vous cliquez sur « Enregistrer » (avec, pour un nouveau logo, un fichier envoyé à Grist, qui devient une pièce jointe du document).
 
 **J'ai changé une information dans Grist et je ne la vois pas.**
 

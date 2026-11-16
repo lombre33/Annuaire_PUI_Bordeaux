@@ -27,7 +27,7 @@ test('loadDirectory gives a person the roles of her own raw rows, not those the 
   const byName = Object.fromEntries(contacts.map(c => [c.nom, c]));
   assert.deepEqual(byName.Martin.labels.taches, ['1.1 Relecture']);
   assert.deepEqual(byName.Martin.taskRoles, { '1.1 relecture': ['Pilote'] }, 'Ana n\'a que la ligne « pilote » : pas le rôle des autres lignes de la même tâche');
-  assert.deepEqual(byName.Durand.labels.taches, ['1.1 Relecture'], 'une seule étiquette pour ses deux lignes');
+  assert.deepEqual(byName.Durand.labels.taches, ['1.1 Relecture', 'Action 2 : Audit'], 'une seule étiquette pour ses deux lignes, et son action sans tâche de ce numéro');
   assert.deepEqual(byName.Durand.taskRoles, { '1.1 relecture': ['Contributeur', 'Observateur'] }, 'toutes les lignes de Bob sous cette étiquette');
   assert.deepEqual(byName['Bergonié'].taskRoles, {}, 'une tâche sans rôle n\'en montre pas');
   assert.deepEqual(byName.Bernard.labels.taches, ['Veille']);

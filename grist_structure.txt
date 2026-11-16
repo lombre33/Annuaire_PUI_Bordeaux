@@ -14,7 +14,8 @@
 # Accepte_apparaitre, par l'interrupteur « Ma présence », et les colonnes de la fiche
 # modifiables par « Modifier ma fiche » : prénom, nom, fonction, e-mail affiché (colonne
 # facultative email_affiche, depuis la 1.18.0), téléphone, rôle et listes de participations
-# et, depuis la 1.19.0, la photo de profil (colonne facultative Avatar) ; l'e-mail et
+# (dont, depuis la 1.40.0, les actions dont la personne se dit responsable : colonne facultative
+# Taches_responsable) et, depuis la 1.19.0, la photo de profil (colonne facultative Avatar) ; l'e-mail et
 # l'établissement seulement quand un administrateur, mode admin allumé, modifie la fiche
 # d'une autre personne ; et, depuis la 1.18.0, UNE LIGNE AJOUTÉE quand une personne que
 # l'annuaire ne connaît pas encore crée sa fiche : l'e-mail de son compte, l'établissement
@@ -25,9 +26,10 @@
 # email et Responsable_de_l_Etablissement, jamais admin). Il ajoute aussi une pièce jointe au
 # document pour un nouveau logo ou une nouvelle photo de profil. Il lit aussi les métadonnées _grist_Tables et
 # _grist_Tables_column pour écrire le téléphone dans la forme de sa
-# colonne. Il ne modifie jamais une table ou une colonne existante et ne crée qu'une seule
-# table, Annuaire_Sonde, quand elle manque (depuis la 1.20.0) : voir GRIST_SETUP.md pour les
-# créer à la main.
+# colonne. Il ne modifie jamais une colonne existante. Il ne crée qu'une seule table,
+# Annuaire_Sonde, quand elle manque (depuis la 1.20.0), et qu'une seule colonne, Taches_responsable
+# de BDD, quand elle manque et qu'un administrateur ouvre l'annuaire (depuis la 1.40.0) : voir
+# GRIST_SETUP.md pour les créer à la main.
 #
 # Les logos des établissements (1.14.0) sont des pièces jointes du document : le widget lit les
 # colonnes facultatives logo et ordre_bandeau d'Etablissements. Les financeurs (le visuel du haut de
@@ -65,9 +67,15 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
     la personne. Sans cette colonne, le widget affiche une erreur au lieu
     d'afficher tout le monde. Voir hasAccepted() dans grist-data.js et
     setPresence() dans presence.js.
-  Actions           : ReferenceList(Actions)
+  Actions           : ReferenceList(Actions)   LUE POUR LA CARTE SEULEMENT
+    Les actions d'une personne sont ses tâches (la colonne Taches ci-dessous, que filtre le bouton
+    « Actions »). Cette colonne ne filtre rien et ne s'écrit pas ; depuis la 1.41.0 le widget la lit
+    pour montrer, sans bouton, l'action d'une personne qui n'a aucune tâche de ce numéro (la 1.39.0
+    ne la lisait plus : les personnes qui n'avaient que des actions les perdaient). Une action sans
+    numéro (« [InnovationS] - Axe Outils ») s'affiche toujours. Une cellule gardée en texte
+    (« [0,14,21,30] ») se lit comme des numéros de ligne, le 0 ignoré ; la console (`[LISTES]`) la signale.
   Communautes       : ReferenceList(Communautes)
-  Taches            : ReferenceList(Taches)
+  Taches            : ReferenceList(Taches)   (les actions de la personne, depuis la 1.39.0)
   Instances         : ReferenceList(INSTANCES)
   GT                : ReferenceList(GT)
   Competences       : ReferenceList(Competences)
@@ -86,11 +94,23 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
                                      l'adresse du compte. Voir shownEmail() dans grist-data.js)
   numero_de_telephone : Numeric     (téléphone de la carte ; le 0 initial qu'un
                                      type Numeric fait perdre est rétabli)
-  Role_dans_le_PUI    : Reference(Role_Dans_le_PUI)   (tag « Rôle PUI »)
+  Role_dans_le_PUI    : Reference(Role_Dans_le_PUI)   (pastille « Rôle dans le PUI » ; « Membre
+                                     d'une action » et « Responsable d'une action » s'y ajoutent
+                                     sans jamais s'écrire : le widget les déduit des actions, à
+                                     chaque lecture, depuis les 1.39.0 et 1.40.0)
   Avatar              : Attachments (Pièces jointes)   (photo de profil, depuis la 1.19.0 : elle
                                      remplace les initiales sur la carte ; le premier fichier de la
                                      cellule est utilisé, ['L', 12] ; modifiable par la personne dans
                                      la fenêtre de modification, donc colonne de DONNÉES)
+  Taches_responsable  : ReferenceList(Taches)   (les actions dont la personne se dit responsable,
+                                     depuis la 1.40.0 : une case par action, sous ses actions, dans
+                                     la fenêtre de modification ; la carte dit « Responsable de
+                                     l'action 1.2 ». Colonne de DONNÉES, modifiable par la personne
+                                     sur sa seule ligne. Le widget la crée quand elle manque et
+                                     qu'un administrateur ouvre l'annuaire (une action AddColumn,
+                                     schema.js) ; si Grist refuse, il s'en passe, sans message à
+                                     l'écran : GRIST_SETUP.md, étape 1, pour la créer à la main.
+                                     Voir responsibleActions() dans grist-data.js)
 
 Tables de référence (id -> libellé, chargées via fetchTable)
   Chaque table porte un libellé brut (issu de l'import) et un libellé corrigé :
@@ -102,14 +122,17 @@ Tables de référence (id -> libellé, chargées via fetchTable)
   Actions            : Actions_corrigees (Choice)     puis Actions (Text)
                        Le libellé commence par « Action n : » (ou « Action n: ») :
                        ce numéro n rattache les tâches du même numéro à l'action
-                       (menu « Tâches » rangé par action).
+                       (menu « Actions » rangé par action ; « Tâches » jusqu'à la 1.38.0).
   Taches             : Taches_corrige (Choice)        puis Taches (Text)
+                       Depuis la 1.39.0 le widget les appelle des « actions » (la pastille
+                       « 1.3 » est une ligne de cette table) ; la table et la colonne
+                       BDD.Taches gardent leur nom.
                        Aucune colonne ne donne l'action d'une tâche : c'est le
                        numéro avant le point de son libellé (« 1.3 Animer le
                        réseau » est une tâche de l'action 1). Une tâche sans
                        numéro, ou sans action de ce numéro, est classée sous
                        « Sans action » ; si aucune tâche n'a son action, le menu
-                       Tâches reste à plat. Voir taskActionNumber() et
+                       Actions reste à plat. Voir taskActionNumber() et
                        actionNumber() dans grist-data.js.
                        + Taches_role (Text), facultative : le rôle de la personne dans la
                        tâche, dit au survol de l'étiquette. Lu sur les lignes brutes

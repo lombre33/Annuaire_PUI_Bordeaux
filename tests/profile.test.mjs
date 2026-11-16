@@ -25,7 +25,7 @@ test('profileFormModel offers every editable column with the current value of th
   const { referenceMaps, row } = await setup();
   const model = profileFormModel(row(1), referenceMaps); // Ana
   assert.deepEqual(model.map(entry => entry.key),
-    ['prenom', 'nom', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+    ['prenom', 'nom', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'GT', 'Competences', 'Communautes', 'Taches']);
   assert.equal(field(model, 'Fonction').value, 'Pharmacienne');
   assert.equal(field(model, 'numero_de_telephone').value, '05 36 49 90 12', 'le 0 perdu par le type Numeric est rétabli');
   assert.equal(field(model, 'Role_dans_le_PUI').value, 1);
@@ -53,6 +53,31 @@ test('profileFormModel lists the options of each reference sorted by label, and 
   for (const forbidden of ['email', 'Etablissement', 'perimetre', 'Accepte_apparaitre']) {
     assert.equal(field(model, forbidden), undefined, forbidden);
   }
+});
+
+// La table des rôles de Antoine porte « Membre d'une action » (1.39.0) : les actions d'une personne le lui donnent, elle ne le choisit pas.
+function withMemberRole() {
+  const tables = sampleTables();
+  tables.Role_Dans_le_PUI = { id: [1, 2, 3], Role: ['Référent qualité', 'Coordinateur de communauté', 'Membre d\'une action'] };
+  return tables;
+}
+
+test('profileFormModel does not offer « Membre d\'une action » as a role to choose: her actions give it; a fiche that already holds it still shows it', async () => {
+  const tables = withMemberRole();
+  const { referenceMaps, row } = await setup(tables);
+  assert.deepEqual(field(profileFormModel(row(1), referenceMaps), 'Role_dans_le_PUI').options.map(option => option.label),
+    ['Coordinateur de communauté', 'Référent qualité'], 'le rôle calculé n\'est pas à choisir');
+  tables.BDD.Role_dans_le_PUI[1] = 3; // Bob l'a écrit à la main dans Grist
+  const held = await setup(tables);
+  const bob = field(profileFormModel(held.row(2), held.referenceMaps), 'Role_dans_le_PUI');
+  assert.equal(bob.value, 3);
+  assert.deepEqual(bob.options.map(option => option.label), ['Coordinateur de communauté', 'Membre d\'une action', 'Référent qualité'],
+    'sa valeur reste dans la liste : le menu la montre, et elle peut la changer');
+});
+
+test('profileFormModel offers every role of a table that has no « Membre d\'une action »', async () => {
+  const { referenceMaps, row } = await setup();
+  assert.deepEqual(field(profileFormModel(row(1), referenceMaps), 'Role_dans_le_PUI').options, [{ id: 1, label: 'Référent qualité' }]);
 });
 
 test('profileFormModel offers the corrected labels only, like the filters: a row without a corrected label is not offered, and the person\'s own value for it is left alone', async () => {
@@ -100,7 +125,7 @@ test('profileFormModel groups the tasks by action, « Sans action » last, once 
     ['Sans action', 'Veille']
   ]);
   assert.deepEqual(field(model, 'Taches').value, [1, 3], 'les tâches de la fiche restent cochées, rangées ou non');
-  assert.ok(field(model, 'Actions').options.every(option => !('group' in option)), 'la liste des actions reste à plat');
+  assert.equal(field(model, 'Actions'), undefined, 'la colonne Actions de BDD n\'est plus proposée : les actions de la personne sont ses tâches (1.39.0)');
   assert.ok(field(model, 'Competences').options.every(option => option.group), 'les compétences gardent leurs domaines');
 });
 
@@ -526,7 +551,7 @@ test('profileFormModel offers the e-mail and the établissement to an administra
   const { referenceMaps, row } = await setup();
   const admin = profileFormModel(row(2), referenceMaps, { admin: true }); // Bob, vu par une administratrice
   assert.deepEqual(admin.map(entry => entry.key),
-    ['Accepte_apparaitre', 'prenom', 'nom', 'email', 'Etablissement', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+    ['Accepte_apparaitre', 'prenom', 'nom', 'email', 'Etablissement', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'GT', 'Competences', 'Communautes', 'Taches']);
   assert.deepEqual(field(admin, 'email'), { key: 'email', label: 'E-mail', kind: 'email', value: 'bob@u-bordeaux-montaigne.example' });
   const etab = field(admin, 'Etablissement');
   assert.deepEqual([etab.kind, etab.category, etab.value, etab.required], ['reference', 'etablissement', 2, true]);
@@ -770,7 +795,7 @@ test('profileFormModel offers the photo first, with the id of the current attach
   const { referenceMaps, row } = await setup(withAvatars());
   const ana = profileFormModel(row(1), referenceMaps);
   assert.deepEqual(ana[0], { key: 'Avatar', label: 'Photo de profil', kind: 'image', value: 501 });
-  assert.deepEqual(ana.slice(1).map(entry => entry.key), ['prenom', 'nom', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+  assert.deepEqual(ana.slice(1).map(entry => entry.key), ['prenom', 'nom', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'GT', 'Competences', 'Communautes', 'Taches']);
   assert.ok(!('options' in ana[0]) && !('category' in ana[0]));
 
   const without = await setup();
@@ -930,7 +955,7 @@ test('a person who creates her fiche picks her établissement, is asked for a na
   const blank = blankFiche(Object.keys(tables.BDD), NEW_EMAIL);
   const model = profileFormModel(blank, referenceMaps, { creating: true });
   assert.deepEqual(model.map(entry => entry.key), ['prenom', 'nom', 'Etablissement', 'Fonction', 'email_affiche', 'numero_de_telephone',
-    'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+    'Role_dans_le_PUI', 'Instances', 'GT', 'Competences', 'Communautes', 'Taches']);
   assert.equal(field(model, 'Etablissement').value, 0);
   assert.equal(field(model, 'Etablissement').required, true);
   const draft = draftOf(model);

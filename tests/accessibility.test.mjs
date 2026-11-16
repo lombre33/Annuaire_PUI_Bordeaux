@@ -256,7 +256,7 @@ test('chaque contrôle atteint à la tabulation a un anneau de focus visible et 
     await waitForCards(page, 4);
     const stops = await tabStops(page);
     assert.ok(stops.length >= 15, `au moins 15 arrêts de tabulation (${stops.length})`);
-    assertFocusRings(stops, ['Rechercher par nom ou prénom', 'Actions', 'Fondateurs', 'Réinitialiser', 'CME', 'Modifier mon profil']);
+    assertFocusRings(stops, ['Rechercher par nom ou prénom', 'Actions', 'Fondateurs', 'Réinitialiser', 'Référent qualité', 'Modifier mon profil']);
   });
 });
 
@@ -286,7 +286,7 @@ const renderedText = (page, selector) => page.locator(selector).evaluateAll(elem
 
 test('pastilles, titres de groupe et lien e-mail d’une carte gardent 4,5:1 sur la page rendue (WCAG 1.4.3)', { skip }, async () => {
   const tables = sampleTables();
-  // Ana porte une pastille de chaque catégorie : GT et Tâches sont vides dans le jeu de base.
+  // Ana porte une pastille de chaque catégorie : GT et Actions sont vides dans le jeu de base (ses deux rôles viennent de sa fiche et de son action).
   tables.BDD.GT[0] = ['L', 1];
   tables.BDD.Taches[0] = ['L', 1];
   await withWidget({ tables }, async ({ page }) => {
@@ -295,10 +295,10 @@ test('pastilles, titres de groupe et lien e-mail d’une carte gardent 4,5:1 sur
     const titles = await renderedText(page, '.contact-card .tag-group-title');
     const links = await renderedText(page, '.contact-card a.email');
     const categories = new Set(pills.map(pill => /\btag-(\w+)/.exec(pill.classes)?.[1]));
-    for (const key of ['actions', 'communautes', 'gt', 'instances', 'taches']) {
+    for (const key of ['communautes', 'gt', 'instances', 'role', 'taches']) {
       assert.ok(categories.has(key), `une pastille « ${key} » est mesurée (sinon le test ne prouve rien pour elle)`);
     }
-    assert.ok(titles.length >= 7 && links.length >= 1, `titres et liens mesurés (${titles.length}, ${links.length})`);
+    assert.ok(titles.length >= 5 && links.length >= 1, `titres et liens mesurés (${titles.length}, ${links.length})`);
     const tooPale = [...pills, ...titles, ...links]
       .map(item => ({ ...item, ratio: contrastRatio(parseColor(item.color), parseColor(item.background)) }))
       .filter(item => item.ratio < MIN_TEXT_CONTRAST)

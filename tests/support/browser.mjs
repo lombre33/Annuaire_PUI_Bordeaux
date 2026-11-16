@@ -73,8 +73,10 @@ export const probeRemoved = page => page.waitForFunction(
 );
 
 // Ce que le faux Grist a reçu : les actions envoyées pour BDD (écrites ou refusées), une cellule de BDD telle qu'elle est maintenant,
-// les demandes de jeton d'accès.
-export const bddCalls = page => page.evaluate(() => window.__fake.calls.filter(call => call.table === 'BDD'));
+// les demandes de jeton d'accès. `bddCalls` ne compte que les écritures de lignes (ajout, modification, suppression) : la colonne
+// `Taches_responsable` qu'un administrateur fait ajouter à son arrivée (1.40.0) est de la structure, que `structureCalls` donne à part.
+export const bddCalls = page => page.evaluate(() => window.__fake.calls.filter(call => call.table === 'BDD' && !/Column$/.test(call.action)));
+export const structureCalls = page => page.evaluate(() => window.__fake.calls.filter(call => /Column$/.test(call.action)));
 export const bddCell = (page, column, index = 0) => page.evaluate(([name, at]) => window.__tables.BDD[name][at], [column, index]);
 export const tokenRequests = page => page.evaluate(() => window.__fake.tokenRequests);
 

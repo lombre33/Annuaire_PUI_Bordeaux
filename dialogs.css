@@ -534,6 +534,40 @@ textarea {
   font-size: 11.5px;
   font-weight: 800;
 }
+/* « Responsable de » (1.40.0) : une case par action que la personne a choisie, sous la liste des actions. */
+.resp-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.resp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+}
+.resp-row[hidden] {
+  display: none;
+}
+.resp-row input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  --check-color: var(--c);
+}
+.resp-row:has(input:checked) {
+  border-color: var(--c);
+}
+.resp-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
 /* Relecture : la carte avant, la carte après, les changements repérés sur « Après ». La
    fenêtre s'élargit pour que les deux cartes tiennent côte à côte. */
@@ -623,24 +657,6 @@ textarea {
 }
 .rv-card .etablissement-tag {
   cursor: default;
-}
-/* Sur une carte de relecture, un rôle ajouté ou retiré se lit en entier : le rôle a sa ligne sous l'e-mail et passe
-   à la ligne s'il le faut, au lieu d'être coupé par « … » à côté de l'e-mail comme dans l'annuaire. */
-.rv-card .details.has-role {
-  display: block;
-}
-.rv-card .role-col {
-  container-type: normal;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  justify-content: flex-start;
-  min-height: 0;
-  padding-left: 0;
-}
-.rv-card .role-text {
-  overflow: visible;
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 .rv-card .tag-group-values {
   gap: 6px 4px;
