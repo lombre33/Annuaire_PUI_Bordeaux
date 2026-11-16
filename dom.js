@@ -2,6 +2,7 @@
 // etablissement-form.js, changes-ui.js...). Rien ne s'exécute à l'import : les fonctions qui touchent au DOM ne sont appelées que par les écrans.
 
 import { formatCount, normalize } from './grist-data.js';
+import { DOC_REFS } from './doc-refs.js';
 
 // Un élément avec sa classe et son texte. Le texte passe toujours par textContent :
 // ce qui vient de Grist (un nom, une fonction) n'est jamais lu comme du HTML.
@@ -29,12 +30,52 @@ export function button(label, className, onClick) {
   return node;
 }
 
+// La fenêtre « Documentation » : main.js dit comment l'ouvrir (`opener({ page, anchor })`) quand elle existe. Tant qu'il n'y en a pas, un
+// message qui cite la documentation n'en fait pas un lien.
+let docOpener = null;
+export function setDocOpener(opener) {
+  docOpener = opener;
+}
+
+// Un passage de la documentation (DOC_REFS) en lien : le clic ouvre la fenêtre « Documentation » à la bonne section, sans quitter la page.
+function docLink(ref) {
+  const link = el('a', 'doc-ref', ref.text);
+  link.href = '#';
+  link.setAttribute('aria-haspopup', 'dialog');
+  link.addEventListener('click', event => {
+    event.preventDefault();
+    docOpener({ page: ref.page, anchor: ref.anchor });
+  });
+  return link;
+}
+
+// Un message en nœuds : son texte, où chaque passage de la documentation que DOC_REFS nomme devient un lien vers la fenêtre
+// « Documentation ». Le texte reste du texte (textContent) ; le lien ne vient que de DOC_REFS, jamais du message lui-même.
+export function messageNodes(text) {
+  if (!docOpener) return [document.createTextNode(text)];
+  const nodes = [];
+  let rest = text;
+  while (rest) {
+    const found = Object.values(DOC_REFS).map(ref => ({ ref, at: rest.indexOf(ref.text) })).filter(hit => hit.at !== -1).sort((a, b) => a.at - b.at)[0];
+    if (!found) {
+      nodes.push(document.createTextNode(rest));
+      break;
+    }
+    if (found.at > 0) nodes.push(document.createTextNode(rest.slice(0, found.at)));
+    nodes.push(docLink(found.ref));
+    rest = rest.slice(found.at + found.ref.text.length);
+  }
+  return nodes;
+}
+
 // Un encadré de message : `kind` 'pending' (à lire), 'ko' (échec) ; `role` 'status' ou 'alert' pour
-// que les lecteurs d'écran l'annoncent.
+// que les lecteurs d'écran l'annoncent. Un passage de la documentation que le message cite y est un lien (messageNodes).
 export function notice(kind, text, role) {
   const box = el('div', `notice notice-${kind}`);
   if (role) box.setAttribute('role', role);
-  box.append(el('p', '', text));
+  const paragraph = el('p');
+  paragraph.append(...messageNodes(text));
+  box.append(paragraph);
   return box;
 }
 

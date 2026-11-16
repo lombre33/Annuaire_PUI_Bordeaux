@@ -279,7 +279,7 @@ test('un établissement sans logo propose d’en ajouter un et montre son sigle 
 test('sans colonne « logo » dans Etablissements, la fenêtre le dit et ne propose pas de logo', { skip }, () =>
   withWidget({ tables: world(tables => { delete tables.Etablissements.logo; delete tables.Etablissements.ordre_bandeau; }), user: ANA_EMAIL }, async ({ page }) => {
     await openFromBar(page);
-    assert.match(await field(page, '.es-logo-help').textContent(), /la colonne « logo » n’existe pas dans la table Etablissements \(GRIST_SETUP\.md, étape 5\)/);
+    assert.match(await field(page, '.es-logo-help').textContent(), /la colonne « logo » n’existe pas dans la table Etablissements \(voir le guide d’installation Grist, étape 5 « Les logos des établissements »\)/);
     assert.equal(await field(page, '.es-logo-actions').count(), 0);
     assert.equal(await field(page, '#etabLogoFile').count(), 0);
     assert.equal(await field(page, '.es-tile .et-pill').textContent(), 'CHU');
@@ -301,6 +301,52 @@ test('si la table ACL ne peut pas être lue, la fiche s’ouvre sans la liste de
     assert.equal(await summary(page), '1 modification : visibilité');
     assert.equal(await save(page).isEnabled(), true);
     assert.match((await Promise.all(logs.warnings)).join('\n'), /La table ACL ne peut pas être lue/);
+  }));
+
+test('le message de la liste des responsables nomme le guide d’installation Grist, et en ouvre l’étape dans la fenêtre « Documentation », par-dessus la fiche', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await shortcut(page).waitFor();
+    await page.evaluate(() => { window.__failTables = ['ACL']; });
+    await shortcut(page).click();
+    await nameInput(page).waitFor();
+    const notice = dlg(page).locator('.es-sec .notice');
+    assert.doesNotMatch(await notice.textContent(), /\.md\b|GRIST_SETUP/, 'aucun nom de fichier dans un message');
+    assert.match(await notice.textContent(), /pour son établissement \(voir le guide d’installation Grist, étape 4 « Règles d’accès »\)\.$/);
+    const link = notice.locator('a.doc-ref');
+    assert.equal(await link.count(), 1, 'un seul lien : le passage qui nomme le guide');
+    assert.equal(await link.textContent(), 'guide d’installation Grist, étape 4 « Règles d’accès »');
+    await link.click();
+    await page.locator('#docDialog .md').waitFor();
+    assert.equal(await page.locator('#docDialog .dlg-sub').textContent(), 'Installation');
+    const heading = page.locator('#docDialog #doc-4-règles-daccès');
+    assert.equal(await heading.evaluate(element => document.activeElement === element), true, 'le focus est sur l’étape citée');
+    const [bodyBox, headingBox] = await Promise.all([page.locator('#docDialog .doc-body').boundingBox(), heading.boundingBox()]);
+    assert.ok(headingBox.y >= bodyBox.y - 2 && headingBox.y < bodyBox.y + 120, 'l’étape est en haut de la fenêtre');
+    assert.equal(await dlg(page).evaluate(dialog => dialog.open), true, 'la fiche de l’établissement reste ouverte dessous');
+    assert.equal(await page.locator('#docDialog .dlg-foot button', { hasText: 'Retour' }).isVisible(), false, 'rien où retourner : on arrive directement à l’étape');
+    await page.keyboard.press('Escape');
+    await until(async () => !(await page.locator('#docDialog').evaluate(dialog => dialog.open)), 'Échap ferme la documentation');
+    assert.equal(await dlg(page).evaluate(dialog => dialog.open), true, 'et laisse la fiche ouverte');
+    await focusReturnsTo(page, '.es-sec .notice a.doc-ref');
+  }));
+
+test('sans fenêtre « Documentation » (adresse DOCS_URL vide), le message nomme le guide sans en faire un lien', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await page.route('**/constants.js', async route => {
+      const response = await route.fetch();
+      await route.fulfill({ response, body: (await response.text()).replace(/export const DOCS_URL = '[^']*';/, 'export const DOCS_URL = \'\';') });
+    });
+    await page.reload();
+    await waitForCards(page, 4);
+    await shortcut(page).waitFor();
+    await page.evaluate(() => { window.__failTables = ['ACL']; });
+    await shortcut(page).click();
+    await nameInput(page).waitFor();
+    const notice = dlg(page).locator('.es-sec .notice');
+    assert.match(await notice.textContent(), /guide d’installation Grist, étape 4 « Règles d’accès »/);
+    assert.equal(await notice.locator('a').count(), 0, 'rien à ouvrir : du texte');
   }));
 
 test('une fiche qui ne peut pas être lue dans Grist s’annonce par une phrase, avec de quoi fermer la fenêtre', { skip }, () =>
@@ -844,7 +890,7 @@ test('un serveur de pièces jointes sans en-têtes CORS fait échouer l’envoi 
     await chooseFile(page, await png(page));
     await save(page).click();
     await alert(page).waitFor();
-    assert.match(await alertText(page), /le navigateur n’a pas pu joindre le serveur, ou l’a refusé\. Déposez le fichier directement dans Grist \(voir GRIST_SETUP\.md\)/);
+    assert.match(await alertText(page), /le navigateur n’a pas pu joindre le serveur, ou l’a refusé\. Déposez le fichier directement dans Grist \(voir le guide d’installation Grist, étape 5 « Les logos des établissements »\)/);
     assert.equal(files.uploads[0].id, FIRST_UPLOAD_ID, 'le serveur a pourtant gardé le fichier : le widget ne peut pas le savoir');
     assert.deepEqual(await writes(page), [], 'et rien n’est écrit dans le document');
     assert.equal(await isOpen(page), true);
@@ -906,7 +952,7 @@ test('une colonne à formule refusée par Grist est expliquée avec la marche à
     });
     await save(page).click();
     await alert(page).waitFor();
-    assert.match(await alertText(page), /colonne à formule : elle ne peut pas être modifiée depuis le widget\. Voir GRIST_SETUP\.md\./);
+    assert.match(await alertText(page), /colonne à formule : elle ne peut pas être modifiée depuis le widget \(voir le guide d’installation Grist, étape 1 « Les colonnes que le widget écrit »\)\./);
   }));
 
 test('si la fiche a changé dans Grist pendant que la fenêtre était ouverte, rien n’est écrit : la saisie est gardée et la personne relit', { skip }, () =>

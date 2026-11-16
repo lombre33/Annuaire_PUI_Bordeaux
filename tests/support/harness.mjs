@@ -18,7 +18,8 @@ import { routeAttachments } from './fake-attachments.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MIME = {
-  '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.woff2': 'font/woff2'
+  '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.woff2': 'font/woff2',
+  '.md': 'text/markdown; charset=utf-8' // comme GitHub Pages
 };
 const GRIST_API_URL = 'https://docs.getgrist.com/grist-plugin-api.js';
 

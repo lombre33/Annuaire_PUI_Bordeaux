@@ -190,13 +190,13 @@ test('uploadAttachment says what to do with the hint of the caller: a profile ph
   assert.match(slow.message, /n’a pas répondu à temps à l’envoi du fichier\. Réessayez ; contactez un administrateur/);
 
   for (const message of [refusedToken, unreachable, failed, unconfirmed, slow].map(error => error.message)) {
-    assert.ok(!message.includes('GRIST_SETUP'), `aucune mention du dépôt manuel dans « ${message} »`);
+    assert.ok(!message.includes('guide d’installation'), `aucune mention du dépôt manuel dans « ${message} »`);
   }
 });
 
 test('uploadAttachment keeps the hand-made upload hint for a logo, and the refusals that name no hint', async () => {
   const failed = await rejection(send(createFakeGrist({}).docApi, answering(status(500))));
-  assert.match(failed.message, /Réessayez ; déposez le fichier directement dans Grist \(voir GRIST_SETUP\.md\)\.$/);
+  assert.match(failed.message, /Réessayez ; déposez le fichier directement dans Grist \(voir le guide d’installation Grist, étape 5 « Les logos des établissements »\)\.$/);
   for (const [code, expected] of [[403, /Contactez un administrateur\.$/], [413, /il est trop volumineux\.$/]]) {
     const withHint = await rejection(send(createFakeGrist({}).docApi, answering(status(code)), FILE, { hint: PHOTO_UPLOAD_HINT }));
     const without = await rejection(send(createFakeGrist({}).docApi, answering(status(code))));

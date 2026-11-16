@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { CATEGORIES, FILTERS, IMAGE_RULES, VERSION } from '../constants.js';
 import { displayName, loadDirectory } from '../grist-data.js';
 import { avatarIdOf } from '../attachments.js';
+import { DOC_REFS } from '../doc-refs.js';
 import { createEmptyFilterState, filterContacts } from '../filters.js';
 import { readIdentity } from '../identity.js';
 import { describePresence, describeHiddenFiche, describeCreated, describeUnknownAccount, setPresence, explainWriteError } from '../presence.js';
@@ -563,6 +564,8 @@ const widgetCode = () => fs.readdirSync(ROOT).filter(name => name.endsWith('.js'
   .map(name => read(name)).join('\n')
   .replace(/['`]\s*\+\s*['`]/g, '')   // une phrase écrite en plusieurs morceaux
   .replaceAll('${MAX_TEXT_LENGTH}', String(MAX_TEXT_LENGTH))   // « 200 caractères au plus. »
+  // le passage du guide que certains messages citent (doc-refs.js) : « (voir le guide d'installation Grist, étape 4 « Règles d'accès »). »
+  .replace(/\$\{DOC_REFS\.(\w+)\.text\}/g, (whole, name) => plain(DOC_REFS[name]?.text ?? whole))
   .replaceAll('\\\'', '\'');
 
 // Les messages d'échec d'un envoi sont composés dans upload.js : une consigne (`hint`), écrite par
@@ -626,7 +629,7 @@ test('les messages cités dans « La fiche de mon établissement » sont ceux du
   // Les messages d'échec d'un envoi sont composés dans upload.js : une consigne commune, écrite une
   // seule fois, termine chacun d'eux. On la recompose ici, comme le fait le code.
   const rawCode = widgetCode();
-  const byHand = /const BY_HAND = '([^']+)';/.exec(rawCode)?.[1];
+  const byHand = /const BY_HAND = [`']([^`']+)[`'];/.exec(rawCode)?.[1];
   assert.ok(byHand, 'upload.js doit définir la consigne par défaut des échecs d\'envoi (BY_HAND), celle des logos.');
   const code = withUploadHint(rawCode, byHand);
   // Le refus d'un format liste les formats acceptés : on le demande à la fonction qui le compose.
@@ -785,10 +788,10 @@ test('la page de sécurité décrit fidèlement le code : méthodes de l\'API Gr
   const withoutHeaderValue = code => code.replaceAll('\'X-Requested-With\': \'XMLHttpRequest\'', '');
   assert.deepEqual(sources.filter(({ code }) => banned.test(withoutHeaderValue(code))).map(({ name }) => name), [],
     'Ces fichiers emploient une API réseau, de stockage ou d\'injection de HTML que docs/securite.md dit absente.');
-  // `fetch` n'est admis que dans upload.js (voir le test suivant) : ni `fetch(`, ni `globalThis.fetch`, ni un
-  // paramètre qui le porte (`fetchImpl`) ailleurs.
-  assert.deepEqual(sources.filter(({ code }) => /\bfetch(?:Impl)?\b/.test(withoutComments(code))).map(({ name }) => name), ['upload.js'],
-    'Seul upload.js émet une requête réseau (docs/securite.md, « L\'envoi d\'un fichier et le jeton en écriture ») : un autre fichier en émet une.');
+  // `fetch` n'est admis que dans upload.js (l'envoi d'un logo, voir le test suivant) et docs-source.js (la lecture des documents de la
+  // fenêtre « Documentation », testée plus bas) : ni `fetch(`, ni `globalThis.fetch`, ni un paramètre qui le porte (`fetchImpl`) ailleurs.
+  assert.deepEqual(sources.filter(({ code }) => /\bfetch(?:Impl)?\b/.test(withoutComments(code))).map(({ name }) => name), ['docs-source.js', 'upload.js'],
+    'Seuls upload.js et docs-source.js émettent une requête réseau (docs/securite.md, « L\'envoi d\'un fichier et le jeton en écriture » et « Les documents de la fenêtre Documentation ») : un autre fichier en émet une.');
   const injected = sources.flatMap(({ name, code }) => [...code.matchAll(/\.innerHTML\s*=\s*([^\n]*)/g)]
     .filter(([, value]) => value.trim().replace(/;$/, '') !== '\'\'').map(([line]) => `${name} : ${line}`));
   assert.deepEqual(injected, [], 'innerHTML ne sert qu\'à vider un conteneur : tout texte venu de Grist passe par textContent.');
@@ -827,6 +830,29 @@ test('l\'envoi d\'un logo garde ses protections, et la page de sécurité les d�
   assert.match(security, /seule requête réseau/, 'docs/securite.md doit dire que l\'envoi est la seule requête réseau du code.');
 });
 
+// La seconde requête réseau du widget, la lecture des documents de la fenêtre « Documentation » (docs/securite.md, « Les documents de la
+// fenêtre Documentation ») : une lecture seule, vers l'adresse même du widget, qui ne porte ni cookie ni adresse de page.
+test('la lecture des documents de la fenêtre Documentation garde ses protections, et la page de sécurité les décrit', () => {
+  const source = withoutComments(read('docs-source.js'));
+  assert.equal([...source.matchAll(/\bfetchImpl\s*\(/g)].length, 1, 'docs-source.js émet une seule requête.');
+  const request = source.slice(source.indexOf('fetchImpl('));
+  assert.match(request, /method:\s*'GET'/, 'La lecture est un GET.');
+  assert.match(request, /credentials:\s*'omit'/, 'Aucun cookie n\'accompagne la lecture.');
+  assert.match(request, /referrerPolicy:\s*'no-referrer'/, 'L\'adresse de la page n\'est pas transmise.');
+  assert.match(request, /redirect:\s*'error'/, 'Une redirection n\'est pas suivie.');
+  assert.match(request, /signal\b/, 'La lecture a un délai maximal (AbortController).');
+  assert.match(source, /new AbortController\(\)/, 'La lecture a un délai maximal (AbortController).');
+  assert.ok(source.indexOf('const url = fileUrl(') > 0 && source.indexOf('const url = fileUrl(') < source.indexOf('await fetchImpl('), 'L\'adresse est composée, et vérifiée, avant la requête.');
+  assert.match(source, /\.origin !== /, 'L\'adresse lue est celle du widget : un autre serveur est refusé.');
+  assert.doesNotMatch(source, /method:\s*'(?:POST|PUT|PATCH|DELETE)'|\bgetAccessToken\b|\bAuthorization\b|\bdocApi\b/, 'La lecture n\'écrit rien et ne porte aucun jeton.');
+  assert.doesNotMatch(source, /\b(?:cache|sessionStorage|localStorage)\b/i, 'Les documents ne sont gardés qu\'en mémoire.');
+
+  const security = read('docs/securite.md');
+  const missing = ['`docs-source.js`', '`credentials: \'omit\'`', '`referrerPolicy: \'no-referrer\'`', '`redirect: \'error\'`', '`AbortController`', '20 secondes', '`markdown.js`']
+    .filter(phrase => !security.includes(phrase));
+  assert.deepEqual(missing, [], 'docs/securite.md (« Les documents de la fenêtre Documentation ») doit décrire ces éléments de la lecture.');
+});
+
 // Une adresse web écrite en dur dans le code est une porte vers l'extérieur : le test précédent
 // ne voit que celles d'index.html, or le lien du bandeau du bas est posé par le code
 // (branding-ui.js). docs/securite.md doit nommer son serveur et dire comment il s'ouvre.
@@ -857,21 +883,26 @@ test('les pages décrivent tous les préfixes de la console, et leur nombre', ()
 test('la page de sécurité nomme chaque adresse web écrite en dur dans le code du widget', () => {
   const literal = /(['"`])(https?:\/\/[^'"`\s]+)\1/g;
   const found = WIDGET_SOURCES().flatMap(({ name, code }) => [...code.matchAll(literal)].map(match => ({ name, url: match[2] })));
-  // Deux adresses, toutes deux dans constants.js : PUI_URL (le bandeau du bas) et DOCS_URL (le lien « Documentation » de l'en-tête).
+  // Deux adresses, toutes deux dans constants.js : PUI_URL (le bandeau du bas) et DOCS_URL (la page de GitHub que propose la fenêtre « Documentation »).
   assert.deepEqual(found.map(({ name }) => name), ['constants.js', 'constants.js'],
     'Une adresse web a été ajoutée au code (ou retirée de constants.js) : décrivez-la dans docs/securite.md (puce « Réseau »), puis ce test.');
   const security = read('docs/securite.md');
   const unnamed = found.map(({ url }) => new URL(url).hostname).filter(host => !security.includes(host));
   assert.deepEqual(unnamed, [], 'docs/securite.md (puce « Réseau ») doit nommer le serveur de chaque adresse écrite en dur.');
 
-  // Les deux liens s'ouvrent dans un autre onglet sans transmettre la page du widget, comme la page le dit.
-  for (const [id, where] of [['bandLink', 'du bandeau du bas'], ['docLink', '« Documentation » de l\'en-tête']]) {
-    const link = read('index.html').match(new RegExp(`<a\\b[^>]*\\bid="${id}"[^>]*>`))?.[0] ?? '';
-    assert.match(link, /\btarget="_blank"/, `Le lien ${where} doit s'ouvrir dans un nouvel onglet.`);
-    assert.match(link, /\brel="noopener noreferrer"/, `Le lien ${where} doit porter rel="noopener noreferrer".`);
+  // Le lien du bandeau s'ouvre dans un autre onglet sans transmettre la page du widget, comme la page le dit.
+  const band = read('index.html').match(/<a\b[^>]*\bid="bandLink"[^>]*>/)?.[0] ?? '';
+  assert.match(band, /\btarget="_blank"/, 'Le lien du bandeau du bas doit s\'ouvrir dans un nouvel onglet.');
+  assert.match(band, /\brel="noopener noreferrer"/, 'Le lien du bandeau du bas doit porter rel="noopener noreferrer".');
+  // « Documentation » est un bouton qui ouvre une fenêtre du widget ; la page de GitHub (DOCS_URL) s'ouvre depuis cette fenêtre, de la même façon.
+  assert.match(read('index.html'), /<button\b[^>]*\bid="docLink"/, 'Le bouton « Documentation » de l\'en-tête est un bouton.');
+  for (const file of ['docs-ui.js', 'markdown-dom.js']) {
+    const code = withoutComments(read(file));
+    assert.match(code, /\.target = '_blank'/, `${file} : les liens vers l'extérieur s'ouvrent dans un nouvel onglet.`);
+    assert.match(code, /\.rel = 'noopener noreferrer'/, `${file} : ces liens portent rel="noopener noreferrer".`);
   }
   assert.ok(security.includes('rel="noopener noreferrer"'), 'docs/securite.md doit dire que ces liens portent rel="noopener noreferrer".');
-  assert.ok(security.includes('DOCS_URL'), 'docs/securite.md doit nommer DOCS_URL (le lien « Documentation » de l\'en-tête).');
+  assert.ok(security.includes('DOCS_URL'), 'docs/securite.md doit nommer DOCS_URL (la page de GitHub que propose la fenêtre « Documentation »).');
 });
 
 // Le widget écrit (la sonde, le choix de présence) : une page qui le dit « en lecture seule »

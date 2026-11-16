@@ -873,7 +873,7 @@ test('un serveur de pièces jointes sans en-têtes CORS fait échouer l\'envoi p
     await validateUntilAlert(page);
     const message = await alertText(page);
     assert.match(message, /le navigateur n’a pas pu joindre le serveur, ou l’a refusé\. Contactez un administrateur si le problème persiste\./);
-    assert.doesNotMatch(message, /GRIST_SETUP/, 'le conseil du logo (déposer le fichier dans Grist) ne vaut pas pour une photo');
+    assert.doesNotMatch(message, /guide d’installation/, 'le conseil du logo (déposer le fichier dans Grist) ne vaut pas pour une photo');
     assert.deepEqual(await bddCalls(page), []);
   }));
 

@@ -47,6 +47,9 @@
   <link rel="modulepreload" href="changes-ui.js">
   <link rel="modulepreload" href="constants.js">
   <link rel="modulepreload" href="dialog-shell.js">
+  <link rel="modulepreload" href="doc-refs.js">
+  <link rel="modulepreload" href="docs-source.js">
+  <link rel="modulepreload" href="docs-ui.js">
   <link rel="modulepreload" href="dom.js">
   <link rel="modulepreload" href="etablissement-form.js">
   <link rel="modulepreload" href="etablissement-save.js">
@@ -58,6 +61,8 @@
   <link rel="modulepreload" href="identity.js">
   <link rel="modulepreload" href="image-prep.js">
   <link rel="modulepreload" href="logos-report.js">
+  <link rel="modulepreload" href="markdown-dom.js">
+  <link rel="modulepreload" href="markdown.js">
   <link rel="modulepreload" href="presence.js">
   <link rel="modulepreload" href="preview.js">
   <link rel="modulepreload" href="profile-form.js">
@@ -83,10 +88,10 @@
         </div>
         <p class="subtitle">Annuaire des accompagnateurs de l'innovation</p>
         <p class="tagline">Pas de mauvaise porte, toujours le bon interlocuteur</p>
-        <!-- « Documentation » : caché tant que main.js ne lui a pas donné son adresse (DOCS_URL, constants.js), et pour toujours si elle est
-             vide. Il est ici, sous le slogan, et non sur la ligne du titre : c'est la largeur de cette ligne qui règle le centrage des
-             financeurs (style.css, « En-tête »). Même ouverture que le lien du bandeau du bas : autre onglet, sans transmettre la page. -->
-        <a id="docLink" class="doc-link" target="_blank" rel="noopener noreferrer" hidden>Documentation<span class="sr-only"> (s'ouvre dans un nouvel onglet)</span><span class="doc-link-mark" aria-hidden="true">↗</span></a>
+        <!-- « Documentation » : caché tant que main.js ne l'a pas allumé (DOCS_URL, constants.js, vide : jamais), et ouvre la fenêtre
+             #docDialog plus bas. Il est ici, sous le slogan, et non sur la ligne du titre : c'est la largeur de cette ligne qui règle
+             le centrage des financeurs (style.css, « En-tête »). -->
+        <button id="docLink" class="doc-link" type="button" aria-haspopup="dialog" hidden>Documentation</button>
       </div>
       <div id="funders" class="funders">
         <p class="funders-label">Projet financé par l'État dans le cadre de France 2030</p>
@@ -183,6 +188,24 @@
         <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>
       </header>
       <div class="dlg-body"></div>
+      <footer class="dlg-foot"></footer>
+    </div>
+  </dialog>
+
+  <!-- La documentation du dépôt lue dans le widget (docs-ui.js) : la barre des documents, le document, puis « Retour », « Ouvrir sur
+       GitHub » et « Fermer » en pied. -->
+  <dialog id="docDialog" class="dlg doc-dlg" aria-labelledby="docTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="docTitle" tabindex="-1">Documentation</h2>
+          <p class="dlg-sub"></p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer la documentation">✕</button>
+      </header>
+      <nav class="doc-nav" aria-label="Documents"></nav>
+      <p class="doc-status sr-only" role="status"></p>
+      <div class="dlg-body doc-body"></div>
       <footer class="dlg-foot"></footer>
     </div>
   </dialog>

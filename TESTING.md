@@ -234,8 +234,8 @@ Sans dépendance, un fichier de tests par module :
 - `tests/docs.test.mjs` — la documentation ne se périme pas : liens, ancres et images de
   `README.md` et de `docs/`, fichiers et fonctions cités, jeu de données fictif et serveur de
   démonstration, phrases du guide utilisateur, schéma des imports, préfixes de la console et
-  affirmations de la page de sécurité qui doivent suivre le code (méthodes de l'API Grist, une
-  seule requête réseau et ses protections, aucun stockage). Sans navigateur.
+  affirmations de la page de sécurité qui doivent suivre le code (méthodes de l'API Grist, les deux
+  requêtes réseau et leurs protections, aucun stockage). Sans navigateur.
 - `tests/license.test.mjs` — la licence : `LICENSE` est le texte officiel de la GNU GPL version 3
   (empreinte vérifiée), le README la déclare et renvoie vers `LICENSE`, `SECURITY.md` dit où
   signaler un problème sans issue publique ni adresse personnelle. Sans navigateur.
@@ -328,6 +328,17 @@ doublon) ; les onglets n'ont aucun cadre (`framesAboveSearch`, un trait de 2 px 
 dit que « rien » ne donne pas d'onglet. Ces tests échouent sur le comportement de la 1.38.0 (7 sur 8, vérifié). Les gardes sont dans
 `tests/support/menu-checks.mjs`. **Règle : les données d'un test viennent du vrai document, jamais de noms imaginés, et un test de menu
 regarde ce que le menu affiche.**
+
+La fenêtre « Documentation » (1.43.0) a cinq fichiers de tests : `tests/markdown.test.mjs` (25 tests, sans navigateur : le lecteur Markdown,
+ses balises admises et refusées, des documents hostiles et démesurés, chaque document du dépôt lu sans balise perdue),
+`tests/docs-source.test.mjs` (11 tests, sans navigateur : la liste des documents, les adresses, la lecture et ses refus),
+`tests/docs-viewer.test.mjs` (17 scénarios dans Chromium : chaque document s'ouvre, la barre, « Retour », les liens et les images, un
+document hostile, un document qui manque, la coupure et « Réessayer », une réponse tardive, Échap et le focus, le clavier, le schéma
+Mermaid, la durée d'affichage du plus long document, le cadre sandbox de Grist sans `allow-same-origin`, le téléphone),
+`tests/doc-link.test.mjs` (le bouton de l'en-tête et sa fenêtre dans `index.html`) et `tests/doc-refs.test.mjs` (3 tests : les messages qui
+citent le guide d'installation nomment une étape qui existe encore, et aucun message montré à une personne ne nomme un fichier).
+`tests/e2e-etablissement.test.mjs` essaie le lien d'un message (la liste des responsables illisible) dans une vraie fenêtre : un clic
+ouvre la documentation à l'étape 4 par-dessus la fiche de l'établissement, Échap ne ferme que la documentation.
 
 `tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
@@ -2001,3 +2012,30 @@ Grist : les tests automatiques simulent `applyUserActions`.**
       administrateur ne peut pas écrire `Taches_responsable` sur la ligne d'une autre (essai depuis la console : **refusé**).
 - [ ] **Rien d'autre ne bouge.** `Taches_role`, `Role_dans_le_PUI` et la table `Taches` sont inchangés ; le nombre de contacts affiché est
       le même qu'avant et aucune fiche n'apparaît ni ne disparaît.
+
+## 29. La fenêtre « Documentation » (1.43.0)
+
+À jouer dans le **vrai Grist** (le widget publié, pas le serveur de démonstration), console ouverte (F12). **Ce protocole est le seul
+contrôle de la fenêtre dans le cadre réel de Grist : les tests automatiques simulent ce cadre (sans `allow-same-origin`) mais pas Grist.**
+
+- [ ] **Le bouton.** « Documentation » est sous le slogan, à gauche de l'en-tête. Un clic ouvre une fenêtre **dans le widget**, sur la
+      présentation (README), sans nouvel onglet. Aucune erreur rouge dans la console, aucune ligne « Refused to … Content Security Policy ».
+- [ ] **Chaque document.** Parcourir la barre : Présentation, Guide utilisateur, Installation, Sécurité, Maintenance, Développeurs, Essais,
+      Cahier des charges, Historique. Chacun s'affiche (titres, tableaux qui défilent sans faire déborder la fenêtre, code, listes).
+      Si l'un dit « Ce document n'est pas disponible dans cette fenêtre », le site qui publie le widget ne publie pas ce fichier Markdown
+      (les documents doivent être servis avec le widget, par exemple par GitHub Pages sur la branche entière).
+- [ ] **Les liens.** Un lien d'un document vers un autre s'ouvre dans la même fenêtre, à son titre ; « ← Retour » ramène à l'endroit où on
+      lisait. Un lien vers un site extérieur s'ouvre dans un nouvel onglet. « Ouvrir sur GitHub » ouvre la page du dépôt.
+- [ ] **Les messages qui citent le guide.** Réglage d'un compte responsable dont la liste des responsables est illisible (règle d'accès
+      d'`ACL`) : dans la fenêtre « Fiche de l'établissement », le message cite le « guide d’installation Grist, étape 4 « Règles d’accès » » ;
+      un clic sur ce passage ouvre la documentation à l'étape 4 **par-dessus la fiche**. Échap la referme et laisse la fiche telle qu'elle
+      était (rien de saisi n'est perdu).
+- [ ] **Les images.** Les captures du guide utilisateur s'affichent ; les pastilles d'un site extérieur (README) sont remplacées par leur texte.
+- [ ] **Sans réseau.** Couper le réseau puis rouvrir un document jamais lu : « Le document n'a pas pu être chargé… », un bouton
+      « Réessayer » et « Ouvrir la documentation sur GitHub ». Rétablir le réseau, « Réessayer » : le document s'affiche.
+- [ ] **Au clavier et au lecteur d'écran.** Tabulation parcourt la barre des documents, les liens et le pied ; Entrée sur un document de la
+      barre l'ouvre sans quitter la barre ; Échap ferme la fenêtre et le focus revient au bouton « Documentation ». Le titre de la fenêtre et
+      le document affiché sont annoncés.
+- [ ] **Sur un téléphone.** La fenêtre prend tout l'écran, la barre des documents défile, le pied reste visible.
+- [ ] **Après un déménagement du dépôt** (migration vers le GitHub de production) : les documents se lisent toujours dans la fenêtre, à
+      l'adresse du nouveau site, et « Ouvrir sur GitHub » mène au nouveau dépôt (`DOCS_URL`, `constants.js`).

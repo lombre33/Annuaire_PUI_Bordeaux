@@ -30,6 +30,7 @@
 // Grist) : tout échec devient une phrase qui dit quoi faire, sans rien écrire dans le document.
 
 import { readTokenInfo } from './attachments.js';
+import { DOC_REFS } from './doc-refs.js';
 
 const TIMEOUT_MS = 30 * 1000;
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
@@ -45,7 +46,7 @@ export class UploadError extends Error {
 
 // Ce que la personne peut faire quand l'envoi échoue : pour un logo, déposer le fichier dans Grist ;
 // pour une photo de profil (`hint` de l'appelant), prévenir un administrateur.
-const BY_HAND = 'Déposez le fichier directement dans Grist (voir GRIST_SETUP.md).';
+const BY_HAND = `Déposez le fichier directement dans Grist (voir le ${DOC_REFS.logos.text}).`;
 
 const lowerFirst = text => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
 
