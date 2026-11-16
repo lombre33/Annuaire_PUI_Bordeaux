@@ -303,6 +303,11 @@ et Tabulation, onglet gardé quand le menu est reconstruit, aucun onglet ni band
 vide (la console le dit), le menu rangé par C.U.R.I.E seul sans la colonne des domaines, arbre d'accessibilité (liste d'onglets, onglet
 sélectionné, panneau nommé), et la mise en page de 280 à 1 200 px, au doigt aussi.
 
+`tests/e2e-actions-sans-tache.test.mjs` y ajoute 4 scénarios sur les actions que la carte montre sans tâche (1.41.0, `withHeldActions` dans
+`tests/fixtures.mjs`) : l'action d'une personne qui n'a pas la tâche de son numéro (sans bouton), la tâche seule quand elle a le même
+numéro, l'action sans numéro, la cellule `BDD.Taches` gardée en texte (« [0,2] ») lue comme des numéros de ligne, le rôle calculé, le filtre
+Actions inchangé et les lignes `[LISTES]` / `[REFS]` de la console.
+
 `tests/e2e-responsible.test.mjs` y ajoute 14 scénarios sur « Responsable de l'action x.y » (1.40.0, `withResponsibleColumn` dans
 `tests/fixtures.mjs` : la colonne `Taches_responsable` de `BDD`) : le rôle écrit sur la carte (une action, plusieurs), le menu du rôle qui
 compte la personne une seule fois, le bloc « Responsable de » de la fenêtre de profil (une case par action choisie, nom de chaque case,

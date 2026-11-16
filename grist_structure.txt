@@ -67,11 +67,13 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
     la personne. Sans cette colonne, le widget affiche une erreur au lieu
     d'afficher tout le monde. Voir hasAccepted() dans grist-data.js et
     setPresence() dans presence.js.
-  Actions           : ReferenceList(Actions)   NON AFFICHÉE
-    Depuis la 1.39.0, les actions d'une personne sont ses tâches (la colonne Taches ci-dessous,
-    que filtre le bouton « Actions ») : cette colonne ne filtre plus rien, ne s'affiche plus et
-    ne s'écrit pas. Le widget la compte seulement, pour dire dans la console combien de
-    personnes n'ont une action que là. Elle peut rester dans le document.
+  Actions           : ReferenceList(Actions)   LUE POUR LA CARTE SEULEMENT
+    Les actions d'une personne sont ses tâches (la colonne Taches ci-dessous, que filtre le bouton
+    « Actions »). Cette colonne ne filtre rien et ne s'écrit pas ; depuis la 1.41.0 le widget la lit
+    pour montrer, sans bouton, l'action d'une personne qui n'a aucune tâche de ce numéro (la 1.39.0
+    ne la lisait plus : les personnes qui n'avaient que des actions les perdaient). Une action sans
+    numéro (« [InnovationS] - Axe Outils ») s'affiche toujours. Une cellule gardée en texte
+    (« [0,14,21,30] ») se lit comme des numéros de ligne, le 0 ignoré ; la console (`[LISTES]`) la signale.
   Communautes       : ReferenceList(Communautes)
   Taches            : ReferenceList(Taches)   (les actions de la personne, depuis la 1.39.0)
   Instances         : ReferenceList(INSTANCES)

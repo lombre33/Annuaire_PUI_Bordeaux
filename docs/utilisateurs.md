@@ -216,7 +216,7 @@ Le menu **Actions** (celui que le widget appelait « Tâches » jusqu'à la 1.38
 
 **La recherche du menu trouve une action comme une tâche, et un numéro aussi.** Elle se comporte comme celle du menu Compétences : le nom d'une action garde l'action avec **toutes** ses tâches, le nom d'une tâche garde cette tâche sous son action, et « 2.1 » retrouve la tâche qui porte ce numéro.
 
-**Il n'y a plus de filtre Actions à part.** Jusqu'à la 1.38.0, un bouton « Actions » (la colonne `Actions` de la fiche) précédait le menu des tâches ; depuis la 1.39.0 le menu Actions le remplace, et la colonne `Actions` n'est plus lue : cocher une action (une ligne en brun orangé) retrouve les personnes qui ont au moins une de ses tâches. Une personne dont la fiche n'a une action que dans cette ancienne colonne n'en a plus à l'écran : la console du navigateur le dit.
+**Il n'y a plus de filtre Actions à part.** Jusqu'à la 1.38.0, un bouton « Actions » (la colonne `Actions` de la fiche) précédait le menu des tâches ; depuis la 1.39.0 le menu Actions le remplace, et cocher une action (une ligne en brun orangé) retrouve les personnes qui ont au moins une de ses tâches. Une personne qui n'a qu'une action, sans le détail de ses tâches (la colonne `Actions` de sa fiche), voit cette action sur sa carte, sous « Actions », sans bouton (depuis la 1.41.0 ; la 1.39.0 les avait fait disparaître) : le menu Actions ne la retrouve pas, puisqu'il cherche des tâches. Dès qu'elle a une tâche du même numéro (« 2.1 » pour l'action 2), c'est la tâche qui s'affiche.
 
 ## Gagner du temps : cliquer sur une étiquette
 

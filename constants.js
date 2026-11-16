@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.40.0';
+export const VERSION = '1.41.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -141,8 +141,9 @@ export const DOCS_URL = 'https://github.com/lombre33/Annuaire_PUI_Bordeaux#docum
 // Les libellés lus de Grist sont rangés par clé de catégorie (referenceMaps),
 // pas par table : deux catégories peuvent lire la même table.
 export const CATEGORIES = {
-  // Depuis la 1.39.0, la table `Actions` ne sert plus qu'à nommer les groupes du menu « Actions » (voir `taches` et `macroTaches`) : elle n'a ni
-  // filtre, ni pastille de carte, ni liste dans la fenêtre de profil, et la colonne `BDD.Actions` n'est plus lue.
+  // Depuis la 1.39.0, la table `Actions` nomme les groupes du menu « Actions » (voir `taches` et `macroTaches`) : elle n'a ni filtre, ni liste dans la
+  // fenêtre de profil. Depuis la 1.41.0 la carte montre encore l'action de la personne quand la colonne `BDD.Actions` la lui donne et qu'aucune de ses
+  // tâches n'en est (ACTIONS_COLUMN) : sans cela, les personnes qui n'ont une action que là n'avaient plus rien sur leur carte.
   actions: { label: 'Intitulés des actions', color: '#c84e0f', table: 'Actions', field: ['Actions_corrigees', 'Actions'], corrected: true },
   // Les « actions » de la personne : ses tâches, que le widget appelait « Tâches » jusqu'à la 1.36.0 (demande d'Antoine du 16 novembre 2026). Le nom
   // de la clé (`taches`), de la table (`Taches`) et de la colonne de BDD (`Taches`) ne change pas : seul ce que la personne lit change de nom.
@@ -195,6 +196,13 @@ export const ETABLISSEMENT_NAMES = 'etablissementNom';
 // rôle absentes) et non une catégorie : aucun filtre ni tag n'en vient. La carte le dit au survol de la tâche.
 export const TASK_ROLE_COLUMN = 'Taches_role';
 export const TASK_ROLES = 'tachesRole';
+
+// La colonne de BDD où Grist garde les actions de la personne telles que la 1.38.0 les montrait (« [ PUI ] Action 2 : Processus métiers »), une liste
+// de références vers la table `Actions`. Depuis la 1.39.0 les actions de la carte sont les tâches (BDD.Taches), rangées par action ; cette colonne ne
+// filtre plus et ne s'écrit pas, mais elle se lit encore, pour une seule chose : la carte d'une personne qui a une action dans cette colonne et aucune
+// tâche de ce numéro montre l'action elle-même (grist-data.js, heldActionsOf). La 1.39.0 l'avait cessé de la lire : les personnes qui n'ont une action
+// que là n'avaient plus rien sur leur carte (retour d'Antoine du 16 novembre 2026, la 1.39.0 a été retirée le jour même).
+export const ACTIONS_COLUMN = 'Actions';
 
 // La colonne de BDD où la personne dit de quelles actions elle est responsable (1.40.0, demande d'Antoine du 16 novembre 2026 : « sur le profil,
 // sur chaque tâche, pouvoir cocher si on est responsable »). Une liste de références vers les lignes de `Taches`, comme `BDD.Taches` : le widget

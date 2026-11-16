@@ -100,8 +100,8 @@ la colonne (il lit son type dans les métadonnées du document).
    a au moins une action (`BDD.Taches`) et le retire avec la dernière ; une ligne de ce nom dans
    `Role_Dans_le_PUI`, si vous en avez une, donne son libellé, et ce qui en est écrit dans `BDD` est ignoré.
 5. Pour `Taches`, type **Liste de références** vers la table `Taches` : ce sont les **actions** de la
-   personne (1.39.0). La colonne `Actions` de `BDD` n'est plus lue ni écrite : une personne qui n'a une
-   action que là n'en a plus à l'écran, et la console du navigateur le dit. Une colonne à formule qui
+   personne (1.39.0). La colonne `Actions` de `BDD` (liste de références vers `Actions`) est lue pour la carte seulement, jamais
+   écrite : une personne qui n'a une action que là la voit sur sa carte, sans bouton (1.41.0). Une colonne à formule qui
    remplit `Taches` se convertit en colonne de données pour que la personne puisse changer ses actions
    depuis « Modifier mon profil ».
 

@@ -110,17 +110,19 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
       groups.map(group => [group.querySelector('.tag-group-title').textContent,
         [...group.querySelectorAll('.tag')].map(tag => tag.textContent)]));
     assert.deepEqual(tagsByGroup, [
-      ['Rôle dans le PUI', ['Référent qualité']],
+      ['Rôle dans le PUI', ['Référent qualité', 'Membre d’une action']],
       ['Instances', ['CME']],
+      ['Actions', ['Vaccination']],
       ['Compétences', ['Oncologie', 'Hématologie']],
       ['Communautés', ['Réseau douleur']]
     ]);
     assert.equal(await ana.locator('.tel').textContent(), '☎ 05 36 49 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
-    const role = ana.locator('.tag-role');
+    const role = ana.locator('.tag-role').first();
     assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est une pastille, la première section du bas de la carte (1.39.0)');
     assert.equal(await role.evaluate(tag => tag.tagName), 'BUTTON', 'il filtre comme les autres tags');
     assert.equal(await ana.locator('.role-col, .role-tag, .role-text').count(), 0, 'plus de rôle écrit sur la ligne de l\'e-mail');
-    assert.equal(await ana.locator('.tag-static').count(), 0);
+    // Ana a une action dans la colonne Actions de BDD, sans tâche : « Vaccination », sans bouton (1.41.0), et seule.
+    assert.deepEqual(await ana.locator('.tag-static').allTextContents(), ['Vaccination']);
     assert.equal(await cardNamed(page, 'Hugo Bernard').locator('.tag-role').count(), 0, 'pas de rôle : pas de pastille de rôle');
 
     const hugo = cardNamed(page, 'Hugo Bernard');
@@ -200,7 +202,8 @@ test('s\'affiche sans erreur si BDD n\'a pas les colonnes facultatives télépho
     await waitForCards(page, 4);
     const ana = cardNamed(page, 'Ana Martin');
     assert.equal(await ana.locator('.tel.visible').count(), 0);
-    assert.equal(await ana.locator('.tag-static').count(), 0);
+    // Ana a une action dans la colonne Actions de BDD, sans tâche : « Vaccination », sans bouton (1.41.0), et seule.
+    assert.deepEqual(await ana.locator('.tag-static').allTextContents(), ['Vaccination']);
     assert.equal(await page.locator('#statusBanner').isHidden(), true);
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
@@ -405,9 +408,9 @@ test('le filtre Rôle dans le PUI propose les rôles de la table Role_Dans_le_PU
     await filter.locator('.filter-button').click();
     assert.deepEqual(await filter.locator('.filter-option .option-label').allTextContents(), ['Membre d’une action', 'Référent qualité'],
       'la table n\'a que « Référent qualité » ; « Membre d\'une action » s\'y ajoute, calculé d\'après les actions');
-    assert.deepEqual(await filter.locator('.filter-option .option-count').allTextContents(), ['0', '1'], 'personne n\'a d\'action dans le jeu de base ; une personne a le rôle choisi');
+    assert.deepEqual(await filter.locator('.filter-option .option-count').allTextContents(), ['1', '1'], 'Ana a une action (colonne Actions de BDD, sans tâche) et le rôle choisi');
 
-    await cardNamed(page, 'Ana Martin').locator('.tag-role').click();
+    await cardNamed(page, 'Ana Martin').locator('.tag-role').first().click();
     await waitForCards(page, 1);
     assert.deepEqual(await cardNames(page), ['Ana Martin']);
     assert.equal(await filter.locator('.filter-count').textContent(), '1');

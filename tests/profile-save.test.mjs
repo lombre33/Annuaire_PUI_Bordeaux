@@ -140,7 +140,7 @@ test('prepareReview builds the card before and after from the fiche as Grist hol
   assert.equal(next.after.Fonction, 'Cheffe de service');
   assert.equal(next.after.numero_de_telephone, 536499013, 'la carte « après » montre ce que Grist stockera');
   assert.deepEqual(next.after.labels.competences, ['Hématologie', 'Pharmacovigilance']);
-  assert.deepEqual(next.after.labels.role, []);
+  assert.deepEqual(next.after.labels.role, ['Membre d’une action'], 'plus de rôle choisi : reste le rôle calculé, la personne ayant une action');
   assert.deepEqual(next.before.labels.competences, ['Oncologie', 'Hématologie']);
   assert.deepEqual(next.marks.tags.competences, { added: ['Pharmacovigilance'], removed: ['Oncologie'] });
   assert.deepEqual(next.marks.tags.role, { added: [], removed: ['Référent qualité'] });

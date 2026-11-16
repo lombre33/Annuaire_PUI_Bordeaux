@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
-import { automaticRoles, enrich, filterableRoles, labelsOf, MEMBER_ROLE, RESPONSIBLE_ROLE, responsibleActions, responsibleText, roleEntries, tagText, taskCode } from '../grist-data.js';
+import { automaticRoles, enrich, filterableRoles, idsInText, isIdListText, labelMapFromRows, labelsOf, listItems, MEMBER_ROLE, recordedLabelsOf, RESPONSIBLE_ROLE, responsibleActions, responsibleText, roleEntries, tagText, taskCode } from '../grist-data.js';
 
 test('enrich: etablissement_label resolves BDD.Etablissement, a direct Reference, in any of the shapes Grist can send', () => {
   const referenceMaps = { etablissement: { 2: 'UBM' } };
@@ -64,12 +64,130 @@ test('enrich: each list-reference category reads its own BDD column and its own 
   assert.deepEqual(result.labels.competences, ['Compétence F']);
 });
 
-test('enrich: the actions of a person are her tasks: the old BDD.Actions column is no longer read (1.39.0)', () => {
-  const referenceMaps = { actions: { 2: 'Action B' }, taches: { 5: '1.2 Tâche E' } };
-  const result = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, referenceMaps);
+// Depuis la 1.39.0 les actions d'une carte sont les tâches de la personne ; une action de la colonne BDD.Actions s'y ajoute tant qu'aucune de ses
+// tâches n'est de ce numéro (1.41.0 : la 1.39.0 faisait disparaître l'action de qui n'a pas le détail des tâches, retour d'Antoine du 16 novembre 2026).
+const HELD_MAPS = {
+  actions: { 2: 'Action 2 : Audit', 3: 'Action 3 : Pilotage', 4: 'Transverse' },
+  taches: { 5: '1.2 Tâche E', 6: '3.1 Tâche F' }
+};
+
+test('enrich: there is no « actions » category any more: the actions of a card are its tasks', () => {
+  const result = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, HELD_MAPS);
   assert.equal(result.labels.actions, undefined, 'plus de catégorie « actions » dans les libellés d\'une personne');
+  assert.deepEqual(enrich({ Taches: ['L', 5] }, HELD_MAPS).labels.taches, ['1.2 Tâche E']);
+});
+
+test('enrich: an action of BDD.Actions stays on the card when none of the person\'s tasks has its number (the 1.39.0 regression)', () => {
+  const onlyAction = enrich({ Actions: ['L', 2] }, HELD_MAPS);
+  assert.deepEqual(onlyAction.labels.taches, ['Action 2 : Audit'], 'que des actions de renseignées : on affiche les actions');
+  assert.deepEqual(onlyAction.heldActions, ['Action 2 : Audit'], 'la carte sait lesquelles sont des actions sans tâche');
+  const mixed = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, HELD_MAPS);
+  assert.deepEqual(mixed.labels.taches, ['1.2 Tâche E', 'Action 2 : Audit'], 'l\'action 2 n\'a aucune tâche chez elle : elle s\'affiche avec la tâche de l\'action 1');
+  assert.deepEqual(mixed.heldActions, ['Action 2 : Audit']);
+});
+
+test('enrich: a task covers the action of its number: the task alone is shown, never both', () => {
+  const result = enrich({ Actions: ['L', 3], Taches: ['L', 6] }, HELD_MAPS);
+  assert.deepEqual(result.labels.taches, ['3.1 Tâche F'], '« 3.1 » est une tâche de l\'action 3');
+  assert.deepEqual(result.heldActions, []);
+  const several = enrich({ Actions: ['L', 2, 3], Taches: ['L', 6] }, HELD_MAPS);
+  assert.deepEqual(several.labels.taches, ['3.1 Tâche F', 'Action 2 : Audit'], 'une action recouverte, l\'autre non');
+});
+
+test('enrich: an action with no number is always shown, and a label that a task already carries is not shown twice', () => {
+  assert.deepEqual(enrich({ Actions: ['L', 4], Taches: ['L', 5] }, HELD_MAPS).labels.taches, ['1.2 Tâche E', 'Transverse']);
+  const same = { actions: { 1: '1.2 Tâche E' }, taches: { 5: '1.2 Tâche E' } };
+  const result = enrich({ Actions: ['L', 1], Taches: ['L', 5] }, same);
   assert.deepEqual(result.labels.taches, ['1.2 Tâche E']);
-  assert.deepEqual(enrich({ Actions: ['L', 2] }, referenceMaps).labels.taches, [], 'une action de l\'ancienne colonne n\'est pas une action de la personne');
+  assert.deepEqual(result.heldActions, [], 'la même ligne, une seule fois : la tâche garde son filtre');
+});
+
+test('enrich: an action already resolved to text, an unknown id and an empty list are read like any list of references', () => {
+  assert.deepEqual(enrich({ Actions: ['L', 'Action 2 : Audit'] }, HELD_MAPS).labels.taches, ['Action 2 : Audit']);
+  assert.deepEqual(enrich({ Actions: ['L', 999] }, HELD_MAPS).labels.taches, [], 'id introuvable : ni valeur fantôme ni identifiant à l\'écran');
+  assert.deepEqual(enrich({ Actions: ['L'] }, HELD_MAPS).labels.taches, []);
+  assert.deepEqual(enrich({}, HELD_MAPS).labels.taches, [], 'sans colonne Actions, rien');
+  assert.deepEqual(enrich({ Actions: ['L', 2] }, {}).labels.taches, [], 'sans la table des actions, rien à nommer');
+  assert.deepEqual(enrich({ Actions: ['L', 2] }, HELD_MAPS).labels.taches.length, 1);
+});
+
+test('enrich: a person who only has an action is « Membre d\'une action » too', () => {
+  const maps = { ...HELD_MAPS, role: { 1: 'Référent qualité' } };
+  assert.deepEqual(enrich({ Actions: ['L', 2] }, maps).labels.role, [MEMBER_ROLE]);
+  assert.deepEqual(enrich({ Actions: ['L', 2], Role_dans_le_PUI: 1 }, maps).labels.role, ['Référent qualité', MEMBER_ROLE]);
+  assert.deepEqual(enrich({ Actions: ['L'], Taches: ['L'] }, maps).labels.role, [], 'aucune action, aucun rôle de membre');
+});
+
+test('enrich: the responsibility of a person only counts for the tasks she holds, never for an action the card adds', () => {
+  const maps = { ...HELD_MAPS, role: {} };
+  const person = enrich({ Actions: ['L', 2], Taches: ['L', 5], Taches_responsable: ['L', 5] }, maps);
+  assert.deepEqual(Object.values(person.roleTexts), ['Responsable de l’action 1.2']);
+  assert.deepEqual(enrich({ Actions: ['L', 2], Taches_responsable: ['L', 5] }, maps).roleTexts, {}, 'responsable d\'une tâche qu\'elle n\'a pas : rien');
+});
+
+test('recordedLabelsOf gives the labels a profile modifies, without the actions the card adds by itself', () => {
+  const mixed = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, HELD_MAPS);
+  assert.deepEqual(labelsOf(mixed, 'taches'), ['1.2 Tâche E', 'Action 2 : Audit']);
+  assert.deepEqual(recordedLabelsOf(mixed, 'taches'), ['1.2 Tâche E']);
+  assert.deepEqual(recordedLabelsOf(mixed, 'instances'), [], 'les autres catégories n\'ont rien à écarter');
+  assert.deepEqual(recordedLabelsOf({}, 'taches'), []);
+});
+
+// Du texte fait de numéros entre crochets n'est jamais un libellé (retour d'Antoine du 16 novembre 2026 : la pastille « [0,14,21,30] »).
+test('isIdListText recognises a text of numbers and nothing that a person could read as a label', () => {
+  for (const unreadable of ['[0,14,21,30]', ' [0, 14, 21, 30] ', '[]', '[ ]', '[1]', '[0;14]', '0,14,21,30', '14, 21']) {
+    assert.equal(isIdListText(unreadable), true, unreadable);
+  }
+  for (const label of ['', '14', '2024', 'CME', '1.2 Tâche E', '[ PUI ] Action 2 : Audit', '[PUI]', 'Tâche 1,5', 'GT 2, GT 3', '[1.2]', '(0,14)', null, undefined, 14]) {
+    assert.equal(isIdListText(label), false, String(label));
+  }
+});
+
+// Ce que désignent ces numéros : des numéros de ligne de la table liée, le 0 d'une recherche de formule qui n'a rien trouvé ne désignant rien.
+test('idsInText reads the row numbers of a bracketed text, drops the 0 of a lookup that found nothing, and refuses the rest', () => {
+  assert.deepEqual(idsInText('[0,14,21,30]'), [14, 21, 30]);
+  assert.deepEqual(idsInText(' [ 14 , 21 ] '), [14, 21]);
+  assert.deepEqual(idsInText('[0;14]'), [14]);
+  assert.deepEqual(idsInText('[0]'), []);
+  assert.deepEqual(idsInText('[]'), []);
+  for (const other of ['14, 21', '0,14,21,30', '14', 'CME', '[1.2]', '[a,1]', '[PUI]', '', null, undefined, 14]) {
+    assert.equal(idsInText(other), null, String(other));
+  }
+  assert.deepEqual(listItems('[0,14,21,30]'), [14, 21, 30]);
+  assert.deepEqual(listItems(['L', 14, 21]), [14, 21]);
+  assert.deepEqual(listItems('14, 21'), ['14, 21'], 'un texte sans crochets reste un texte : isIdListText l\'écarte ensuite');
+  assert.deepEqual(listItems(null), []);
+});
+
+// Le cas d'Antoine (16 novembre 2026) : BDD.Taches d'une personne contient le texte « [0,14,21,30] » ; les lignes 14, 21 et 30 de Taches sont des
+// tâches de membre d'équipe (Tâche 2.3, 4.2, 7.1), le 0 est la recherche de la formule `Taches.lookupOne(...)` qui n'a rien trouvé.
+test('enrich: a bracketed text of row numbers in BDD.Taches shows the tasks those rows are, never the numbers', () => {
+  const maps = { ...HELD_MAPS, taches: { 14: 'Tâche 2.3 : Dispositif d’incitation', 21: 'Tâche 4.2 : Plan tactiques', 30: 'Tâche 7.1 : Détection' } };
+  const person = enrich({ Taches: '[0,14,21,30]', Actions: ['L', 2, 3] }, maps);
+  assert.deepEqual(person.labels.taches, ['Tâche 2.3 : Dispositif d’incitation', 'Tâche 4.2 : Plan tactiques', 'Tâche 7.1 : Détection', 'Action 3 : Pilotage']);
+  assert.deepEqual(person.heldActions, ['Action 3 : Pilotage'], 'l\'action 2 est recouverte par la tâche 2.3, l\'action 3 n\'a aucune tâche de son numéro');
+  assert.deepEqual(enrich({ Taches: '[0,14,21,30]', Actions: ['L', 2] }, { ...HELD_MAPS, taches: { 14: '2.3 Tâche X' } }).labels.taches, ['2.3 Tâche X'],
+    'un numéro qu\'aucune ligne ne porte ne montre rien');
+  assert.deepEqual(enrich({ Taches: '[0]', Actions: ['L', 2] }, maps).labels.taches, ['Action 2 : Audit'], 'le 0 seul ne désigne rien : la personne montre ses actions');
+});
+
+test('enrich: other unreadable texts of numbers show nothing: never the numbers, whatever the column', () => {
+  const maps = { ...HELD_MAPS, instances: { 7: 'CME' }, gt: { 1: 'GT 1' }, role: { 1: 'Référent qualité' } };
+  const row = { Taches: '14, 21', GT: ['L', '[0,14]'], Actions: '0,2', Role_dans_le_PUI: '[1]' };
+  const result = enrich(row, maps);
+  assert.deepEqual([result.labels.taches, result.labels.gt, result.labels.role], [[], [], []]);
+  assert.deepEqual(result.heldActions, []);
+  assert.deepEqual(enrich({ Taches: '14, 21', Actions: ['L', 2] }, HELD_MAPS).labels.taches, ['Action 2 : Audit'], 'la personne dont les tâches sont illisibles montre ses actions');
+  // Une liste ordinaire de textes déjà résolus (CHANGELOG 1.5.1) et une liste de lignes dont l'une est un texte de numéros : la seconde ne montre pas les numéros.
+  assert.deepEqual(enrich({ Taches: 'Relecture' }, HELD_MAPS).labels.taches, ['Relecture'], 'un texte qui se lit reste un libellé (texte déjà résolu)');
+  assert.deepEqual(enrich({ Instances: '[7]' }, maps).labels.instances, ['CME'], 'une liste de références écrite en texte se lit sous toute colonne de liste');
+});
+
+test('a label made of numbers, in a reference table, is not a label either: the next column is read, or the row is ignored', () => {
+  const fields = ['Taches_corrige', 'Taches'];
+  assert.deepEqual(labelMapFromRows([{ id: 1, Taches_corrige: '[0,14,21,30]', Taches: '1.1 Relecture' }], fields), { 1: '1.1 Relecture' });
+  assert.deepEqual(labelMapFromRows([{ id: 1, Taches_corrige: '[0,14,21,30]', Taches: '' }, { id: 2, Taches_corrige: '1.2 Rappel', Taches: '' }], fields), { 2: '1.2 Rappel' });
+  assert.deepEqual(labelMapFromRows([{ id: 1, Taches_corrige: ['L', 14, 21], Taches: '' }], fields), { 1: '14 / 21' }, 'une liste de choix garde son sens, sans crochets');
 });
 
 // Les domaines (compétences macro) se lisent depuis BDD.Competences : même

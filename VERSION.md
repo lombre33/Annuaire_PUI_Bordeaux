@@ -1,4 +1,4 @@
-# Version 1.40.0 — « Responsable de l'action 1.2 » : la personne coche, dans son profil, les actions dont elle est responsable ; le widget crée la colonne qui les garde (voir CHANGELOG.md)
+# Version 1.41.0 — les 1.39.0 et 1.40.0 remises en ligne, sans perdre les actions : celles de la colonne Actions de BDD s'affichent, les tâches gardées en texte se lisent (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en

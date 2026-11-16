@@ -1,10 +1,29 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
+import { ACTIONS_COLUMN, CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
+}
+
+// Des numéros entre crochets (« [0,14,21,30] ») ne sont pas un libellé : c'est ce que garde une cellule de liste de Grist quand ce qu'on y a écrit
+// n'est pas une liste de références (Grist l'affiche en rouge). En pastille, ce texte ne dit rien à personne (retour d'Antoine du 16 novembre 2026,
+// sous « Tâches » comme sous « Actions ») : il n'est jamais pris pour un libellé, d'où qu'il vienne (cellule de BDD ou libellé d'une table liée).
+// Un texte de chiffres séparés par des virgules, sans crochets, vaut la même chose.
+const ID_LIST_TEXT = /^(?:\[[\s\d,;]*\]|\d+(?:\s*[,;]\s*\d+)+)$/;
+export const isIdListText = value => ID_LIST_TEXT.test(text(value));
+
+// Ce que ces numéros désignent, pour une cellule de liste de références (BDD.Taches, BDD.Actions…) : des numéros de ligne de la table liée, quand le
+// texte est entre crochets (« [0,14,21,30] », que Grist écrit avec le 0 d'une formule dont la recherche n'a rien trouvé). Antoine a confirmé la
+// forme le 16 novembre 2026 avec la structure de son document : ces colonnes sont remplies par des formules `Taches.lookupOne(...)`, et les lignes
+// 14, 21 et 30 de Taches sont des tâches de membre d'équipe. Le 0 ne désigne rien. Sans crochets (« 14, 21 »), le texte reste illisible : il ne dit
+// pas ce qu'il désigne, et une mauvaise tâche sous le nom d'une personne est pire qu'aucune tâche. null si le texte n'est pas de cette forme.
+const BRACKETED_IDS = /^\[\s*\d+(?:\s*[,;]\s*\d+)*\s*\]$|^\[\s*\]$/;
+export function idsInText(value) {
+  const cell = text(value);
+  if (!BRACKETED_IDS.test(cell)) return null;
+  return (cell.match(/\d+/g) ?? []).map(Number).filter(id => Number.isSafeInteger(id) && id > 0);
 }
 
 // Adresse e-mail comparée sans casse ni espaces autour : « Ana.Martin@CHU.example » et
@@ -103,6 +122,11 @@ export function safeValues(value) {
   return isBlank(value) ? [] : [value];
 }
 
+// Les éléments d'une cellule de liste de références : ses valeurs, ou les numéros de ligne que contient un texte « [0,14,21,30] » (idsInText).
+export function listItems(cell) {
+  return (typeof cell === 'string' && idsInText(cell)) || safeValues(cell);
+}
+
 // Table Grist en colonnes ({ id: [...], nom: [...] }) → tableau de lignes.
 export function tableToRows(table) {
   if (!table || typeof table !== 'object') return [];
@@ -122,7 +146,10 @@ export function tableToRows(table) {
 
 // Le texte d'une cellule de libellé. Une liste de choix (['L', 'C', 'R']) se lit « C / R » : sans son marqueur ni ses virgules, et
 // sans deviner un rangement multiple que le widget ne sait pas faire (la colonne du référentiel C.U.R.I.E est un texte ou un choix).
-const labelText = value => (Array.isArray(value) ? safeValues(value).map(text).filter(Boolean).join(' / ') : text(value));
+const labelText = value => {
+  const label = Array.isArray(value) ? safeValues(value).map(text).filter(Boolean).join(' / ') : text(value);
+  return isIdListText(label) ? '' : label;
+};
 
 // Première valeur non vide parmi plusieurs colonnes candidates, dans l'ordre.
 export function pickLabel(row, fields) {
@@ -143,7 +170,7 @@ export function refId(value) {
 
 // Libellé d'une Référence simple, quelle que soit sa forme.
 export function refLabel(value, referenceMap) {
-  if (typeof value === 'string') return text(value);
+  if (typeof value === 'string') return isIdListText(value) ? '' : text(value);
   const id = refId(value);
   return (id && referenceMap?.[String(id)]) || '';
 }
@@ -214,7 +241,7 @@ export function referenceMapsEqual(a, b) {
 // (« CME »), comme une Référence simple. Ne traiter que l'id fait disparaître
 // les tags des cartes (CHANGELOG 1.5.1).
 export function resolveListItem(item, referenceMap) {
-  if (typeof item === 'string') return text(item);
+  if (typeof item === 'string') return isIdListText(item) ? '' : text(item);
   return referenceMap?.[String(item)] || '';
 }
 
@@ -260,8 +287,38 @@ function listLabels(contact, referenceMaps) {
     const resolve = groups
       ? item => resolveGroupItem(item, referenceMaps[key], referenceMaps[groups])
       : item => resolveListItem(item, referenceMaps[key]);
-    return [key, uniqueLabels(safeValues(contact[column]).map(resolve).filter(Boolean))];
+    return [key, uniqueLabels(listItems(contact[column]).map(resolve).filter(Boolean))];
   }));
+}
+
+// ===== LES ACTIONS QUE LA CARTE MONTRE SANS TÂCHE =====
+// La section « Actions » d'une carte porte les tâches de la personne (BDD.Taches), rangées par numéro d'action (demande d'Antoine du 16 novembre
+// 2026, 1.39.0). Mais des personnes n'ont une action que dans la colonne BDD.Actions, sans le détail des tâches : la 1.39.0, qui ne lisait plus cette
+// colonne, leur retirait toute action (« ceux qui avaient des Actions, la catégorie a disparu »). Comportement voulu par Antoine : « ceux qui
+// n'avaient que des actions de renseigné et pas le détail des tâches, on affiche que les actions ». Une action de la colonne Actions s'affiche donc
+// tant qu'aucune des tâches de la personne n'est de ce numéro (« Action 2 : Processus métiers » et la tâche « 2.1 » se recouvrent : la tâche seule).
+// Une action sans numéro s'affiche toujours. `taskLabels` : les libellés des tâches de la personne (listLabels). Rend les libellés de ces actions.
+export function heldActionsOf(contact, referenceMaps, taskLabels) {
+  const held = uniqueLabels(listItems(contact[ACTIONS_COLUMN]).map(item => resolveListItem(item, referenceMaps.actions)).filter(Boolean));
+  if (held.length === 0) return NO_LABELS;
+  const taskKeys = new Set(taskLabels.map(normalize));
+  const covered = new Set(taskLabels.map(taskActionNumber).filter(number => number !== null));
+  const shown = held.filter(label => {
+    const number = actionNumber(label);
+    return !taskKeys.has(normalize(label)) && (number === null || !covered.has(number));
+  });
+  return shown.length > 0 ? shown : NO_LABELS;
+}
+
+// Aucune action à ajouter : la même liste vide pour tous les contacts (un annuaire en compte des milliers).
+const NO_LABELS = Object.freeze([]);
+
+// Les libellés d'une catégorie tels que la fiche les écrit dans Grist, sans les actions que la carte ajoute d'elle-même (heldActionsOf) : ce
+// que la fenêtre de profil modifie, et donc ce que la relecture compare. Une action ajoutée à la carte n'est pas un ajout de la personne, et
+// celle qu'une tâche vient recouvrir n'est pas un retrait.
+export function recordedLabelsOf(contact, key) {
+  const labels = labelsOf(contact, key);
+  return key === 'taches' && contact.heldActions?.length > 0 ? labels.filter(label => !contact.heldActions.includes(label)) : labels;
 }
 
 // Libellé normalisé de la ligne `id`, calculé une fois par table de libellés : normalize() coûte cher
@@ -284,7 +341,7 @@ function taskRolesOf(contact, referenceMaps) {
   const labels = referenceMaps.taches;
   if (!roles || !labels || Object.keys(roles).length === 0) return {};
   const byLabel = new Map();
-  safeValues(contact.Taches).forEach(item => {
+  listItems(contact.Taches).forEach(item => {
     const role = Number.isSafeInteger(item) && roles[item];
     if (!role || !labels[item]) return;
     const label = normalizedLabel(labels, item);
@@ -360,7 +417,7 @@ export function roleEntries(stored, hasActions, roleMap, isResponsible = false) 
 // n'est pas forcément celle de ses actions). Une action cochée qu'elle n'a plus ne compte pas. Triées dans l'ordre des numéros. `held` : les
 // libellés de ses actions (listLabels). La colonne absente de BDD (le widget la crée, schema.js) ou vide : aucune.
 export function responsibleActions(contact, referenceMaps, held) {
-  const flagged = safeValues(contact[RESPONSIBLE_COLUMN]);
+  const flagged = listItems(contact[RESPONSIBLE_COLUMN]);
   if (flagged.length === 0 || held.length === 0) return [];
   const heldKeys = new Set(held.map(normalize));
   const labels = flagged.map(item => resolveListItem(item, referenceMaps.taches)).filter(label => label && heldKeys.has(normalize(label)));
@@ -392,7 +449,11 @@ export function enrich(contact, referenceMaps, etabFlags) {
   const etablissement = refLabel(contact.Etablissement, referenceMaps.etablissement);
   const lists = listLabels(contact, referenceMaps);
   const actions = responsibleActions(contact, referenceMaps, lists.taches);
-  const roles = roleEntries(refLabel(contact.Role_dans_le_PUI, referenceMaps.role), lists.taches.length > 0, referenceMaps.role, actions.length > 0);
+  // Les actions de la colonne BDD.Actions qu'aucune tâche de la personne ne recouvre s'ajoutent à ses tâches (heldActionsOf) : la carte les
+  // montre, sans filtre, et la personne a une action, donc le rôle « Membre d'une action », qu'elle ait des tâches ou non.
+  const heldActions = heldActionsOf(contact, referenceMaps, lists.taches);
+  const shownActions = heldActions.length > 0 ? [...lists.taches, ...heldActions] : lists.taches;
+  const roles = roleEntries(refLabel(contact.Role_dans_le_PUI, referenceMaps.role), shownActions.length > 0, referenceMaps.role, actions.length > 0);
   const flags = etablissementFlags(contact, etabFlags);
 
   return {
@@ -402,9 +463,12 @@ export function enrich(contact, referenceMaps, etabFlags) {
     // carte utilise `etablissement_label`). Le rôle en a plusieurs (voir roleEntries).
     labels: {
       ...lists,
+      taches: shownActions,
       etablissement: etablissement ? [etablissement] : [],
       role: roles
     },
+    // Ceux des libellés de `labels.taches` qui sont des actions sans tâche : la carte les montre sans filtre (render.js).
+    heldActions,
     taskRoles: taskRolesOf(contact, referenceMaps),
     // Le texte de la pastille du rôle « Responsable d'une action » (tagText) ; rien pour une personne qui n'en est pas responsable.
     roleTexts: actions.length > 0 ? { [normalize(automaticRoles(referenceMaps.role).responsible)]: responsibleText(actions) } : {},
@@ -915,14 +979,33 @@ function warnAboutMissingEtablissement(rows, log) {
     + 'renseigné (identifiants de ligne Grist) :', ids.slice(0, 20));
 }
 
-// Depuis la 1.39.0 les actions d'une personne sont ses tâches (BDD.Taches) : la colonne BDD.Actions n'est plus lue. Une personne affichée qui
-// n'a une action que dans cette ancienne colonne n'en a donc plus aucune à l'écran : la console le dit, sans la nommer.
-function warnAboutActionsWithoutTasks(contacts, log) {
-  const count = contacts.filter(contact => safeValues(contact.Actions).length > 0 && safeValues(contact.Taches).length === 0).length;
+// Les personnes dont la carte montre une action de la colonne BDD.Actions faute de tâche de ce numéro (heldActionsOf) : la console en donne le
+// nombre, jamais les noms. Pour ces personnes le filtre « Actions » ne trouve rien (il cherche des tâches) : leur ajouter des tâches dans Grist les y
+// rend visibles.
+function reportHeldActions(contacts, log) {
+  const count = contacts.filter(contact => contact.heldActions?.length > 0).length;
   if (count) {
-    log.info(`[REFS] ${count} contact(s) affichable(s) ont une ligne dans la colonne Actions de BDD mais aucune dans la colonne Taches : `
-      + 'le widget ne lit plus la colonne Actions (1.39.0), ils n\'ont donc aucune action à l\'écran. Les ajouter à Taches les y rend visibles.');
+    log.info(`[REFS] ${count} contact(s) affichable(s) ont une action dans la colonne ${ACTIONS_COLUMN} de BDD sans tâche de ce numéro : `
+      + 'leur carte montre l\'action, sans filtre ; le filtre « Actions » ne les trouve que par leurs tâches.');
   }
+}
+
+// Les cellules de liste que Grist n'a pas pu lire comme une liste de références : du texte fait de numéros (« [0,14,21,30] »), que Grist affiche en
+// rouge. Entre crochets, le widget les lit comme des numéros de ligne de la table liée (listItems) ; sans crochets, il ne les montre pas. Dans les
+// deux cas la console dit où elles sont (identifiants de ligne de BDD et forme du texte, jamais un nom) pour les corriger dans Grist : la fiche d'une
+// telle personne ne peut pas être modifiée depuis le widget tant que la cellule est du texte (profile-save.js).
+function warnAboutTextInLists(rows, log) {
+  const columns = [...new Set([...LIST_CATEGORIES.map(({ column }) => column), ACTIONS_COLUMN, RESPONSIBLE_COLUMN])];
+  columns.forEach(column => {
+    const bad = rows.filter(row => typeof row[column] === 'string' && isIdListText(row[column]));
+    if (bad.length === 0) return;
+    const readable = bad.filter(row => idsInText(row[column]) !== null).length;
+    const examples = [...new Set(bad.map(row => text(row[column])))].slice(0, 3).join(' ; ');
+    log.warn(`[LISTES] ${MAIN_TABLE}.${column} : ${bad.length} cellule(s) contiennent un texte de numéros au lieu d'une liste de références `
+      + `(exemples : ${examples} ; identifiants de ligne : ${bad.slice(0, 20).map(row => row.id).join(', ')}). `
+      + `Le widget en lit ${readable} comme des numéros de ligne (le 0 est ignoré)${bad.length > readable ? ` et ne montre pas les ${bad.length - readable} autre(s)` : ''} ; `
+      + 'Grist les affiche en rouge. À corriger dans Grist : ces fiches ne sont pas modifiables depuis le widget.');
+  });
 }
 
 // Les personnes qui n'ont pas accepté d'apparaître sont normales, pas une anomalie : la console en
@@ -981,7 +1064,8 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const contacts = buildContacts(rows, referenceMaps, etabFlags);
   log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
-  warnAboutActionsWithoutTasks(contacts, log);
+  reportHeldActions(contacts, log);
+  warnAboutTextInLists(rows, log);
   warnAboutMissingEtablissement(rows, log);
   logWithoutConsent(rows, log);
 

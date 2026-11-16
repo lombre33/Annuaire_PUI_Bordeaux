@@ -98,7 +98,7 @@ test('previewOf gives the card after with the values that will be written, enric
   assert.equal(after.Fonction, 'Cheffe de service');
   assert.equal(after.numero_de_telephone, 536499013);
   assert.deepEqual(after.labels.competences, ['Hématologie', 'Pharmacovigilance']);
-  assert.deepEqual(after.labels.role, []);
+  assert.deepEqual(after.labels.role, ['Membre d’une action'], 'plus de rôle choisi : reste le rôle calculé, la personne ayant une action');
   assert.deepEqual(after.labels.macro, ['Cancérologie', 'Pharmacie'], 'les domaines suivent les compétences');
   assert.equal(after.etablissement_label, 'CHU', 'ce qu\'on ne modifie pas reste');
   assert.equal(after.etablissement_fondateur, true);

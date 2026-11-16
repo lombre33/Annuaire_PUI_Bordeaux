@@ -24,7 +24,8 @@ test('une carte montre toutes ses pastilles, sans plafond ni bouton « +N » (au
     await waitForCards(page, 4);
     const ana = gridCard(page, 'Ana');
     assert.deepEqual(await group(ana, 'Compétences').locator('.tag').allTextContents(), names('Compétence', 1, 9));
-    assert.deepEqual(await group(ana, 'Actions').locator('.tag').allTextContents(), names('Action', 1, 6));
+    // Ses six actions numérotées, puis « Vaccination » : l'action sans numéro que BDD.Actions lui donne (1.41.0) s'affiche toujours, en dernière rangée.
+    assert.deepEqual(await group(ana, 'Actions').locator('.tag').allTextContents(), [...names('Action', 1, 6), 'Vaccination']);
     assert.deepEqual(await group(ana, 'Rôle dans le PUI').locator('.tag').allTextContents(), ['Référent qualité', 'Membre d’une action']);
     assert.equal(await ana.locator('.tag[hidden]').count(), 0, 'aucune pastille cachée');
     assert.equal(await ana.locator('.tag').filter({ hasText: /^\+\d/ }).count(), 0, 'aucun bouton « +N »');
@@ -46,7 +47,7 @@ test('la carte de relecture d\'une modification n\'a ni barre d\'outils ni pasti
         focusable: card.querySelectorAll('.card-tags [tabindex]').length
       };
     });
-    assert.deepEqual(preview, { tags: 23, toolbar: null, focusable: 0 });
+    assert.deepEqual(preview, { tags: 24, toolbar: null, focusable: 0 });
   }));
 
 // ===== U22 : un arrêt de tabulation par carte =====
