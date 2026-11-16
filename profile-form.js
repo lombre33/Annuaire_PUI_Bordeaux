@@ -1,6 +1,6 @@
 // Le formulaire de la fenêtre de modification d'une fiche, première étape : le bloc d'identité, la case « Accepte d'apparaître » (un
-// administrateur sur la fiche d'une autre personne), la photo de profil, les champs, les listes de pastilles, la case « Apparaître
-// dans l'annuaire » d'une fiche qu'on crée, et ce qui se remet à jour à chaque
+// administrateur sur la fiche d'une autre personne), la photo de profil, les champs, les listes de pastilles (et, sous les actions, les cases
+// « Responsable de »), la case « Apparaître dans l'annuaire » d'une fiche qu'on crée, et ce qui se remet à jour à chaque
 // saisie (erreurs, « Ce qui va changer », résumé du pied, bouton « Relire »). Textes et mise en page suivent la maquette v5.
 // DOM seulement ; profile-ui.js tient l'état de la fenêtre et enchaîne les étapes.
 //
@@ -290,6 +290,8 @@ function makeChip(ctx, field, option, syncCount) {
     else list.push(option.id);
     sync();
     syncCount();
+    // Une action décochée n'est plus une action dont on est responsable (voir responsibleBlock).
+    ctx.ui.companions[field.key]?.follow(option.id, list.includes(option.id));
     refreshForm(ctx);
   });
   sync();
@@ -368,6 +370,71 @@ function picker(ctx, field) {
   return section;
 }
 
+// Le bloc « Responsable de » (1.40.0, `companionOf` : sous la liste des actions) : une case par action que la personne a choisie, rien tant qu'elle n'en
+// a choisi aucune. Toutes les cases sont construites une fois (elles gardent leur focus) et se montrent ou se cachent d'après le brouillon des actions.
+// Décocher une action dans la liste la retire aussi des actions dont on est responsable (`follow`, appelé par makeChip) : on ne peut pas être responsable
+// d'une action qu'on n'a pas. Ce que la carte en dit (« Responsable de l'action 1.2 ») se calcule à la lecture (grist-data.js, responsibleActions).
+const RESPONSIBLE_HELP = 'Cochez les actions dont vous êtes responsable : votre carte l’écrit alors, par exemple « Responsable de l’action 1.2 ».';
+const RESPONSIBLE_HELP_ADMIN = 'Cochez les actions dont cette personne est responsable : sa carte l’écrit alors, par exemple « Responsable de l’action 1.2 ».';
+
+function responsibleBlock(ctx, field) {
+  const held = () => ctx.draft[field.companionOf];
+  if (!held() || field.options.length === 0) return null;
+  const section = el('section', 'grp grp-responsible');
+  section.style.setProperty('--c', CATEGORIES[field.category].color);
+  section.setAttribute('role', 'group');
+  const title = el('h3', 'grp-title', field.label);
+  title.id = `profile-${field.key}-title`;
+  section.setAttribute('aria-labelledby', title.id);
+  const count = el('span', 'grp-count');
+  const head = el('div', 'grp-head');
+  head.append(title, count);
+  const list = el('div', 'resp-list');
+
+  const rows = field.options.map(option => {
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    const row = el('label', 'resp-row');
+    row.append(input, el('span', 'resp-label', option.label));
+    input.addEventListener('change', () => {
+      const flagged = ctx.draft[field.key];
+      const at = flagged.indexOf(option.id);
+      if (input.checked && at < 0) flagged.push(option.id);
+      else if (!input.checked && at >= 0) flagged.splice(at, 1);
+      sync();
+      refreshForm(ctx);
+    });
+    list.append(row);
+    return { option, row, input };
+  });
+
+  function sync() {
+    let shown = 0;
+    let ticked = 0;
+    rows.forEach(({ option, row, input }) => {
+      const has = held().includes(option.id);
+      row.hidden = !has;
+      input.checked = ctx.draft[field.key].includes(option.id);
+      if (has) shown += 1;
+      if (has && input.checked) ticked += 1;
+    });
+    section.hidden = shown === 0;
+    count.textContent = `${ticked} sélectionnée${ticked > 1 ? 's' : ''}`;
+  }
+
+  ctx.ui.companions[field.companionOf] = {
+    follow(id, stillHeld) {
+      const flagged = ctx.draft[field.key];
+      const at = flagged.indexOf(id);
+      if (!stillHeld && at >= 0) flagged.splice(at, 1);
+      sync();
+    }
+  };
+  section.append(head, el('p', 'fld-hint', ctx.admin ? RESPONSIBLE_HELP_ADMIN : RESPONSIBLE_HELP), list);
+  sync();
+  return section;
+}
+
 // La case « apparaître » : celle de la fiche qu'on crée, cochée d'avance (voir CONSENT_LABEL), ou celle qu'un administrateur règle sur la
 // fiche d'une autre personne. Même présentation que la case de la fiche d'établissement : son nom en gras, ce qu'elle change en dessous.
 // Elle lit et écrit `draft.Accepte_apparaitre`, un booléen ; le formulaire n'a jamais les deux à la fois.
@@ -405,7 +472,7 @@ const consentField = (ctx, field) => {
 
 // Les éléments du corps de la fenêtre à cette étape, dans leur ordre. Repart d'un `ctx.ui` neuf, où ils se rangent.
 export function buildForm(ctx) {
-  ctx.ui = { fields: {} };
+  ctx.ui = { fields: {}, companions: {} };
   const { ui, draft } = ctx;
   ui.alert = el('div', 'dlg-alert');
   ui.recap = el('section', 'recap');
@@ -421,6 +488,7 @@ export function buildForm(ctx) {
     else if (field.kind === 'image') photo = photoSection(ctx);
     else if (field.kind === 'text' || field.kind === 'phone' || field.kind === 'email') grid.append(textField(ctx, field));
     else if (field.kind === 'reference') grid.append(referenceField(ctx, field));
+    else if (field.companionOf) pickers.push(...[responsibleBlock(ctx, field)].filter(Boolean));
     else pickers.push(picker(ctx, field));
   });
   const publish = ctx.creating && typeof draft[CONSENT_COLUMN] === 'boolean' ? [publishField(ctx)] : [];

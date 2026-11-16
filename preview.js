@@ -7,7 +7,7 @@
 // exactement ce que l'annuaire affichera une fois la fiche enregistrée.
 
 import { TAG_GROUPS } from './constants.js';
-import { displayName, enrich, formatPhone, labelsOf, normalize, shownEmail, text } from './grist-data.js';
+import { displayName, enrich, formatPhone, normalize, recordedLabelsOf, shownEmail, tagText, text } from './grist-data.js';
 
 // Les lignes de texte d'une carte qui peuvent changer, et comment on les lit.
 const TEXT_PARTS = {
@@ -20,9 +20,12 @@ const TEXT_PARTS = {
 
 // Ce qui diffère entre deux cartes : { texts, tags }.
 //   texts  { name | etab | fonction | email | tel → { before, after } } pour chaque ligne modifiée
-//   tags   { catégorie → { added, removed } } (des libellés) pour chaque catégorie de
+//   tags   { catégorie → { added, removed } } (des textes de pastille) pour chaque catégorie de
 //          tags modifiée. Comparés à la casse et aux accents près, comme partout dans
-//          le widget : un libellé écrit autrement n'est pas un ajout.
+//          le widget : un libellé écrit autrement n'est pas un ajout. Le texte d'une pastille est
+//          son libellé, sauf pour « Responsable d'une action », qui dit de quelles actions (tagText) :
+//          une action de plus, c'est une pastille de plus à lire. Les actions que la carte montre d'elle-même,
+//          faute de tâche (recordedLabelsOf), ne sont ni un ajout ni un retrait.
 export function diffContacts(before, after) {
   const texts = {};
   Object.entries(TEXT_PARTS).forEach(([part, read]) => {
@@ -33,8 +36,8 @@ export function diffContacts(before, after) {
 
   const tags = {};
   TAG_GROUPS.forEach(({ key }) => {
-    const was = labelsOf(before, key);
-    const now = labelsOf(after, key);
+    const was = recordedLabelsOf(before, key).map(label => tagText(before, key, label));
+    const now = recordedLabelsOf(after, key).map(label => tagText(after, key, label));
     const wasKeys = new Set(was.map(normalize));
     const nowKeys = new Set(now.map(normalize));
     const added = now.filter(label => !wasKeys.has(normalize(label)));

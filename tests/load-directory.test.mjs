@@ -174,8 +174,9 @@ test('loadDirectory reads the phone and the PUI role that BDD now holds', async 
   const { contacts } = await load(sampleTables());
   const [ana, bob] = ['Ana', 'Bob'].map(prenom => contacts.find(contact => contact.prenom === prenom));
   assert.equal(ana.numero_de_telephone, 536499012);
-  assert.deepEqual(ana.labels.role, ['Référent qualité']);
-  assert.deepEqual(bob.labels.role, []);
+  // Ana et Bob ont une action dans BDD.Actions (sans tâche) : « Membre d'une action » s'ajoute au rôle qu'Ana a choisi.
+  assert.deepEqual(ana.labels.role, ['Référent qualité', 'Membre d’une action']);
+  assert.deepEqual(bob.labels.role, ['Membre d’une action']);
 });
 
 test('loadDirectory works without the optional BDD columns (Fonction, email, phone, PUI role): same contacts, no issue', async () => {
@@ -185,7 +186,8 @@ test('loadDirectory works without the optional BDD columns (Fonction, email, pho
   const { contacts, issues } = await load(bare);
   assert.equal(contacts.length, 5);
   assert.deepEqual(issues, []);
-  assert.deepEqual(contacts.map(contact => contact.labels.role), contacts.map(() => []));
+  // Sans colonne de rôle, il ne reste que le rôle calculé : Bob et Ana ont une action (dans l'ordre des noms : Gina, Hugo, Bob, Hostile, Ana).
+  assert.deepEqual(contacts.map(contact => contact.labels.role), [[], [], ['Membre d’une action'], [], ['Membre d’une action']]);
 });
 
 // ===== Consentement individuel : BDD.Accepte_apparaitre =====

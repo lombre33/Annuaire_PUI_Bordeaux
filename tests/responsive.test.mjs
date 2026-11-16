@@ -55,8 +55,8 @@ test('le texte des cartes reste dans sa carte, même sans point de coupure (nom,
         const found = [];
         document.querySelectorAll('.contact-card').forEach(card => {
           const box = card.getBoundingClientRect();
-          // Un bloc dont le texte est plus large que lui : coupé par la carte, donc illisible. Seul texte coupé exprès : le
-          // rôle PUI (`.role-text`, dans son tag), par « … » avec le rôle entier en infobulle (tests/branding-layout.test.mjs).
+          // Un bloc dont le texte est plus large que lui : coupé par la carte, donc illisible. Aucun texte n'est coupé exprès
+          // depuis la 1.39.0 : le rôle PUI, jusque-là coupé par « … » sur la ligne de l'e-mail, est une pastille comme les autres.
           card.querySelectorAll('.name, .fonction, .detail-row, .tag, .tag-group-title').forEach(element => {
             if (element.scrollWidth > element.clientWidth + 1) found.push(`${element.className} : « ${element.textContent.slice(0, 30)} »`);
           });
@@ -200,7 +200,7 @@ test('barre d\'outils : sous 600px chaque rangée va d\'un bord à l\'autre, de 
 test('chaque menu de filtre s\'ouvre en entier dans le cadre, de 280px à 1920px', { skip }, () =>
   withWidget({}, async ({ page }) => {
     const filters = await page.locator('.filter').count();
-    assert.equal(filters, 8, 'les 8 filtres du widget');
+    assert.equal(filters, 7, 'les 7 filtres du widget');
     // 280px : un panneau Grist plus étroit que le plus petit téléphone, le menu se réduit alors à lui.
     await atEachWidth(page, [280, 320, 360, 414, 600, 768, 1024, 1280, 1480, 1920], async width => {
       for (let index = 0; index < filters; index++) {
@@ -304,7 +304,7 @@ test('le menu Compétences, tout déplié, tient dans son cadre étroit : libell
     });
   }));
 
-test('le menu Tâches, rangé par action et tout déplié, tient dans son cadre étroit : actions et tâches longues à la ligne, nombres et boutons dans le menu', { skip }, () =>
+test('le menu Actions, rangé par groupe et tout déplié, tient dans son cadre étroit : groupes et actions longs à la ligne, nombres et boutons dans le menu', { skip }, () =>
   withWidget({ tables: crowdedTablesByAction() }, async ({ page }) => {
     await atEachWidth(page, [280, 320, 360, 414, 768], async width => {
       const report = await expandedMenuReport(await openedMenu(page, 'taches'));
@@ -481,7 +481,7 @@ test('au doigt aussi : texte de carte de 12px au moins, pastilles et badges de 2
 
 test('les nombres des filtres (celui du bouton, celui de chaque option) font 12px', { skip }, () =>
   withWidget({}, async ({ page }) => {
-    const filter = page.locator('.filter[data-filter-key="actions"]');
+    const filter = page.locator('.filter[data-filter-key="instances"]');
     await filter.locator('.filter-button').click();
     await filter.locator('.filter-option').first().locator('input').check();
     const sizes = await page.evaluate(() => ({
