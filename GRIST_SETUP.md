@@ -255,19 +255,21 @@ navigateur. Depuis la 1.12.0, une personne modifie sa fiche **directement**, san
 validation ni historique tenu par le widget : ces règles sont la seule barrière entre
 une fiche et les autres utilisateurs du document.
 
-Ce qui suit est ce dont le widget a besoin, pas une configuration complète. Ces règles
-n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du document.
+Les tableaux qui suivent disent ce dont le widget a besoin ; « Le jeu complet » (à la fin de
+cette étape) dit comment le saisir : refus par défaut, structure verrouillée, cas d'un lien
+public. Ces règles n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du
+document (`TESTING.md`, section 27).
 
 | Où | Qui peut | Pourquoi |
 |---|---|---|
-| `Annuaire_Sonde` : ajouter une ligne, lire et supprimer **la sienne**, ne rien modifier | toute personne qui peut modifier le document (les deux règles exactes sont plus bas) | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
+| `Annuaire_Sonde` : ajouter une ligne, lire et supprimer **la sienne**, ne rien modifier | toute personne **connectée** qui peut modifier le document (les deux règles exactes sont plus bas) | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
 | `BDD` : modifier `prenom`, `nom`, `Fonction`, `email_affiche` (si vous l'avez ajoutée, étape 1), `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Avatar` (si vous l'avez ajoutée, étape 6), `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
 | `BDD` : modifier `email`, `Etablissement` | les administrateurs | c'est ce que le widget écrit quand un administrateur, mode admin allumé, change l'adresse ou l'établissement d'une autre personne. `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` décide de qui apparaît |
 | `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais, et ne le lit plus depuis la 1.27.0 : il ne décide plus de qui apparaît |
-| `BDD` : **ajouter** une ligne dont `email` est le sien (`newRec.email == user.Email`) | toute personne qui peut modifier le document, et les administrateurs | c'est ce que le widget écrit quand une personne crée sa fiche (« Créer ma fiche », 1.18.0) : une seule ligne, avec son adresse, son établissement et son choix d'apparaître. Sans cette règle, Grist refuse la création et le widget le dit (« Grist a refusé la création : vos droits ne permettent pas d'ajouter une fiche… ») sans rien écrire. Le widget écrit l'adresse en minuscules : elle doit s'écrire comme celle du compte Grist (voir plus bas) |
+| `BDD` : **ajouter** une ligne dont `email` est le sien (`user.IsLoggedIn and newRec.email == user.Email`) | toute personne qui peut modifier le document, et les administrateurs | c'est ce que le widget écrit quand une personne crée sa fiche (« Créer ma fiche », 1.18.0) : une seule ligne, avec son adresse, son établissement et son choix d'apparaître. Sans cette règle, Grist refuse la création et le widget le dit (« Grist a refusé la création : vos droits ne permettent pas d'ajouter une fiche… ») sans rien écrire. Le widget écrit l'adresse en minuscules : elle doit s'écrire comme celle du compte Grist (voir plus bas) |
 | `BDD` : ajouter une ligne qui porte l'adresse d'une autre personne, **supprimer** une ligne | les administrateurs | le widget ne crée que la fiche de la personne connectée, et ne supprime jamais de fiche |
 | `ACL` : lire les lignes de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce qui affiche la liste des responsables dans la fiche. Si la règle la leur refuse, la fiche s'ouvre sans cette liste et le dit |
-| `ACL` : ajouter, supprimer, modifier `email` et `Responsable_de_l_Etablissement` d'une ligne de son établissement | les responsables de cet établissement, et les administrateurs | c'est ce que le widget écrit quand un responsable nomme ou retire un responsable. **`admin` : les administrateurs seulement** (le widget ne l'écrit jamais ; sans cette règle, un responsable pourrait se donner le droit d'administrateur depuis la console) |
+| `ACL` : **ajouter** une ligne pour son établissement, **supprimer** celle d'un autre responsable (jamais celle d'un administrateur) | les responsables de cet établissement, et les administrateurs | c'est ce que le widget écrit quand un responsable nomme ou retire un responsable. **Aucun droit « Modifier » pour un responsable, et rien sur `admin`** : sans cela, il pourrait réécrire une adresse ou une ligne d'administrateur, ou se donner le droit d'administrateur depuis la console (le widget n'écrit jamais `admin`). Deux cas restent donc aux administrateurs : retirer un responsable qui est aussi administrateur (le widget ne lui retire que son établissement, une modification), et nommer responsable une adresse déjà dans `ACL` sans établissement, un administrateur par exemple (le widget reprend sa ligne, une modification aussi) |
 | `Etablissements` : modifier `nom_complet`, `ok_pour_apparaitre` et `logo` d'**une ligne** | les responsables de cette ligne, et les administrateurs | c'est ce que le widget écrit pour la fiche d'un établissement. `ok_pour_apparaitre` décide de qui apparaît ; `acronyme`, `fondateur`, `partenaire` et `autres` : l'équipe du PUI seulement, le widget ne les écrit pas |
 | `Etablissements` : **lire** la colonne `logo` (une règle sur cette seule colonne) | toute personne qui a accès au document, Lecteurs, Éditeurs et propriétaires : `user.Access in [OWNER, EDITOR, VIEWER]`, lecture autorisée | le jeton en lecture seule qui sert à afficher les logos compte comme un **Lecteur** : si la table n'est lisible que par les Éditeurs et les propriétaires, Grist refuse tous les logos (étape 5, 1.28.2). Les Éditeurs et les propriétaires doivent y être aussi : le widget lit la colonne avec le rôle réel de la personne |
 | Ajouter une pièce jointe au document | les responsables et les administrateurs (le logo) ; toute personne qui modifie sa fiche (sa photo de profil, étape 6) | c'est ce que fait l'envoi d'un logo ou d'une photo. Un compte au rôle **Lecteur** du document ne peut rien écrire, pas même cela |
@@ -277,19 +279,21 @@ n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du doc
 `Annuaire_Sonde` avec ces deux règles, dans cet ordre (pour chaque droit, la première règle qui
 s'applique et qui se prononce l'emporte) :
 
-| Règle | Condition | Lire | Créer | Modifier | Supprimer |
+| Règle | Condition | Lire | Modifier | Créer | Supprimer |
 |---|---|---|---|---|---|
-| 1 | `rec.Email == user.Email` (la ligne est la sienne) | autorisé | (laisser vide) | **refusé** | autorisé |
-| 2 | tout le monde (aucune condition) | refusé | **autorisé** | refusé | refusé |
+| 1 | `user.IsLoggedIn and rec.Email == user.Email` (la ligne est la sienne) | autorisé | **refusé** | (laisser vide) | autorisé |
+| 2 | `user.IsLoggedIn` (toute personne connectée) | refusé | refusé | **autorisé** | refusé |
 
 Chacun peut ainsi ajouter une ligne, la lire et la supprimer, mais personne ne peut en modifier
 une (l'adresse que Grist y inscrit ne se réécrit pas) ni lire celles des autres. Sans ces règles,
 toute personne qui peut écrire dans le document lirait les adresses des autres et pourrait
 réécrire une ligne. Cela ne lui donnerait pas pour autant les droits de quelqu'un d'autre sur les
 fiches : le widget ne lit que la ligne qu'il vient d'ajouter, et ce sont les règles de `BDD`,
-`Etablissements` et `ACL` (ci-dessus) qui protègent les données. La création ne porte aucune
-condition (une ligne qui n'existe pas encore n'a pas d'adresse à comparer). Le widget fonctionne
-avec ces droits : il ajoute une ligne, la relit, puis la supprime. À essayer sur une copie.
+`Etablissements` et `ACL` (ci-dessus) qui protègent les données. La création ne compare aucune
+adresse (une ligne qui n'existe pas encore n'en a pas) ; elle exige seulement d'être connecté
+(`user.IsLoggedIn`) : sans cette condition, une personne sans compte, que le lien public d'un
+document laisse entrer, ajouterait des lignes (voir « Le jeu complet », plus bas). Le widget
+fonctionne avec ces droits : il ajoute une ligne, la relit, puis la supprime. À essayer sur une copie.
 
 **Si des lignes restent dans `Annuaire_Sonde`.** La table doit être vide au repos. Depuis la 1.21.7,
 le widget attend la réponse de Grist à la suppression de sa ligne, la retente une fois et, si Grist la
@@ -317,8 +321,9 @@ conditions s'écrivent ensuite avec `user.Acl` :
 
 | Où | Condition |
 |---|---|
-| `ACL` : lire, modifier, supprimer une ligne de son établissement | `rec.Responsable_de_l_Etablissement and user.Acl.Responsable_de_l_Etablissement == rec.Responsable_de_l_Etablissement` |
-| `ACL` : ajouter une ligne pour son établissement | `newRec.Responsable_de_l_Etablissement and user.Acl.Responsable_de_l_Etablissement == newRec.Responsable_de_l_Etablissement` |
+| `ACL` : lire une ligne de son établissement | `rec.Responsable_de_l_Etablissement and user.Acl.Responsable_de_l_Etablissement == rec.Responsable_de_l_Etablissement` |
+| `ACL` : supprimer une ligne de son établissement, sauf celle d'un administrateur | `rec.Responsable_de_l_Etablissement and user.Acl.Responsable_de_l_Etablissement == rec.Responsable_de_l_Etablissement and not rec.admin` |
+| `ACL` : ajouter une ligne pour son établissement, sans `admin` | `newRec.Responsable_de_l_Etablissement and user.Acl.Responsable_de_l_Etablissement == newRec.Responsable_de_l_Etablissement and not newRec.admin` |
 | `Etablissements` : modifier une ligne | `rec.id == user.Acl.Responsable_de_l_Etablissement` |
 | les administrateurs | `user.Acl.admin` |
 
@@ -330,12 +335,19 @@ source utilisable ici : elle est vide au repos, la valeur de sa colonne `Respons
 que le temps de l'identification. **Ces conditions n'ont pas encore été essayées dans un vrai Grist** :
 à tester sur une copie, avec « Voir en tant que » sur le compte d'un responsable.
 
-Pour « la personne dont `email` est la sienne », la condition `user.Email and rec.email == user.Email`.
+Pour « la personne dont `email` est la sienne », la condition `user.IsLoggedIn and rec.email == user.Email`.
+Le début `user.IsLoggedIn` n'est pas un luxe : une personne sans compte, que le lien public d'un
+document laisse entrer, a pour adresse `anon@getgrist.com` d'après la documentation de Grist, la même
+pour tous les visiteurs, et `user.Email` seul la reconnaîtrait.
 Elle tient compte des majuscules et des espaces (une condition ne peut pas les ignorer) : l'adresse
-de `BDD` doit être écrite comme celle du compte Grist, en général en minuscules et sans espace. Pour
+de `BDD` doit être écrite comme celle du compte Grist, en général en minuscules et sans espace (le
+widget, lui, les ignore : une fiche en `Prenom.Nom@univ.example` montrerait « Modifier » à la personne
+connectée en `prenom.nom@univ.example`, puis Grist refuserait l'enregistrement). Pour
 une comparaison qui les ignore, un second attribut d'utilisateur (nom `Fiche`, table `BDD`, colonne
 `email`, valeur `user.Email`) donne la condition `user.Fiche.id == rec.id`, qui profite de la recherche de
-Grist (insensible à la casse dans ses versions récentes : à vérifier sur votre instance).
+Grist (insensible à la casse dans ses versions récentes : à vérifier sur votre instance), mais il ne
+renvoie que la première ligne d'une adresse portée par plusieurs fiches, alors que le widget les gère
+toutes : préférez corriger les adresses.
 Pour « les administrateurs », la condition `user.Acl.admin` du tableau ci-dessus. Comme cet
 attribut ne lit qu'une ligne (voir ci-dessus), cochez `admin` sur **chaque**
 ligne d'`ACL` d'un administrateur qui en a plusieurs (le bouton « Mode admin » du widget, lui,
@@ -343,7 +355,8 @@ regarde toutes les lignes). La recherche d'un attribut tient compte de la casse 
 versions de Grist : écrivez les adresses d'`ACL` en minuscules, par prudence.
 
 Si vous préférez que le rôle dans le PUI (`Role_dans_le_PUI`) soit attribué par les
-administrateurs, retirez-le de la deuxième ligne : le champ reste affiché dans la
+administrateurs, retirez-le de la deuxième ligne du tableau du début de l'étape (ou, avec « Le jeu
+complet », réservez-le par une règle de colonne) : le champ reste affiché dans la
 fenêtre, mais Grist refusera la modification.
 
 Un refus des règles d'accès n'abîme rien : le widget affiche « Grist a refusé la
@@ -355,6 +368,88 @@ nouveau logo, déjà envoyé, reste alors dans les pièces jointes sans servir (
 l'envoi du fichier que Grist refuse, le message est un autre (« Grist a refusé le fichier : vos
 droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. »)
 et rien n'a été envoyé.
+
+### Le jeu complet : refuser par défaut, autoriser table par table
+
+Les tableaux ci-dessus disent ce dont le widget a besoin ; voici, dans l'ordre où le saisir, le jeu
+qui en fait une **liste blanche**. Pour chaque droit, la première règle qui se prononce l'emporte ;
+Grist lit les règles de **colonne** d'abord, puis celles de la **table**, puis les règles **par
+défaut**. Dans les tableaux, ✓ veut dire autorisé, ✗ refusé et — pas d'avis (la règle suivante
+décide). **Ces règles n'ont pas été essayées dans un vrai Grist** (elles viennent de l'étude des
+droits du 16 novembre 2026, d'après la documentation et le code de Grist) : à saisir d'abord sur une
+**copie complète** du document, puis à passer au protocole de [`TESTING.md`](TESTING.md), section 27.
+
+**A. Verrouiller la structure.** Dans les règles spéciales, décochez « Allow Editors to edit
+structure ». Elle est cochée **par défaut**, même quand des règles existent, et laisse un Éditeur
+ajouter une colonne à formule qui lit n'importe quelle table (Grist le dit lui-même : « which give
+access to all data regardless of read restrictions »), supprimer des colonnes et, sans doute,
+changer l'adresse du widget. Laissez décochées « Allow everyone to view Access Rules » et « Allow
+everyone to copy the entire document, or view it in full in fiddle mode ». Conséquence : seul un
+**propriétaire** du document crée une table ou une colonne. Le widget ne peut donc plus créer
+`Annuaire_Sonde` (étape 2) pour un Éditeur, ni une colonne qu'une version future lui ferait créer :
+la table et les colonnes doivent exister, ou être créées par un propriétaire qui ouvre l'annuaire
+le premier.
+
+**B. L'attribut d'utilisateur `Acl`** (« Ajouter des attributs d'utilisateur ») : nom `Acl`,
+attribut de la personne `Email`, table `ACL`, colonne `email`. N'ajoutez pas l'attribut `Fiche`
+(voir plus haut).
+
+**C. Les règles de chaque table**, avec `user.IsLoggedIn` dans toute règle qui vise « tout le
+monde » (un visiteur sans compte a le rôle du lien public et l'adresse `anon@getgrist.com`).
+
+`BDD`, règles de la table, dans cet ordre :
+
+| # | Condition | Lire | Modifier | Créer | Supprimer |
+|---|---|---|---|---|---|
+| 1 | `user.Acl.admin` | ✓ | ✓ | ✓ | ✓ |
+| 2 | `user.IsLoggedIn and rec.email == user.Email and newRec.email == rec.email and newRec.Etablissement == rec.Etablissement` | — | ✓ | — | — |
+| 3 | `user.IsLoggedIn and newRec.email == user.Email` | — | — | ✓ | — |
+| 4 | au choix (ci-dessous) | ✓ | — | — | — |
+
+La ligne 4, à choisir : **lecture simple**, `user.IsLoggedIn` (toute personne connectée lit toutes
+les lignes) ; ou **lecture stricte**, `user.IsLoggedIn and (rec.Accepte_apparaitre or rec.email ==
+user.Email)` (on ne lit que les fiches qui apparaissent, et la sienne), à préférer dès qu'un lien
+public existe : sans elle, les contacts que le widget masque, noms, adresses et téléphones compris,
+se lisent dans les données brutes de Grist. La ligne 2 ne laisse changer ni l'adresse ni
+l'établissement d'une fiche, que seul un administrateur modifie (comme dans le widget) ; il n'y a
+aucune liste de colonnes : une colonne ajoutée plus tard à `BDD` est modifiable par la personne pour sa
+ligne. Pour en réserver une aux administrateurs (par exemple `perimetre`, ou `Role_dans_le_PUI`),
+ajoutez-lui une règle de **colonne**, qui passe avant : `user.Acl.admin or user.Access == OWNER`
+Modifier ✓, puis « Tous les autres » Modifier ✗.
+
+`Etablissements` : une règle de **colonne** pour `nom_complet`, `ok_pour_apparaitre` et `logo`,
+`rec.id == user.Acl.Responsable_de_l_Etablissement`, Modifier ✓ ; puis les règles de la table :
+`user.Acl.admin` (tout ✓), `user.IsLoggedIn` (Lire ✓). Gardez la règle de colonne qui laisse lire
+`logo` à `user.Access in [OWNER, EDITOR, VIEWER]` (étape 5) : elle est redondante avec la lecture de la
+table, mais elle a fait ses preuves.
+
+`ACL`, règles de la table, dans cet ordre : `user.Acl.admin` (tout ✓) ; puis les trois conditions du
+tableau des attributs ci-dessus (lire, supprimer sauf un administrateur, ajouter sans `admin`),
+chacune avec le seul droit qu'elle nomme. Un responsable n'a **aucun** droit « Modifier ».
+
+`Annuaire_Sonde` : les deux règles données plus haut.
+
+Les sept tables de référence (`Actions`, `Taches`, `Communautes`, `INSTANCES`, `GT`,
+`Competences`, `Role_Dans_le_PUI`) : une seule règle de table chacune, `user.IsLoggedIn`, Lire ✓.
+Toute autre table du document ne reçoit aucune règle : elle reste cachée.
+
+**D. Les règles par défaut, en dernier.** Dans la section des règles par défaut : `user.Access ==
+OWNER` (tout ✓), puis « Tous les autres » (tout ✗). C'est ce geste qui cache d'un coup toutes les
+tables que le widget n'utilise pas, y compris celles que ce dépôt ne connaît pas (voir
+`grist_structure.txt`), et qui fait de cette liste une liste blanche ; une règle mal écrite donne « rien
+ne s'affiche », jamais « tout s'affiche ». N'ajoutez pas de ligne « Tous les autres » refusée dans une
+table : les propriétaires y seraient refusés aussi. Pour revenir en arrière, supprimer les deux règles
+par défaut suffit.
+
+**Ce que cela change pour le widget.** Un compte Éditeur voit l'annuaire, modifie sa fiche, crée la sienne
+s'il n'en a pas, et rien d'autre ; un référent y ajoute la fiche de son établissement ; un administrateur
+(case `admin` d'`ACL`) corrige toutes les fiches ; un visiteur sans compte n'a droit à rien (annuaire
+vide ou erreur de lecture : le widget n'a pas de message dédié) ; les propriétaires gardent tout. Un
+administrateur d'`ACL` qui n'est pas propriétaire du document ne voit pas les tables techniques et ne
+touche pas à la structure.
+
+**Le mode de partage** (invitations ou lien public en Éditeur) ne change pas ces règles, mais change qui
+profite d'une règle oubliée : voir [`docs/securite.md`](docs/securite.md#le-partage-du-document-lien-public-ou-invitations).
 
 ## 5. Les logos des établissements (facultatif)
 
