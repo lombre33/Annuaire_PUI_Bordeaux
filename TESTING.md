@@ -319,7 +319,7 @@ console, pas de case, le reste comme avant) et un document sans action. `tests/r
 les fonctions (`responsibleActions()`, `responsibleText()`, `taskCode()`, `tagText()`, le delta de `Taches_responsable`,
 `createResponsibleColumn()`).
 
-`tests/e2e-curie-affichage.test.mjs` y ajoute 8 **contrôles d'interface** (1.41.1, repris en 1.41.2) : ce que le menu MONTRE sous « C.U.R.I.E » avec
+`tests/e2e-curie-affichage.test.mjs` y ajoute 8 **contrôles d'interface** (1.41.1, repris en 1.42.1) : ce que le menu MONTRE sous « C.U.R.I.E » avec
 la structure du vrai document (`withCurieCodes` et `curieTable`, `tests/fixtures.mjs` : 14 compétences dont la colonne est une Référence vers
 `Referentiel_competences_CURIE`, avec ses numéros de ligne, 0 et « — aucune correspondance — », structure et capture d'Antoine du 16 novembre
 2026) : des titres qui sont les libellés des lignes du référentiel (« Compétences en gestion de projet. »), jamais un numéro ni « N° 13 », rien pour

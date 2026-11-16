@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.41.2';
+export const VERSION = '1.42.1';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -133,7 +133,7 @@ export const DOCS_URL = 'https://github.com/lombre33/Annuaire_PUI_Bordeaux#docum
 //   optional      sur un regroupement : sa colonne est facultative. Absente ou
 //                 vide dans Grist, le menu n'a pas cet onglet, sans bandeau
 //                 d'erreur ni avertissement (la console le dit)
-//   referential   sur un regroupement : sa colonne est une Référence vers une table de référentiel, { table, field } (1.41.2) : la table
+//   referential   sur un regroupement : sa colonne est une Référence vers une table de référentiel, { table, field } (1.42.1) : la table
 //                 qui nomme les groupes et sa colonne de libellé. Grist n'envoie que le numéro de ligne de cette table (3, 13…), jamais son
 //                 libellé : le groupe prend le libellé de cette ligne. Une valeur qui ne nomme rien n'est pas un groupe : 0 (une Référence
 //                 vide), le texte « — aucune correspondance — » qu'une Référence invalide garde, une ligne introuvable ou sans libellé.
@@ -174,7 +174,7 @@ export const CATEGORIES = {
   // le second onglet du menu Compétences. Même table, même colonne de BDD et mêmes valeurs que le rangement par domaine, seul le groupe change.
   // Un groupe par ligne du référentiel : dans le document d'Antoine, `referenciel_C_U_R_I_E` est une Référence vers la table
   // `Referentiel_competences_CURIE` (colonne `Competence`), et Grist n'envoie que le numéro de ligne (3, 13…) : la 1.38.0 et la 1.41.1 le
-  // montraient tel quel (« 13 », puis « N° 13 »), ce qui ne dit rien à personne (1.41.2). Sans `fallback`, une compétence que le référentiel
+  // montraient tel quel (« 13 », puis « N° 13 »), ce qui ne dit rien à personne (1.42.1). Sans `fallback`, une compétence que le référentiel
   // ne classe pas n'est pas montrée sous cet onglet (1.41.1), elle l'est sous « Classique ».
   curie: {
     label: 'C.U.R.I.E', color: '#00697f', table: 'Competences', field: ['referenciel_C_U_R_I_E'], column: 'Competences',
@@ -215,6 +215,10 @@ export const TASK_ROLES = 'tachesRole';
 // tâche de ce numéro montre l'action elle-même (grist-data.js, heldActionsOf). La 1.39.0 l'avait cessé de la lire : les personnes qui n'ont une action
 // que là n'avaient plus rien sur leur carte (retour d'Antoine du 16 novembre 2026, la 1.39.0 a été retirée le jour même).
 export const ACTIONS_COLUMN = 'Actions';
+
+// La colonne de BDD qui porte les rôles de la personne dans le PUI (une liste de références vers `Role_Dans_le_PUI` depuis la 1.42.0 ; une référence
+// simple avant, que le widget lit toujours).
+export const ROLE_COLUMN = 'Role_dans_le_PUI';
 
 // La colonne de BDD où la personne dit de quelles actions elle est responsable (1.40.0, demande d'Antoine du 16 novembre 2026 : « sur le profil,
 // sur chaque tâche, pouvoir cocher si on est responsable »). Une liste de références vers les lignes de `Taches`, comme `BDD.Taches` : le widget
@@ -299,7 +303,9 @@ export const PROFILE_FIELDS = [
   // L'adresse que la carte montre à la place de `email` quand elle n'est pas vide (colonne facultative).
   { key: 'email_affiche', label: 'E-mail affiché', kind: 'email', optional: true },
   { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
-  { key: 'Role_dans_le_PUI', label: 'Rôle dans le PUI', kind: 'reference', category: 'role' },
+  // Plusieurs rôles se cumulent (1.42.0, Antoine, 16 novembre 2026) : la colonne est une liste de références. Une colonne qui est encore une
+  // référence simple se lit toujours, et n'accepte qu'un seul rôle à l'écriture (profile-save.js).
+  { key: ROLE_COLUMN, label: 'Rôle dans le PUI', kind: 'list', category: 'role' },
   ...LIST_FIELD_KEYS.flatMap(category => {
     const field = { key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category };
     // Sous les actions, de quelles actions la personne est responsable (colonne facultative : absente de BDD, le formulaire ne la propose pas).

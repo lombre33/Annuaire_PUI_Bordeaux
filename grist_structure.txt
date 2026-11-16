@@ -94,7 +94,9 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
                                      l'adresse du compte. Voir shownEmail() dans grist-data.js)
   numero_de_telephone : Numeric     (téléphone de la carte ; le 0 initial qu'un
                                      type Numeric fait perdre est rétabli)
-  Role_dans_le_PUI    : Reference(Role_Dans_le_PUI)   (pastille « Rôle dans le PUI » ; « Membre
+  Role_dans_le_PUI    : ReferenceList(Role_Dans_le_PUI)   (1.42.0 : les rôles se cumulent ; une
+                                     Référence simple se lit encore, et n'accepte qu'un rôle à
+                                     l'écriture) (pastille « Rôle dans le PUI » ; « Membre
                                      d'une action » et « Responsable d'une action » s'y ajoutent
                                      sans jamais s'écrire : le widget les déduit des actions, à
                                      chaque lecture, depuis les 1.39.0 et 1.40.0)

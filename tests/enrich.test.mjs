@@ -173,7 +173,7 @@ test('enrich: a bracketed text of row numbers in BDD.Taches shows the tasks thos
 
 test('enrich: other unreadable texts of numbers show nothing: never the numbers, whatever the column', () => {
   const maps = { ...HELD_MAPS, instances: { 7: 'CME' }, gt: { 1: 'GT 1' }, role: { 1: 'Référent qualité' } };
-  const row = { Taches: '14, 21', GT: ['L', '[0,14]'], Actions: '0,2', Role_dans_le_PUI: '[1]' };
+  const row = { Taches: '14, 21', GT: ['L', '[0,14]'], Actions: '0,2', Role_dans_le_PUI: '1, 2' };
   const result = enrich(row, maps);
   assert.deepEqual([result.labels.taches, result.labels.gt, result.labels.role], [[], [], []]);
   assert.deepEqual(result.heldActions, []);

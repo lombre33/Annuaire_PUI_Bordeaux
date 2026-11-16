@@ -43,9 +43,10 @@ export function sampleTables() {
       // Hugo n'a aucun périmètre (['L'] : une liste vide) et apparaît quand même : le périmètre ne décide de rien.
       perimetre: [['L', 1], ['L', 2], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 1], ['L', 3], ['L'], ['L', 1], ['L', 1]],
       // Colonnes facultatives, rajoutées dans BDD sous ces noms : Numeric (le 0
-      // initial est perdu) et Référence vers Role_Dans_le_PUI (0 = vide).
+      // initial est perdu) et Liste de références vers Role_Dans_le_PUI (Antoine l'a passée de Référence en liste le 16 novembre 2026, 1.42.0 ;
+      // withSingleRole rend l'ancienne forme).
       numero_de_telephone: [536499012, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      Role_dans_le_PUI: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      Role_dans_le_PUI: [['L', 1], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L'], ['L']],
       // Case à cocher : seul `true` vaut accord. Iris a refusé, Jules n'a pas
       // répondu (cellule vide).
       Accepte_apparaitre: [true, true, true, true, true, true, true, true, true, true, false, null]
@@ -98,7 +99,7 @@ export function withoutOptionalColumns(tables) {
 }
 
 // Le référentiel C.U.R.I.E (1.38.0) : la colonne facultative `referenciel_C_U_R_I_E` de Competences, qui range les compétences d'une autre
-// façon que les domaines. Comme dans le VRAI document (structure et capture d'Antoine du 16 novembre 2026, 1.41.2), c'est une Référence vers la
+// façon que les domaines. Comme dans le VRAI document (structure et capture d'Antoine du 16 novembre 2026, 1.42.1), c'est une Référence vers la
 // table `Referentiel_competences_CURIE` (colonne `Competence`) : Grist n'envoie que le numéro de ligne de cette table (3, 13…), 0 quand la
 // Référence est vide, et le texte « — aucune correspondance — » quand elle est invalide. Les tests de la 1.38.0 avaient des noms de groupe que
 // j'avais imaginés (« Groupe C ») ; ceux de la 1.41.1 avaient des numéros qu'ils croyaient être les groupes : le menu montrait « N° 13 ».
@@ -218,6 +219,14 @@ export const withDuplicateCHU = tables => withEtablissement(tables, {
   id: 6, acronyme: 'CHU', nom_complet: 'CHU (doublon)', fondateur: true, partenaire: false, autres: false, ok_pour_apparaitre: false
 });
 
+// La colonne `Role_dans_le_PUI` telle qu'elle était avant le 16 novembre 2026 : une Référence simple (un identifiant de ligne, 0 pour aucun), que
+// le widget lit toujours et à laquelle il n'écrit qu'un seul rôle.
+export function withSingleRole(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  copy.BDD.Role_dans_le_PUI = copy.BDD.Role_dans_le_PUI.map(cell => (Array.isArray(cell) ? cell.filter(item => item !== 'L')[0] ?? 0 : cell));
+  return copy;
+}
+
 // Les tâches rangées par action : le numéro avant le point du libellé d'une tâche est celui
 // de son action, que la table Actions porte dans son libellé. Les deux actions de la base de
 // départ sont numérotées, et quatre tâches sont portées par BDD.Taches. Avec ces données
@@ -326,7 +335,7 @@ export function withSchema(tables = sampleTables(), { phoneType = 'Numeric' } = 
   copy._grist_Tables = { id: [1, 2], tableId: ['BDD', 'Etablissements'] };
   const bdd = [
     ['prenom', 'Text'], ['nom', 'Text'], ['email', 'Text'], ['Fonction', 'Text'], ['numero_de_telephone', phoneType],
-    ['Etablissement', 'Ref:Etablissements'], ['Role_dans_le_PUI', 'Ref:Role_Dans_le_PUI'],
+    ['Etablissement', 'Ref:Etablissements'], ['Role_dans_le_PUI', 'RefList:Role_Dans_le_PUI'],
     ['Instances', 'RefList:INSTANCES'], ['Actions', 'RefList:Actions'], ['GT', 'RefList:GT'],
     ['Communautes', 'RefList:Communautes'], ['Taches', 'RefList:Taches'], ['Competences', 'RefList:Competences'],
     ['perimetre', 'RefList:REMMAPING_PERIMETRES_COMPETENCES'], ['Accepte_apparaitre', 'Bool'],

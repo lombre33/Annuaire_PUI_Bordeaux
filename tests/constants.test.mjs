@@ -75,7 +75,7 @@ test('the C.U.R.I.E groups are a second grouping of the same skills: an optional
   assert.equal(curie.groups, 'competences');
   assert.equal(curie.fallback, undefined, 'pas de groupe « Hors C.U.R.I.E » : une compétence que la colonne ne classe pas n\'est pas montrée sous cet onglet (1.41.1)');
   assert.deepEqual(curie.referential, { table: 'Referentiel_competences_CURIE', field: ['Competence'] },
-    'la colonne est une Référence vers la table du référentiel : Grist n\'envoie que le numéro de ligne (3, 13…), le libellé du groupe est dans cette table (1.41.2)');
+    'la colonne est une Référence vers la table du référentiel : Grist n\'envoie que le numéro de ligne (3, 13…), le libellé du groupe est dans cette table (1.42.1)');
   assert.equal(macro.referential, undefined, 'les domaines sont des noms : rien n\'y est écarté ni renommé');
   const source = key => REFERENCE_SOURCES.find(entry => entry.key === key);
   assert.deepEqual(source('curie').referential, curie.referential, 'la lecture des libellés le sait');

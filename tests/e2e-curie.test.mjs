@@ -28,7 +28,7 @@ const focused = page => page.evaluate(() => {
 });
 
 const DOMAINS = ['Cancérologie', 'Pharmacie', 'Autres'];
-// Les groupes sont les libellés des lignes 3 et 13 de la table du référentiel (tests/fixtures.mjs), pas leurs numéros (1.41.2).
+// Les groupes sont les libellés des lignes 3 et 13 de la table du référentiel (tests/fixtures.mjs), pas leurs numéros (1.42.1).
 const PROJET = CURIE.projet;
 const INNOVATION = CURIE.innovation;
 const GROUPS = [PROJET, INNOVATION];
