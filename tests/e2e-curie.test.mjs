@@ -353,15 +353,15 @@ test('sans la colonne des domaines, le menu Compétences se range par groupe C.U
   });
 });
 
-test('les menus Tâches, Actions et les autres n\'ont pas d\'onglets, même avec la colonne C.U.R.I.E', { skip }, () =>
+test('le menu Actions et les autres n\'ont pas d\'onglets, même avec la colonne C.U.R.I.E', { skip }, () =>
   withWidget({ tables: withCurie() }, async ({ page }) => {
     await waitForCards(page, 4);
-    for (const key of ['actions', 'taches', 'communautes', 'gt', 'instances', 'etablissement', 'role']) {
+    for (const key of ['taches', 'communautes', 'gt', 'instances', 'etablissement', 'role']) {
       assert.equal(await page.locator(`.filter[data-filter-key="${key}"] .view-tabs`).count(), 0, key);
     }
     assert.equal(await page.locator('.filter[data-filter-key="curie"]').count(), 0, 'pas de bouton de filtre « C.U.R.I.E » de plus');
     assert.deepEqual(await page.locator('.filter-button > span:nth-child(2)').allTextContents(),
-      ['Actions', 'Tâches', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement', 'Rôle PUI']);
+      ['Actions', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement', 'Rôle dans le PUI']);
     assert.equal(await page.locator('.contact-card .tag-curie, .tag-group-title:has-text("C.U.R.I.E")').count(), 0, 'aucune pastille de plus sur les cartes');
   }));
 

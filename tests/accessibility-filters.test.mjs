@@ -13,7 +13,7 @@ import { sampleTables, withClones } from './fixtures.mjs';
 import { accessibilityTree, accessibleNode } from './support/accessibility-tree.mjs';
 import { changeFonction, gridCard, reload, skip, waitForCards, withWidget } from './support/browser.mjs';
 
-// Le filtre de clé `key` (data-filter-key : actions, competences, instances…), son bouton et son menu.
+// Le filtre de clé `key` (data-filter-key : taches, competences, instances…), son bouton et son menu.
 const filter = (page, key) => page.locator(`.filter[data-filter-key="${key}"]`);
 const button = (page, key) => filter(page, key).locator('.filter-button');
 const option = (page, key, value) => filter(page, key).locator(`.filter-option[data-value="${value}"] input`);
@@ -64,7 +64,7 @@ test('chaque bouton de filtre annonce s\'il est ouvert et désigne son menu, un 
         popup: toggle.hasAttribute('aria-haspopup')
       };
     }));
-    assert.ok(wiring.length >= 8, `les huit filtres sont là (${wiring.length})`);
+    assert.equal(wiring.length, 7, `les sept filtres sont là (${wiring.length})`);
     for (const { label, expanded, menuIsItsOwn, menuRole, menuName, chevronHidden, popup } of wiring) {
       assert.deepEqual({ expanded, menuIsItsOwn, menuRole, menuName, chevronHidden, popup },
         { expanded: 'false', menuIsItsOwn: true, menuRole: 'group', menuName: label, chevronHidden: 'true', popup: false }, label);
@@ -82,13 +82,13 @@ test('chaque bouton de filtre annonce s\'il est ouvert et désigne son menu, un 
     // Un autre menu s'ouvre : le premier se replie et le dit ; un second clic sur son bouton le replie aussi. Le premier clic est celui
     // que `click()` envoie, sans déplacer le focus : comme dans Safari, où un bouton ne prend pas le focus au clic (sinon c'est la
     // sortie du focus qui referme le premier menu).
-    await button(page, 'actions').evaluate(element => element.click());
-    assert.deepEqual(await openFilters(page), ['actions']);
+    await button(page, 'taches').evaluate(element => element.click());
+    assert.deepEqual(await openFilters(page), ['taches']);
     assert.equal(await button(page, 'instances').getAttribute('aria-expanded'), 'false');
-    assert.equal(await button(page, 'actions').getAttribute('aria-expanded'), 'true');
-    await button(page, 'actions').click();
+    assert.equal(await button(page, 'taches').getAttribute('aria-expanded'), 'true');
+    await button(page, 'taches').click();
     assert.deepEqual(await openFilters(page), []);
-    assert.equal(await button(page, 'actions').getAttribute('aria-expanded'), 'false');
+    assert.equal(await button(page, 'taches').getAttribute('aria-expanded'), 'false');
   }));
 
 test('le nom d\'un bouton de filtre dit combien de valeurs sont choisies, en toutes lettres, et celui d\'une case n\'est que son libellé (audit U15)', { skip }, () =>
@@ -207,8 +207,8 @@ test('à la souris, un menu ne se referme pas quand le focus part sans destinati
 
 // ===== U17 : le focus survit au dessin de la grille =====
 
-// La pastille d'action de la carte d'Ana, un bouton qui filtre sur « Vaccination ».
-const pillOfAna = page => gridCard(page, 'Ana').locator('button.tag', { hasText: 'Vaccination' });
+// La pastille d'instance de la carte d'Ana, un bouton qui filtre sur « CME ».
+const pillOfAna = page => gridCard(page, 'Ana').locator('button.tag', { hasText: 'CME' });
 
 test('au clavier, activer une pastille de carte garde le focus sur elle quand la grille se redessine (audit U17)', { skip }, () =>
   withWidget({ tables: sampleTables() }, async ({ page }) => {
@@ -216,12 +216,12 @@ test('au clavier, activer une pastille de carte garde le focus sur elle quand la
     await pillOfAna(page).focus();
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => document.querySelectorAll('.contact-card').length === 1);
-    assert.deepEqual(await focusedControl(page), { ...await focusedControl(page), tag: 'BUTTON', text: 'Vaccination', inGrid: true },
+    assert.deepEqual(await focusedControl(page), { ...await focusedControl(page), tag: 'BUTTON', text: 'CME', inGrid: true },
       'le focus est resté sur la pastille, dans la grille, et non revenu à la page');
     // Une deuxième activation retire le filtre : les quatre cartes reviennent et le focus est toujours sur la pastille.
     await page.keyboard.press('Enter');
     await waitForCards(page, 4);
-    assert.equal((await focusedControl(page)).text, 'Vaccination');
+    assert.equal((await focusedControl(page)).text, 'CME');
     assert.equal((await focusedControl(page)).inGrid, true);
   }));
 
@@ -244,7 +244,7 @@ test('quand la carte est refaite par une relecture de Grist, le focus passe au m
     assert.ok(scrolled > 800, `la carte est loin du haut (${scrolled} px)`);
     await changeFonction(page, { row: 0, name: 'Ana', fonction: 'Cheffe de service' });
     assert.equal(await before.evaluate(element => element.isConnected), false, 'la carte d\'Ana a bien été refaite (sinon ce test ne prouve rien)');
-    assert.deepEqual(await focusedControl(page), { ...await focusedControl(page), tag: 'BUTTON', text: 'Vaccination', inGrid: true });
+    assert.deepEqual(await focusedControl(page), { ...await focusedControl(page), tag: 'BUTTON', text: 'CME', inGrid: true });
     assert.equal(await page.evaluate(() => document.activeElement.closest('.contact-card').querySelector('.fonction').textContent), 'Cheffe de service');
     assert.equal(await focusIsOnScreen(page), true, 'le contrôle qui a le focus est à l\'écran');
   }));

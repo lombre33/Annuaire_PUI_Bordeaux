@@ -6,16 +6,17 @@ la faire et comment vérifier qu'elle a marché.
 
 | Étape | Quoi | Sans elle |
 |---|---|---|
-| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** | l'interrupteur « Ma présence » échoue (la console dit la colonne et renvoie ici), de même que l'enregistrement ou la création d'une fiche, avec un message qui renvoie ici |
+| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** ; la colonne `Taches_responsable` (« Responsable de l'action x.y », 1.40.0, facultative) : **le widget la crée lui-même** quand un administrateur ouvre l'annuaire | l'interrupteur « Ma présence » échoue (la console dit la colonne et renvoie ici), de même que l'enregistrement ou la création d'une fiche, avec un message qui renvoie ici ; sans `Taches_responsable`, seule la case « Responsable de » manque dans « Modifier mon profil » |
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement : **le widget la crée lui-même** au premier chargement, ouvert par un compte qui peut modifier la structure du document | si le widget n'a pas pu la créer, personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, depuis la 1.17.0 une fiche d'établissement aussi, et depuis la 1.18.0 une personne crée elle-même sa fiche |
 | 5 | Les logos des établissements : colonnes `logo` et `ordre_bandeau` dans `Etablissements` (facultatif) ; le remplacement d'un logo depuis le widget en dépend. Les financeurs n'en dépendent pas : ce sont deux images fixes du widget | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas ; un responsable ne peut plus changer le logo de son établissement depuis le widget (la fenêtre le dit) ; rien d'autre ne change |
 | 6 | La photo de profil : colonne `Avatar` (Pièces jointes) dans `BDD` (facultatif) | les cartes gardent les initiales et le formulaire de modification n'a pas de carte « Photo de profil » ; rien d'autre ne change |
 
-Le widget ne modifie jamais la structure du document (colonne, règle d'accès) et ne crée
-qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2) : tout le reste de ce qui
-est ci-dessous se fait à la main, une fois. Hors cette création, il n'écrit que
+Le widget ne modifie jamais la structure du document (règle d'accès, colonne existante) et ne crée
+qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2), et qu'une seule colonne,
+`BDD.Taches_responsable`, quand elle manque et qu'un administrateur ouvre l'annuaire (étape 1, 1.40.0) :
+tout le reste de ce qui est ci-dessous se fait à la main, une fois. Hors ces créations, il n'écrit que
 des lignes et des cellules : celle de la personne connectée dans `BDD` (son choix de présence, sa
 fiche, ou la fiche qu'elle crée quand elle n'en a pas) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
 passagère d'`Annuaire_Sonde` et, pour un responsable d'établissement, la ligne de son établissement
@@ -31,8 +32,9 @@ Le widget écrit dans `BDD` dans quatre cas :
   `Accepte_apparaitre` ;
 - quand elle enregistre la modification de sa fiche : `prenom`, `nom`, `Fonction`,
   `email_affiche` (si la colonne existe, voir plus bas), `numero_de_telephone`,
-  `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`,
-  `Taches` et, si elle existe (étape 6), `Avatar` ;
+  `Role_dans_le_PUI`, `Instances`, `GT`, `Competences`, `Communautes`,
+  `Taches` (les « actions » de la personne depuis la 1.39.0), `Taches_responsable` (les actions dont elle
+  est responsable, depuis la 1.40.0 : si la colonne existe, voir plus bas) et, si elle existe (étape 6), `Avatar` ;
 - quand une personne dont l'adresse ne figure dans aucune fiche clique sur
   « Créer ma fiche » (1.18.0) : il **ajoute une ligne**, c'est la seule fois où le widget
   crée une fiche. Elle porte l'adresse du compte (`email`, en minuscules), l'établissement
@@ -60,6 +62,25 @@ connecté, les droits et la recherche de la fiche ne lisent jamais `email_affich
 le formulaire n'a pas le champ « E-mail affiché » et la carte montre `email`. Comme les autres
 colonnes de la fiche, elle doit être une colonne de **données** (voir ci-dessous).
 
+**`Taches_responsable` (facultative, 1.40.0).** C'est elle qui donne à une carte le rôle « Responsable de
+l'action 1.2 » : dans « Modifier mon profil », sous la liste des actions, la personne coche celles dont elle est
+responsable. La colonne est de type **Liste de références** vers `Taches` (comme `Taches`), une colonne de
+**données**, et elle est dans `BDD` et non dans la table des actions : une personne n'écrit que sa propre ligne
+de `BDD` (étape 4), ce qu'une table partagée par tous ne permettrait pas. Elle est **vide au départ** : nul n'est
+« Responsable » tant qu'il ne l'a pas coché lui-même, et elle ne compte que pour les actions que la personne a aussi.
+
+*Le widget la crée lui-même quand elle manque*, mais **seulement quand un administrateur** (la case `admin` d'`ACL`,
+étape 3) **ouvre l'annuaire**, que `BDD` a une colonne `Taches` et que la table `Taches` a des lignes : une seule
+fois par chargement de la page, en une action (`AddColumn`), après quoi la case « Responsable de » apparaît sans
+recharger. Grist n'accepte l'ajout d'une colonne que d'un compte qui peut modifier la structure du document : si les règles
+d'accès la verrouillent (étape 4, « Le jeu complet », point A : « Allow Editors to edit structure » décoché), seul un
+**propriétaire** du document la crée, c'est-à-dire un propriétaire qui est aussi administrateur d'`ACL`. Quand Grist
+refuse, la console du navigateur le dit en une ligne (`[SCHEMA] la colonne « Taches_responsable » manque dans BDD
+et Grist n'a pas permis de la créer…`), la case « Responsable de » n'est pas proposée, et rien d'autre ne change.
+**À la main**, dans les données brutes de `BDD` : ajoutez une colonne `Taches_responsable`, type **Liste de
+références** vers `Taches` (colonne affichée au choix), comportement **Colonne de données**, et ne la remplissez pas.
+Cette création n'a pas été essayée dans un vrai Grist.
+
 Grist refuse d'écrire dans une colonne **à formule** : chacune doit être une colonne
 de **données**. `Accepte_apparaitre` est de type **Case à cocher** (Bascule) ;
 `numero_de_telephone` peut être numérique ou texte, le widget écrit dans la forme de
@@ -72,9 +93,17 @@ la colonne (il lit son type dans les métadonnées du document).
 3. Pour `Accepte_apparaitre`, type **Case à cocher** ; cochez la case des personnes
    qui ont déjà donné leur accord. Une case vide ou décochée masque la personne.
 4. Pour `Role_dans_le_PUI`, type **Référence** vers la table `Role_Dans_le_PUI` (colonne
-   affichée `Role`) : c'est elle qui alimente le filtre « Rôle PUI » et le rôle de la carte
+   affichée `Role`) : c'est elle qui alimente le filtre « Rôle dans le PUI » et le rôle de la carte
    (1.24.0). Une colonne à formule qui la remplit se convertit en colonne de données pour que
-   la personne puisse la changer depuis « Modifier mon profil ».
+   la personne puisse la changer depuis « Modifier mon profil ». Depuis la 1.39.0, le rôle
+   « Membre d'une action » n'a pas besoin d'y être écrit : le widget le donne de lui-même à toute personne qui
+   a au moins une action (`BDD.Taches`) et le retire avec la dernière ; une ligne de ce nom dans
+   `Role_Dans_le_PUI`, si vous en avez une, donne son libellé, et ce qui en est écrit dans `BDD` est ignoré.
+5. Pour `Taches`, type **Liste de références** vers la table `Taches` : ce sont les **actions** de la
+   personne (1.39.0). La colonne `Actions` de `BDD` n'est plus lue ni écrite : une personne qui n'a une
+   action que là n'en a plus à l'écran, et la console du navigateur le dit. Une colonne à formule qui
+   remplit `Taches` se convertit en colonne de données pour que la personne puisse changer ses actions
+   depuis « Modifier mon profil ».
 
 Depuis la 1.17.0, le widget écrit aussi, quand un responsable enregistre la fiche de
 son établissement, dans trois colonnes d'`Etablissements` (`nom_complet`,
@@ -263,7 +292,7 @@ document (`TESTING.md`, section 27).
 | Où | Qui peut | Pourquoi |
 |---|---|---|
 | `Annuaire_Sonde` : ajouter une ligne, lire et supprimer **la sienne**, ne rien modifier | toute personne **connectée** qui peut modifier le document (les deux règles exactes sont plus bas) | sinon elle n'est pas identifiée (le widget échoue en sécurité : ni bandeau ni bouton) |
-| `BDD` : modifier `prenom`, `nom`, `Fonction`, `email_affiche` (si vous l'avez ajoutée, étape 1), `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `Actions`, `GT`, `Competences`, `Communautes`, `Taches`, `Avatar` (si vous l'avez ajoutée, étape 6), `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
+| `BDD` : modifier `prenom`, `nom`, `Fonction`, `email_affiche` (si vous l'avez ajoutée, étape 1), `numero_de_telephone`, `Role_dans_le_PUI`, `Instances`, `GT`, `Competences`, `Communautes`, `Taches`, `Taches_responsable` (si vous l'avez ajoutée, étape 1), `Avatar` (si vous l'avez ajoutée, étape 6), `Accepte_apparaitre` | la personne dont `email` est la sienne, et les administrateurs | c'est ce que le widget écrit |
 | `BDD` : modifier `email`, `Etablissement` | les administrateurs | c'est ce que le widget écrit quand un administrateur, mode admin allumé, change l'adresse ou l'établissement d'une autre personne. `email` désigne la personne : qui peut le changer peut prendre l'identité d'un autre. `Etablissement` décide de qui apparaît |
 | `BDD` : modifier `perimetre` | les administrateurs | le widget ne l'écrit jamais, et ne le lit plus depuis la 1.27.0 : il ne décide plus de qui apparaît |
 | `BDD` : **ajouter** une ligne dont `email` est le sien (`user.IsLoggedIn and newRec.email == user.Email`) | toute personne qui peut modifier le document, et les administrateurs | c'est ce que le widget écrit quand une personne crée sa fiche (« Créer ma fiche », 1.18.0) : une seule ligne, avec son adresse, son établissement et son choix d'apparaître. Sans cette règle, Grist refuse la création et le widget le dit (« Grist a refusé la création : vos droits ne permettent pas d'ajouter une fiche… ») sans rien écrire. Le widget écrit l'adresse en minuscules : elle doit s'écrire comme celle du compte Grist (voir plus bas) |

@@ -179,7 +179,7 @@ Sans dépendance, un fichier de tests par module :
   fenêtre, les contrôles sans nom et la mise en page (`dialogFit`), pour
   `tests/e2e-profile.test.mjs`, `tests/e2e-avatar.test.mjs` et `tests/e2e-etablissement.test.mjs`.
 - `tests/support/grouped-menu.mjs` — les aides communes aux tests des menus rangés par
-  groupe (Compétences par domaine, Tâches par action) : groupe, case, flèche,
+  groupe (Compétences par domaine, Actions par numéro) : groupe, case, flèche,
   nombres, éléments visibles, et le parcours au clavier (`assertKeyboardWalk`).
 - `tests/support/fiction.mjs` — le contrôle que le jeu de données d'un test ne contient que des
   coordonnées inventées (`assertFictionalContacts`), et le repérage, dans un texte quelconque, d'une
@@ -285,9 +285,9 @@ fermeture de la page ne laisse aucun rejet non traité).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
-`tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Tâches rangé par action,
+`tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Actions rangé par action,
 sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
-huit boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
+sept boutons seulement (plus de filtre « Actions » à plat), actions repliées avec « Sans action »
 en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
 filtres, nombres de cartes, recherche d'une action, d'une tâche ou d'un numéro, tag de
 carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numéros (console
@@ -302,6 +302,16 @@ l'interrupteur Partenaires et les autres filtres, tag de carte, recherche déjà
 et Tabulation, onglet gardé quand le menu est reconstruit, aucun onglet ni bandeau ni avertissement sans la colonne ou avec une colonne
 vide (la console le dit), le menu rangé par C.U.R.I.E seul sans la colonne des domaines, arbre d'accessibilité (liste d'onglets, onglet
 sélectionné, panneau nommé), et la mise en page de 280 à 1 200 px, au doigt aussi.
+
+`tests/e2e-responsible.test.mjs` y ajoute 14 scénarios sur « Responsable de l'action x.y » (1.40.0, `withResponsibleColumn` dans
+`tests/fixtures.mjs` : la colonne `Taches_responsable` de `BDD`) : le rôle écrit sur la carte (une action, plusieurs), le menu du rôle qui
+compte la personne une seule fois, le bloc « Responsable de » de la fenêtre de profil (une case par action choisie, nom de chaque case,
+clavier, tenue de 320 à 1 200 px), la relecture « avant » et « après » puis l'écriture, une action décochée dans la liste qui retire sa
+case et sa responsabilité, un administrateur sur la fiche d'une autre personne, la colonne créée par un administrateur (une seule demande,
+vide, la case ensuite), un compte qui n'est pas administrateur (aucune demande), la structure refusée par Grist (une phrase dans la
+console, pas de case, le reste comme avant) et un document sans action. `tests/responsible.test.mjs` (14 tests, sans navigateur) couvre
+les fonctions (`responsibleActions()`, `responsibleText()`, `taskCode()`, `tagText()`, le delta de `Taches_responsable`,
+`createResponsibleColumn()`).
 
 `tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
@@ -379,7 +389,7 @@ données de la mise en page ne contient que des coordonnées fictives) sur la mi
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
-d'outils, menus de filtres (les menus Compétences et Tâches dépliés compris) entièrement
+d'outils, menus de filtres (les menus Compétences et Actions dépliés compris) entièrement
 dans le cadre, cibles tactiles (écran
 tactile émulé), taille du texte des cartes (12px au moins à toute largeur, souris ou doigt), pastilles de
 24px de haut et petites cibles isolées (WCAG 2.5.8), bandeau d'erreur et état vide à 320px, et
@@ -396,8 +406,8 @@ logos s'afficher), console qui dit la version et ce que Grist donne des logos, a
 refuse (1.28.2), aucune trace du jeton dans la console, relecture d'une fiche.
 `tests/branding-layout.test.mjs` y ajoute 19 scénarios sur la mise en page de l'habillage, de
 320 à 1920px : en-tête (titre, financeurs, profil), logos de formes variées dans leur case et à la même
-surface visuelle (marges transparentes retirées), rôle PUI à droite de la ligne de l'e-mail, bandeau du
-bas qui se replie, rien qui dépasse du cadre.
+surface visuelle (marges transparentes retirées), rôle dans le PUI en première section de pastilles (même très long, il reste dans
+la carte), bandeau du bas qui se replie, rien qui dépasse du cadre.
 
 `tests/logos-preload-e2e.test.mjs` y ajoute 8 scénarios sur le chargement des logos, avec un Grist
 capricieux servi par `tests/support/fake-attachments.mjs` (réponses retenues puis libérées, première demande
@@ -519,9 +529,10 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
       inférieur ou égal à N (les personnes qui n'ont pas accepté d'apparaître, ou dont
       l'établissement n'est pas validé, fondateur ou partenaire, ne s'affichent pas ;
       `perimetre` ne compte plus depuis la 1.27.0).
-- [ ] Les 8 boutons de filtre (Actions, Tâches, Communautés, GT, Compétences,
-      Instances, Établissement, Rôle PUI) sont présents dans la barre d'outils. Il n'y a
-      pas de bouton « Domaines » : les domaines sont dans le menu Compétences.
+- [ ] Les 7 boutons de filtre (Actions, Communautés, GT, Compétences,
+      Instances, Établissement, Rôle dans le PUI) sont présents dans la barre d'outils. Il n'y a
+      pas de bouton « Domaines » : les domaines sont dans le menu Compétences ; ni de bouton « Tâches » (1.39.0) : les tâches
+      s'appellent « Actions », rangées par groupe d'actions dans le menu Actions.
 - [ ] Sur une carte avec toutes les infos renseignées : initiales correctes
       dans l'avatar, nom + prénom, fonction visible, logo (ou pastille)
       de l'établissement en haut à droite, email en lien `mailto:`, téléphone visible.
@@ -564,8 +575,8 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
 
 ## 3. Chaque filtre, seul
 
-Pour chacun des 8 filtres (Actions, Tâches, Communautés, GT, Compétences,
-Instances, Établissement, Rôle PUI) :
+Pour chacun des 7 filtres (Actions, Communautés, GT, Compétences,
+Instances, Établissement, Rôle dans le PUI) :
 
 - [ ] Ouvrir le menu (clic sur le bouton) → seul ce menu est ouvert (les
       autres se ferment).
@@ -671,13 +682,13 @@ copie du document, la colonne `referenciel_C_U_R_I_E` (texte ou choix) à la tab
 - [ ] Une valeur de colonne écrite de deux façons (« Groupe U », « groupe u ») ne fait qu'un groupe. Une colonne à choix multiples ou de
       type Référence n'est pas gérée (voir `docs/maintenance.md`).
 
-Spécifique **Tâches par action** : le menu Tâches range ses valeurs par action, sans
+Spécifique **Tâches par action** : le menu Actions range ses valeurs par action, sans
 second bouton et sans colonne à ajouter dans Grist. Le numéro avant le point du libellé
 d'une tâche (« 2.1 … ») est celui de son action, dont le libellé commence par « Action 2 ».
-Le menu Tâches fonctionne comme le menu Compétences par domaine (ci-dessus) : reprendre
+Le menu Actions fonctionne comme le menu Compétences par domaine (ci-dessus) : reprendre
 les mêmes essais en remplaçant domaine par action et compétence par tâche, puis :
 
-- [ ] L'infobulle du bouton « Tâches » parle d'actions ; le champ de recherche du menu
+- [ ] L'infobulle du bouton « Actions » parle d'actions ; le champ de recherche du menu
       dit « Action ou tâche… » en entier, sans être coupé.
 - [ ] Les actions sont dans l'ordre de leur numéro (« Action 2 » avant « Action 10 »),
       chaque tâche sous l'action dont elle porte le numéro, et les tâches d'une action
@@ -685,7 +696,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       dernier** s'il existe une tâche sans numéro, ou dont le numéro ne correspond à
       aucune action. Une action qui n'a aucune tâche ne figure pas dans le menu.
 - [ ] Le filtre **Actions** est inchangé : toujours une liste à plat, qui filtre sur les
-      actions inscrites sur les cartes, et qui ne coche pas le menu Tâches (ni
+      actions inscrites sur les cartes, et qui ne coche pas le menu Actions (ni
       l'inverse). Les deux se cumulent (ET).
 - [ ] Rechercher « 2.1 » (le numéro d'une tâche) garde cette tâche sous son action ;
       « action 2 » garde l'action avec toutes ses tâches.
@@ -696,7 +707,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       action » (`[REFS] Taches: n ligne(s) sans regroupement…`) : les numéroter dans
       Grist, puis recharger le widget.
 - [ ] Sur une copie du document où **aucune tâche** ne commence par un numéro « n.m »
-      (ou aucune action par « Action n »), le menu Tâches reste complet, mais à plat,
+      (ou aucune action par « Action n »), le menu Actions reste complet, mais à plat,
       sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches: aucune
       ligne n'est rattachée à une action…`).
 - [ ] Dans la fenêtre « Modifier mon profil », la liste des tâches est rangée par action
@@ -709,7 +720,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       correspondent aux deux restent.
 - [ ] Recherche libre + un filtre catégorie en même temps → les deux
       s'appliquent ensemble.
-- [ ] Les 8 filtres cochés simultanément (au moins une valeur chacun) →
+- [ ] Les 7 filtres cochés simultanément (au moins une valeur chacun) →
       résultat cohérent (potentiellement vide, mais sans erreur console).
 
 ## 5. Interactions carte → filtre
@@ -717,7 +728,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
 - [ ] Cliquer sur le badge établissement d'une carte → le filtre
       Établissement se coche sur cette valeur, la grille se filtre en
       conséquence.
-- [ ] Cliquer sur un tag Instances/Actions/GT/Compétences/Communautés/Tâches
+- [ ] Cliquer sur un tag Instances/Actions/GT/Compétences/Communautés/Rôle dans le PUI
       d'une carte → le filtre correspondant se coche, curseur "main" au
       survol de ces tags.
 - [ ] **Après un clic sur un tag/badge de carte** (pas dans le menu) : ouvrir
@@ -725,14 +736,10 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       case est bien cochée (pas seulement mise en évidence visuellement), et
       le badge de comptage sur le bouton du filtre est à jour — même
       résultat qu'en cochant la case directement dans le menu.
-- [ ] **Le rôle PUI d'une carte (du texte violet, comme la fonction, à droite de la ligne de l'e-mail) est cliquable** (1.24.0, 1.27.1) :
-      curseur "main" au survol, le rôle souligné ; un clic coche la valeur
-      dans le filtre « Rôle PUI » et la grille se filtre ; un second clic la
-      décoche. Il reste sur la ligne de l'e-mail à toute largeur, sans la
-      faire passer à la ligne ni agrandir la carte : un rôle long
-      (« Référent innovation et valorisation ») est coupé par « … » et le
-      rôle entier s'affiche au survol ; il disparaît quand l'e-mail prend
-      presque toute la ligne (téléphone étroit, e-mail très long).
+- [ ] **Le rôle dans le PUI d'une carte (la première section de pastilles) est cliquable** (1.24.0, 1.39.0) :
+      un clic coche la valeur dans le filtre « Rôle dans le PUI » et la grille se filtre ; un second clic la
+      décoche. Une personne qui a au moins une action porte aussi la pastille « Membre d'une action »
+      (le widget la met et la retire d'après ses actions : l'ajouter ou retirer une action dans Grist suffit).
 
 ## 6. Bouton Réinitialiser
 
@@ -756,10 +763,12 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 - [ ] **Téléphone** : repérer un contact dont le téléphone commence par 0
       dans Grist (la quasi-totalité) → la carte affiche bien le 0 initial,
       formaté par paires (`05 36 49 90 12`), pas un nombre à 9 chiffres.
-- [ ] **Rôle PUI** : un contact avec `Role_dans_le_PUI` renseigné affiche
-      bien son rôle en petite pastille (à droite de la fonction et de l'e-mail sur
-      une carte de 480 px ou plus, sous l'e-mail sur une carte plus étroite), et le menu
-      du filtre « Rôle PUI » liste les valeurs de la table `Role_Dans_le_PUI`.
+- [ ] **Rôle dans le PUI** : un contact avec `Role_dans_le_PUI` renseigné affiche
+      bien son rôle en pastille, première section de la carte, et le menu du filtre « Rôle dans le PUI »
+      liste les valeurs de la table `Role_Dans_le_PUI` plus « Membre d'une action ».
+- [ ] **Actions rangées sur la carte** (1.39.0) : la section « Actions » d'une personne qui a des actions numérotées
+      (« 1.2 », « 1.3 », « 3.5 ») les range par numéro d'action, avec un retour à la ligne à chaque nouveau numéro
+      (« 1.2 1.3 » puis « 3.5 »), et les actions sans numéro sur la dernière ligne.
 - [ ] **Renommage de libellé** : dans Grist, cocher un filtre (ex.
       Établissement sur une valeur), puis renommer cette valeur dans la
       table de référence correspondante (ex. `Etablissements.acronyme`).
@@ -908,7 +917,7 @@ iOS, Chrome Android) que les tests ne couvrent pas :
       se referme d'un clic ailleurs. Élargir le cadre puis le rouvrir : il
       s'ouvre de nouveau sous son bouton.
 - [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit
-      (et de même le menu Tâches avec une action dépliée) : aucune barre de
+      (et de même le menu Actions avec une action dépliée) : aucune barre de
       défilement horizontale, un nom de compétence, de tâche ou d'action très
       long passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et
       le nombre de chaque domaine ou action restent visibles, et la flèche se
@@ -1104,7 +1113,7 @@ lecteur d'écran : NVDA ou JAWS sous Windows, VoiceOver sous macOS ou iOS, TalkB
 - [ ] Zoom du navigateur à 200 % : l'anneau n'est coupé par aucun bord (ni celui de la barre d'outils, ni celui
       d'une carte, ni celui d'un menu).
 - [ ] **Couleurs des étiquettes** (1.16.2) : sur une carte qui en porte plusieurs, le texte blanc des
-      pastilles (Instances, Actions, GT, Compétences, Communautés, Tâches, Rôle PUI) se lit sans effort à la
+      pastilles (Rôle dans le PUI, Instances, Actions, GT, Compétences, Communautés) se lit sans effort à la
       taille normale, comme les titres de groupe et l'adresse e-mail ; on distingue encore les catégories
       d'un coup d'œil, et le point de chaque bouton de filtre a la couleur des pastilles de sa catégorie.
       À comparer avec `docs/images/carte-anatomie.png`.
@@ -1690,7 +1699,7 @@ Grist ne se charge pas ; le reste se lit ou se tabule.
       (relecture). À la souris, cliquer une étiquette filtre la liste sans faire apparaître d'anneau de focus.
 - [ ] **Une case cochée au clavier garde le focus.** Dans un menu à plat (Établissement, par exemple), elle passe en
       tête sans que le focus la quitte et, dans un menu long, le menu défile jusqu'à elle ; à la souris, la liste ne
-      bouge pas sous le doigt. Dans un menu par groupe (Compétences, Tâches), rien ne bouge pendant qu'on coche, au
+      bouge pas sous le doigt. Dans un menu par groupe (Compétences, Actions), rien ne bouge pendant qu'on coche, au
       clavier comme à la souris : les cases cochées passent devant à l'ouverture suivante.
 - [ ] **Une seule zone annoncée.** Avec un lecteur d'écran, taper un nom dans la recherche : il annonce le nombre de
       contacts (« 3 sur 245 contacts » depuis la 1.34.0), pas la liste des cartes.
@@ -1814,7 +1823,7 @@ d'être fusionnés. À comparer avec `docs/images/filtre-competences.png`, `docs
 - [ ] **Le clavier ne se cache pas sous elle.** Menu long ouvert, descendre de case en case avec Tab, puis remonter avec Maj+Tab :
       la case qui a le focus n'est jamais cachée par le champ de recherche, anneau de focus compris.
 - [ ] **L'aide est écrite dans le menu.** « Compétences » : sous la recherche, « Cochez un domaine pour toutes ses compétences, ou
-      dépliez-le pour choisir parmi elles » ; « Tâches » : « Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi
+      dépliez-le pour choisir parmi elles » ; « Actions » : « Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi
       elles ». Elle défile avec la liste, disparaît dès qu'on tape dans la recherche du menu et revient quand on l'efface ; un menu à
       plat (Instances, Établissement, GT) n'en a pas. Avec un lecteur d'écran, elle est lue à l'ouverture du menu.
 - [ ] **Le compteur dit sur combien.** « 245 contacts » sans recherche ni filtre ; « 3 sur 245 contacts » dès qu'une recherche ou un
@@ -1935,3 +1944,39 @@ compte le voit. En cas de désaccord, le vrai compte fait foi.
 - [ ] **Surveillance.** L'onglet Activité du document, la table `Annuaire_Sonde` (vide au repos), le nombre de lignes de `BDD` (un filtre
       sur les adresses en double repère les créations en rafale), et un coup d'œil par jour la première semaine. Si quelque chose
       tourne mal, désactiver le partage public referme tout d'un coup.
+
+## 28. « Responsable de l'action x.y » et la colonne `Taches_responsable` (1.40.0)
+
+Réglages d'abord : aucun si vous laissez le widget créer la colonne (premier point) ; sinon `GRIST_SETUP.md`, étape 1 (colonne
+`Taches_responsable` de `BDD`, liste de références vers `Taches`, colonne de données). À jouer sur une **copie** du document, console
+ouverte (F12), avec un compte **administrateur** (case `admin` d'`ACL`) dont la fiche porte au moins deux actions, et un compte qui n'est
+pas administrateur. **Ce protocole est le seul contrôle de la création de la colonne et de l'écriture de `Taches_responsable` dans un vrai
+Grist : les tests automatiques simulent `applyUserActions`.**
+
+- [ ] **Création par un administrateur.** Sans la colonne dans `BDD` (données brutes), ouvrir l'annuaire avec le compte administrateur :
+      la colonne `Taches_responsable` apparaît dans `BDD` (liste de références vers `Taches`, colonne de données, vide), la console écrit
+      une ligne `[SCHEMA] colonne « Taches_responsable » absente de BDD : créée…`, et « Modifier mon profil » montre, sous les actions, le
+      bloc « Responsable de » sans qu'on recharge la page. Recharger : pas de seconde colonne (`Taches_responsable2`), pas de nouvelle
+      ligne `[SCHEMA]`.
+- [ ] **Pas de création par un autre compte.** Supprimer la colonne puis ouvrir l'annuaire avec un compte qui n'est pas administrateur :
+      rien n'est créé, aucun bloc « Responsable de ». Rouvrir avec l'administrateur : la colonne revient, une seule fois.
+- [ ] **Structure verrouillée** (« Allow Editors to edit structure » décoché, `GRIST_SETUP.md` étape 4, « Le jeu complet »). Colonne
+      supprimée, un administrateur qui n'est qu'Éditeur du document ouvre l'annuaire : Grist refuse ; la console le dit en une ligne
+      (`[SCHEMA] la colonne « Taches_responsable » manque dans BDD et Grist n'a pas permis de la créer…`), le bloc n'est pas proposé et
+      le reste de la fenêtre, comme l'annuaire, est comme avant. Avec un propriétaire du document qui est aussi administrateur : la
+      colonne est créée.
+- [ ] **Cocher.** Compte avec au moins deux actions, « Modifier mon profil » : le bloc « Responsable de » porte une case par action
+      choisie, aucune cochée d'avance. Cocher une action, « Relire mes modifications » : la carte « Après » ajoute « Responsable de
+      l'action 1.2 » (repérée) ; « Valider ». Dans Grist, `BDD.Taches_responsable` de la ligne contient l'action cochée (une seule
+      action Grist : « Annuler » défait tout) et la carte lit « Responsable de l'action 1.2 », dernier rôle de la première section.
+- [ ] **Plusieurs actions.** Cocher une seconde action : la pastille devient « Responsable des actions 1.2, 1.3 », l'ancienne est
+      barrée dans la relecture.
+- [ ] **Le filtre.** Un clic sur la pastille coche « Responsable d'une action » dans le menu « Rôle dans le PUI » (une seule option,
+      avec son nombre de cartes) et la grille se réduit aux personnes responsables.
+- [ ] **Action perdue.** Décocher l'action dans la liste « Actions » du profil (ou la retirer de `BDD.Taches` dans Grist) : la pastille
+      « Responsable de l'action … » disparaît, même si la case reste cochée dans `Taches_responsable`.
+- [ ] **Un administrateur sur la fiche d'une autre personne** (mode admin) : même bloc, aide « cette personne » ; ce qui est coché va
+      dans la ligne de cette personne, pas dans la sienne. Avec les règles d'accès de l'étape 4, une personne qui n'est pas
+      administrateur ne peut pas écrire `Taches_responsable` sur la ligne d'une autre (essai depuis la console : **refusé**).
+- [ ] **Rien d'autre ne bouge.** `Taches_role`, `Role_dans_le_PUI` et la table `Taches` sont inchangés ; le nombre de contacts affiché est
+      le même qu'avant et aucune fiche n'apparaît ni ne disparaît.

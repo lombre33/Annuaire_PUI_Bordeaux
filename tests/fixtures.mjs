@@ -119,9 +119,10 @@ export function withEtablissement(tables, row) {
 
 // Le document où Ana (la première fiche, la dernière de la grille) porte de longues listes de valeurs, de quoi essayer les cartes très
 // chargées (1.31.0, la barre d'outils des pastilles) : 9 compétences (« Compétence 1 » à « Compétence 9 »), 6 actions (« Action 1 » à
-// « Action 6 »), 5 communautés (« Communauté 1 » à « Communauté 5 ») et son instance de départ (CME), soit 21 pastilles. Les trois tables
-// de référence sont remplacées : les autres personnes y gardent leurs numéros de ligne, donc d'autres libellés (Bob porte la compétence 3,
-// Gina la 4), sans rapport avec ceux de la base.
+// « Action 6 » : depuis la 1.39.0 les actions d'une personne sont ses tâches, la table Taches), 5 communautés (« Communauté 1 » à « Communauté 5 »)
+// et son instance de départ (CME), soit 21 pastilles, plus ses deux rôles (« Référent qualité », que la fiche porte, et « Membre d'une action »,
+// que ses actions lui donnent) : 23 en tout. Les trois tables de référence sont remplacées : les autres personnes y gardent leurs numéros de ligne,
+// donc d'autres libellés (Bob porte la compétence 3, Gina la 4), sans rapport avec ceux de la base.
 export function withLongTagLists(tables = sampleTables()) {
   const copy = structuredClone(tables);
   const rows = count => Array.from({ length: count }, (_, index) => index + 1);
@@ -129,10 +130,10 @@ export function withLongTagLists(tables = sampleTables()) {
   copy.Competences = {
     id: rows(9), Competences: named('comp', 9), Competences_corrigees: named('Compétence', 9), Macro_competences: rows(9).map(() => 'Cancérologie')
   };
-  copy.Actions = { id: rows(6), Actions: named('Action', 6), Actions_corrigees: rows(6).map(() => '') };
+  copy.Taches = { id: rows(6), Taches: named('Action', 6), Taches_corrige: rows(6).map(() => ''), Taches_role: rows(6).map(() => '') };
   copy.Communautes = { id: rows(5), communautes: named('Communauté', 5), communautes_corrigees: rows(5).map(() => '') };
   copy.BDD.Competences[0] = ['L', ...rows(9)];
-  copy.BDD.Actions[0] = ['L', ...rows(6)];
+  copy.BDD.Taches[0] = ['L', ...rows(6)];
   copy.BDD.Communautes[0] = ['L', ...rows(5)];
   return copy;
 }
@@ -186,6 +187,14 @@ export function withTaskActions(tables = sampleTables()) {
   };
   const tasksOf = { 1: ['L', 1, 3], 2: ['L', 3], 9: ['L', 2], 10: ['L', 4] };
   copy.BDD.Taches = copy.BDD.id.map(id => tasksOf[id] || ['L']);
+  return copy;
+}
+
+// La colonne `Taches_responsable` de BDD (1.40.0) : les actions dont chaque personne est responsable, parmi celles qu'elle a. `flags` : { identifiant
+// de ligne de BDD → cellule } ; par défaut Ana (1) est responsable de « 1.1 Relecture » (tâche 1), personne d'autre ne l'est.
+export function withResponsibleColumn(tables = withTaskActions(), flags = { 1: ['L', 1] }) {
+  const copy = structuredClone(tables);
+  copy.BDD.Taches_responsable = copy.BDD.id.map(id => flags[id] || ['L']);
   return copy;
 }
 

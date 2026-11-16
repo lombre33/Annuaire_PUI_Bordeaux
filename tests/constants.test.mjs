@@ -2,14 +2,18 @@ import { test } from 'node:test';
 import assert from './support/assert.mjs';
 import { CATEGORIES, CONSENT_ADMIN_LABEL, FILTERS, TAG_GROUPS, REFERENCE_TABLES, REFERENCE_SOURCES, LIST_CATEGORIES, MAIN_TABLE, PROFILE_FIELDS, fieldsFor } from '../constants.js';
 
-test('FILTERS lists the 8 filter buttons in display order, Rôle PUI last: a grouping has no button of its own, it is the groups of the menu it arranges', () => {
-  assert.deepEqual(FILTERS.map(f => f.key), ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role']);
+test('FILTERS lists the 7 filter buttons in display order, Rôle dans le PUI last: a grouping has no button of its own, it is the groups of the menu it arranges', () => {
+  assert.deepEqual(FILTERS.map(f => f.key), ['taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role']);
   assert.ok(!FILTERS.some(f => f.key === 'macro'), 'plus de filtre « Domaines » séparé');
-  assert.ok(!FILTERS.some(f => f.key === 'macroTaches'), 'pas de filtre « Actions des tâches » : les actions rangent le menu Tâches');
+  assert.ok(!FILTERS.some(f => f.key === 'macroTaches'), 'pas de filtre « Groupes d\'actions » : les groupes rangent le menu Actions');
+  assert.ok(!FILTERS.some(f => f.key === 'actions'), 'plus de filtre « Actions » à part depuis la 1.39.0 : le menu des tâches porte ce nom');
+  assert.equal(FILTERS.find(f => f.key === 'taches').label, 'Actions', 'les tâches s\'appellent « Actions » à l\'écran');
+  assert.equal(FILTERS.find(f => f.key === 'role').label, 'Rôle dans le PUI');
 });
 
-test('TAG_GROUPS lists the 7 tag sections of a card in display order, Rôle PUI included, Établissement and the groupings excluded', () => {
-  assert.deepEqual(TAG_GROUPS.map(g => g.key), ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role']);
+test('TAG_GROUPS lists the 6 tag sections of a card in display order, Rôle dans le PUI first, Établissement and the groupings excluded', () => {
+  assert.deepEqual(TAG_GROUPS.map(g => g.key), ['role', 'instances', 'taches', 'gt', 'competences', 'communautes']);
+  assert.equal(TAG_GROUPS.find(g => g.key === 'taches').label, 'Actions');
 });
 
 test('a category has the same label and color wherever it appears', () => {
@@ -93,10 +97,22 @@ test('the tasks are grouped by action from their numbers: no column of their own
   assert.notEqual(macroTaches.numberedIn, macroTaches.groups);
   assert.ok(CATEGORIES[macroTaches.numberedIn], 'la catégorie visée existe');
   assert.notEqual(macroTaches.color, taches.color, 'le nom d\'une action se distingue d\'une tâche dans le menu');
-  assert.equal(CATEGORIES.actions.groups, undefined, 'le filtre Actions reste tel quel');
+  assert.equal(CATEGORIES.actions.groups, undefined, 'la table des actions ne range rien : elle nomme les groupes');
   assert.equal(CATEGORIES.actions.groupings, undefined);
-  assert.deepEqual(taches.groupings, ['macroTaches'], 'un seul rangement : le menu Tâches n\'a pas d\'onglets');
+  assert.equal(CATEGORIES.actions.column, undefined, 'depuis la 1.39.0 la colonne BDD.Actions n\'est plus lue : les actions d\'une personne sont ses tâches');
+  assert.ok(!FILTERS.concat(TAG_GROUPS, LIST_CATEGORIES, PROFILE_FIELDS.filter(field => field.kind === 'list')).some(entry => entry.key === 'actions'),
+    'la table des actions n\'a ni filtre, ni pastille de carte, ni liste dans la fenêtre de profil');
+  assert.deepEqual(taches.groupings, ['macroTaches'], 'un seul rangement : le menu Actions n\'a pas d\'onglets');
   assert.equal(taches.viewsLabel, undefined);
+});
+
+test('the tasks are what the person reads as « Actions »: the key, the table and the BDD column keep the name they had', () => {
+  const { taches, macroTaches } = CATEGORIES;
+  assert.equal(taches.label, 'Actions');
+  assert.equal(macroTaches.label, 'Groupes d’actions');
+  assert.equal(taches.table, 'Taches');
+  assert.equal(taches.column, 'Taches');
+  assert.ok(LIST_CATEGORIES.some(entry => entry.key === 'taches' && entry.column === 'Taches' && entry.table === 'Taches'));
 });
 
 test('only a grouping has a fallback, hint, placeholder, tab, numbering or optional column, and its source keeps them', () => {
@@ -146,7 +162,6 @@ test('the button of a grouped menu says what it offers: groups to tick whole, an
 
 test('LIST_CATEGORIES maps each ReferenceList column of BDD to its own reference table', () => {
   assert.deepEqual(LIST_CATEGORIES, [
-    { key: 'actions', column: 'Actions', table: 'Actions' },
     { key: 'taches', column: 'Taches', table: 'Taches' },
     { key: 'communautes', column: 'Communautes', table: 'Communautes' },
     { key: 'gt', column: 'GT', table: 'GT' },
