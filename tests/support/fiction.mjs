@@ -24,6 +24,9 @@ export function assertFictionalContacts(tables) {
 // Une adresse d'un domaine réservé à la fiction (RFC 2606) : .example, .test, .invalid, .localhost, example.com, example.org, example.net.
 const FICTION_DOMAIN = /(?:\.(?:example|test|invalid|localhost)|@example\.(?:com|org|net))$/i;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+// La seule adresse réelle que le dépôt écrit : celle que Grist donne à tout visiteur sans compte (sa documentation, « User attributes »),
+// la même pour tous et celle d'aucune personne. Exactement celle-ci : toute autre adresse du même domaine reste refusée.
+const ANONYMOUS_VISITOR = 'anon@getgrist.com';
 // Un numéro français écrit à la main : 0 et neuf chiffres, ou +33 ou 0033 et neuf chiffres, groupés (espace, point, tiret) ou non, et
 // qu'une lettre colle ou non à la suite (« 05 36 49 90 12x » : une saisie fautive d'un test garde la tête d'un vrai numéro).
 const PHONE = /(?:\+33|0033|\b0)\s?[1-9](?:[ .-]?\d{2}){4}(?!\d)/g;
@@ -39,7 +42,7 @@ const tenDigits = phone => phone.replace(/\D/g, '').replace(/^(?:33|0033)/, '0')
 // fiction, un numéro français hors des plages que l'ARCEP y réserve.
 export function realLookingCoordinates(text) {
   const plain = readable(text);
-  const emails = (plain.match(EMAIL) ?? []).filter(email => !FICTION_DOMAIN.test(email));
+  const emails = (plain.match(EMAIL) ?? []).filter(email => !FICTION_DOMAIN.test(email) && email.toLowerCase() !== ANONYMOUS_VISITOR);
   const phones = (plain.match(PHONE) ?? []).filter(phone => !FICTION_PHONE.test(tenDigits(phone)));
   return [...emails, ...phones];
 }

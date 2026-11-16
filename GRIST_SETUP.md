@@ -341,8 +341,8 @@ document laisse entrer, a pour adresse `anon@getgrist.com` d'après la documenta
 pour tous les visiteurs, et `user.Email` seul la reconnaîtrait.
 Elle tient compte des majuscules et des espaces (une condition ne peut pas les ignorer) : l'adresse
 de `BDD` doit être écrite comme celle du compte Grist, en général en minuscules et sans espace (le
-widget, lui, les ignore : une fiche en `Prenom.Nom@Univ.fr` montrerait « Modifier » à la personne
-connectée en `prenom.nom@univ.fr`, puis Grist refuserait l'enregistrement). Pour
+widget, lui, les ignore : une fiche en `Prenom.Nom@univ.example` montrerait « Modifier » à la personne
+connectée en `prenom.nom@univ.example`, puis Grist refuserait l'enregistrement). Pour
 une comparaison qui les ignore, un second attribut d'utilisateur (nom `Fiche`, table `BDD`, colonne
 `email`, valeur `user.Email`) donne la condition `user.Fiche.id == rec.id`, qui profite de la recherche de
 Grist (insensible à la casse dans ses versions récentes : à vérifier sur votre instance), mais il ne
