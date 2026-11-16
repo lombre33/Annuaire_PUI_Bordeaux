@@ -5,7 +5,7 @@ import {
   compareLabels, compareContacts,
   formatPhone, createRequestSequencer, debounce, referenceMapsEqual, sortWithCheckedFirst, resolveListItem,
   labelMapFromRows, mailtoHref, telHref, groupLabelMap, hasAccepted, buildContacts, describeVisibility, displayName, taskActionNumber, actionNumber, shownEmail,
-  loadDirectory
+  isNoMatch, referentialLabel, loadDirectory
 } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { sampleTables } from './fixtures.mjs';
@@ -386,6 +386,48 @@ test('groupLabelMap ignores rows that are not in the detailed map and works with
   assert.deepEqual(groupLabelMap({ 1: 'X', 9: 'Orphelin' }, { 1: 'A', 2: 'B' }, 'Autres'), { 1: 'X', 2: 'Autres' });
   assert.deepEqual(groupLabelMap({ 1: 'X' }, { 1: 'A', 2: 'B' }), { 1: 'X' }, 'sans repli, une ligne non classée est omise');
   assert.deepEqual(groupLabelMap({}, {}, 'Autres'), {});
+});
+
+// ===== La colonne d'un référentiel (C.U.R.I.E, 1.41.1) =====
+// Dans le vrai document, `referenciel_C_U_R_I_E` porte des numéros (0, 3, 13…) et « — aucune correspondance — » : le menu en faisait un groupe
+// « — aucune correspondance — » en tête de liste et des titres « 0 », « 3 », « 13 » (capture d'Antoine, 16 novembre 2026).
+
+test('labelMapFromRows passes each label through `format`, and a format that returns nothing drops the row', () => {
+  const rows = [{ id: 1, code: '3' }, { id: 2, code: '— aucune correspondance —' }, { id: 3, code: 'C' }];
+  assert.deepEqual(labelMapFromRows(rows, 'code', label => (label.startsWith('—') ? '' : label.toLowerCase())), { 1: '3', 3: 'c' });
+  assert.deepEqual(labelMapFromRows(rows, 'code'), { 1: '3', 2: '— aucune correspondance —', 3: 'C' }, 'sans format : les libellés tels quels');
+});
+
+test('isNoMatch reads « nothing » whatever its spelling: empty, 0, « — aucune correspondance — », « n/a », « néant », dashes, any case or accent', () => {
+  [
+    '', '  ', null, undefined, 0, '0', '00', '—', '-', '–', '…', '?', '— aucune correspondance —', '—aucune correspondance—', 'Aucune correspondance',
+    'AUCUNE CORRESPONDANCE', '  aucune   correspondance  ', 'aucune correspondance trouvée', 'Aucun', 'aucune', 'Aucun lien', '(aucune correspondance)',
+    '[aucune correspondance]', 'néant', 'Néant', 'N/A', 'n/a', 'NA', 'n.a.', 'sans objet', 'Sans correspondance', 'Non applicable', 'non renseigné',
+    'Non défini', 'pas de correspondance', 'vide', '(vide)'
+  ].forEach(value => assert.equal(isNoMatch(value), true, `« ${value} » dit « rien »`));
+});
+
+test('isNoMatch keeps what names a group: numbers, letters, words, even one that starts like « aucun »', () => {
+  [
+    '3', '13', 3, 13, '1.2', 'C', 'U', 'R', 'I', 'E', 'C / R', 'Culture', 'Communication', 'Innovation', 'Recherche', 'Entrepreneuriat', 'Nature', 'Analyse',
+    'Aucune réserve sur la gestion de projet en équipe', 'Non-linéaire', 'Numérique', 'NAN', 'Navigation'
+  ].forEach(value => assert.equal(isNoMatch(value), false, `« ${value} » est un groupe`));
+});
+
+test('referentialLabel gives a group « N° 13 » for a number, nothing for « nothing », and the text for the rest', () => {
+  assert.equal(referentialLabel('3'), 'N° 3');
+  assert.equal(referentialLabel('13'), 'N° 13');
+  assert.equal(referentialLabel(13), 'N° 13', 'un nombre de Grist (colonne Numeric) comme un texte');
+  assert.equal(referentialLabel(' 13 '), 'N° 13', 'les espaces autour ne comptent pas');
+  assert.equal(referentialLabel('03'), 'N° 3', '« 03 » et « 3 » sont le même groupe');
+  assert.equal(referentialLabel('0'), '');
+  assert.equal(referentialLabel(0), '');
+  assert.equal(referentialLabel('— aucune correspondance —'), '');
+  assert.equal(referentialLabel(null), '');
+  assert.equal(referentialLabel('Culture'), 'Culture', 'un nom est gardé tel quel');
+  assert.equal(referentialLabel('C1'), 'C1');
+  assert.equal(referentialLabel('1.2'), '1.2', 'un code à points n\'est pas un numéro nu');
+  assert.equal(referentialLabel('  Culture  '), 'Culture');
 });
 
 test('hasAccepted counts a checked box (true) as consent and nothing else', () => {
