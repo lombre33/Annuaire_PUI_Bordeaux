@@ -92,8 +92,12 @@ la colonne (il lit son type dans les métadonnées du document).
    données », choisissez-le.
 3. Pour `Accepte_apparaitre`, type **Case à cocher** ; cochez la case des personnes
    qui ont déjà donné leur accord. Une case vide ou décochée masque la personne.
-4. Pour `Role_dans_le_PUI`, type **Référence** vers la table `Role_Dans_le_PUI` (colonne
-   affichée `Role`) : c'est elle qui alimente le filtre « Rôle dans le PUI » et le rôle de la carte
+4. Pour `Role_dans_le_PUI`, type **Liste de références** vers la table `Role_Dans_le_PUI` (colonne
+   affichée `Role`), depuis la 1.42.0 : les rôles d'une personne se cumulent. Une colonne qui est encore une
+   **Référence** simple se lit toujours, mais n'accepte qu'un seul rôle depuis « Modifier mon profil » (le widget
+   refuse d'en écrire deux) ; la passer en liste dans Grist (type de la colonne, « Liste de références »)
+   garde les valeurs actuelles. Si cette colonne est dans votre synchro (table `Synchro`), son type change.
+   Elle alimente le filtre « Rôle dans le PUI » et le rôle de la carte
    (1.24.0). Une colonne à formule qui la remplit se convertit en colonne de données pour que
    la personne puisse la changer depuis « Modifier mon profil ». Depuis la 1.39.0, le rôle
    « Membre d'une action » n'a pas besoin d'y être écrit : le widget le donne de lui-même à toute personne qui

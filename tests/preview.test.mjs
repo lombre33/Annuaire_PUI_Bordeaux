@@ -93,7 +93,7 @@ test('previewOf gives the card before exactly as the directory shows it', async 
 
 test('previewOf gives the card after with the values that will be written, enriched like the directory', async () => {
   const { referenceMaps, etabFlags, row } = await directory();
-  const values = { Fonction: 'Cheffe de service', numero_de_telephone: 536499013, Role_dans_le_PUI: 0, Competences: ['L', 2, 3] };
+  const values = { Fonction: 'Cheffe de service', numero_de_telephone: 536499013, Role_dans_le_PUI: ['L'], Competences: ['L', 2, 3] };
   const { before, after, marks } = previewOf(row(1), values, referenceMaps, etabFlags);
   assert.equal(after.Fonction, 'Cheffe de service');
   assert.equal(after.numero_de_telephone, 536499013);

@@ -96,10 +96,10 @@ test('buildRowUpdate writes the phone in the form of its column: a number when N
   assert.deepEqual(buildRowUpdate(clear, w.row(1), { numero_de_telephone: 'Text' }).values, { numero_de_telephone: '' });
 });
 
-test('buildRowUpdate writes text and references, and refuses a nameless row or a missing column', async () => {
+test('buildRowUpdate writes text and lists, and refuses a nameless row or a missing column', async () => {
   const w = await world();
-  const change = { Fonction: { avant: '', apres: 'Cheffe' }, Role_dans_le_PUI: { avant: { id: 1, label: '' }, apres: { id: 0, label: '' } } };
-  assert.deepEqual(buildRowUpdate(change, w.row(1)).values, { Fonction: 'Cheffe', Role_dans_le_PUI: 0 });
+  const change = { Fonction: { avant: '', apres: 'Cheffe' }, Role_dans_le_PUI: { ajout: [], retrait: [{ id: 1, label: '' }] } };
+  assert.deepEqual(buildRowUpdate(change, w.row(1)).values, { Fonction: 'Cheffe', Role_dans_le_PUI: ['L'] });
   const nameless = { prenom: { avant: '', apres: '' }, nom: { avant: '', apres: '' } };
   assert.match(buildRowUpdate(nameless, w.row(1)).error, /ni prénom ni nom/);
   const alreadyNameless = { ...w.row(1), prenom: '', nom: '' };
@@ -108,6 +108,21 @@ test('buildRowUpdate writes text and references, and refuses a nameless row or a
   assert.match(buildRowUpdate({ prenom: { avant: '', apres: '' } }, alreadyNameless).error, /ni prénom ni nom/);
   const { numero_de_telephone: _omitted, ...withoutPhone } = w.row(1);
   assert.match(buildRowUpdate({ numero_de_telephone: { avant: '', apres: '0536499013' } }, withoutPhone).error, /la colonne numero_de_telephone n'existe pas/);
+});
+
+test('buildRowUpdate writes the roles as a list, and one id only to a column that is still a simple reference (before the 16 novembre 2026)', async () => {
+  const w = await world();
+  const add = { Role_dans_le_PUI: { ajout: [{ id: 2, label: '' }], retrait: [] } };
+  assert.deepEqual(buildRowUpdate(add, w.row(1), { Role_dans_le_PUI: 'RefList:Role_Dans_le_PUI' }).values, { Role_dans_le_PUI: ['L', 1, 2] }, 'les rôles se cumulent');
+  assert.deepEqual(buildRowUpdate(add, w.row(1)).values, { Role_dans_le_PUI: ['L', 1, 2] }, 'types illisibles : une liste, comme le document actuel');
+  const single = { Role_dans_le_PUI: 'Ref:Role_Dans_le_PUI' };
+  assert.match(buildRowUpdate(add, w.row(1), single).error, /n'accepte qu'une valeur/, 'deux rôles ne tiennent pas dans une référence simple');
+  const swap = { Role_dans_le_PUI: { ajout: [{ id: 2, label: '' }], retrait: [{ id: 1, label: '' }] } };
+  assert.deepEqual(buildRowUpdate(swap, w.row(1), single).values, { Role_dans_le_PUI: 2 }, 'un seul rôle : l\'identifiant, comme avant');
+  const clear = { Role_dans_le_PUI: { ajout: [], retrait: [{ id: 1, label: '' }] } };
+  assert.deepEqual(buildRowUpdate(clear, w.row(1), single).values, { Role_dans_le_PUI: 0 }, 'aucun rôle : 0, comme avant');
+  const fromSingle = { ...w.row(1), Role_dans_le_PUI: 1 };
+  assert.deepEqual(buildRowUpdate(add, fromSingle).values, { Role_dans_le_PUI: ['L', 1, 2] }, 'une cellule qui est encore un identifiant se lit comme une liste d\'un rôle');
 });
 
 test('buildRowUpdate writes nothing for an empty set of changes, and only the columns that changed', async () => {
@@ -134,7 +149,7 @@ test('signatureOf changes when a touched cell changes, and only then', async () 
 
 test('prepareReview builds the card before and after from the fiche as Grist holds it, and writes nothing', async () => {
   const w = await world();
-  const next = await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '05 36 49 90 13', Role_dans_le_PUI: 0, Competences: [2, 3] });
+  const next = await review(w, 1, { Fonction: 'Cheffe de service', numero_de_telephone: '05 36 49 90 13', Role_dans_le_PUI: [], Competences: [2, 3] });
   assert.equal(next.rowId, 1);
   assert.equal(next.before.Fonction, 'Pharmacienne');
   assert.equal(next.after.Fonction, 'Cheffe de service');
@@ -284,7 +299,7 @@ test('after saving, the directory shows the new values: the whole path, from the
 
 test('what the card after showed is what the directory shows once the fiche is saved', async () => {
   const w = await world();
-  const next = await review(w, 1, { Fonction: 'Cheffe', Competences: [2, 3], Role_dans_le_PUI: 0, numero_de_telephone: '' });
+  const next = await review(w, 1, { Fonction: 'Cheffe', Competences: [2, 3], Role_dans_le_PUI: [], numero_de_telephone: '' });
   await saveProfile(w.docApi, next, { log: quiet });
   const { contacts } = await loadDirectory(w.docApi, { log: quiet });
   const ana = contacts.find(contact => contact.id === 1);
@@ -389,7 +404,7 @@ test('an administrator saves the fiche of someone else the same way, on that fic
 
 test('unsavedLabels is empty when Grist kept everything, and names the fields it did not keep', async () => {
   const w = await world();
-  const next = await review(w, 1, { Fonction: 'Cheffe', Competences: [2, 3], Role_dans_le_PUI: 0 });
+  const next = await review(w, 1, { Fonction: 'Cheffe', Competences: [2, 3], Role_dans_le_PUI: [] });
   await saveProfile(w.docApi, next, { log: quiet });
   assert.deepEqual(unsavedLabels(next, w.row(1), w.referenceMaps), []);
   // Grist a ignoré la fonction et le rôle, et remis la compétence retirée.

@@ -496,10 +496,9 @@ test('« Modifier mon profil » ouvre le formulaire avec les valeurs de la fiche
     assert.equal(await field(page, 'nom').inputValue(), 'Martin');
     assert.equal(await field(page, 'Fonction').inputValue(), 'Pharmacienne');
     assert.equal(await field(page, 'numero_de_telephone').inputValue(), '05 36 49 90 12');
-    assert.equal(await chosenOf(page, 'Role_dans_le_PUI'), 'Référent qualité');
-
     assert.deepEqual(await dialog(page).locator('.grp-title').allTextContents(),
-      ['Instances', 'GT', 'Compétences', 'Communautés', 'Actions']);
+      ['Rôle dans le PUI', 'Instances', 'GT', 'Compétences', 'Communautés', 'Actions'], 'les rôles se cumulent : une liste à cocher, comme les autres');
+    assert.equal(await isPressed(page, 'Rôle dans le PUI', 'Référent qualité'), true);
     assert.equal(await isPressed(page, 'Instances', 'CME'), true);
     assert.equal(await isPressed(page, 'Instances', 'COVIRIS'), false);
     assert.equal(await isPressed(page, 'Compétences', 'Oncologie'), true);
@@ -1298,7 +1297,7 @@ test('changer le rôle ou le nom se voit sur la carte après, et le retirer barr
   withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
     await field(page, 'prenom').fill('Anna');
-    await pickOption(page, 'Role_dans_le_PUI', 'Non renseigné');
+    await chip(page, 'Rôle dans le PUI', 'Référent qualité').click();
     await review(page);
     const after = column(page, 'after').locator('.contact-card');
     assert.equal(await after.locator('.name').textContent(), 'Anna Martin modifié');
@@ -1306,7 +1305,7 @@ test('changer le rôle ou le nom se voit sur la carte après, et le retirer barr
     assert.deepEqual(await after.locator('.tag.tag-del').allTextContents(), ['Référent qualité (retiré)']);
     assert.equal(await after.locator('.tag-group[aria-label="Rôle dans le PUI"] .tag-role.tag-del').count(), 1, 'le rôle retiré reste barré, dans la section du rôle de la carte');
     await validateWith(page, 'Vos modifications sont enregistrées.');
-    assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ prenom: 'Anna', Role_dans_le_PUI: 0 }]);
+    assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ prenom: 'Anna', Role_dans_le_PUI: ['L'] }]);
     await until(async () => (await page.locator('#cardsGrid .name').allTextContents()).includes('Anna Martin'), 'le prénom n\'a pas été mis à jour');
   }));
 
