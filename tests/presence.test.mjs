@@ -123,6 +123,20 @@ test('describeHiddenFiche tells a person who has not accepted where the switch i
   assert.match(describeHiddenFiche(jules.status, { own: false }), /n’a pas accepté d’apparaître/, 'une case vide n\'est pas un accord');
 });
 
+test('describeHiddenFiche tells an administrator who unticks « Accepte d’apparaître » that the fiche leaves the directory and that she cannot open it there any more', async () => {
+  const { find } = await setup();
+  const [iris] = find(IRIS_EMAIL);
+  const said = describeHiddenFiche(iris.status, { own: false, withdrawn: true });
+  assert.equal(said, 'Après cette modification, la fiche ne sera plus visible dans l’annuaire et vous ne pourrez plus l’ouvrir ici. '
+    + 'La personne la réaffiche avec l’interrupteur « Apparaître dans l’annuaire » de sa page.');
+  assert.equal(describeHiddenFiche(iris.status, { own: false }), 'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.', 'sans cette décision, la phrase ne change pas');
+  assert.match(describeHiddenFiche(iris.status, { own: true, withdrawn: true }), /^Votre fiche est masquée/, 'sa propre fiche garde la phrase de l\'interrupteur');
+  const [ana] = find(ANA_EMAIL);
+  assert.equal(describeHiddenFiche(ana.status, { own: false, withdrawn: true }), '', 'une fiche qui figure dans l\'annuaire n\'a rien à dire');
+  const [dan] = find('dan@inserm.example');
+  assert.match(describeHiddenFiche(dan.status, { own: false, withdrawn: true }), /n’a pas validé sa présence/, 'un établissement non validé passe d\'abord');
+});
+
 test('describeHiddenFiche gives the reason a fiche that was accepted stays hidden, in the voice of the reader', async () => {
   const { find } = await setup();
   const say = (email, own) => describeHiddenFiche(find(email)[0].status, { own });

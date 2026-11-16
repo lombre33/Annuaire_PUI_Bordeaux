@@ -78,7 +78,7 @@ test('sur le papier : les pastilles (le rôle dans le PUI comme les autres), les
       })));
     assert.deepEqual(borders, {
       '.tag': ['1px', 'rgb(255, 255, 255)'],
-      '.tag-role': ['1px', 'rgb(255, 255, 255)'], // Ana porte un rôle : sa pastille a le bord des autres (1.37.0)
+      '.tag-role': ['1px', 'rgb(255, 255, 255)'], // Ana porte un rôle : sa pastille a le bord des autres (1.39.0)
       '.avatar': ['1px', 'rgb(255, 255, 255)'],
       '.etablissement-tag.visible:not(.has-logo)': ['1px', 'rgb(255, 255, 255)']
     });

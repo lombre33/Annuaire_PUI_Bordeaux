@@ -4,7 +4,7 @@
 // pastilles). Le plafond de pastilles « +N » (audit U35) a été écarté par Antoine le 20 octobre 2026 : les cartes restent comme avant.
 //
 // Les tests chargent le vrai index.html dans Chromium (optionnel : voir TESTING.md). Ana, la dernière carte de la grille, porte des listes
-// longues (withLongTagLists, tests/fixtures.mjs) : 9 compétences, 6 actions, 5 communautés, une instance et deux rôles dans le PUI (1.37.0 : le
+// longues (withLongTagLists, tests/fixtures.mjs) : 9 compétences, 6 actions, 5 communautés, une instance et deux rôles dans le PUI (1.39.0 : le
 // rôle est une section de pastilles comme les autres, la première).
 
 import { test } from 'node:test';
@@ -143,7 +143,7 @@ test('Tab sort de la barre d\'outils de la carte pour la carte suivante et Maj+T
     assert.equal(prevented, true);
   }));
 
-test('le rôle dans le PUI est la première pastille de la barre d\'outils de la carte : Entrée coche le filtre Rôle dans le PUI, le focus reste sur elle (1.37.0)', { skip }, () =>
+test('le rôle dans le PUI est la première pastille de la barre d\'outils de la carte : Entrée coche le filtre Rôle dans le PUI, le focus reste sur elle (1.39.0)', { skip }, () =>
   withWidget({ tables: withLongTagLists() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     const role = gridCard(page, 'Ana').locator('.card-tags button.tag').first();

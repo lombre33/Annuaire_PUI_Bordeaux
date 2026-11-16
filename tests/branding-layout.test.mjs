@@ -325,7 +325,7 @@ test('le nom et la fonction ne passent jamais sous le logo de l\'établissement,
     });
   }));
 
-// Le rôle dans le PUI est une section de pastilles comme les autres, la première de la carte (1.37.0) : il n'est plus du texte à droite de la
+// Le rôle dans le PUI est une section de pastilles comme les autres, la première de la carte (1.39.0) : il n'est plus du texte à droite de la
 // ligne de l'e-mail (1.27.1 à 1.36.0), donc il ne touche ni l'e-mail, ni le nom, ni la colonne du logo. Un rôle très long passe à la ligne dans sa
 // pastille (`overflow-wrap`) : il ne fait dépasser ni la carte ni la page, à aucune largeur.
 const withLongRole = tables => {

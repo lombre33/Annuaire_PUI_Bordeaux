@@ -41,7 +41,7 @@ test('une carte n\'ajoute aucun titre au plan de la page : ses groupes de pastil
     assert.deepEqual([...new Set(headings.map(node => node.level))].sort(), [1, 2],
       'un titre de niveau 1, puis le nom de chaque carte (niveau 2) : plus de niveau 3');
     assert.equal(headings.filter(node => node.level === 2).length, 4);
-    // Ana porte une pastille de quatre catégories (le rôle dans le PUI en tête, depuis la 1.37.0) : quatre groupes, nommés comme le titre qu'on voit à l'écran.
+    // Ana porte une pastille de quatre catégories (le rôle dans le PUI en tête, depuis la 1.39.0) : quatre groupes, nommés comme le titre qu'on voit à l'écran.
     const groups = await page.locator('.contact-card', { hasText: 'Ana Martin' }).evaluate(card =>
       [...card.querySelectorAll('.tag-group')].map(group => ({
         role: group.getAttribute('role'),

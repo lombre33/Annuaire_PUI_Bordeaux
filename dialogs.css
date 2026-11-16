@@ -961,6 +961,11 @@ textarea {
   margin-top: 1px;
   --check-color: var(--teal-deep);
 }
+/* La case « Accepte d'apparaître » d'un administrateur (1.38.0) suit le bloc d'identité et précède les champs : même espace que l'identité. */
+.es-chk.es-chk-lead {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
 .es-chk-label {
   display: block;
   font-size: 14px;

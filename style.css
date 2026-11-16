@@ -203,6 +203,28 @@ h1 {
   font-weight: 700;
   font-style: italic;
 }
+/* « Documentation » (1.37.0) : un petit bouton sous le slogan, qui ouvre la documentation du dépôt dans un autre onglet (DOCS_URL,
+   constants.js). Même teinte que « Réinitialiser ». Il tient dans la largeur du slogan : il ne change pas celle du bloc du titre, dont
+   dépend le centrage des financeurs (voir plus bas). Caché tant que main.js ne lui a pas donné son adresse. */
+.doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  color: #443aaf;
+  border: 1px solid #c9c5f7;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.doc-link[hidden] {
+  display: none;
+}
+.doc-link:hover {
+  border-color: var(--violet);
+}
 .result-count {
   padding: 10px 16px;
   color: #443aaf;
@@ -923,6 +945,44 @@ button.avatar:hover {
   padding: 8px 0 6px;
   background: #fff;
 }
+/* Les onglets d'un menu qui se range de plusieurs façons (1.38.0 : « Classique » et « C.U.R.I.E » du menu Compétences) : au-dessus de la
+   recherche, dans l'en-tête collant, donc toujours en vue. Le même boîtier que l'interrupteur Fondateurs/Partenaires : l'onglet montré est
+   blanc, à contour violet (8,5:1), le bord du boîtier est celui des champs (3:1 exigés). L'en-tête est plus haut de 42 px avec eux
+   (`--menu-head`, qui garde les cases atteintes au clavier sous lui). */
+.view-tabs {
+  display: flex;
+  gap: 3px;
+  margin: 0 0 8px;
+  padding: 3px;
+  background: #f7f8fc;
+  border: 1px solid var(--field-line);
+  border-radius: 10px;
+}
+.view-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.view-tab:hover {
+  color: #443aaf;
+}
+.view-tab[aria-selected="true"] {
+  color: #443aaf;
+  background: #fff;
+  box-shadow: inset 0 0 0 1.5px #443aaf;
+}
+.filter-menu.has-tabs {
+  --menu-head: 88px;
+}
 /* L'aide d'un menu rangé par groupe (1.34.0, audit U27) : elle défile avec la liste, et s'efface pendant une recherche, qui a
    besoin de la place. */
 .filter-help {
@@ -1299,6 +1359,12 @@ button.avatar:hover {
     --menu-head: 54px;
     width: 320px;
   }
+  .view-tab {
+    height: 40px;
+  }
+  .filter-menu.has-tabs {
+    --menu-head: 110px;
+  }
   button.tag,
   .etablissement-tag,
   .card-edit,
@@ -1325,6 +1391,9 @@ button.avatar:hover {
   }
   .scope-btn:not(.active):hover {
     color: var(--muted);
+  }
+  .doc-link:hover {
+    border-color: #c9c5f7;
   }
 }
 .status-banner {
@@ -1482,6 +1551,10 @@ button.avatar:hover {
 /* Couleurs imposées (mode contraste élevé) : la piste et le curseur y prendraient le même fond et
    l'interrupteur ne montrerait plus son état. On les pose en couleurs système, que le mode respecte. */
 @media (forced-colors: active) {
+  .view-tab[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
   .tag-tip,
   .scroll-count,
   .to-top {
@@ -1823,7 +1896,8 @@ button.avatar:hover {
   .account-bar,
   .admin-strip,
   .card-actions,
-  .status-action {
+  .status-action,
+  .doc-link {
     display: none !important; /* plusieurs de ces règles d'affichage sont plus précises que celle-ci (`.page-header > .account-bar`) */
   }
   body {
@@ -1845,7 +1919,7 @@ button.avatar:hover {
   .etablissement-tag {
     color: var(--ink);
   }
-  /* `!important` : la couleur d'une pastille est écrite sur l'élément lui-même (render.js). Depuis la 1.37.0 le rôle dans le PUI est une
+  /* `!important` : la couleur d'une pastille est écrite sur l'élément lui-même (render.js). Depuis la 1.39.0 le rôle dans le PUI est une
      pastille comme les autres : il s'imprime de même, texte foncé et bord. */
   .avatar,
   .tag,

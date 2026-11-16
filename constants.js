@@ -7,6 +7,9 @@ export const MAIN_TABLE = 'BDD';
 export const CONSENT_COLUMN = 'Accepte_apparaitre';
 // Le nom de ce choix pour la personne : la case de la fenêtre de création et la ligne « pas gardé » d'une relecture.
 export const CONSENT_LABEL = 'Apparaître dans l’annuaire';
+// Le même choix vu par un administrateur qui modifie la fiche d'une autre personne (1.38.0) : la case en tête de sa fenêtre, et sa ligne
+// de la relecture (« Accepte d’apparaître dans l’annuaire : Non → Oui »).
+export const CONSENT_ADMIN_LABEL = 'Accepte d’apparaître dans l’annuaire';
 
 // Table-sonde qui dit au widget qui est connecté (voir identity.js). Elle appartient
 // au document et se crée à la main : GRIST_SETUP.md donne ses colonnes.
@@ -53,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.37.0';
+export const VERSION = '1.39.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -79,6 +82,14 @@ export const PRESENCE_ANNOUNCE_MS = 6000;
 // Page du projet, vers laquelle renvoie la phrase du bandeau du bas.
 export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos-leviers/pui-reveler-le-potentiel-du-territoire';
 
+// Documentation, vers laquelle mène le lien « Documentation » de l'en-tête (index.html, `docLink` ; main.js lui donne cette adresse) :
+// la page du dépôt, dont le README renvoie au guide utilisateur, à la documentation développeur, à la sécurité et à la maintenance.
+// Le lien s'ouvre dans un autre onglet, comme celui du bandeau du bas. C'est l'adresse à changer quand le dépôt change d'adresse
+// (une migration : elle ne se déduit pas de celle du widget, qui peut être servi par un autre site que le dépôt). Une chaîne vide
+// retire le lien : à employer si la page n'est pas lisible sans compte, elle ne s'ouvrirait pas pour les personnes du document.
+// Toujours en https, et son serveur est nommé dans docs/securite.md (tests/docs.test.mjs).
+export const DOCS_URL = 'https://github.com/lombre33/Annuaire_PUI_Bordeaux#documentation';
+
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.
 //   label, color  affichage. La couleur sert de fond à du texte blanc (les pastilles) et de
@@ -102,14 +113,24 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 //                 une colonne de la table Competences) ou la déduit (voir
 //                 `numberedIn`) ; `fallback` est alors le libellé des lignes que
 //                 ce regroupement ne couvre pas
-//   grouping      l'inverse de `groups` : la catégorie qui range celle-ci en
+//   groupings     l'inverse de `groups` : les catégories qui rangent celle-ci en
 //                 groupes. Le menu de cette catégorie présente ses valeurs par
 //                 groupe (les compétences par domaine, les tâches par action) ;
 //                 le regroupement n'a pas de menu à lui, il ne sert qu'à ranger
-//                 et à compter
+//                 et à compter. Le premier est le rangement de départ ; quand
+//                 il y en a plusieurs que Grist remplit (les compétences par
+//                 domaine, ou par groupe C.U.R.I.E), le haut du menu a un onglet
+//                 pour chacun (`tab`) : la sélection est la même, seul le
+//                 rangement change
+//   viewsLabel    sur une catégorie à plusieurs regroupements : le nom de la
+//                 barre d'onglets, pour les lecteurs d'écran
 //   hint,         sur un regroupement : l'infobulle du bouton et le texte du
 //   placeholder   champ de recherche du menu qu'il range, tant que ce menu est
 //                 rangé par groupe (à plat, le menu garde les textes par défaut)
+//   tab           sur un regroupement : le texte de son onglet
+//   optional      sur un regroupement : sa colonne est facultative. Absente ou
+//                 vide dans Grist, le menu n'a pas cet onglet, sans bandeau
+//                 d'erreur ni avertissement (la console le dit)
 //   numberedIn    sur un regroupement sans colonne à lire (ses `field` sont ceux
 //                 des lignes qu'il range, qu'on ne relit pas) : le numéro avant
 //                 le point du libellé d'une ligne (« 1.3 Animer le réseau ») est
@@ -120,26 +141,34 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 // Les libellés lus de Grist sont rangés par clé de catégorie (referenceMaps),
 // pas par table : deux catégories peuvent lire la même table.
 export const CATEGORIES = {
-  // Depuis la 1.37.0, la table `Actions` ne sert plus qu'à nommer les groupes du menu « Actions » (voir `taches` et `macroTaches`) : elle n'a ni
+  // Depuis la 1.39.0, la table `Actions` ne sert plus qu'à nommer les groupes du menu « Actions » (voir `taches` et `macroTaches`) : elle n'a ni
   // filtre, ni pastille de carte, ni liste dans la fenêtre de profil, et la colonne `BDD.Actions` n'est plus lue.
   actions: { label: 'Intitulés des actions', color: '#c84e0f', table: 'Actions', field: ['Actions_corrigees', 'Actions'], corrected: true },
   // Les « actions » de la personne : ses tâches, que le widget appelait « Tâches » jusqu'à la 1.36.0 (demande d'Antoine du 16 novembre 2026). Le nom
   // de la clé (`taches`), de la table (`Taches`) et de la colonne de BDD (`Taches`) ne change pas : seul ce que la personne lit change de nom.
   taches: {
     label: 'Actions', color: '#a96500', table: 'Taches', field: ['Taches_corrige', 'Taches'], corrected: true, column: 'Taches',
-    grouping: 'macroTaches'
+    groupings: ['macroTaches']
   },
   communautes: { label: 'Communautés', color: '#cf3788', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], corrected: true, column: 'Communautes' },
   gt: { label: 'GT', color: '#158378', table: 'GT', field: ['GT_corrige', 'GT'], corrected: true, column: 'GT' },
   competences: {
     label: 'Compétences', color: '#9c27b0', table: 'Competences', field: ['Competences_corrigees', 'Competences'], corrected: true, column: 'Competences',
-    grouping: 'macro'
+    groupings: ['macro', 'curie'], viewsLabel: 'Rangement des compétences'
   },
   macro: {
     label: 'Domaines', color: '#6a1b9a', table: 'Competences', field: ['Macro_competences'], column: 'Competences',
-    groups: 'competences', fallback: 'Autres',
+    groups: 'competences', fallback: 'Autres', tab: 'Classique',
     hint: 'Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
     placeholder: 'Domaine ou compétence…'
+  },
+  // Le rangement des compétences par le référentiel C.U.R.I.E (colonne facultative `referenciel_C_U_R_I_E` de la table Competences, 1.38.0) :
+  // le second onglet du menu Compétences. Même table, même colonne de BDD et mêmes valeurs que le rangement par domaine, seul le groupe change.
+  curie: {
+    label: 'C.U.R.I.E', color: '#00697f', table: 'Competences', field: ['referenciel_C_U_R_I_E'], column: 'Competences',
+    groups: 'competences', fallback: 'Hors C.U.R.I.E', tab: 'C.U.R.I.E', optional: true,
+    hint: 'Cochez un groupe C.U.R.I.E pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
+    placeholder: 'Groupe ou compétence…'
   },
   macroTaches: {
     label: 'Groupes d’actions', color: '#9a3412', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
@@ -170,12 +199,12 @@ export const TASK_ROLES = 'tachesRole';
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
 // groupes du menu Compétences, les actions (les intitulés de la table `Actions`) ceux du menu Actions. Rôle dans
 // le PUI en a un depuis la 1.24.0 (demande d'Antoine du 13 octobre 2026). Il n'y a plus de bouton « Actions » à part
-// depuis la 1.37.0 : le menu des tâches porte ce nom, et cocher le nom d'une action coche toutes ses tâches.
+// depuis la 1.39.0 : le menu des tâches porte ce nom, et cocher le nom d'une action coche toutes ses tâches.
 const FILTER_KEYS = ['taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role'];
 
 // Les sections de tags d'une carte, dans l'ordre. Établissement a son badge dédié ; les
 // regroupements n'y figurent pas : la carte garde le détail des compétences et des actions. Le rôle dans le PUI
-// est une section comme les autres depuis la 1.37.0 (il était écrit en texte à droite de la ligne de l'e-mail
+// est une section comme les autres depuis la 1.39.0 (il était écrit en texte à droite de la ligne de l'e-mail
 // de la 1.27.1 à la 1.36.0), en tête : une personne en a plusieurs (voir roleEntries dans grist-data.js).
 const TAG_KEYS = ['role', 'instances', 'taches', 'gt', 'competences', 'communautes'];
 
@@ -190,10 +219,10 @@ export const REFERENCE_TABLES = [...new Set(Object.values(CATEGORIES).map(({ tab
 
 // Un libellé à lire par catégorie : { key, table, field } avec `corrected` si sa première colonne est
 // le libellé corrigé et, pour un regroupement, { groups, fallback } avec, s'il se déduit des numéros,
-// numberedIn.
+// numberedIn, et, si sa colonne est facultative, optional.
 export const REFERENCE_SOURCES = Object.entries(CATEGORIES)
-  .map(([key, { table, field, corrected, groups, fallback, numberedIn }]) => ({
-    key, table, field, ...(corrected && { corrected }), ...(groups && { groups, fallback, ...(numberedIn && { numberedIn }) })
+  .map(([key, { table, field, corrected, groups, fallback, numberedIn, optional }]) => ({
+    key, table, field, ...(corrected && { corrected }), ...(groups && { groups, fallback, ...(numberedIn && { numberedIn }), ...(optional && { optional }) })
   }));
 
 // Catégories dont BDD porte une colonne ReferenceList ; `groups` pour un
@@ -211,8 +240,9 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 // elle n'en a pas encore, et sans lui la fiche ne pourrait jamais s'afficher.
 //   key       colonne de BDD
 //   kind      'text', 'email' (une adresse), 'phone' (numéro français), 'reference'
-//             (une valeur d'une table de référence), 'list' (plusieurs) ou 'image' (la photo de
-//             profil : une pièce jointe, envoyée à Grist par upload.js)
+//             (une valeur d'une table de référence), 'list' (plusieurs), 'image' (la photo de
+//             profil : une pièce jointe, envoyée à Grist par upload.js) ou 'consent' (une case à
+//             cocher, vraie ou fausse : « accepte d'apparaître », réservée à un administrateur)
 //   category  catégorie de CATEGORIES dont viennent les valeurs proposées
 //   admin     réservé à un administrateur sur la fiche d'une autre personne
 //   atCreation  proposé aussi à la personne qui crée sa fiche
@@ -225,6 +255,9 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 const LIST_FIELD_KEYS = ['instances', 'gt', 'competences', 'communautes', 'taches'];
 
 export const PROFILE_FIELDS = [
+  // Au début de la fenêtre d'un administrateur sur la fiche d'une autre personne (1.38.0). Pas à la création : la personne y a sa propre case
+  // (CONSENT_LABEL, hors de ces champs), cochée d'avance. Sur sa fiche, c'est l'interrupteur du bandeau « Ma présence » qui la règle.
+  { key: CONSENT_COLUMN, label: CONSENT_ADMIN_LABEL, kind: 'consent', admin: true, afterCreation: true },
   { key: 'Avatar', label: 'Photo de profil', kind: 'image', afterCreation: true },
   { key: 'prenom', label: 'Prénom', kind: 'text' },
   { key: 'nom', label: 'Nom', kind: 'text' },

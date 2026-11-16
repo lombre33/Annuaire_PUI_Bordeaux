@@ -56,7 +56,7 @@ test('le texte des cartes reste dans sa carte, même sans point de coupure (nom,
         document.querySelectorAll('.contact-card').forEach(card => {
           const box = card.getBoundingClientRect();
           // Un bloc dont le texte est plus large que lui : coupé par la carte, donc illisible. Aucun texte n'est coupé exprès
-          // depuis la 1.37.0 : le rôle PUI, jusque-là coupé par « … » sur la ligne de l'e-mail, est une pastille comme les autres.
+          // depuis la 1.39.0 : le rôle PUI, jusque-là coupé par « … » sur la ligne de l'e-mail, est une pastille comme les autres.
           card.querySelectorAll('.name, .fonction, .detail-row, .tag, .tag-group-title').forEach(element => {
             if (element.scrollWidth > element.clientWidth + 1) found.push(`${element.className} : « ${element.textContent.slice(0, 30)} »`);
           });

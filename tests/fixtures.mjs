@@ -97,6 +97,19 @@ export function withoutOptionalColumns(tables) {
   return copy;
 }
 
+// Le référentiel C.U.R.I.E (1.38.0) : la colonne facultative `referenciel_C_U_R_I_E` de Competences, qui range les compétences d'une autre
+// façon que les domaines. Avec ces données (périmètre par défaut ; Bob est partenaire) :
+//   Groupe C        → Oncologie (Ana)
+//   Groupe U        → Hématologie (Ana) et Pharmacovigilance (Bob), la seconde écrite « groupe u » : les deux orthographes n'en font qu'un
+//   Hors C.U.R.I.E  → Divers (Gina), que la colonne ne classe pas
+// Les domaines restent ceux de la base (Cancérologie : Oncologie, Hématologie ; Pharmacie : Pharmacovigilance ; Autres : Divers), de quoi
+// voir qu'un groupe C.U.R.I.E coupe un domaine en deux.
+export function withCurie(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  copy.Competences.referenciel_C_U_R_I_E = ['Groupe C', 'Groupe U', 'groupe u', ''];
+  return copy;
+}
+
 // Le document avec une ligne de plus dans Etablissements : `row` donne sa valeur à chaque colonne (id, acronyme, …).
 export function withEtablissement(tables, row) {
   const copy = structuredClone(tables);
@@ -106,7 +119,7 @@ export function withEtablissement(tables, row) {
 
 // Le document où Ana (la première fiche, la dernière de la grille) porte de longues listes de valeurs, de quoi essayer les cartes très
 // chargées (1.31.0, la barre d'outils des pastilles) : 9 compétences (« Compétence 1 » à « Compétence 9 »), 6 actions (« Action 1 » à
-// « Action 6 » : depuis la 1.37.0 les actions d'une personne sont ses tâches, la table Taches), 5 communautés (« Communauté 1 » à « Communauté 5 »)
+// « Action 6 » : depuis la 1.39.0 les actions d'une personne sont ses tâches, la table Taches), 5 communautés (« Communauté 1 » à « Communauté 5 »)
 // et son instance de départ (CME), soit 21 pastilles, plus ses deux rôles (« Référent qualité », que la fiche porte, et « Membre d'une action »,
 // que ses actions lui donnent) : 23 en tout. Les trois tables de référence sont remplacées : les autres personnes y gardent leurs numéros de ligne,
 // donc d'autres libellés (Bob porte la compétence 3, Gina la 4), sans rapport avec ceux de la base.

@@ -64,7 +64,7 @@ test('enrich: each list-reference category reads its own BDD column and its own 
   assert.deepEqual(result.labels.competences, ['Compétence F']);
 });
 
-test('enrich: the actions of a person are her tasks: the old BDD.Actions column is no longer read (1.37.0)', () => {
+test('enrich: the actions of a person are her tasks: the old BDD.Actions column is no longer read (1.39.0)', () => {
   const referenceMaps = { actions: { 2: 'Action B' }, taches: { 5: '1.2 Tâche E' } };
   const result = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, referenceMaps);
   assert.equal(result.labels.actions, undefined, 'plus de catégorie « actions » dans les libellés d\'une personne');
@@ -143,7 +143,7 @@ test('enrich: the same label twice in one category appears once (a contact is co
   assert.deepEqual(enrich({ Taches: ['L', 1, 2] }, referenceMaps).labels.taches, ['1.1 Vaccination']);
 });
 
-// Les rôles dans le PUI (1.37.0) : celui que la personne a choisi, plus « Membre d'une action » calculé à chaque lecture d'après ses actions.
+// Les rôles dans le PUI (1.39.0) : celui que la personne a choisi, plus « Membre d'une action » calculé à chaque lecture d'après ses actions.
 const ROLE_MAPS = {
   role: { 1: 'Coordinateur de communauté', 2: 'Responsable d\'une action', 3: 'Membre d\'une action' },
   taches: { 1: '1.1 Relecture', 2: '2.1 Inspection' }

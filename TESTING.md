@@ -285,7 +285,7 @@ fermeture de la page ne laisse aucun rejet non traité).
 `CHROMIUM_PATH` désigne un Chromium déjà installé. Sans Playwright, ces
 scénarios sont ignorés.
 
-`tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Tâches rangé par action,
+`tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Actions rangé par action,
 sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
 huit boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
 en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
@@ -293,6 +293,15 @@ filtres, nombres de cartes, recherche d'une action, d'une tâche ou d'un numéro
 carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numéros (console
 et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
 les tâches par action.
+
+`tests/e2e-curie.test.mjs` y ajoute 18 scénarios sur les onglets « Classique » et « C.U.R.I.E » du menu Compétences
+(1.38.0, `withCurie` dans `tests/fixtures.mjs` : la colonne facultative `referenciel_C_U_R_I_E` de `Competences`) : les deux onglets
+juste au-dessus de la recherche, le même menu dessous, les groupes C.U.R.I.E avec leurs nombres, une seule sélection pour les deux
+rangements (groupe coché d'un côté, domaine à moitié coché de l'autre, badge qui suit l'onglet), nombres de groupes qui suivent
+l'interrupteur Partenaires et les autres filtres, tag de carte, recherche déjà tapée qui s'applique à l'autre onglet, flèches, Début, Fin
+et Tabulation, onglet gardé quand le menu est reconstruit, aucun onglet ni bandeau ni avertissement sans la colonne ou avec une colonne
+vide (la console le dit), le menu rangé par C.U.R.I.E seul sans la colonne des domaines, arbre d'accessibilité (liste d'onglets, onglet
+sélectionné, panneau nommé), et la mise en page de 280 à 1 200 px, au doigt aussi.
 
 `tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
@@ -512,7 +521,7 @@ mise en page (`style.css`), faites de même dans `tests/responsive.test.mjs`.
       `perimetre` ne compte plus depuis la 1.27.0).
 - [ ] Les 7 boutons de filtre (Actions, Communautés, GT, Compétences,
       Instances, Établissement, Rôle dans le PUI) sont présents dans la barre d'outils. Il n'y a
-      pas de bouton « Domaines » : les domaines sont dans le menu Compétences ; ni de bouton « Tâches » (1.37.0) : les tâches
+      pas de bouton « Domaines » : les domaines sont dans le menu Compétences ; ni de bouton « Tâches » (1.39.0) : les tâches
       s'appellent « Actions », rangées par groupe d'actions dans le menu Actions.
 - [ ] Sur une carte avec toutes les infos renseignées : initiales correctes
       dans l'avatar, nom + prénom, fonction visible, logo (ou pastille)
@@ -646,13 +655,30 @@ valeurs par domaine, sans second bouton.
       bandeau « Colonne de libellé introuvable » s'affiche et le menu Compétences
       reste complet, mais à plat, sans domaines.
 
-Spécifique **Tâches par action** : le menu Tâches range ses valeurs par action, sans
+Spécifique **Compétences, onglet C.U.R.I.E** (1.38.0, **à essayer dans le vrai Grist** : jamais fait) : ajouter, sur une
+copie du document, la colonne `referenciel_C_U_R_I_E` (texte ou choix) à la table `Competences` et la remplir.
+
+- [ ] Sans la colonne (ou colonne vide) : le menu Compétences est celui d'avant, sans onglets, sans bandeau ; la console dit
+      seulement que la colonne manque ou est vide.
+- [ ] Avec la colonne remplie : deux onglets, « Classique » et « C.U.R.I.E », tout en haut du menu, juste au-dessus du champ de
+      recherche ; le menu s'ouvre sur « Classique », inchangé.
+- [ ] Un clic sur « C.U.R.I.E » range les mêmes compétences par groupe : l'aide, le champ de recherche (« Groupe ou compétence… ») et
+      l'infobulle du bouton changent ; une compétence que la colonne ne classe pas est sous « Hors C.U.R.I.E », en dernier.
+- [ ] Cocher un groupe C.U.R.I.E, puis revenir sous « Classique » : les mêmes compétences sont cochées, leurs domaines complets ou à moitié
+      cochés ; les cartes ne bougent pas au changement d'onglet ; le chiffre du bouton suit l'onglet (un groupe entier = 1).
+- [ ] Une recherche tapée sous un onglet s'applique à l'autre ; « Réinitialiser » vide la sélection, et le menu rouvre sur l'onglet
+      choisi.
+- [ ] Au clavier : Tabulation arrive sur l'onglet affiché, les flèches (Début, Fin) passent à l'autre, Tabulation mène à la recherche.
+- [ ] Une valeur de colonne écrite de deux façons (« Groupe U », « groupe u ») ne fait qu'un groupe. Une colonne à choix multiples ou de
+      type Référence n'est pas gérée (voir `docs/maintenance.md`).
+
+Spécifique **Tâches par action** : le menu Actions range ses valeurs par action, sans
 second bouton et sans colonne à ajouter dans Grist. Le numéro avant le point du libellé
 d'une tâche (« 2.1 … ») est celui de son action, dont le libellé commence par « Action 2 ».
-Le menu Tâches fonctionne comme le menu Compétences par domaine (ci-dessus) : reprendre
+Le menu Actions fonctionne comme le menu Compétences par domaine (ci-dessus) : reprendre
 les mêmes essais en remplaçant domaine par action et compétence par tâche, puis :
 
-- [ ] L'infobulle du bouton « Tâches » parle d'actions ; le champ de recherche du menu
+- [ ] L'infobulle du bouton « Actions » parle d'actions ; le champ de recherche du menu
       dit « Action ou tâche… » en entier, sans être coupé.
 - [ ] Les actions sont dans l'ordre de leur numéro (« Action 2 » avant « Action 10 »),
       chaque tâche sous l'action dont elle porte le numéro, et les tâches d'une action
@@ -660,7 +686,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       dernier** s'il existe une tâche sans numéro, ou dont le numéro ne correspond à
       aucune action. Une action qui n'a aucune tâche ne figure pas dans le menu.
 - [ ] Le filtre **Actions** est inchangé : toujours une liste à plat, qui filtre sur les
-      actions inscrites sur les cartes, et qui ne coche pas le menu Tâches (ni
+      actions inscrites sur les cartes, et qui ne coche pas le menu Actions (ni
       l'inverse). Les deux se cumulent (ET).
 - [ ] Rechercher « 2.1 » (le numéro d'une tâche) garde cette tâche sous son action ;
       « action 2 » garde l'action avec toutes ses tâches.
@@ -671,7 +697,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       action » (`[REFS] Taches: n ligne(s) sans regroupement…`) : les numéroter dans
       Grist, puis recharger le widget.
 - [ ] Sur une copie du document où **aucune tâche** ne commence par un numéro « n.m »
-      (ou aucune action par « Action n »), le menu Tâches reste complet, mais à plat,
+      (ou aucune action par « Action n »), le menu Actions reste complet, mais à plat,
       sans actions et sans bandeau ; la console dit pourquoi (`[REFS] Taches: aucune
       ligne n'est rattachée à une action…`).
 - [ ] Dans la fenêtre « Modifier mon profil », la liste des tâches est rangée par action
@@ -700,7 +726,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       case est bien cochée (pas seulement mise en évidence visuellement), et
       le badge de comptage sur le bouton du filtre est à jour — même
       résultat qu'en cochant la case directement dans le menu.
-- [ ] **Le rôle dans le PUI d'une carte (la première section de pastilles) est cliquable** (1.24.0, 1.37.0) :
+- [ ] **Le rôle dans le PUI d'une carte (la première section de pastilles) est cliquable** (1.24.0, 1.39.0) :
       un clic coche la valeur dans le filtre « Rôle dans le PUI » et la grille se filtre ; un second clic la
       décoche. Une personne qui a au moins une action porte aussi la pastille « Membre d'une action »
       (le widget la met et la retire d'après ses actions : l'ajouter ou retirer une action dans Grist suffit).
@@ -730,7 +756,7 @@ entièrement) couvert par `node --test`, parce qu'il implique `main.js`/
 - [ ] **Rôle dans le PUI** : un contact avec `Role_dans_le_PUI` renseigné affiche
       bien son rôle en pastille, première section de la carte, et le menu du filtre « Rôle dans le PUI »
       liste les valeurs de la table `Role_Dans_le_PUI` plus « Membre d'une action ».
-- [ ] **Actions rangées sur la carte** (1.37.0) : la section « Actions » d'une personne qui a des actions numérotées
+- [ ] **Actions rangées sur la carte** (1.39.0) : la section « Actions » d'une personne qui a des actions numérotées
       (« 1.2 », « 1.3 », « 3.5 ») les range par numéro d'action, avec un retour à la ligne à chaque nouveau numéro
       (« 1.2 1.3 » puis « 3.5 »), et les actions sans numéro sur la dernière ligne.
 - [ ] **Renommage de libellé** : dans Grist, cocher un filtre (ex.
@@ -881,7 +907,7 @@ iOS, Chrome Android) que les tests ne couvrent pas :
       se referme d'un clic ailleurs. Élargir le cadre puis le rouvrir : il
       s'ouvre de nouveau sous son bouton.
 - [ ] Menu Compétences ouvert et un domaine déplié, dans le cadre le plus étroit
-      (et de même le menu Tâches avec une action dépliée) : aucune barre de
+      (et de même le menu Actions avec une action dépliée) : aucune barre de
       défilement horizontale, un nom de compétence, de tâche ou d'action très
       long passe à la ligne (il ne déborde ni du menu ni de la page), la flèche et
       le nombre de chaque domaine ou action restent visibles, et la flèche se
@@ -1127,6 +1153,15 @@ sur une copie du document.
 - [ ] Choisir un établissement qui n'a pas validé sa présence : l'avertissement sous le champ,
       puis dans la relecture l'avis « … n’a pas validé sa présence : après cette modification,
       la fiche ne sera plus visible dans l’annuaire. ». Après « Valider », la carte disparaît.
+- [ ] La première case de la fenêtre, sous l'identité, est « Accepte d’apparaître dans
+      l’annuaire », cochée. Elle n'existe ni sur sa propre fiche (même administrateur, mode admin
+      allumé) ni dans la fenêtre « Créer ma fiche ». La décocher : « 1 champ modifié » ; la recocher :
+      « Aucune modification ». La décocher, relire : l'avis « Après cette modification, la fiche ne
+      sera plus visible dans l’annuaire et vous ne pourrez plus l’ouvrir ici… » et la ligne
+      « Accepte d’apparaître dans l’annuaire : Oui → Non ». Après « Valider » : `BDD.Accepte_apparaitre`
+      de cette ligne seule vaut `false` (un seul « Annuler » de Grist), la carte disparaît, le
+      compteur baisse d'un et le focus est sur le nombre de résultats. La personne, connectée, retrouve
+      son interrupteur « Apparaître dans l'annuaire » éteint et peut le rallumer.
 - [ ] Changer l'e-mail : la relecture prévient que la table `ACL` ne suit pas. Après
       « Valider », `BDD.email` a changé et `ACL` est intacte.
 - [ ] La relecture montre la nouvelle adresse et le nouvel établissement sur la carte

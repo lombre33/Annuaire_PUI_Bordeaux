@@ -1,6 +1,6 @@
 // Test navigateur du menu Actions rangé par groupe : charge le vrai index.html dans Chromium,
 // avec le faux document Grist de tests/support/fake-grist.js, et vérifie ce que voit la
-// personne. Depuis la 1.37.0 les « tâches » de la table Taches s'appellent « Actions » à l'écran (demande d'Antoine du
+// personne. Depuis la 1.39.0 les « tâches » de la table Taches s'appellent « Actions » à l'écran (demande d'Antoine du
 // 16 novembre 2026), et le bouton « Actions » d'avant (la colonne BDD.Actions) n'existe plus. Le menu est celui des
 // compétences rangées par domaine (e2e.test.mjs) : une case par groupe d'actions (« Action 1 : Vaccination »), qui coche
 // toutes ses actions, un bouton qui déplie le détail, une recherche qui trouve un groupe comme une action. Ce fichier
@@ -47,7 +47,7 @@ const consoleLines = async logs => (await Promise.all([...logs.warnings, ...logs
 
 // ===== Le menu : des actions repliées, « Sans action » en dernier =====
 
-test('la barre compte sept boutons : le menu Actions est celui des tâches, ses groupes n\'ont pas de bouton, et il n\'y a plus de bouton Actions à plat (1.37.0)', { skip }, () =>
+test('la barre compte sept boutons : le menu Actions est celui des tâches, ses groupes n\'ont pas de bouton, et il n\'y a plus de bouton Actions à plat (1.39.0)', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await page.locator('.filter-button > span:nth-child(2)').allTextContents(),
@@ -363,7 +363,7 @@ test('le menu Actions se range aussi quand les libellés sont écrits « T1.1 »
   });
 });
 
-test('la carte range les actions par numéro, une rangée par action du groupe, sans bandeau ni groupe sur la carte (1.37.0)', { skip }, () =>
+test('la carte range les actions par numéro, une rangée par action du groupe, sans bandeau ni groupe sur la carte (1.39.0)', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     assert.equal(await page.locator('#statusBanner').isHidden(), true);

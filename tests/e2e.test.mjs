@@ -117,7 +117,7 @@ test('affiche le contenu des cartes : initiales, fonction, e-mail, téléphone, 
     ]);
     assert.equal(await ana.locator('.tel').textContent(), '☎ 05 36 49 90 12', 'le 0 initial perdu par le type Numeric est rétabli');
     const role = ana.locator('.tag-role');
-    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est une pastille, la première section du bas de la carte (1.37.0)');
+    assert.equal(await role.textContent(), 'Référent qualité', 'le rôle PUI est une pastille, la première section du bas de la carte (1.39.0)');
     assert.equal(await role.evaluate(tag => tag.tagName), 'BUTTON', 'il filtre comme les autres tags');
     assert.equal(await ana.locator('.role-col, .role-tag, .role-text').count(), 0, 'plus de rôle écrit sur la ligne de l\'e-mail');
     assert.equal(await ana.locator('.tag-static').count(), 0);

@@ -181,7 +181,7 @@ function buildRemovedTag(group, value) {
   return tag;
 }
 
-// Les actions d'une carte rangées par action (1.37.0, demande d'Antoine du 16 novembre 2026) : une rangée par numéro d'action, si bien que « 1.2 »
+// Les actions d'une carte rangées par action (1.39.0, demande d'Antoine du 16 novembre 2026) : une rangée par numéro d'action, si bien que « 1.2 »
 // et « 1.3 » se suivent et que « 3.5 » passe à la ligne. Les actions sans numéro font la dernière rangée. `entries` : { value, tag }, le libellé
 // de l'action (dont on lit le numéro, voir taskActionNumber) et sa pastille.
 function actionRows(entries) {
