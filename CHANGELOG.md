@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.42.0 — La documentation se lit dans une fenêtre du widget, et les messages qui renvoient au guide d'installation le nomment en clair et y mènent
+## 1.43.0 — La documentation se lit dans une fenêtre du widget, et les messages qui renvoient au guide d'installation le nomment en clair et y mènent
 
 Point 9 des « retours pour finaliser le projet » d'Antoine, repris (16 novembre 2026, 13 h 42 : « une pop-up qui s'ouvre dans le widget et qui reprend le contenu sans forcément rediriger dans l'interface de GitHub, qui peut faire peur »), et sa remarque de 14 h 03 sur le message de la fiche de l'établissement qui dit « (GRIST_SETUP.md) ». **À savoir pour la migration (point 8)** : la fenêtre lit les fichiers Markdown **sur le site qui sert le widget** ; le dépôt de production doit donc publier aussi `README.md`, `GRIST_SETUP.md`, `TESTING.md`, `specs.md`, `CHANGELOG.md` et `docs/` avec le widget (GitHub Pages sur la branche entière le fait). Rien à régler dans Grist.
 

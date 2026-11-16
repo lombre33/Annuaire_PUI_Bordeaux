@@ -329,7 +329,7 @@ dit que « rien » ne donne pas d'onglet. Ces tests échouent sur le comportemen
 `tests/support/menu-checks.mjs`. **Règle : les données d'un test viennent du vrai document, jamais de noms imaginés, et un test de menu
 regarde ce que le menu affiche.**
 
-La fenêtre « Documentation » (1.42.0) a cinq fichiers de tests : `tests/markdown.test.mjs` (25 tests, sans navigateur : le lecteur Markdown,
+La fenêtre « Documentation » (1.43.0) a cinq fichiers de tests : `tests/markdown.test.mjs` (25 tests, sans navigateur : le lecteur Markdown,
 ses balises admises et refusées, des documents hostiles et démesurés, chaque document du dépôt lu sans balise perdue),
 `tests/docs-source.test.mjs` (11 tests, sans navigateur : la liste des documents, les adresses, la lecture et ses refus),
 `tests/docs-viewer.test.mjs` (17 scénarios dans Chromium : chaque document s'ouvre, la barre, « Retour », les liens et les images, un
@@ -2013,7 +2013,7 @@ Grist : les tests automatiques simulent `applyUserActions`.**
 - [ ] **Rien d'autre ne bouge.** `Taches_role`, `Role_dans_le_PUI` et la table `Taches` sont inchangés ; le nombre de contacts affiché est
       le même qu'avant et aucune fiche n'apparaît ni ne disparaît.
 
-## 29. La fenêtre « Documentation » (1.42.0)
+## 29. La fenêtre « Documentation » (1.43.0)
 
 À jouer dans le **vrai Grist** (le widget publié, pas le serveur de démonstration), console ouverte (F12). **Ce protocole est le seul
 contrôle de la fenêtre dans le cadre réel de Grist : les tests automatiques simulent ce cadre (sans `allow-same-origin`) mais pas Grist.**

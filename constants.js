@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.42.0';
+export const VERSION = '1.43.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -83,7 +83,7 @@ export const PRESENCE_ANNOUNCE_MS = 6000;
 export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos-leviers/pui-reveler-le-potentiel-du-territoire';
 
 // La page de la documentation sur GitHub (le README du dépôt, qui renvoie au guide utilisateur, à la documentation développeur, à la
-// sécurité et à la maintenance). Depuis la 1.42.0, le bouton « Documentation » de l'en-tête (index.html, `docLink`) ouvre une fenêtre du
+// sécurité et à la maintenance). Depuis la 1.43.0, le bouton « Documentation » de l'en-tête (index.html, `docLink`) ouvre une fenêtre du
 // widget qui lit ces documents sur le site qui sert le widget (docs-source.js) ; cette adresse n'est plus que celle que la fenêtre propose
 // en bas (« Ouvrir sur GitHub », dans un autre onglet, comme le lien du bandeau du bas) et quand un document n'a pas pu être lu. C'est
 // l'adresse à changer quand le dépôt change d'adresse (une migration : elle ne se déduit pas de celle du widget, qui peut être servi par un
