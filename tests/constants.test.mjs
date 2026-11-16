@@ -31,7 +31,7 @@ test('every category names a reference table and a label column, and tables are 
   });
   assert.equal(new Set(REFERENCE_TABLES).size, REFERENCE_TABLES.length);
   assert.deepEqual(REFERENCE_TABLES,
-    ['Actions', 'Taches', 'Communautes', 'GT', 'Competences', 'INSTANCES', 'Etablissements', 'Role_Dans_le_PUI']);
+    ['Actions', 'Taches', 'Communautes', 'GT', 'Competences', 'Referentiel_competences_CURIE', 'INSTANCES', 'Etablissements', 'Role_Dans_le_PUI']);
 });
 
 test('the main table is BDD, and the old Annuaire table is no longer read', () => {
@@ -74,11 +74,13 @@ test('the C.U.R.I.E groups are a second grouping of the same skills: an optional
   assert.deepEqual(curie.field, ['referenciel_C_U_R_I_E']);
   assert.equal(curie.groups, 'competences');
   assert.equal(curie.fallback, undefined, 'pas de groupe « Hors C.U.R.I.E » : une compétence que la colonne ne classe pas n\'est pas montrée sous cet onglet (1.41.1)');
-  assert.equal(curie.referential, true, 'la colonne porte les codes d\'un référentiel (des numéros, « — aucune correspondance — »), pas des noms de groupe');
+  assert.deepEqual(curie.referential, { table: 'Referentiel_competences_CURIE', field: ['Competence'] },
+    'la colonne est une Référence vers la table du référentiel : Grist n\'envoie que le numéro de ligne (3, 13…), le libellé du groupe est dans cette table (1.43.1)');
   assert.equal(macro.referential, undefined, 'les domaines sont des noms : rien n\'y est écarté ni renommé');
   const source = key => REFERENCE_SOURCES.find(entry => entry.key === key);
-  assert.equal(source('curie').referential, true, 'la lecture des libellés le sait');
+  assert.deepEqual(source('curie').referential, curie.referential, 'la lecture des libellés le sait');
   assert.equal(source('macro').referential, undefined);
+  assert.ok(REFERENCE_TABLES.includes('Referentiel_competences_CURIE'), 'la table du référentiel se lit, comme les autres tables de référence');
   assert.equal(macro.fallback, 'Autres', 'le rangement de départ garde son groupe de repli : personne n\'y devient introuvable');
   assert.equal(curie.optional, true, 'la colonne est facultative : sans elle, pas d\'onglet, ni bandeau ni avertissement');
   assert.equal(curie.numberedIn, undefined);

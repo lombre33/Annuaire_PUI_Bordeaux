@@ -199,13 +199,13 @@ export function labelMapFromRows(rows, labelFields, format = label => label) {
 }
 
 // ===== COLONNE D'UN RÉFÉRENTIEL (C.U.R.I.E) =====
-// Une colonne de regroupement qui porte les codes d'un référentiel (`referential` dans constants.js) n'a pas de noms de groupe à lire :
-// dans le document d'Antoine elle contient des numéros (0, 3, 13…) et « — aucune correspondance — » (capture du 16 novembre 2026). Un
-// groupe par valeur, sans en inventer, mais jamais le signe du vide comme groupe, ni un numéro nu comme titre.
+// Une colonne de regroupement qui est une Référence vers une table de référentiel (`referential` dans constants.js) : dans le document
+// d'Antoine, `Competences.referenciel_C_U_R_I_E` renvoie à `Referentiel_competences_CURIE` (colonne `Competence`). Grist n'envoie que le
+// numéro de ligne de cette table (3, 13, 15…), ou le texte « — aucune correspondance — » quand la Référence est invalide, ou 0 quand elle est
+// vide (capture du 16 novembre 2026). Le groupe porte le libellé de la ligne désignée : jamais le numéro, ni le signe du vide.
 
 // Une valeur qui dit « rien » : vide, 0, ou un texte qui le dit (« — aucune correspondance — », « Aucun », « n/a », « néant », « sans
-// objet », « - »…), sans tenir compte de la casse, des accents ni de la ponctuation autour. Ce n'est pas un groupe. 0 est lu comme Grist
-// lit un nombre ou une référence sans valeur (voir isBlank) : si c'est un vrai numéro du référentiel, c'est à Antoine de le dire.
+// objet », « - »…), sans tenir compte de la casse, des accents ni de la ponctuation autour. Ce n'est pas un groupe.
 const NO_MATCH = /^(?:0+|aucune?(?: [\p{L}']+){0,3}|pas de [\p{L}]+|neant|vide|n ?[./]? ?a|sans (?:objet|correspondance|valeur|reponse)|non (?:applicable|renseigne|defini|classe))$/u;
 const AROUND = /^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu;
 export function isNoMatch(value) {
@@ -213,13 +213,16 @@ export function isNoMatch(value) {
   return bare === '' || NO_MATCH.test(bare);
 }
 
-// Le libellé d'un groupe d'après la valeur de la colonne d'un référentiel : '' quand la valeur dit « rien » (la ligne n'a pas de groupe),
-// « N° 13 » pour un numéro (« 03 » et « 3 » sont le même groupe ; une espace ordinaire, que la recherche d'un menu retrouve quand on
-// tape « n° 13 »), le texte sinon, tel quel.
-export function referentialLabel(value) {
-  const label = text(value);
-  if (isNoMatch(label)) return '';
-  return /^\d+$/.test(label) ? `N° ${Number(label)}` : label;
+// Le libellé du groupe d'après la valeur de la colonne d'un référentiel, '' quand la valeur ne nomme rien (la ligne n'a pas de groupe) :
+// - un numéro (un nombre de Grist, ou un texte de chiffres) est celui d'une ligne du référentiel : on prend son libellé dans `names`
+//   (id → libellé, voir readReferentialNames). 0 (une Référence vide), une ligne que la table n'a pas ou sans libellé : aucun groupe, jamais
+//   « 13 » ni « N° 13 » comme titre (1.41.1 : « N° 13 » ne disait rien à Antoine, 1.43.1) ;
+// - un texte est son propre libellé (une colonne de texte ou de choix, ou une valeur écrite à la main), sauf s'il dit « rien ».
+export function referentialLabel(value, names = {}) {
+  const raw = Array.isArray(value) ? refId(value) : value;
+  const isNumber = typeof raw === 'number' || (typeof raw === 'string' && /^\s*\d+\s*$/.test(raw));
+  const label = isNumber ? text(names[String(Number(raw))]) : text(raw);
+  return isNoMatch(label) ? '' : label;
 }
 
 // `fn` ne s'exécute qu'après `wait` ms sans nouvel appel, avec les arguments du dernier : une rafale d'appels (les éditions d'un
@@ -851,11 +854,11 @@ export function groupLabelMap(groupMap, detailMap, fallback) {
 // seraient vides en silence). Une catégorie `corrected` (voir constants.js) lit sa seule
 // colonne corrigée dès que la table en remplit au moins une : une ligne qui n'en a pas est
 // laissée de côté, la console dit combien, au lieu d'être montrée avec son libellé brut.
-function readReferenceMap({ key, table, field, corrected, optional, referential }, result, log) {
+function readReferenceMap({ key, table, field, corrected, optional, referential }, result, log, names) {
   const rows = tableToRows(result.value);
   const labelFields = [].concat(field);
   const correctedOnly = corrected === true && rows.some(row => text(row[labelFields[0]]));
-  const map = labelMapFromRows(rows, correctedOnly ? labelFields.slice(0, 1) : labelFields, referential ? referentialLabel : undefined);
+  const map = labelMapFromRows(rows, correctedOnly ? labelFields.slice(0, 1) : labelFields, referential ? label => referentialLabel(label, names) : undefined);
   const withoutLabel = rows.length - Object.keys(map).length;
   log.info(`[REFS] ${key} (${table}): ${Object.keys(map).length} entrées`
     + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${correctedOnly ? `${labelFields[0]}, ignorée(s)` : labelFields.join('/')})` : ''));
@@ -864,6 +867,23 @@ function readReferenceMap({ key, table, field, corrected, optional, referential 
   if (absent.length && optional) log.info(`[REFS] ${table}: colonne(s) facultative(s) absente(s) : ${absent.join(', ')}`);
   else if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
   return { map, labelColumnsMissing: absent.length === labelFields.length };
+}
+
+// id → libellé des lignes de la table d'un référentiel (`referential` dans constants.js), qui nomme les groupes d'un regroupement dont la
+// colonne est une Référence. Une table absente ou illisible ne donne aucun nom : la console le dit, aucun bandeau (le rangement est facultatif),
+// et les numéros de la colonne n'ont alors pas de groupe.
+function readReferentialNames({ key, referential }, results, log) {
+  const result = results[referential.table];
+  if (result.status === 'rejected') {
+    log.info(`[REFS] ${key} : la table ${referential.table} est absente ou illisible, ses lignes ne peuvent pas nommer les groupes.`, result.reason?.message || result.reason || '');
+    return {};
+  }
+  const rows = tableToRows(result.value);
+  const names = labelMapFromRows(rows, referential.field);
+  const absent = missingColumns(rows, [].concat(referential.field));
+  log.info(`[REFS] ${key} (${referential.table}) : ${Object.keys(names).length} libellé(s)`
+    + (absent.length === [].concat(referential.field).length ? ` ; colonne(s) introuvable(s) : ${absent.join(', ')}` : ''));
+  return names;
 }
 
 // Le rôle de chaque ligne de la table des tâches (colonne facultative `Taches_role`, voir TASK_ROLES dans
@@ -964,7 +984,9 @@ function completeGroupMap({ key, table, groups, fallback, numberedIn }, referenc
 // précédents de ses catégories ; `unreadable` la signale, `unlabeled` les
 // catégories dont aucune colonne de libellé n'existe.
 function readReferenceMaps(results, previousMaps, log) {
-  const unreadable = REFERENCE_TABLES.filter(table => results[table].status === 'rejected');
+  // La table d'un référentiel est facultative comme sa colonne : sa lecture ratée est dite par readReferentialNames, sans bandeau.
+  const referentialTables = new Set(REFERENCE_SOURCES.filter(source => source.referential).map(source => source.referential.table));
+  const unreadable = REFERENCE_TABLES.filter(table => results[table].status === 'rejected' && !referentialTables.has(table));
   unreadable.forEach(table => log.warn(`[REFS] Impossible de charger ${table}`, results[table].reason));
 
   const referenceMaps = {};
@@ -980,7 +1002,7 @@ function readReferenceMaps(results, previousMaps, log) {
       if (source.optional && Object.keys(referenceMaps[source.key]).length === 0) withoutLabelColumn.add(source.key);
       return;
     }
-    const read = readReferenceMap(source, result, log);
+    const read = readReferenceMap(source, result, log, source.referential ? readReferentialNames(source, results, log) : undefined);
     referenceMaps[source.key] = read.map;
     if (read.labelColumnsMissing) {
       // Une colonne facultative absente ne s'annonce pas au bandeau : le rangement qu'elle donnerait n'est simplement pas proposé.
@@ -988,7 +1010,8 @@ function readReferenceMaps(results, previousMaps, log) {
       withoutLabelColumn.add(source.key);
     } else if (source.optional && Object.keys(read.map).length === 0) {
       // Une colonne facultative vide ne range rien : classer toutes les lignes sous le seul groupe de repli n'aiderait personne.
-      log.info(`[REFS] ${source.key} (${source.table}) : colonne ${[].concat(source.field).join('/')} vide, le rangement correspondant n'est pas proposé.`);
+      log.info(`[REFS] ${source.key} (${source.table}) : colonne ${[].concat(source.field).join('/')} vide`
+        + `${source.referential ? ` ou sans aucune ligne que ${source.referential.table} nomme` : ''}, le rangement correspondant n'est pas proposé.`);
       withoutLabelColumn.add(source.key);
     }
   });

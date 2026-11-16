@@ -319,11 +319,12 @@ console, pas de case, le reste comme avant) et un document sans action. `tests/r
 les fonctions (`responsibleActions()`, `responsibleText()`, `taskCode()`, `tagText()`, le delta de `Taches_responsable`,
 `createResponsibleColumn()`).
 
-`tests/e2e-curie-affichage.test.mjs` y ajoute 8 **contrôles d'interface** (1.41.1) : ce que le menu MONTRE sous « C.U.R.I.E » avec les
-valeurs du vrai document (`withCurieCodes`, 14 compétences dont les valeurs sont des numéros, « 0 » et « — aucune correspondance — »,
-capture d'Antoine du 16 novembre 2026) : des titres « N° 3 », « N° 7 », « N° 12 », « N° 13 » dans l'ordre des numéros, rien pour
+`tests/e2e-curie-affichage.test.mjs` y ajoute 8 **contrôles d'interface** (1.41.1, repris en 1.43.1) : ce que le menu MONTRE sous « C.U.R.I.E » avec
+la structure du vrai document (`withCurieCodes` et `curieTable`, `tests/fixtures.mjs` : 14 compétences dont la colonne est une Référence vers
+`Referentiel_competences_CURIE`, avec ses numéros de ligne, 0 et « — aucune correspondance — », structure et capture d'Antoine du 16 novembre
+2026) : des titres qui sont les libellés des lignes du référentiel (« Compétences en gestion de projet. »), jamais un numéro ni « N° 13 », rien pour
 « — aucune correspondance — » ni « 0 », ni en haut ni en bas ; les compétences sans correspondance restent sous « Classique » et leurs
-personnes se retrouvent ; chaque menu de filtre est lisible (`assertReadableMenu` : ni libellé vide, ni nombre nu, ni « rien », ni
+personnes se retrouvent ; chaque menu de filtre est lisible (`assertReadableMenu` : ni libellé vide, ni numéro nu ni « N° 13 », ni « rien », ni
 doublon) ; les onglets n'ont aucun cadre (`framesAboveSearch`, un trait de 2 px sous l'onglet montré, au doigt aussi) ; une colonne qui ne
 dit que « rien » ne donne pas d'onglet. Ces tests échouent sur le comportement de la 1.38.0 (7 sur 8, vérifié). Les gardes sont dans
 `tests/support/menu-checks.mjs`. **Règle : les données d'un test viennent du vrai document, jamais de noms imaginés, et un test de menu
@@ -703,9 +704,9 @@ et être remplie (sur une copie du document pour l'essai).
 - [ ] Les onglets n'ont aucun cadre : deux mots, un filet dessous et un trait sous l'onglet affiché (le menu et la recherche gardent le
       leur).
 - [ ] Un clic sur « C.U.R.I.E » range les mêmes compétences par groupe : l'aide, le champ de recherche (« Groupe ou compétence… ») et
-      l'infobulle du bouton changent. Un numéro de la colonne est un groupe « N° 13 », dans l'ordre des numéros ; une compétence que la
-      colonne ne classe pas (vide, « 0 », « — aucune correspondance — ») n'est **pas** sous cet onglet (elle est sous « Classique »),
-      et aucun titre n'est un numéro nu ni « aucun… ».
+      l'infobulle du bouton changent. Chaque groupe porte le libellé de la ligne du référentiel (« Compétences en gestion de projet. »), dans l'ordre alphabétique ;
+      une compétence que la colonne ne classe pas (référence vide, « — aucune correspondance — ») n'est **pas** sous cet onglet (elle est sous
+      « Classique »), et aucun titre n'est un numéro, ni « N° 13 », ni « aucun… ».
 - [ ] Cocher un groupe C.U.R.I.E, puis revenir sous « Classique » : les mêmes compétences sont cochées, leurs domaines complets ou à moitié
       cochés ; les cartes ne bougent pas au changement d'onglet ; le chiffre du bouton suit l'onglet (un groupe entier = 1).
 - [ ] Une recherche tapée sous un onglet s'applique à l'autre ; « Réinitialiser » vide la sélection, et le menu rouvre sur l'onglet

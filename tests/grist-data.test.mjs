@@ -414,20 +414,24 @@ test('isNoMatch keeps what names a group: numbers, letters, words, even one that
   ].forEach(value => assert.equal(isNoMatch(value), false, `« ${value} » est un groupe`));
 });
 
-test('referentialLabel gives a group « N° 13 » for a number, nothing for « nothing », and the text for the rest', () => {
-  assert.equal(referentialLabel('3'), 'N° 3');
-  assert.equal(referentialLabel('13'), 'N° 13');
-  assert.equal(referentialLabel(13), 'N° 13', 'un nombre de Grist (colonne Numeric) comme un texte');
-  assert.equal(referentialLabel(' 13 '), 'N° 13', 'les espaces autour ne comptent pas');
-  assert.equal(referentialLabel('03'), 'N° 3', '« 03 » et « 3 » sont le même groupe');
-  assert.equal(referentialLabel('0'), '');
-  assert.equal(referentialLabel(0), '');
-  assert.equal(referentialLabel('— aucune correspondance —'), '');
-  assert.equal(referentialLabel(null), '');
-  assert.equal(referentialLabel('Culture'), 'Culture', 'un nom est gardé tel quel');
-  assert.equal(referentialLabel('C1'), 'C1');
-  assert.equal(referentialLabel('1.2'), '1.2', 'un code à points n\'est pas un numéro nu');
-  assert.equal(referentialLabel('  Culture  '), 'Culture');
+test('referentialLabel names a group by the row of the referential that a number designates, never by the number itself', () => {
+  const names = { 3: 'Compétences en gestion de projet.', 13: 'Connaissance de l’écosystème d’innovation.' };
+  assert.equal(referentialLabel(3, names), 'Compétences en gestion de projet.', 'un nombre de Grist : le numéro de ligne du référentiel');
+  assert.equal(referentialLabel('13', names), 'Connaissance de l’écosystème d’innovation.', 'ou un texte de chiffres');
+  assert.equal(referentialLabel(' 13 ', names), 'Connaissance de l’écosystème d’innovation.', 'les espaces autour ne comptent pas');
+  assert.equal(referentialLabel('03', names), 'Compétences en gestion de projet.', '« 03 » et « 3 » sont la même ligne');
+  assert.equal(referentialLabel(['R', 'Referentiel_competences_CURIE', 3], names), 'Compétences en gestion de projet.', 'une Référence sous sa forme [\'R\', table, id]');
+  assert.equal(referentialLabel(0, names), '', '0 : une Référence vide');
+  assert.equal(referentialLabel('0', names), '');
+  assert.equal(referentialLabel(99, names), '', 'une ligne que le référentiel n\'a pas : pas de groupe, jamais « 99 » ni « N° 99 »');
+  assert.equal(referentialLabel(3), '', 'sans la table du référentiel, un numéro ne nomme rien');
+  assert.equal(referentialLabel(3, { 3: '' }), '', 'une ligne sans libellé non plus');
+  assert.equal(referentialLabel(3, { 3: '— aucune correspondance —' }), '', 'ni une ligne dont le libellé dit « rien »');
+  assert.equal(referentialLabel('— aucune correspondance —', names), '', 'le texte d\'une Référence invalide : pas un groupe');
+  assert.equal(referentialLabel(null, names), '');
+  assert.equal(referentialLabel('Culture', names), 'Culture', 'un nom écrit à la main (colonne de texte ou de choix) est gardé tel quel');
+  assert.equal(referentialLabel('1.2', names), '1.2', 'un code à points n\'est pas un numéro de ligne');
+  assert.equal(referentialLabel('  Culture  ', names), 'Culture');
 });
 
 test('hasAccepted counts a checked box (true) as consent and nothing else', () => {
