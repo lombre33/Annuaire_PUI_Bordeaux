@@ -948,27 +948,25 @@ button.avatar:hover {
   background: #fff;
 }
 /* Les onglets d'un menu qui se range de plusieurs façons (1.38.0 : « Classique » et « C.U.R.I.E » du menu Compétences) : au-dessus de la
-   recherche, dans l'en-tête collant, donc toujours en vue. Le même boîtier que l'interrupteur Fondateurs/Partenaires : l'onglet montré est
-   blanc, à contour violet (8,5:1), le bord du boîtier est celui des champs (3:1 exigés). L'en-tête est plus haut de 42 px avec eux
-   (`--menu-head`, qui garde les cases atteintes au clavier sous lui). */
+   recherche, dans l'en-tête collant, donc toujours en vue. Légers (1.41.1) : aucun cadre, ni autour de la barre ni autour d'un onglet,
+   puisque le menu a déjà le sien et la recherche le sien (trois contours emboîtés pour deux mots, c'était trop). Un filet sous la barre,
+   et sous l'onglet montré un trait violet (8,5:1 sur blanc, 3:1 exigés pour le reconnaître) ; le texte de l'autre est gris (4,7:1).
+   L'en-tête est plus haut de 38 px avec eux (`--menu-head`, qui garde les cases atteintes au clavier sous lui). */
 .view-tabs {
   display: flex;
-  gap: 3px;
   margin: 0 0 8px;
-  padding: 3px;
-  background: #f7f8fc;
-  border: 1px solid var(--field-line);
-  border-radius: 10px;
+  border-bottom: 1px solid var(--line);
 }
 .view-tab {
   flex: 1 1 0;
   min-width: 0;
-  height: 26px;
+  height: 30px;
+  margin-bottom: -1px; /* le trait de l'onglet montré recouvre le filet de la barre */
   padding: 0 8px;
   color: var(--muted);
   background: transparent;
   border: 0;
-  border-radius: 7px;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
   font-size: 12px;
   font-weight: 750;
@@ -979,11 +977,10 @@ button.avatar:hover {
 }
 .view-tab[aria-selected="true"] {
   color: #443aaf;
-  background: #fff;
-  box-shadow: inset 0 0 0 1.5px #443aaf;
+  border-bottom-color: #443aaf;
 }
 .filter-menu.has-tabs {
-  --menu-head: 88px;
+  --menu-head: 84px;
 }
 /* L'aide d'un menu rangé par groupe (1.34.0, audit U27) : elle défile avec la liste, et s'efface pendant une recherche, qui a
    besoin de la place. */
@@ -1365,7 +1362,7 @@ button.avatar:hover {
     height: 40px;
   }
   .filter-menu.has-tabs {
-    --menu-head: 110px;
+    --menu-head: 102px;
   }
   button.tag,
   .etablissement-tag,
@@ -1554,6 +1551,7 @@ button.avatar:hover {
    l'interrupteur ne montrerait plus son état. On les pose en couleurs système, que le mode respecte. */
 @media (forced-colors: active) {
   .view-tab[aria-selected="true"] {
+    border-bottom-color: Highlight;
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }

@@ -295,12 +295,13 @@ et sans bandeau), clavier, et le formulaire de modification de fiche, qui range 
 les tâches par action.
 
 `tests/e2e-curie.test.mjs` y ajoute 18 scénarios sur les onglets « Classique » et « C.U.R.I.E » du menu Compétences
-(1.38.0, `withCurie` dans `tests/fixtures.mjs` : la colonne facultative `referenciel_C_U_R_I_E` de `Competences`) : les deux onglets
+(1.38.0, `withCurie` dans `tests/fixtures.mjs` : la colonne facultative `referenciel_C_U_R_I_E` de `Competences`, avec les valeurs du vrai
+document depuis la 1.41.1 : des numéros et « — aucune correspondance — ») : les deux onglets
 juste au-dessus de la recherche, le même menu dessous, les groupes C.U.R.I.E avec leurs nombres, une seule sélection pour les deux
 rangements (groupe coché d'un côté, domaine à moitié coché de l'autre, badge qui suit l'onglet), nombres de groupes qui suivent
 l'interrupteur Partenaires et les autres filtres, tag de carte, recherche déjà tapée qui s'applique à l'autre onglet, flèches, Début, Fin
 et Tabulation, onglet gardé quand le menu est reconstruit, aucun onglet ni bandeau ni avertissement sans la colonne ou avec une colonne
-vide (la console le dit), le menu rangé par C.U.R.I.E seul sans la colonne des domaines, arbre d'accessibilité (liste d'onglets, onglet
+vide (la console le dit), le menu à plat (et non rangé par C.U.R.I.E seul) sans la colonne des domaines, arbre d'accessibilité (liste d'onglets, onglet
 sélectionné, panneau nommé), et la mise en page de 280 à 1 200 px, au doigt aussi.
 
 `tests/e2e-actions-sans-tache.test.mjs` y ajoute 4 scénarios sur les actions que la carte montre sans tâche (1.41.0, `withHeldActions` dans
@@ -317,6 +318,16 @@ vide, la case ensuite), un compte qui n'est pas administrateur (aucune demande),
 console, pas de case, le reste comme avant) et un document sans action. `tests/responsible.test.mjs` (14 tests, sans navigateur) couvre
 les fonctions (`responsibleActions()`, `responsibleText()`, `taskCode()`, `tagText()`, le delta de `Taches_responsable`,
 `createResponsibleColumn()`).
+
+`tests/e2e-curie-affichage.test.mjs` y ajoute 8 **contrôles d'interface** (1.41.1) : ce que le menu MONTRE sous « C.U.R.I.E » avec les
+valeurs du vrai document (`withCurieCodes`, 14 compétences dont les valeurs sont des numéros, « 0 » et « — aucune correspondance — »,
+capture d'Antoine du 16 novembre 2026) : des titres « N° 3 », « N° 7 », « N° 12 », « N° 13 » dans l'ordre des numéros, rien pour
+« — aucune correspondance — » ni « 0 », ni en haut ni en bas ; les compétences sans correspondance restent sous « Classique » et leurs
+personnes se retrouvent ; chaque menu de filtre est lisible (`assertReadableMenu` : ni libellé vide, ni nombre nu, ni « rien », ni
+doublon) ; les onglets n'ont aucun cadre (`framesAboveSearch`, un trait de 2 px sous l'onglet montré, au doigt aussi) ; une colonne qui ne
+dit que « rien » ne donne pas d'onglet. Ces tests échouent sur le comportement de la 1.38.0 (7 sur 8, vérifié). Les gardes sont dans
+`tests/support/menu-checks.mjs`. **Règle : les données d'un test viennent du vrai document, jamais de noms imaginés, et un test de menu
+regarde ce que le menu affiche.**
 
 La fenêtre « Documentation » (1.42.0) a cinq fichiers de tests : `tests/markdown.test.mjs` (25 tests, sans navigateur : le lecteur Markdown,
 ses balises admises et refusées, des documents hostiles et démesurés, chaque document du dépôt lu sans balise perdue),
@@ -681,22 +692,27 @@ valeurs par domaine, sans second bouton.
       bandeau « Colonne de libellé introuvable » s'affiche et le menu Compétences
       reste complet, mais à plat, sans domaines.
 
-Spécifique **Compétences, onglet C.U.R.I.E** (1.38.0, **à essayer dans le vrai Grist** : jamais fait) : ajouter, sur une
-copie du document, la colonne `referenciel_C_U_R_I_E` (texte ou choix) à la table `Competences` et la remplir.
+Spécifique **Compétences, onglet C.U.R.I.E** (1.38.0, corrigé en 1.41.1 d'après le retour d'Antoine ; **à confirmer dans le vrai Grist** :
+le sens des numéros n'est pas connu du widget) : la colonne `referenciel_C_U_R_I_E` (texte ou choix) de la table `Competences` doit exister
+et être remplie (sur une copie du document pour l'essai).
 
 - [ ] Sans la colonne (ou colonne vide) : le menu Compétences est celui d'avant, sans onglets, sans bandeau ; la console dit
       seulement que la colonne manque ou est vide.
 - [ ] Avec la colonne remplie : deux onglets, « Classique » et « C.U.R.I.E », tout en haut du menu, juste au-dessus du champ de
       recherche ; le menu s'ouvre sur « Classique », inchangé.
+- [ ] Les onglets n'ont aucun cadre : deux mots, un filet dessous et un trait sous l'onglet affiché (le menu et la recherche gardent le
+      leur).
 - [ ] Un clic sur « C.U.R.I.E » range les mêmes compétences par groupe : l'aide, le champ de recherche (« Groupe ou compétence… ») et
-      l'infobulle du bouton changent ; une compétence que la colonne ne classe pas est sous « Hors C.U.R.I.E », en dernier.
+      l'infobulle du bouton changent. Un numéro de la colonne est un groupe « N° 13 », dans l'ordre des numéros ; une compétence que la
+      colonne ne classe pas (vide, « 0 », « — aucune correspondance — ») n'est **pas** sous cet onglet (elle est sous « Classique »),
+      et aucun titre n'est un numéro nu ni « aucun… ».
 - [ ] Cocher un groupe C.U.R.I.E, puis revenir sous « Classique » : les mêmes compétences sont cochées, leurs domaines complets ou à moitié
       cochés ; les cartes ne bougent pas au changement d'onglet ; le chiffre du bouton suit l'onglet (un groupe entier = 1).
 - [ ] Une recherche tapée sous un onglet s'applique à l'autre ; « Réinitialiser » vide la sélection, et le menu rouvre sur l'onglet
       choisi.
 - [ ] Au clavier : Tabulation arrive sur l'onglet affiché, les flèches (Début, Fin) passent à l'autre, Tabulation mène à la recherche.
-- [ ] Une valeur de colonne écrite de deux façons (« Groupe U », « groupe u ») ne fait qu'un groupe. Une colonne à choix multiples ou de
-      type Référence n'est pas gérée (voir `docs/maintenance.md`).
+- [ ] Une valeur de colonne écrite de deux façons (« 3 » et « 03 », ou « Culture » et « culture ») ne fait qu'un groupe. Une colonne à
+      choix multiples ou de type Référence n'est pas gérée (voir `docs/maintenance.md`).
 
 Spécifique **Tâches par action** : le menu Actions range ses valeurs par action, sans
 second bouton et sans colonne à ajouter dans Grist. Le numéro avant le point du libellé
