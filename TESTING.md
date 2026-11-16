@@ -179,7 +179,7 @@ Sans dépendance, un fichier de tests par module :
   fenêtre, les contrôles sans nom et la mise en page (`dialogFit`), pour
   `tests/e2e-profile.test.mjs`, `tests/e2e-avatar.test.mjs` et `tests/e2e-etablissement.test.mjs`.
 - `tests/support/grouped-menu.mjs` — les aides communes aux tests des menus rangés par
-  groupe (Compétences par domaine, Tâches par action) : groupe, case, flèche,
+  groupe (Compétences par domaine, Actions par numéro) : groupe, case, flèche,
   nombres, éléments visibles, et le parcours au clavier (`assertKeyboardWalk`).
 - `tests/support/fiction.mjs` — le contrôle que le jeu de données d'un test ne contient que des
   coordonnées inventées (`assertFictionalContacts`), et le repérage, dans un texte quelconque, d'une
@@ -287,7 +287,7 @@ scénarios sont ignorés.
 
 `tests/e2e-taches.test.mjs` y ajoute 25 scénarios sur le menu Actions rangé par action,
 sur des tâches et des actions numérotées (`withTaskActions` dans `tests/fixtures.mjs`) :
-huit boutons seulement, le filtre Actions inchangé, actions repliées avec « Sans action »
+sept boutons seulement (plus de filtre « Actions » à plat), actions repliées avec « Sans action »
 en dernier, case d'action et case partielle, OU dans le menu et ET avec les autres
 filtres, nombres de cartes, recherche d'une action, d'une tâche ou d'un numéro, tag de
 carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numéros (console
@@ -389,7 +389,7 @@ données de la mise en page ne contient que des coordonnées fictives) sur la mi
 noms, e-mails, fonctions et tags très longs, dont certains sans point de
 coupure) : aucun défilement horizontal, texte contenu dans les cartes, nom
 jamais sous le badge de l'établissement, trois, deux puis une colonne, barre
-d'outils, menus de filtres (les menus Compétences et Tâches dépliés compris) entièrement
+d'outils, menus de filtres (les menus Compétences et Actions dépliés compris) entièrement
 dans le cadre, cibles tactiles (écran
 tactile émulé), taille du texte des cartes (12px au moins à toute largeur, souris ou doigt), pastilles de
 24px de haut et petites cibles isolées (WCAG 2.5.8), bandeau d'erreur et état vide à 320px, et
@@ -720,7 +720,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
       correspondent aux deux restent.
 - [ ] Recherche libre + un filtre catégorie en même temps → les deux
       s'appliquent ensemble.
-- [ ] Les 8 filtres cochés simultanément (au moins une valeur chacun) →
+- [ ] Les 7 filtres cochés simultanément (au moins une valeur chacun) →
       résultat cohérent (potentiellement vide, mais sans erreur console).
 
 ## 5. Interactions carte → filtre
@@ -728,7 +728,7 @@ les mêmes essais en remplaçant domaine par action et compétence par tâche, p
 - [ ] Cliquer sur le badge établissement d'une carte → le filtre
       Établissement se coche sur cette valeur, la grille se filtre en
       conséquence.
-- [ ] Cliquer sur un tag Instances/Actions/GT/Compétences/Communautés/Tâches
+- [ ] Cliquer sur un tag Instances/Actions/GT/Compétences/Communautés/Rôle dans le PUI
       d'une carte → le filtre correspondant se coche, curseur "main" au
       survol de ces tags.
 - [ ] **Après un clic sur un tag/badge de carte** (pas dans le menu) : ouvrir
@@ -1699,7 +1699,7 @@ Grist ne se charge pas ; le reste se lit ou se tabule.
       (relecture). À la souris, cliquer une étiquette filtre la liste sans faire apparaître d'anneau de focus.
 - [ ] **Une case cochée au clavier garde le focus.** Dans un menu à plat (Établissement, par exemple), elle passe en
       tête sans que le focus la quitte et, dans un menu long, le menu défile jusqu'à elle ; à la souris, la liste ne
-      bouge pas sous le doigt. Dans un menu par groupe (Compétences, Tâches), rien ne bouge pendant qu'on coche, au
+      bouge pas sous le doigt. Dans un menu par groupe (Compétences, Actions), rien ne bouge pendant qu'on coche, au
       clavier comme à la souris : les cases cochées passent devant à l'ouverture suivante.
 - [ ] **Une seule zone annoncée.** Avec un lecteur d'écran, taper un nom dans la recherche : il annonce le nombre de
       contacts (« 3 sur 245 contacts » depuis la 1.34.0), pas la liste des cartes.
@@ -1823,7 +1823,7 @@ d'être fusionnés. À comparer avec `docs/images/filtre-competences.png`, `docs
 - [ ] **Le clavier ne se cache pas sous elle.** Menu long ouvert, descendre de case en case avec Tab, puis remonter avec Maj+Tab :
       la case qui a le focus n'est jamais cachée par le champ de recherche, anneau de focus compris.
 - [ ] **L'aide est écrite dans le menu.** « Compétences » : sous la recherche, « Cochez un domaine pour toutes ses compétences, ou
-      dépliez-le pour choisir parmi elles » ; « Tâches » : « Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi
+      dépliez-le pour choisir parmi elles » ; « Actions » : « Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi
       elles ». Elle défile avec la liste, disparaît dès qu'on tape dans la recherche du menu et revient quand on l'efface ; un menu à
       plat (Instances, Établissement, GT) n'en a pas. Avec un lecteur d'écran, elle est lue à l'ouverture du menu.
 - [ ] **Le compteur dit sur combien.** « 245 contacts » sans recherche ni filtre ; « 3 sur 245 contacts » dès qu'une recherche ou un
