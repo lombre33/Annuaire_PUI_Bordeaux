@@ -125,7 +125,7 @@ export function pruneStaleFilters(activeFilters, referenceMaps) {
 export function computeFilterCounts(contacts, activeFilters, searchTerm, scope) {
   const counts = {};
   FILTERS.forEach(filter => {
-    const keys = filter.grouping ? [filter.key, filter.grouping] : [filter.key];
+    const keys = [filter.key, ...(filter.groupings ?? [])];
     const tallies = new Map(keys.map(key => [key, new Map()])); // des Map : un libellé peut être « constructor »
     filterContacts(contacts, activeFilters, searchTerm, scope, filter.key).forEach(contact => {
       keys.forEach(key => labelsOf(contact, key).forEach(label => {
@@ -150,10 +150,11 @@ export function computeFilterCounts(contacts, activeFilters, searchTerm, scope) 
 // différents, elle figure dans les deux. Un groupe se reconnaît à son libellé normalisé
 // (casse, accents), comme son compteur, et garde la première écriture. `null` quand le
 // menu reste plat : la catégorie n'a pas de regroupement, ou Grist n'en donne aucun
-// (colonne de regroupement absente, libellés d'une table illisible).
-export function menuGroups(filter, referenceMaps) {
-  const grouping = filter.grouping && CATEGORIES[filter.grouping];
-  const groupOf = grouping && referenceMaps[filter.grouping];
+// (colonne de regroupement absente, libellés d'une table illisible). `groupingKey` : celui des
+// regroupements du menu (CATEGORIES.*.groupings) qui range les valeurs, le premier par défaut.
+export function menuGroups(filter, referenceMaps, groupingKey = filter.groupings?.[0]) {
+  const grouping = groupingKey && CATEGORIES[groupingKey];
+  const groupOf = grouping && referenceMaps[groupingKey];
   if (!groupOf || Object.keys(groupOf).length === 0) return null;
 
   const byGroup = new Map();
@@ -169,6 +170,15 @@ export function menuGroups(filter, referenceMaps) {
   return [...byGroup]
     .sort(([keyA, a], [keyB, b]) => rank(keyA) - rank(keyB) || compareLabels(a.label, b.label))
     .map(([, { label, values }]) => ({ label, values: [...values.values()].sort(compareLabels) }));
+}
+
+// Les rangements qu'un menu peut montrer : [{ grouping, groups }], dans l'ordre de CATEGORIES.*.groupings, sans ceux que Grist ne
+// remplit pas (menuGroups rend null). Vide : le menu reste à plat ; un seul : un menu par groupe sans onglets ; deux ou plus : des
+// onglets en haut du menu (le premier est le rangement de départ).
+export function menuViews(filter, referenceMaps) {
+  return (filter.groupings ?? [])
+    .map(grouping => ({ grouping, groups: menuGroups(filter, referenceMaps, grouping) }))
+    .filter(view => view.groups !== null);
 }
 
 // Où en est un groupe : 'none', 'some' ou 'all' de ses valeurs sont cochées.

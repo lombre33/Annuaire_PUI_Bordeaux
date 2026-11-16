@@ -60,6 +60,9 @@ function writePhone(field, change, row, columnTypes) {
 
 const writeReference = (field, change) => ({ value: change.apres.id });
 
+// La case « accepte d'apparaître » s'écrit vraie ou fausse, jamais vide : « non » est un choix, pas une absence de réponse.
+const writeConsent = (field, change) => ({ value: change.apres === true });
+
 // Une liste se calcule sur les valeurs ACTUELLES de la fiche.
 function writeList(field, change, row) {
   const current = safeValues(row[field.key]);
@@ -75,7 +78,7 @@ function writeList(field, change, row) {
   return { value: ['L', ...kept, ...added] };
 }
 
-const WRITERS = { image: writeImage, text: writeText, email: writeText, phone: writePhone, reference: writeReference };
+const WRITERS = { image: writeImage, text: writeText, email: writeText, phone: writePhone, reference: writeReference, consent: writeConsent };
 
 // Les valeurs à écrire dans la ligne de BDD pour appliquer `champs` (la forme de
 // diffProfile, ramenée sur la fiche par rebaseChanges) : { values } ou { error }.
@@ -207,9 +210,9 @@ export function unsavedLabels(review, saved, referenceMaps, { attachmentId = nul
 function checkSaveable(review, upload) {
   const keys = Object.keys(review.champs);
   if (keys.length === 0) throw new ProfileSaveError('Aucun changement à enregistrer.');
-  // Fermé par défaut : l'e-mail et l'établissement ne s'écrivent que pour un administrateur.
+  // Fermé par défaut : l'e-mail, l'établissement et le choix d'apparaître d'une autre personne ne s'écrivent que pour un administrateur.
   if (review.admin !== true && PROFILE_FIELDS.some(field => field.admin && keys.includes(field.key))) {
-    throw new ProfileSaveError('Ces modifications ne peuvent pas être enregistrées : l\'e-mail et l\'établissement sont réservés à un administrateur.');
+    throw new ProfileSaveError('Ces modifications ne peuvent pas être enregistrées : l\'e-mail, l\'établissement et le choix d\'apparaître sont réservés à un administrateur.');
   }
   const replacing = review.champs.Avatar?.action === 'replace';
   if (replacing && (!review.file || typeof upload !== 'function')) throw new ProfileSaveError(FAILURES.noFile);

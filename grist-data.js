@@ -120,9 +120,13 @@ export function tableToRows(table) {
   });
 }
 
+// Le texte d'une cellule de libellé. Une liste de choix (['L', 'C', 'R']) se lit « C / R » : sans son marqueur ni ses virgules, et
+// sans deviner un rangement multiple que le widget ne sait pas faire (la colonne du référentiel C.U.R.I.E est un texte ou un choix).
+const labelText = value => (Array.isArray(value) ? safeValues(value).map(text).filter(Boolean).join(' / ') : text(value));
+
 // Première valeur non vide parmi plusieurs colonnes candidates, dans l'ordre.
 export function pickLabel(row, fields) {
-  return fields.map(field => text(row[field])).find(Boolean) || '';
+  return fields.map(field => labelText(row[field])).find(Boolean) || '';
 }
 
 // Une Référence simple arrive sous 3 formes selon la « visible column » de la
@@ -658,7 +662,7 @@ export function groupLabelMap(groupMap, detailMap, fallback) {
 // seraient vides en silence). Une catégorie `corrected` (voir constants.js) lit sa seule
 // colonne corrigée dès que la table en remplit au moins une : une ligne qui n'en a pas est
 // laissée de côté, la console dit combien, au lieu d'être montrée avec son libellé brut.
-function readReferenceMap({ key, table, field, corrected }, result, log) {
+function readReferenceMap({ key, table, field, corrected, optional }, result, log) {
   const rows = tableToRows(result.value);
   const labelFields = [].concat(field);
   const correctedOnly = corrected === true && rows.some(row => text(row[labelFields[0]]));
@@ -667,7 +671,9 @@ function readReferenceMap({ key, table, field, corrected }, result, log) {
   log.info(`[REFS] ${key} (${table}): ${Object.keys(map).length} entrées`
     + (withoutLabel ? ` (${withoutLabel} ligne(s) sans ${correctedOnly ? `${labelFields[0]}, ignorée(s)` : labelFields.join('/')})` : ''));
   const absent = missingColumns(rows, labelFields);
-  if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
+  // Une colonne facultative (le rangement C.U.R.I.E) qui manque n'est pas une anomalie : la console le dit, rien de plus.
+  if (absent.length && optional) log.info(`[REFS] ${table}: colonne(s) facultative(s) absente(s) : ${absent.join(', ')}`);
+  else if (absent.length) log.warn(`[REFS] ${table}: colonne(s) de libellé introuvable(s) : ${absent.join(', ')}`);
   return { map, labelColumnsMissing: absent.length === labelFields.length };
 }
 
@@ -771,12 +777,20 @@ function readReferenceMaps(results, previousMaps, log) {
     const result = results[source.table];
     if (result.status === 'rejected') {
       referenceMaps[source.key] = previousMaps[source.key] ?? {};
+      // Un rangement facultatif que la lecture d'avant n'offrait pas ne s'offre pas davantage parce que la table est illisible : classer
+      // toutes les compétences sous le seul groupe de repli ferait un faux onglet.
+      if (source.optional && Object.keys(referenceMaps[source.key]).length === 0) withoutLabelColumn.add(source.key);
       return;
     }
     const read = readReferenceMap(source, result, log);
     referenceMaps[source.key] = read.map;
     if (read.labelColumnsMissing) {
-      unlabeled.push({ table: source.table, fields: [].concat(source.field) });
+      // Une colonne facultative absente ne s'annonce pas au bandeau : le rangement qu'elle donnerait n'est simplement pas proposé.
+      if (!source.optional) unlabeled.push({ table: source.table, fields: [].concat(source.field) });
+      withoutLabelColumn.add(source.key);
+    } else if (source.optional && Object.keys(read.map).length === 0) {
+      // Une colonne facultative vide ne range rien : classer toutes les lignes sous le seul groupe de repli n'aiderait personne.
+      log.info(`[REFS] ${source.key} (${source.table}) : colonne ${[].concat(source.field).join('/')} vide, le rangement correspondant n'est pas proposé.`);
       withoutLabelColumn.add(source.key);
     }
   });
