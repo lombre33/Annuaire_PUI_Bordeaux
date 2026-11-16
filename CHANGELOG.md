@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.37.0 — Un bouton « Documentation » dans l'en-tête, dont l'adresse se change en un seul endroit
+
+Point 9 des « retours pour finaliser le projet » d'Antoine (16 novembre 2026) : lire la documentation technique depuis le document Grist, par un petit bouton en haut. Premier pas de la préparation de la migration vers un dépôt de production
+(point 8) : l'adresse de la documentation est une constante, elle ne se déduit pas de celle du widget. Rien à régler dans Grist.
+
+- **Un petit bouton « Documentation » sous le slogan** (`#docLink`, `index.html`). Un clic ouvre **la page du dépôt** dans un autre onglet : son README, dont la section « Documentation » mène au guide utilisateur, à la documentation développeur, à `GRIST_SETUP.md`, à la sécurité et à la
+  maintenance, rendues par GitHub (tableaux, schémas, images). Le lien porte `target="_blank"` et `rel="noopener noreferrer"` comme celui du bandeau du bas : l'onglet n'a pas accès à la page du widget (`window.opener` vaut `null`, vérifié). Il est annoncé aux lecteurs d'écran « Documentation (s'ouvre dans
+  un nouvel onglet) » ; la flèche ↗ est décorative.
+- **Pourquoi un onglet, et non la page affichée dans le widget.** (1) GitHub refuse d'être affiché dans un cadre (`X-Frame-Options: deny` sur `github.com`, relevé le 16 novembre 2026). (2) Lire les fichiers du dépôt et les mettre en page dans le widget demanderait un `fetch` de plus et un convertisseur
+  Markdown : la page de sécurité garantit aujourd'hui **une seule requête réseau** (l'envoi d'un logo ou d'une photo), et le widget a l'accès complet au document. (3) Ces pages font de 30 à 300 Ko de texte chacune, et le cadre d'un widget Grist est petit. Si l'ouverture dans le widget lui-même reste voulue,
+  la piste est un cadre sur la version GitHub Pages des pages (une adresse de plus dans la politique de sécurité de contenu, `frame-src`, et des pages sans la mise en forme de GitHub) : à décider avec Antoine.
+- **Une seule adresse à changer : `DOCS_URL`** (`constants.js`, à côté de `PUI_URL`). Elle vaut aujourd'hui `https://github.com/lombre33/Annuaire_PUI_Bordeaux#documentation`. À la migration vers le dépôt de production, c'est cette ligne qui change (avec `manifest.yml` et les adresses de la documentation). **Une chaîne vide retire
+  le bouton** : à employer si le nouveau dépôt n'est pas lisible sans compte, car la page ne s'ouvrirait pas pour les personnes du document. `index.html` n'a pas d'adresse : `main.js` la donne au lien, qui est caché tant qu'il n'en a pas. Un `index.html` ancien, sans le lien (le cache de GitHub Pages garde chaque
+  fichier dix minutes), ne gêne pas le code neuf.
+- **Où il est, et pourquoi.** Sous le slogan, et non sur la ligne du titre : la largeur de cette ligne règle le centrage des financeurs (`style.css`, « En-tête »), un bouton de plus l'aurait élargie. Il tient dans la largeur du slogan, donc rien ne bouge à 320, 414, 860, 1 180 et 1 480 px (mesuré : les financeurs restent centrés, aucun
+  défilement horizontal). Même teinte et même bord que « Réinitialiser » ; il **ne s'imprime pas** (une commande de plus, comme la barre d'outils).
+- **Sécurité.** Aucune requête du widget : c'est un lien, le navigateur l'ouvre au clic. `docs/securite.md` (puce « Réseau ») le dit, nomme `github.com` et `DOCS_URL`, et `tests/docs.test.mjs` exige maintenant **deux** adresses écrites dans `constants.js` (`PUI_URL`, `DOCS_URL`), dont chacune porte `rel="noopener noreferrer"` et
+  dont le serveur est nommé dans la page de sécurité.
+- **Tests.** `tests/doc-link.test.mjs` (7 tests, dont 5 dans un navigateur) : `DOCS_URL` vide ou en https sans identifiants ; le lien de `index.html` (caché, sans adresse, autre onglet, nom pour les lecteurs d'écran) ; sa place (dans l'en-tête, sous le titre, au-dessus de la barre d'outils, au moins 24 px) ; un clic qui
+  ouvre `DOCS_URL` dans un onglet sans `window.opener` ; rien sur le papier ; rien sans adresse (`constants.js` servi avec `DOCS_URL = ''`) ; rien non plus avec un `index.html` ancien. Cinq échouent avec l'ancien code.
+- **À confirmer par Antoine, dans le vrai Grist.** Le lien suit le même principe que celui du bandeau du bas (qui n'a jamais posé de problème), mais un clic dans le cadre de Grist n'a pas été essayé ici : si Grist empêchait l'ouverture d'un onglet depuis un widget, ni l'un ni l'autre ne s'ouvrirait. Les captures de
+  `docs/images/` qui montrent l'en-tête n'ont pas le bouton : elles seront refaites à la prochaine passe sur la documentation.
+
 ## 1.36.0 — Audit UI/UX : le bord des champs se voit, 4 à 5 colonnes sur les très grands écrans, la page s'imprime, la police Inter est embarquée
 
 Dernier lot de la réponse d'Antoine du 3 novembre 2026 (« Les seize »), le troisième des **onze constats qui changent un peu l'écran** (U25, U12, U11, U41). Comme convenu, chacun est montré en images avant/après à Antoine avant d'être fusionné, et il peut en

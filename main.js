@@ -10,7 +10,7 @@
 // et logos-report.js (les logos : cartes, fondateurs, bilan de la console) et
 // avatar-ui.js (les photos de profil), status-ui.js (le bandeau d'état et l'écran « Aucun contact »).
 
-import { CONSENT_COLUMN, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
+import { CONSENT_COLUMN, DOCS_URL, ETABLISSEMENT_NAMES, SEARCH_DELAY_MS, VERSION } from './constants.js';
 import { loadDirectory, describeLoadFailure, debounce, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, describeEmptyResults, filterContacts, countInScope, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
@@ -37,6 +37,14 @@ import { createAvatar, createPhotoViewer, createThumb } from './avatar-ui.js';
 // minutes : un index.html ancien sans cette ligne ne doit pas empêcher le code neuf de démarrer.
 const versionNote = document.getElementById('versionNote');
 if (versionNote) versionNote.textContent = `Version ${VERSION}`;
+
+// Le lien « Documentation » de l'en-tête (DOCS_URL, constants.js) : caché dans index.html, il n'apparaît qu'avec son adresse. Sans adresse,
+// ou avec un index.html ancien qui n'a pas ce lien (cache de GitHub Pages), il n'y en a pas et rien d'autre n'en dépend.
+const docLink = document.getElementById('docLink');
+if (docLink && DOCS_URL) {
+  docLink.href = DOCS_URL;
+  docLink.hidden = false;
+}
 
 const state = {
   // Faux jusqu'à la première lecture réussie de Grist : d'ici là le compteur dit « Chargement… » et rien d'autre ne s'affiche
