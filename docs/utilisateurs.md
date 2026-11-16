@@ -331,7 +331,7 @@ Vous pouvez corriger vous-même votre fiche : votre nom, votre fonction, l'adres
 | Information | Dans ce formulaire ? |
 |---|---|
 | Prénom, nom, fonction, téléphone | Oui, en saisissant le texte |
-| Rôle dans le PUI | Oui, dans une liste déroulante (une valeur, ou « Non renseigné ») |
+| Rôle dans le PUI | Oui, une liste à cocher : les rôles se cumulent (depuis la 1.42.0) |
 | Instances, GT, Compétences, Communautés, Actions | Oui, en cochant ou en décochant des pastilles. Les compétences sont rangées par domaine et les tâches par action, mais seules les compétences et les tâches se cochent |
 | Les actions dont vous êtes responsable | Oui, avec les cases du bloc **Responsable de**, sous la liste des actions : une case par action que vous avez choisie. Le bloc n'existe que si le document Grist a la colonne `Taches_responsable` ([Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable)) |
 | Adresse e-mail affichée | Oui, avec le champ facultatif « E-mail affiché » : la carte montre cette adresse à la place de celle de votre compte. Le champ n'existe que si le document Grist a la colonne `email_affiche` ([L'adresse e-mail affichée](#ladresse-e-mail-affichée)) |
@@ -352,7 +352,7 @@ Le formulaire s'ouvre avec les valeurs actuelles de la fiche. Sous le titre, une
 - **Photo de profil** : votre photo actuelle (ou vos initiales) et les boutons pour la changer, quand le document Grist a une colonne `Avatar` ([Ma photo de profil](#ma-photo-de-profil)).
 - **Prénom, Nom, Fonction, Téléphone** : des zones de texte.
 - **E-mail affiché** (entre la fonction et le téléphone) : une zone de texte facultative, pour montrer sur votre carte une autre adresse que celle de votre compte ([L'adresse e-mail affichée](#ladresse-e-mail-affichée)). Elle n'existe que si le document Grist a la colonne `email_affiche`.
-- **Rôle dans le PUI** : une liste déroulante. Elle s'ouvre sur une zone de recherche et les valeurs, que la saisie réduit en direct (sans tenir compte des accents ni des majuscules), comme les menus de filtre ; « Non renseigné » n'en choisit aucune : elle est la première valeur de la liste, mais n'apparaît pas parmi les résultats d'une recherche.
+- **Rôle dans le PUI** : une liste à cocher, comme les instances ou les communautés (depuis la 1.42.0 les rôles se cumulent : cochez-en autant que nécessaire ; une zone de recherche réduit la liste en direct, sans tenir compte des accents ni des majuscules). « Membre d'une action » n'est pas à cocher : vos actions vous le donnent.
 - **Instances, GT, Compétences, Communautés, Actions** : toutes les valeurs que Grist propose, en pastilles. Un clic coche ou décoche une pastille, et chaque liste dit combien de valeurs sont sélectionnées. Une zone de recherche, sous le titre de chaque liste, ne garde que les pastilles qui répondent à ce qu'on tape (sans tenir compte des accents ni des majuscules). Une valeur que Grist propose sous plusieurs lignes du même libellé n'est proposée qu'une fois : la cocher ou la décocher agit sur toutes.
 - **Responsable de** : sous la liste des actions, une case par action que vous avez choisie ([Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable)).
 - **Ce qui va changer** : sous les listes, un encadré apparaît dès que vous modifiez quelque chose et dit, champ par champ, ce qui change.

@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { ACTIONS_COLUMN, CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
+import { ACTIONS_COLUMN, CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, ROLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -123,7 +123,10 @@ export function safeValues(value) {
 }
 
 // Les éléments d'une cellule de liste de références : ses valeurs, ou les numéros de ligne que contient un texte « [0,14,21,30] » (idsInText).
+// Une Référence simple (un identifiant, ou ['R', table, id]) se lit comme une liste d'un élément : une colonne qui passe de référence à liste, ou
+// l'inverse (BDD.Role_dans_le_PUI, 1.42.0), se lit sans rien changer.
 export function listItems(cell) {
+  if (Array.isArray(cell) && cell[0] === 'R') return refId(cell) ? [refId(cell)] : [];
   return (typeof cell === 'string' && idsInText(cell)) || safeValues(cell);
 }
 
@@ -351,7 +354,7 @@ function taskRolesOf(contact, referenceMaps) {
 }
 
 // ===== RÔLES DANS LE PUI =====
-// Le rôle que la personne a choisi (BDD.Role_dans_le_PUI, un seul) ne dit pas tout : une personne qui a au moins une action est « Membre
+// Les rôles que la personne a choisis (BDD.Role_dans_le_PUI, une liste depuis la 1.42.0 : ils se cumulent) ne disent pas tout : une personne qui a au moins une action est « Membre
 // d'une action », qu'elle ait aussi un autre rôle ou non (demande d'Antoine du 16 novembre 2026 : « le widget le met et le retire »). Ce rôle-là
 // n'est écrit nulle part : il se calcule à chaque lecture d'après les actions de la personne (BDD.Taches). Une personne qui perd sa dernière
 // action le perd donc d'elle-même, et celle dont Grist, un import ou un administrateur change les actions n'attend personne. Si la table des
@@ -402,13 +405,16 @@ export function filterableRoles(roleMap, { responsible: columnExists = false } =
 
 // Les rôles d'une personne, dans l'ordre où la carte les écrit : celui qu'elle a choisi (sauf les rôles calculés, que le calcul seul décide),
 // puis « Membre d'une action » si elle a au moins une action, puis « Responsable d'une action » si elle en a coché au moins une dont elle est
-// responsable. `stored` : le libellé de BDD.Role_dans_le_PUI ; `hasActions` : la personne a au moins une action ; `roleMap` : les libellés de
+// responsable. `stored` : les libellés de BDD.Role_dans_le_PUI ; `hasActions` : la personne a au moins une action ; `roleMap` : les libellés de
 // la table des rôles ; `isResponsible` : elle est responsable d'au moins une de ses actions (responsibleActions). Un « Responsable d'une
 // action » choisi à la main reste tel quel tant que la personne n'a coché aucune action : il ne dit alors rien de plus.
 export function roleEntries(stored, hasActions, roleMap, isResponsible = false) {
   const { member, responsible } = automaticRoles(roleMap);
-  const own = stored ? roleWords(stored) : '';
-  const chosen = own && own !== roleWords(member) && !(isResponsible && own === roleWords(responsible)) ? [stored] : [];
+  // `stored` : les libellés des rôles que la personne a (plusieurs depuis la 1.42.0), ou un seul libellé.
+  const chosen = [stored].flat().filter(Boolean).filter(role => {
+    const own = roleWords(role);
+    return own && own !== roleWords(member) && !(isResponsible && own === roleWords(responsible));
+  });
   return [...chosen, ...(hasActions ? [member] : []), ...(isResponsible ? [responsible] : [])];
 }
 
@@ -453,7 +459,8 @@ export function enrich(contact, referenceMaps, etabFlags) {
   // montre, sans filtre, et la personne a une action, donc le rôle « Membre d'une action », qu'elle ait des tâches ou non.
   const heldActions = heldActionsOf(contact, referenceMaps, lists.taches);
   const shownActions = heldActions.length > 0 ? [...lists.taches, ...heldActions] : lists.taches;
-  const roles = roleEntries(refLabel(contact.Role_dans_le_PUI, referenceMaps.role), shownActions.length > 0, referenceMaps.role, actions.length > 0);
+  const chosenRoles = uniqueLabels(listItems(contact.Role_dans_le_PUI).map(item => resolveListItem(item, referenceMaps.role)).filter(Boolean));
+  const roles = roleEntries(chosenRoles, shownActions.length > 0, referenceMaps.role, actions.length > 0);
   const flags = etablissementFlags(contact, etabFlags);
 
   return {
@@ -995,7 +1002,7 @@ function reportHeldActions(contacts, log) {
 // deux cas la console dit où elles sont (identifiants de ligne de BDD et forme du texte, jamais un nom) pour les corriger dans Grist : la fiche d'une
 // telle personne ne peut pas être modifiée depuis le widget tant que la cellule est du texte (profile-save.js).
 function warnAboutTextInLists(rows, log) {
-  const columns = [...new Set([...LIST_CATEGORIES.map(({ column }) => column), ACTIONS_COLUMN, RESPONSIBLE_COLUMN])];
+  const columns = [...new Set([...LIST_CATEGORIES.map(({ column }) => column), ACTIONS_COLUMN, RESPONSIBLE_COLUMN, ROLE_COLUMN])];
   columns.forEach(column => {
     const bad = rows.filter(row => typeof row[column] === 'string' && isIdListText(row[column]));
     if (bad.length === 0) return;

@@ -8,8 +8,8 @@
 // libellé) n'est jamais perdue, et ce qu'un autre a changé entre-temps non plus.
 
 import { avatarIdOf } from './attachments.js';
-import { CATEGORIES, PROFILE_FIELDS, fieldsFor } from './constants.js';
-import { automaticRoles, compareLabels, formatPhone, normalize, normalizeEmail, refId, safeValues, text } from './grist-data.js';
+import { CATEGORIES, PROFILE_FIELDS, ROLE_COLUMN, fieldsFor } from './constants.js';
+import { automaticRoles, compareLabels, formatPhone, listItems, normalize, normalizeEmail, refId, text } from './grist-data.js';
 
 export const MAX_TEXT_LENGTH = 200;
 
@@ -194,7 +194,7 @@ function labelsKey(field, referenceMaps) {
 // formulaire peut montrer. Une ligne qui se lit comme une autre compte pour son entrée.
 function knownIds(cell, options) {
   const entryOf = entryOfRow(options);
-  return [...new Set(safeValues(cell).filter(item => typeof item === 'number' && entryOf.has(item)).map(item => entryOf.get(item)))];
+  return [...new Set(listItems(cell).filter(item => typeof item === 'number' && entryOf.has(item)).map(item => entryOf.get(item)))];
 }
 
 // Les établissements qu'une fiche peut choisir : ceux que la table Etablissements marque fondateur ou partenaire,
@@ -210,18 +210,18 @@ function choosableEtablissements(options, row, etabFlags) {
 }
 
 // Les rôles qu'une fiche peut choisir : ceux de la table des rôles, sauf « Membre d'une action », que les actions de la personne lui donnent
-// d'office (roleEntries, grist-data.js) : le choisir n'aurait aucun effet. Celui que la fiche porte déjà reste dans la liste, pour qu'elle
-// le montre.
+// d'office (roleEntries, grist-data.js) : le choisir n'aurait aucun effet. Ceux que la fiche porte déjà restent dans la liste, pour qu'elle
+// les montre.
 function choosableRoles(options, row, referenceMaps) {
   const { member } = automaticRoles(referenceMaps.role);
-  const current = refId(row.Role_dans_le_PUI);
-  return options.filter(option => option.id === current || normalize(option.label) !== normalize(member));
+  const current = new Set(listItems(row[ROLE_COLUMN]));
+  return options.filter(option => (option.ids || [option.id]).some(id => current.has(id)) || normalize(option.label) !== normalize(member));
 }
 
-// Ce qu'une référence propose : les établissements et les rôles se restreignent (voir plus haut), les autres références proposent tout.
-function choosable(field, options, row, referenceMaps, etabFlags) {
-  if (field.category === 'etablissement') return choosableEtablissements(options, row, etabFlags);
-  return field.category === 'role' ? choosableRoles(options, row, referenceMaps) : options;
+// Ce qu'une référence simple propose : les établissements se restreignent (voir plus haut), les autres références proposent tout. (Les rôles,
+// une liste depuis la 1.42.0, se restreignent par choosableRoles.)
+function choosable(field, options, row, etabFlags) {
+  return field.category === 'etablissement' ? choosableEtablissements(options, row, etabFlags) : options;
 }
 
 // Le formulaire de modification d'une fiche : un champ par PROFILE_FIELDS, avec la
@@ -244,9 +244,10 @@ export function profileFormModel(row, referenceMaps, { admin = false, creating =
     if (field.kind === 'consent') return { ...base, value: row[field.key] === true };
     const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: field.kind === 'list' });
     if (field.kind === 'reference') {
-      return { ...base, options: choosable(field, options, row, referenceMaps, etabFlags), value: refId(row[field.key]) || 0 };
+      return { ...base, options: choosable(field, options, row, etabFlags), value: refId(row[field.key]) || 0 };
     }
-    return { ...base, options, value: knownIds(row[field.key], options) };
+    const offered = field.category === 'role' ? choosableRoles(options, row, referenceMaps) : options;
+    return { ...base, options: offered, value: knownIds(row[field.key], offered) };
   });
 }
 
@@ -435,7 +436,7 @@ function rebaseReference(field, change, row, referenceMaps) {
 
 // Une liste garde ses ajouts et ses retraits, moins ceux qui sont déjà faits : ils s'appliquent à n'importe quel état.
 function rebaseList(field, change, row) {
-  const present = new Set(safeValues(row[field.key]).filter(Number.isSafeInteger));
+  const present = new Set(listItems(row[field.key]).filter(Number.isSafeInteger));
   const there = entry => (entry.ids || [entry.id]).some(id => present.has(id));
   const ajout = change.ajout.filter(entry => !there(entry));
   const retrait = change.retrait.filter(there);
