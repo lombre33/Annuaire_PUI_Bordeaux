@@ -680,7 +680,7 @@ test('describeChanges says the e-mail and the établissement like any other text
   ]);
 });
 
-// ===== La case « Accepte d'apparaître » : l'administrateur la règle sur la fiche d'une autre personne (1.37.0) =====
+// ===== La case « Accepte d'apparaître » : l'administrateur la règle sur la fiche d'une autre personne (1.38.0) =====
 
 const CONSENT_KEY = 'Accepte_apparaitre';
 const CONSENT_LABEL_ADMIN = 'Accepte d’apparaître dans l’annuaire';

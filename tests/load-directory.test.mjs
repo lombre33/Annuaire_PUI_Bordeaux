@@ -367,7 +367,7 @@ test('loadDirectory reuses the previous skills and domains together when the Com
   assert.deepEqual([firstLoad.referenceMaps.macro, firstLoad.referenceMaps.competences], [{}, {}]);
 });
 
-// ===== Compétences C.U.R.I.E : une colonne facultative de plus de la table Competences (1.37.0) =====
+// ===== Compétences C.U.R.I.E : une colonne facultative de plus de la table Competences (1.38.0) =====
 
 // Les avertissements de la console qui parlent des compétences : ceux du reste de l'annuaire d'exemple (Eve n'a pas d'établissement) n'y sont pas.
 const aboutSkills = warnings => warnings.filter(args => /Competences|C_U_R_I_E/.test(String(args[0])));

@@ -295,7 +295,7 @@ et sans bandeau), clavier, et le formulaire de modification de fiche, qui range 
 les tâches par action.
 
 `tests/e2e-curie.test.mjs` y ajoute 18 scénarios sur les onglets « Classique » et « C.U.R.I.E » du menu Compétences
-(1.37.0, `withCurie` dans `tests/fixtures.mjs` : la colonne facultative `referenciel_C_U_R_I_E` de `Competences`) : les deux onglets
+(1.38.0, `withCurie` dans `tests/fixtures.mjs` : la colonne facultative `referenciel_C_U_R_I_E` de `Competences`) : les deux onglets
 juste au-dessus de la recherche, le même menu dessous, les groupes C.U.R.I.E avec leurs nombres, une seule sélection pour les deux
 rangements (groupe coché d'un côté, domaine à moitié coché de l'autre, badge qui suit l'onglet), nombres de groupes qui suivent
 l'interrupteur Partenaires et les autres filtres, tag de carte, recherche déjà tapée qui s'applique à l'autre onglet, flèches, Début, Fin
@@ -654,7 +654,7 @@ valeurs par domaine, sans second bouton.
       bandeau « Colonne de libellé introuvable » s'affiche et le menu Compétences
       reste complet, mais à plat, sans domaines.
 
-Spécifique **Compétences, onglet C.U.R.I.E** (1.37.0, **à essayer dans le vrai Grist** : jamais fait) : ajouter, sur une
+Spécifique **Compétences, onglet C.U.R.I.E** (1.38.0, **à essayer dans le vrai Grist** : jamais fait) : ajouter, sur une
 copie du document, la colonne `referenciel_C_U_R_I_E` (texte ou choix) à la table `Competences` et la remplir.
 
 - [ ] Sans la colonne (ou colonne vide) : le menu Compétences est celui d'avant, sans onglets, sans bandeau ; la console dit

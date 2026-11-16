@@ -1,4 +1,4 @@
-// Test navigateur des onglets du menu Compétences (1.37.0, point 2 des retours d'Antoine du 2026-11-16) : « Classique » (les domaines,
+// Test navigateur des onglets du menu Compétences (1.38.0, point 2 des retours d'Antoine du 2026-11-16) : « Classique » (les domaines,
 // comme avant) et « C.U.R.I.E » (les groupes de la colonne facultative `referenciel_C_U_R_I_E` de la table Competences), en haut du menu,
 // juste au-dessus de la recherche. Charge le vrai index.html dans Chromium avec le faux document Grist (optionnel : voir TESTING.md).
 //

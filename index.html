@@ -83,6 +83,10 @@
         </div>
         <p class="subtitle">Annuaire des accompagnateurs de l'innovation</p>
         <p class="tagline">Pas de mauvaise porte, toujours le bon interlocuteur</p>
+        <!-- « Documentation » : caché tant que main.js ne lui a pas donné son adresse (DOCS_URL, constants.js), et pour toujours si elle est
+             vide. Il est ici, sous le slogan, et non sur la ligne du titre : c'est la largeur de cette ligne qui règle le centrage des
+             financeurs (style.css, « En-tête »). Même ouverture que le lien du bandeau du bas : autre onglet, sans transmettre la page. -->
+        <a id="docLink" class="doc-link" target="_blank" rel="noopener noreferrer" hidden>Documentation<span class="sr-only"> (s'ouvre dans un nouvel onglet)</span><span class="doc-link-mark" aria-hidden="true">↗</span></a>
       </div>
       <div id="funders" class="funders">
         <p class="funders-label">Projet financé par l'État dans le cadre de France 2030</p>

@@ -41,7 +41,7 @@ Le widget écrit dans `BDD` dans quatre cas :
   remplies parmi celles du cas précédent, sauf `Avatar` : la photo s'ajoute ensuite ;
 - quand un administrateur, mode admin allumé, enregistre la fiche d'une autre
   personne : les mêmes colonnes que pour la modification d'une fiche, plus `email`,
-  `Etablissement` et, depuis la 1.37.0, `Accepte_apparaitre` (la case « Accepte
+  `Etablissement` et, depuis la 1.38.0, `Accepte_apparaitre` (la case « Accepte
   d’apparaître dans l’annuaire », en tête de sa fenêtre).
 
 Jamais `perimetre` (le widget ne le lit ni ne l'écrit plus depuis la 1.27.0), ni

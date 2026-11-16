@@ -100,7 +100,7 @@ export function describeUnknownAccount({ email, admin, emailColumn = true }) {
 // personne qui n'a pas accepté d'apparaître. `creating` : la personne crée sa fiche et a coché
 // « Apparaître dans l'annuaire » ; si la fiche reste masquée, c'est que quelqu'un d'autre doit régler
 // un point (l'établissement choisi, par exemple, qui n'a pas validé sa présence). `withdrawn` : un administrateur
-// vient de décocher « Accepte d'apparaître » dans la modification qu'il relit (1.37.0) : la fiche disparaît de la
+// vient de décocher « Accepte d'apparaître » dans la modification qu'il relit (1.38.0) : la fiche disparaît de la
 // grille, il ne pourra plus l'ouvrir depuis l'annuaire, et c'est la personne qui la réaffiche. Renvoie '' quand
 // la fiche figure dans l'annuaire.
 export function describeHiddenFiche(status, { own, etablissement = '', creating = false, withdrawn = false }) {

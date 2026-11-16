@@ -631,7 +631,7 @@ test('pruneStaleFilters drops a ticked task that no longer exists, and has no ac
   assert.ok(!('macroTaches' in pruned));
 });
 
-// ===== Compétences : un second rangement, par le référentiel C.U.R.I.E (1.37.0) =====
+// ===== Compétences : un second rangement, par le référentiel C.U.R.I.E (1.38.0) =====
 // Les mêmes compétences, rangées par une autre colonne de la table Competences (`referenciel_C_U_R_I_E`, facultative) : le menu
 // Compétences a alors deux rangements, un onglet chacun. La sélection reste la même (des compétences) ; seuls les groupes changent.
 

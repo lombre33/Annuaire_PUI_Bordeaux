@@ -97,7 +97,7 @@ export function withoutOptionalColumns(tables) {
   return copy;
 }
 
-// Le référentiel C.U.R.I.E (1.37.0) : la colonne facultative `referenciel_C_U_R_I_E` de Competences, qui range les compétences d'une autre
+// Le référentiel C.U.R.I.E (1.38.0) : la colonne facultative `referenciel_C_U_R_I_E` de Competences, qui range les compétences d'une autre
 // façon que les domaines. Avec ces données (périmètre par défaut ; Bob est partenaire) :
 //   Groupe C        → Oncologie (Ana)
 //   Groupe U        → Hématologie (Ana) et Pharmacovigilance (Bob), la seconde écrite « groupe u » : les deux orthographes n'en font qu'un

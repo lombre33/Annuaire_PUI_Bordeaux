@@ -7,7 +7,7 @@ export const MAIN_TABLE = 'BDD';
 export const CONSENT_COLUMN = 'Accepte_apparaitre';
 // Le nom de ce choix pour la personne : la case de la fenêtre de création et la ligne « pas gardé » d'une relecture.
 export const CONSENT_LABEL = 'Apparaître dans l’annuaire';
-// Le même choix vu par un administrateur qui modifie la fiche d'une autre personne (1.37.0) : la case en tête de sa fenêtre, et sa ligne
+// Le même choix vu par un administrateur qui modifie la fiche d'une autre personne (1.38.0) : la case en tête de sa fenêtre, et sa ligne
 // de la relecture (« Accepte d’apparaître dans l’annuaire : Non → Oui »).
 export const CONSENT_ADMIN_LABEL = 'Accepte d’apparaître dans l’annuaire';
 
@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.36.0';
+export const VERSION = '1.38.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -81,6 +81,14 @@ export const PRESENCE_ANNOUNCE_MS = 6000;
 
 // Page du projet, vers laquelle renvoie la phrase du bandeau du bas.
 export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos-leviers/pui-reveler-le-potentiel-du-territoire';
+
+// Documentation, vers laquelle mène le lien « Documentation » de l'en-tête (index.html, `docLink` ; main.js lui donne cette adresse) :
+// la page du dépôt, dont le README renvoie au guide utilisateur, à la documentation développeur, à la sécurité et à la maintenance.
+// Le lien s'ouvre dans un autre onglet, comme celui du bandeau du bas. C'est l'adresse à changer quand le dépôt change d'adresse
+// (une migration : elle ne se déduit pas de celle du widget, qui peut être servi par un autre site que le dépôt). Une chaîne vide
+// retire le lien : à employer si la page n'est pas lisible sans compte, elle ne s'ouvrirait pas pour les personnes du document.
+// Toujours en https, et son serveur est nommé dans docs/securite.md (tests/docs.test.mjs).
+export const DOCS_URL = 'https://github.com/lombre33/Annuaire_PUI_Bordeaux#documentation';
 
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.
@@ -150,7 +158,7 @@ export const CATEGORIES = {
     hint: 'Cochez un domaine pour toutes ses compétences, ou dépliez-le pour choisir parmi elles',
     placeholder: 'Domaine ou compétence…'
   },
-  // Le rangement des compétences par le référentiel C.U.R.I.E (colonne facultative `referenciel_C_U_R_I_E` de la table Competences, 1.37.0) :
+  // Le rangement des compétences par le référentiel C.U.R.I.E (colonne facultative `referenciel_C_U_R_I_E` de la table Competences, 1.38.0) :
   // le second onglet du menu Compétences. Même table, même colonne de BDD et mêmes valeurs que le rangement par domaine, seul le groupe change.
   curie: {
     label: 'C.U.R.I.E', color: '#00697f', table: 'Competences', field: ['referenciel_C_U_R_I_E'], column: 'Competences',
@@ -242,7 +250,7 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 const LIST_FIELD_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches'];
 
 export const PROFILE_FIELDS = [
-  // Au début de la fenêtre d'un administrateur sur la fiche d'une autre personne (1.37.0). Pas à la création : la personne y a sa propre case
+  // Au début de la fenêtre d'un administrateur sur la fiche d'une autre personne (1.38.0). Pas à la création : la personne y a sa propre case
   // (CONSENT_LABEL, hors de ces champs), cochée d'avance. Sur sa fiche, c'est l'interrupteur du bandeau « Ma présence » qui la règle.
   { key: CONSENT_COLUMN, label: CONSENT_ADMIN_LABEL, kind: 'consent', admin: true, afterCreation: true },
   { key: 'Avatar', label: 'Photo de profil', kind: 'image', afterCreation: true },

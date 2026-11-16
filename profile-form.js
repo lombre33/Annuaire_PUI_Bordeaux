@@ -27,7 +27,7 @@ const PHOTO_HELP = 'Elle remplace les initiales sur la carte et s’agrandit au 
 // de la créer masquée, et elle écrit Accepte_apparaitre avec la fiche.
 const PUBLISH_HELP = 'Décochée, votre fiche est créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page.';
 
-// La même case sur la fiche d'une autre personne, pour un administrateur (1.37.0) : elle règle la colonne que la personne règle elle-même
+// La même case sur la fiche d'une autre personne, pour un administrateur (1.38.0) : elle règle la colonne que la personne règle elle-même
 // avec l'interrupteur de son bandeau.
 const ADMIN_CONSENT_HELP = 'Décochée, la fiche n’apparaît pas dans l’annuaire. La personne règle aussi ce choix elle-même, avec l’interrupteur de son bandeau.';
 

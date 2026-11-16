@@ -1139,7 +1139,7 @@ for (const width of [280, 360]) {
     }));
 }
 
-// ===== L'administrateur règle « Accepte d'apparaître » sur la fiche d'une autre personne (1.37.0) =====
+// ===== L'administrateur règle « Accepte d'apparaître » sur la fiche d'une autre personne (1.38.0) =====
 
 const consentBox = page => field(page, 'Accepte_apparaitre');
 const WITHDRAWN_NOTICE = 'Après cette modification, la fiche ne sera plus visible dans l’annuaire et vous ne pourrez plus l’ouvrir ici. '

@@ -695,7 +695,7 @@ const SCENES = [
       exiger(await page.locator('#profile-email').isVisible() && await page.locator('#profile-Etablissement').isVisible(), 'l\'e-mail et l\'établissement ne sont pas modifiables');
       exiger(await fenetre(page).locator('.ident-lock').count() === 0, 'la fenêtre d\'un administrateur ne verrouille rien');
       exiger(await fenetre(page).locator('.photo-field').count() === 1, 'l\'administrateur devrait aussi voir la carte « Photo de profil »');
-      exiger(await page.locator('#profile-Accepte_apparaitre').isChecked(), 'la case « Accepte d’apparaître dans l’annuaire » devrait être là, cochée (1.37.0)');
+      exiger(await page.locator('#profile-Accepte_apparaitre').isChecked(), 'la case « Accepte d’apparaître dans l’annuaire » devrait être là, cochée (1.38.0)');
       await page.evaluate(() => document.activeElement.blur());
     }
   },

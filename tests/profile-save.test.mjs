@@ -516,7 +516,7 @@ test('unsavedLabels notices an e-mail or an établissement that Grist did not ke
   assert.deepEqual(unsavedLabels(next, { ...saved, Etablissement: 4 }, w.referenceMaps), ['Établissement']);
 });
 
-// ===== L'administrateur qui règle « Accepte d'apparaître » sur la fiche d'une autre personne (1.37.0) =====
+// ===== L'administrateur qui règle « Accepte d'apparaître » sur la fiche d'une autre personne (1.38.0) =====
 
 const CONSENT = 'Accepte_apparaitre';
 const CONSENT_LINE_LABEL = 'Accepte d’apparaître dans l’annuaire';
