@@ -1139,6 +1139,108 @@ for (const width of [280, 360]) {
     }));
 }
 
+// ===== L'administrateur règle « Accepte d'apparaître » sur la fiche d'une autre personne (1.37.0) =====
+
+const consentBox = page => field(page, 'Accepte_apparaitre');
+const WITHDRAWN_NOTICE = 'Après cette modification, la fiche ne sera plus visible dans l’annuaire et vous ne pourrez plus l’ouvrir ici. '
+  + 'La personne la réaffiche avec l’interrupteur « Apparaître dans l’annuaire » de sa page.';
+
+test('la fenêtre d\'un administrateur s\'ouvre sur la case « Accepte d’apparaître dans l’annuaire », cochée, après l\'identité et avant les champs ; une personne ne l\'a pas sur sa fiche', { skip }, async () => {
+  await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOther(page, 'Hugo Bernard');
+    assert.equal(await consentBox(page).getAttribute('type'), 'checkbox');
+    assert.equal(await consentBox(page).isChecked(), true, 'Hugo figure dans l\'annuaire : il a accepté d\'apparaître');
+    assert.equal(await dialog(page).getByRole('checkbox', { name: 'Accepte d’apparaître dans l’annuaire' }).count(), 1);
+    assert.match(await dialog(page).locator('#profile-Accepte_apparaitre-help').textContent(), /^Décochée, la fiche n’apparaît pas dans l’annuaire\./);
+    assert.equal(await consentBox(page).getAttribute('aria-describedby'), 'profile-Accepte_apparaitre-help');
+    assert.deepEqual(await page.evaluate(() => {
+      const follows = (first, second) => Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const box = document.getElementById('profile-Accepte_apparaitre');
+      return {
+        afterIdentity: follows(document.querySelector('#profileDialog .ident'), box),
+        beforeFirstName: follows(box, document.getElementById('profile-prenom')),
+        beforeEmail: follows(box, document.getElementById('profile-email'))
+      };
+    }), { afterIdentity: true, beforeFirstName: true, beforeEmail: true });
+    assert.equal(await summary(page), 'Aucune modification');
+    assert.deepEqual(await unnamedControls(dialog(page)), []);
+    assert.deepEqual(await bddCalls(page), []);
+  });
+  // Sa propre fiche, même pour une administratrice en mode admin : l'interrupteur du bandeau règle ce choix.
+  await withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await enableAdminMode(page);
+    await gridCard(page, 'Ana Martin').locator('.card-edit').click();
+    await dialog(page).waitFor();
+    assert.equal(await consentBox(page).count(), 0);
+  });
+  await withWidget({ tables: memberTables(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOwn(page);
+    assert.equal(await consentBox(page).count(), 0);
+  });
+});
+
+test('décocher la case retire la fiche de l\'annuaire : la relecture le dit, l\'écriture tient en une seule action, et le focus revient au nombre de résultats', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page, logs }) => {
+    await openOther(page, 'Hugo Bernard');
+    await consentBox(page).uncheck();
+    assert.equal(await summary(page), '1 champ modifié');
+    await press(page, 'Relire les modifications').click();
+    await headingIs(page, 'Relire avant de valider');
+    assert.deepEqual(await notices(page).allTextContents(), [WITHDRAWN_NOTICE]);
+    assert.equal(await notices(page).first().getAttribute('role'), 'status');
+    assert.deepEqual(await dialog(page).locator('.recap .diff-label').allTextContents(), ['Accepte d’apparaître dans l’annuaire']);
+    assert.equal(await dialog(page).locator('.recap .diff-row del').textContent(), 'Oui');
+    assert.equal(await dialog(page).locator('.recap .diff-row ins').textContent(), 'Non');
+    assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
+
+    await validateWith(page, 'La fiche de Hugo Bernard est enregistrée.');
+    assert.deepEqual(await bddCalls(page), [{ action: 'UpdateRecord', table: 'BDD', rowId: 10, ok: true, values: { Accepte_apparaitre: false } }]);
+    assert.equal(await bddCell(page, 'Accepte_apparaitre', 9), false);
+    assert.equal(await bddCell(page, 'Accepte_apparaitre', 0), true, 'les autres fiches gardent leur choix');
+    await waitForCards(page, 3);
+    assert.equal(await gridCard(page, 'Hugo Bernard').count(), 0, 'la carte a quitté l\'annuaire');
+    await focusReturnsTo(page, '#resultCount'); // le bouton « Modifier » de la fiche a disparu avec sa carte
+    assert.deepEqual(await Promise.all(logs.errors), []);
+  }));
+
+test('décocher la case avec une autre modification les écrit ensemble, et la recocher avant de relire n\'est plus une modification', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOther(page, 'Hugo Bernard');
+    await field(page, 'Fonction').fill('Directeur');
+    await consentBox(page).uncheck();
+    assert.equal(await summary(page), '2 champs modifiés');
+    // Recocher la case revient à l'état d'origine : seule la fonction reste modifiée.
+    await consentBox(page).check();
+    assert.equal(await summary(page), '1 champ modifié');
+    await consentBox(page).uncheck();
+    await press(page, 'Relire les modifications').click();
+    await headingIs(page, 'Relire avant de valider');
+    assert.deepEqual(await dialog(page).locator('.recap .diff-label').allTextContents(), ['Accepte d’apparaître dans l’annuaire', 'Fonction'], 'la case, puis les champs, dans l\'ordre de la fenêtre');
+    await validateWith(page, 'La fiche de Hugo Bernard est enregistrée.');
+    assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ Accepte_apparaitre: false, Fonction: 'Directeur' }]);
+    await waitForCards(page, 3);
+  }));
+
+test('la case garde son état quand on revient de la relecture, et une personne qui s\'est masquée elle-même pendant la relecture ne fait rien écrire de plus', { skip }, () =>
+  withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
+    await openOther(page, 'Hugo Bernard');
+    await consentBox(page).uncheck();
+    await press(page, 'Relire les modifications').click();
+    await headingIs(page, 'Relire avant de valider');
+    await press(page, 'Retour').click();
+    await headingIs(page, 'Modifier la fiche de Hugo Bernard');
+    assert.equal(await consentBox(page).isChecked(), false, 'le brouillon est intact');
+    await press(page, 'Relire les modifications').click();
+    await headingIs(page, 'Relire avant de valider');
+    // La personne a décoché elle-même l'interrupteur de son bandeau pendant que l'administrateur relisait.
+    await page.evaluate(() => { window.__tables.BDD.Accepte_apparaitre[9] = false; });
+    await press(page, 'Valider').click();
+    await alert(page).waitFor();
+    assert.match(await alertText(page), /Ces modifications sont déjà dans la fiche : il n'y a rien à enregistrer\./);
+    assert.equal(await heading(page).textContent(), 'Relire avant de valider');
+    assert.deepEqual(await bddCalls(page), [], 'rien n\'est écrit : la fiche est déjà telle que l\'administrateur la voulait');
+  }));
+
 test('une personne qui n\'apparaît pas dans l\'annuaire modifie quand même sa fiche depuis le bandeau', { skip }, () =>
   withWidget({ tables: withIdentity(), user: IRIS_EMAIL }, async ({ page }) => {
     await openOwn(page);

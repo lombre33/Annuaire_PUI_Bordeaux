@@ -526,17 +526,18 @@ test('profileFormModel offers the e-mail and the établissement to an administra
   const { referenceMaps, row } = await setup();
   const admin = profileFormModel(row(2), referenceMaps, { admin: true }); // Bob, vu par une administratrice
   assert.deepEqual(admin.map(entry => entry.key),
-    ['prenom', 'nom', 'email', 'Etablissement', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
+    ['Accepte_apparaitre', 'prenom', 'nom', 'email', 'Etablissement', 'Fonction', 'numero_de_telephone', 'Role_dans_le_PUI', 'Instances', 'Actions', 'GT', 'Competences', 'Communautes', 'Taches']);
   assert.deepEqual(field(admin, 'email'), { key: 'email', label: 'E-mail', kind: 'email', value: 'bob@u-bordeaux-montaigne.example' });
   const etab = field(admin, 'Etablissement');
   assert.deepEqual([etab.kind, etab.category, etab.value, etab.required], ['reference', 'etablissement', 2, true]);
   assert.deepEqual(etab.options.map(option => option.label),
     ['Clinique', 'CHU', 'INSERM', 'Institut Bergonié', 'UBM'].sort((a, b) => a.localeCompare(b, 'fr-FR')),
     'tous les établissements, validés ou non, par leur acronyme (leur nom complet seulement quand ils n\'en ont pas), triés');
-  for (const forbidden of ['perimetre', 'Accepte_apparaitre', 'Avatar']) assert.equal(field(admin, forbidden), undefined, forbidden);
+  for (const forbidden of ['perimetre', 'Avatar']) assert.equal(field(admin, forbidden), undefined, forbidden);
   for (const model of [profileFormModel(row(2), referenceMaps), profileFormModel(row(2), referenceMaps, { admin: false }), profileFormModel(row(2), referenceMaps, {})]) {
     assert.equal(field(model, 'email'), undefined);
     assert.equal(field(model, 'Etablissement'), undefined);
+    assert.equal(field(model, 'Accepte_apparaitre'), undefined);
   }
 });
 
@@ -679,6 +680,87 @@ test('describeChanges says the e-mail and the établissement like any other text
   ]);
 });
 
+// ===== La case « Accepte d'apparaître » : l'administrateur la règle sur la fiche d'une autre personne (1.37.0) =====
+
+const CONSENT_KEY = 'Accepte_apparaitre';
+const CONSENT_LABEL_ADMIN = 'Accepte d’apparaître dans l’annuaire';
+
+test('profileFormModel offers the choice to appear first to an administrator, as it stands in the fiche, and to nobody else', async () => {
+  const { referenceMaps, row } = await setup();
+  assert.deepEqual(profileFormModel(row(2), referenceMaps, { admin: true })[0], { key: CONSENT_KEY, label: CONSENT_LABEL_ADMIN, kind: 'consent', value: true });
+  assert.equal(field(profileFormModel(row(11), referenceMaps, { admin: true }), CONSENT_KEY).value, false, 'Iris a refusé');
+  assert.equal(field(profileFormModel(row(12), referenceMaps, { admin: true }), CONSENT_KEY).value, false, 'une cellule vide n\'est pas un accord');
+  assert.equal(field(profileFormModel({ ...row(2), [CONSENT_KEY]: 'true' }, referenceMaps, { admin: true }), CONSENT_KEY).value, false, 'seul `true` vaut accord');
+  for (const options of [undefined, {}, { admin: false }, { admin: 'oui' }, { creating: true }, { admin: true, creating: true }]) {
+    assert.equal(field(profileFormModel(row(2), referenceMaps, options), CONSENT_KEY), undefined, JSON.stringify(options));
+  }
+});
+
+test('draftOf starts the choice to appear at the current one', async () => {
+  const { referenceMaps, row } = await setup();
+  assert.equal(draftOf(profileFormModel(row(2), referenceMaps, { admin: true }))[CONSENT_KEY], true);
+  assert.equal(draftOf(profileFormModel(row(11), referenceMaps, { admin: true }))[CONSENT_KEY], false);
+});
+
+test('diffProfile records the choice to appear that an administrator changes, in both directions', async () => {
+  const { referenceMaps, row } = await setup();
+  const admin = { admin: true };
+  assert.deepEqual(diffProfile(row(2), { [CONSENT_KEY]: false }, referenceMaps, admin),
+    { champs: { [CONSENT_KEY]: { avant: true, apres: false } }, errors: [], fieldErrors: {} });
+  assert.deepEqual(diffProfile(row(11), { [CONSENT_KEY]: true }, referenceMaps, admin).champs, { [CONSENT_KEY]: { avant: false, apres: true } });
+  assert.deepEqual(diffProfile(row(12), { [CONSENT_KEY]: true }, referenceMaps, admin).champs, { [CONSENT_KEY]: { avant: false, apres: true } }, 'une cellule vide valait « non »');
+  assert.deepEqual(diffProfile(row(12), { [CONSENT_KEY]: false }, referenceMaps, admin).champs, {}, 'et reste « non » : rien à écrire');
+  assert.deepEqual(diffProfile(row(2), { [CONSENT_KEY]: true }, referenceMaps, admin).champs, {}, 'inchangée');
+});
+
+test('diffProfile refuses a choice to appear that is not a true or a false, against its own field, instead of reading it as « no »', async () => {
+  const { referenceMaps, row } = await setup();
+  for (const wrong of ['false', 0, 1, null, 'Non', ['L'], {}]) {
+    const next = diffProfile(row(2), { [CONSENT_KEY]: wrong }, referenceMaps, { admin: true });
+    assert.deepEqual(next.champs, {}, JSON.stringify(wrong));
+    assert.deepEqual(next.fieldErrors, { [CONSENT_KEY]: 'Valeur illisible.' }, JSON.stringify(wrong));
+    assert.deepEqual(next.errors, [`${CONSENT_LABEL_ADMIN} : Valeur illisible.`]);
+  }
+});
+
+test('diffProfile never reads the choice to appear of a draft when nobody is administrating or a fiche is being created, whatever the draft holds', async () => {
+  const { referenceMaps, row } = await setup();
+  for (const options of [undefined, {}, { admin: false }, { admin: 'oui' }, { admin: 1 }, { creating: true }, { admin: true, creating: true }]) {
+    const next = diffProfile(row(2), { [CONSENT_KEY]: false, Fonction: 'Chef' }, referenceMaps, options);
+    assert.ok(!(CONSENT_KEY in next.champs), JSON.stringify(options));
+  }
+  const bad = diffProfile(row(2), { [CONSENT_KEY]: 'peut-être' }, referenceMaps);
+  assert.deepEqual(bad, { champs: {}, errors: [], fieldErrors: {} }, 'même invalide, il n\'est pas lu');
+});
+
+test('rebaseChanges drops the choice to appear when the fiche already has it, never reports it as moved, and ignores it without an administrator', async () => {
+  const { referenceMaps, row } = await setup();
+  const admin = { admin: true };
+  const { champs } = diffProfile(row(2), { [CONSENT_KEY]: false }, referenceMaps, admin);
+  assert.deepEqual(rebaseChanges(champs, row(2), referenceMaps, admin), { champs, moved: [] });
+  // Déjà fait par la personne, avec son interrupteur : plus rien à écrire.
+  assert.deepEqual(rebaseChanges(champs, { ...row(2), [CONSENT_KEY]: false }, referenceMaps, admin), { champs: {}, moved: [] });
+  assert.deepEqual(rebaseChanges(champs, { ...row(2), [CONSENT_KEY]: null }, referenceMaps, admin), { champs: {}, moved: [] }, 'une cellule vide vaut déjà « non »');
+  // Cochée depuis une fiche qui valait « non » : elle part de ce que Grist dit aujourd'hui.
+  const ticked = diffProfile(row(11), { [CONSENT_KEY]: true }, referenceMaps, admin).champs;
+  assert.deepEqual(rebaseChanges(ticked, { ...row(11), [CONSENT_KEY]: null }, referenceMaps, admin), { champs: { [CONSENT_KEY]: { avant: false, apres: true } }, moved: [] });
+  assert.deepEqual(rebaseChanges(ticked, { ...row(11), [CONSENT_KEY]: true }, referenceMaps, admin), { champs: {}, moved: [] });
+  // Sans administrateur, le choix est écarté.
+  assert.deepEqual(rebaseChanges(champs, row(2), referenceMaps).champs, {});
+  assert.deepEqual(rebaseChanges(champs, row(2), referenceMaps, { admin: false }).champs, {});
+});
+
+test('describeChanges says the choice to appear in words, « Oui » or « Non », before and after', async () => {
+  const { referenceMaps, row } = await setup();
+  const off = diffProfile(row(2), { [CONSENT_KEY]: false, prenom: 'Robert' }, referenceMaps, { admin: true }).champs;
+  assert.deepEqual(describeChanges(off), [
+    { key: CONSENT_KEY, label: CONSENT_LABEL_ADMIN, kind: 'consent', before: 'Oui', after: 'Non' },
+    { key: 'prenom', label: 'Prénom', kind: 'text', before: 'Bob', after: 'Robert' }
+  ], 'en tête, comme dans la fenêtre');
+  const on = diffProfile(row(11), { [CONSENT_KEY]: true }, referenceMaps, { admin: true }).champs;
+  assert.deepEqual(describeChanges(on).map(line => [line.before, line.after]), [['Non', 'Oui']]);
+});
+
 // ===== La photo de profil (colonne Avatar de BDD, pièce jointe) =====
 
 // Une photo que le formulaire vient de préparer (image-prep.js) : le fichier et son adresse locale.
@@ -705,10 +787,10 @@ test('profileFormModel shows 0 for a person without photo, whatever form Grist g
   assert.equal(field(profileFormModel(several, referenceMaps), 'Avatar').value, 7, 'la première pièce jointe est celle qu’on montre');
 });
 
-test('profileFormModel offers the photo to an administrator too, still first', async () => {
+test('profileFormModel offers the photo to an administrator too, right after the choice to appear', async () => {
   const { referenceMaps, row } = await setup(withAvatars());
   const keys = profileFormModel(row(1), referenceMaps, { admin: true }).map(entry => entry.key);
-  assert.deepEqual(keys.slice(0, 3), ['Avatar', 'prenom', 'nom']);
+  assert.deepEqual(keys.slice(0, 3), ['Accepte_apparaitre', 'Avatar', 'prenom']);
   assert.ok(keys.includes('email') && keys.includes('Etablissement'));
 });
 

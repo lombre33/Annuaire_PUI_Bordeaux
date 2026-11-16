@@ -99,9 +99,11 @@ export function describeUnknownAccount({ email, admin, emailColumn = true }) {
 // établissement qui n'a pas validé sa présence (quand c'est la seule raison), puis une
 // personne qui n'a pas accepté d'apparaître. `creating` : la personne crée sa fiche et a coché
 // « Apparaître dans l'annuaire » ; si la fiche reste masquée, c'est que quelqu'un d'autre doit régler
-// un point (l'établissement choisi, par exemple, qui n'a pas validé sa présence). Renvoie '' quand la fiche
-// figure dans l'annuaire.
-export function describeHiddenFiche(status, { own, etablissement = '', creating = false }) {
+// un point (l'établissement choisi, par exemple, qui n'a pas validé sa présence). `withdrawn` : un administrateur
+// vient de décocher « Accepte d'apparaître » dans la modification qu'il relit (1.37.0) : la fiche disparaît de la
+// grille, il ne pourra plus l'ouvrir depuis l'annuaire, et c'est la personne qui la réaffiche. Renvoie '' quand
+// la fiche figure dans l'annuaire.
+export function describeHiddenFiche(status, { own, etablissement = '', creating = false, withdrawn = false }) {
   if (status.visible) return '';
   if (status.etablissement === 'not_validated' && status.named) {
     return own
@@ -109,8 +111,9 @@ export function describeHiddenFiche(status, { own, etablissement = '', creating 
       : `${etablissement || 'Son établissement'} n’a pas validé sa présence : après cette modification, la fiche ne sera plus visible dans l’annuaire.`;
   }
   if (!status.accepted) {
-    return own
-      ? 'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).'
+    if (own) return 'Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page).';
+    return withdrawn
+      ? 'Après cette modification, la fiche ne sera plus visible dans l’annuaire et vous ne pourrez plus l’ouvrir ici. La personne la réaffiche avec l’interrupteur « Apparaître dans l’annuaire » de sa page.'
       : 'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.';
   }
   const reasons = hiddenReasons([status], own ? VOICES.own : VOICES.admin);

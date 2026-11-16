@@ -294,6 +294,15 @@ carte, Réinitialiser, données qui changent dans Grist, menu à plat sans numé
 et sans bandeau), clavier, et le formulaire de modification de fiche, qui range lui aussi
 les tâches par action.
 
+`tests/e2e-curie.test.mjs` y ajoute 18 scénarios sur les onglets « Classique » et « C.U.R.I.E » du menu Compétences
+(1.37.0, `withCurie` dans `tests/fixtures.mjs` : la colonne facultative `referenciel_C_U_R_I_E` de `Competences`) : les deux onglets
+juste au-dessus de la recherche, le même menu dessous, les groupes C.U.R.I.E avec leurs nombres, une seule sélection pour les deux
+rangements (groupe coché d'un côté, domaine à moitié coché de l'autre, badge qui suit l'onglet), nombres de groupes qui suivent
+l'interrupteur Partenaires et les autres filtres, tag de carte, recherche déjà tapée qui s'applique à l'autre onglet, flèches, Début, Fin
+et Tabulation, onglet gardé quand le menu est reconstruit, aucun onglet ni bandeau ni avertissement sans la colonne ou avec une colonne
+vide (la console le dit), le menu rangé par C.U.R.I.E seul sans la colonne des domaines, arbre d'accessibilité (liste d'onglets, onglet
+sélectionné, panneau nommé), et la mise en page de 280 à 1 200 px, au doigt aussi.
+
 `tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
 (au-dessus, dans le cadre, refermée en la quittant), au clavier (Échap, cartes redessinées) et, sur un écran
@@ -644,6 +653,23 @@ valeurs par domaine, sans second bouton.
 - [ ] Sans la colonne `Macro_competences` (essai sur une copie du document) : le
       bandeau « Colonne de libellé introuvable » s'affiche et le menu Compétences
       reste complet, mais à plat, sans domaines.
+
+Spécifique **Compétences, onglet C.U.R.I.E** (1.37.0, **à essayer dans le vrai Grist** : jamais fait) : ajouter, sur une
+copie du document, la colonne `referenciel_C_U_R_I_E` (texte ou choix) à la table `Competences` et la remplir.
+
+- [ ] Sans la colonne (ou colonne vide) : le menu Compétences est celui d'avant, sans onglets, sans bandeau ; la console dit
+      seulement que la colonne manque ou est vide.
+- [ ] Avec la colonne remplie : deux onglets, « Classique » et « C.U.R.I.E », tout en haut du menu, juste au-dessus du champ de
+      recherche ; le menu s'ouvre sur « Classique », inchangé.
+- [ ] Un clic sur « C.U.R.I.E » range les mêmes compétences par groupe : l'aide, le champ de recherche (« Groupe ou compétence… ») et
+      l'infobulle du bouton changent ; une compétence que la colonne ne classe pas est sous « Hors C.U.R.I.E », en dernier.
+- [ ] Cocher un groupe C.U.R.I.E, puis revenir sous « Classique » : les mêmes compétences sont cochées, leurs domaines complets ou à moitié
+      cochés ; les cartes ne bougent pas au changement d'onglet ; le chiffre du bouton suit l'onglet (un groupe entier = 1).
+- [ ] Une recherche tapée sous un onglet s'applique à l'autre ; « Réinitialiser » vide la sélection, et le menu rouvre sur l'onglet
+      choisi.
+- [ ] Au clavier : Tabulation arrive sur l'onglet affiché, les flèches (Début, Fin) passent à l'autre, Tabulation mène à la recherche.
+- [ ] Une valeur de colonne écrite de deux façons (« Groupe U », « groupe u ») ne fait qu'un groupe. Une colonne à choix multiples ou de
+      type Référence n'est pas gérée (voir `docs/maintenance.md`).
 
 Spécifique **Tâches par action** : le menu Tâches range ses valeurs par action, sans
 second bouton et sans colonne à ajouter dans Grist. Le numéro avant le point du libellé
@@ -1128,6 +1154,15 @@ sur une copie du document.
 - [ ] Choisir un établissement qui n'a pas validé sa présence : l'avertissement sous le champ,
       puis dans la relecture l'avis « … n’a pas validé sa présence : après cette modification,
       la fiche ne sera plus visible dans l’annuaire. ». Après « Valider », la carte disparaît.
+- [ ] La première case de la fenêtre, sous l'identité, est « Accepte d’apparaître dans
+      l’annuaire », cochée. Elle n'existe ni sur sa propre fiche (même administrateur, mode admin
+      allumé) ni dans la fenêtre « Créer ma fiche ». La décocher : « 1 champ modifié » ; la recocher :
+      « Aucune modification ». La décocher, relire : l'avis « Après cette modification, la fiche ne
+      sera plus visible dans l’annuaire et vous ne pourrez plus l’ouvrir ici… » et la ligne
+      « Accepte d’apparaître dans l’annuaire : Oui → Non ». Après « Valider » : `BDD.Accepte_apparaitre`
+      de cette ligne seule vaut `false` (un seul « Annuler » de Grist), la carte disparaît, le
+      compteur baisse d'un et le focus est sur le nombre de résultats. La personne, connectée, retrouve
+      son interrupteur « Apparaître dans l'annuaire » éteint et peut le rallumer.
 - [ ] Changer l'e-mail : la relecture prévient que la table `ACL` ne suit pas. Après
       « Valider », `BDD.email` a changé et `ACL` est intacte.
 - [ ] La relecture montre la nouvelle adresse et le nouvel établissement sur la carte

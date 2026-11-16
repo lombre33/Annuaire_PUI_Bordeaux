@@ -4,7 +4,7 @@ import { normalize, enrich } from '../grist-data.js';
 import { FILTERS } from '../constants.js';
 import {
   filterContacts, createEmptyFilterState, pruneStaleFilters, computeFilterCounts,
-  menuGroups, groupState, toggleGroup, selectionCount
+  menuGroups, menuViews, groupState, toggleGroup, selectionCount
 } from '../filters.js';
 
 const names = contacts => contacts.map(contact => contact.nom);
@@ -16,14 +16,15 @@ function keptBy(contacts, key, value) {
   return names(filterContacts(contacts, activeFilters, ''));
 }
 
-// Cocher un groupe du menu `filter` (un domaine, une action) garde exactement les contacts qui ont au moins une valeur dans ce
-// groupe (`contact.labels[filter.grouping]`), ni plus ni moins ; `what` complète le message (« de ce domaine »).
-function assertTickingKeepsTheGroup(contacts, filter, groups, what) {
+// Cocher un groupe du menu `filter` (un domaine, une action, un groupe C.U.R.I.E) garde exactement les contacts qui ont au moins une
+// valeur dans ce groupe (`contact.labels[grouping]`, le premier rangement du menu par défaut), ni plus ni moins ; `what` complète le
+// message (« de ce domaine »).
+function assertTickingKeepsTheGroup(contacts, filter, groups, what, grouping = filter.groupings[0]) {
   groups.forEach(group => {
     const activeFilters = createEmptyFilterState();
     toggleGroup(activeFilters[filter.key], group.values);
     assert.deepEqual(names(filterContacts(contacts, activeFilters, '')),
-      names(contacts.filter(contact => contact.labels[filter.grouping].includes(group.label))),
+      names(contacts.filter(contact => contact.labels[grouping].includes(group.label))),
       `cocher « ${group.label} » donne les contacts de ${what}, ni plus ni moins`);
   });
 }
@@ -502,8 +503,8 @@ test('the filter bar has no filter of its own for the actions of the tasks: they
   const state = createEmptyFilterState();
   assert.ok(!('macroTaches' in state));
   assert.ok(!FILTERS.some(filter => filter.key === 'macroTaches'));
-  assert.equal(tachesFilter.grouping, 'macroTaches', 'le menu Tâches connaît son regroupement');
-  assert.equal(FILTERS.find(filter => filter.key === 'actions').grouping, undefined, 'le filtre Actions reste à plat');
+  assert.deepEqual(tachesFilter.groupings, ['macroTaches'], 'le menu Tâches connaît son regroupement, un seul : pas d\'onglets');
+  assert.equal(FILTERS.find(filter => filter.key === 'actions').groupings, undefined, 'le filtre Actions reste à plat');
 });
 
 test('ticking an action keeps the contacts with at least one task in it', () => {
@@ -629,3 +630,102 @@ test('pruneStaleFilters drops a ticked task that no longer exists, and has no ac
   assert.deepEqual([...pruned.taches], [RELECTURE]);
   assert.ok(!('macroTaches' in pruned));
 });
+
+// ===== Compétences : un second rangement, par le référentiel C.U.R.I.E (1.37.0) =====
+// Les mêmes compétences, rangées par une autre colonne de la table Competences (`referenciel_C_U_R_I_E`, facultative) : le menu
+// Compétences a alors deux rangements, un onglet chacun. La sélection reste la même (des compétences) ; seuls les groupes changent.
+
+const CURIE_SKILLS = {
+  ...SKILLS,
+  curie: { 1: 'Groupe C', 2: 'Groupe U', 3: 'Groupe U', 4: 'Hors C.U.R.I.E', 5: 'Groupe C' }
+};
+
+test('menuViews offers the domains first and the C.U.R.I.E groups second, each ranging the very same skills', () => {
+  const views = menuViews(competencesFilter, CURIE_SKILLS);
+  assert.deepEqual(views.map(view => view.grouping), ['macro', 'curie']);
+  assert.deepEqual(views[0].groups, menuGroups(competencesFilter, CURIE_SKILLS), 'le premier rangement est celui d\'avant, inchangé');
+  assert.deepEqual(views[1].groups, [
+    { label: 'Groupe C', values: ['Oncologie', 'Radiothérapie'] },
+    { label: 'Groupe U', values: ['Hématologie', 'Pharmacovigilance'] },
+    { label: 'Hors C.U.R.I.E', values: ['Divers'] }
+  ], 'groupes triés, « Hors C.U.R.I.E » en dernier, compétences triées dans chacun');
+  assert.deepEqual(menuGroups(competencesFilter, CURIE_SKILLS, 'curie'), views[1].groups);
+  const skillsOf = groups => groups.flatMap(group => group.values).sort();
+  assert.deepEqual(skillsOf(views[1].groups), skillsOf(views[0].groups), 'les deux onglets rangent les mêmes compétences');
+});
+
+test('menuViews has no C.U.R.I.E view without data: the menu keeps its single ranking, so no tabs', () => {
+  assert.deepEqual(menuViews(competencesFilter, SKILLS).map(view => view.grouping), ['macro'], 'aucune lecture de la colonne');
+  assert.deepEqual(menuViews(competencesFilter, { ...SKILLS, curie: {} }).map(view => view.grouping), ['macro'], 'colonne absente ou vide');
+  assert.equal(menuGroups(competencesFilter, { ...SKILLS, curie: {} }, 'curie'), null);
+});
+
+test('menuViews leaves the skills menu with the C.U.R.I.E ranking alone when the domains are not filled, and the other menus untouched', () => {
+  const withoutDomains = { ...CURIE_SKILLS, macro: {} };
+  assert.deepEqual(menuViews(competencesFilter, withoutDomains).map(view => view.grouping), ['curie'], 'un seul rangement : pas d\'onglets');
+  assert.deepEqual(menuViews(competencesFilter, { competences: SKILLS.competences, macro: {}, curie: {} }), [], 'menu à plat');
+  assert.deepEqual(menuViews(tachesFilter, TASKS).map(view => view.grouping), ['macroTaches'], 'le menu Tâches garde son rangement par action');
+  assert.deepEqual(menuViews(FILTERS.find(filter => filter.key === 'actions'), TASKS), [], 'le filtre Actions reste à plat');
+});
+
+test('a skills menu with C.U.R.I.E has no filter of its own for them: the state still holds skills only', () => {
+  assert.ok(!FILTERS.some(filter => filter.key === 'curie'));
+  assert.ok(!('curie' in createEmptyFilterState()));
+  const activeFilters = createEmptyFilterState();
+  activeFilters.competences.add('Oncologie');
+  assert.ok(!('curie' in pruneStaleFilters(activeFilters, CURIE_SKILLS)), 'rien à purger : un groupe n\'est pas une valeur du filtre');
+});
+
+test('enrich gives each contact the C.U.R.I.E groups of their skills, once each, and none when the column is not read', () => {
+  const person = contact => enrich(contact, CURIE_SKILLS).labels.curie;
+  assert.deepEqual(person({ Competences: ['L', 1, 2, 3] }), ['Groupe C', 'Groupe U'], 'deux compétences du même groupe : une fois');
+  assert.deepEqual(person({ Competences: ['L', 4] }), ['Hors C.U.R.I.E']);
+  assert.deepEqual(person({ Competences: ['L'] }), []);
+  assert.deepEqual(enrich({ Competences: ['L', 1] }, SKILLS).labels.curie, [], 'colonne absente : aucun groupe');
+});
+
+test('ticking a C.U.R.I.E group keeps the contacts with at least one skill in it, ni plus ni moins', () => {
+  const contacts = [
+    { nom: 'A', Competences: ['L', 1, 2] },
+    { nom: 'B', Competences: ['L', 3, 1] },
+    { nom: 'C', Competences: ['L', 4] },
+    { nom: 'D', Competences: ['L'] },
+    { nom: 'E', Competences: ['L', 5] }
+  ].map(contact => enrich(contact, CURIE_SKILLS));
+  const groups = menuGroups(competencesFilter, CURIE_SKILLS, 'curie');
+  assert.deepEqual(groups.map(group => group.label), ['Groupe C', 'Groupe U', 'Hors C.U.R.I.E']);
+  assertTickingKeepsTheGroup(contacts, competencesFilter, groups, 'ce groupe C.U.R.I.E', 'curie');
+});
+
+test('a group ticked in one tab shows ticked, or partly ticked, in the other: one selection, two rankings', () => {
+  const [domains, curie] = menuViews(competencesFilter, CURIE_SKILLS).map(view => view.groups);
+  const selected = new Set();
+  toggleGroup(selected, curie[0].values); // « Groupe C » : Oncologie et Radiothérapie
+  assert.deepEqual([...selected].sort(), ['Oncologie', 'Radiothérapie']);
+  const cancerology = domains.find(group => group.label === 'Cancérologie'); // Oncologie, Hématologie, Radiothérapie
+  assert.equal(groupState(selected, cancerology.values), 'some', 'le domaine est à moitié coché');
+  assert.equal(selectionCount(selected, curie), 1, 'un groupe C.U.R.I.E entier');
+  assert.equal(selectionCount(selected, domains), 2, 'deux compétences d\'un domaine partiel');
+  toggleGroup(selected, cancerology.values);
+  assert.equal(groupState(selected, curie[0].values), 'all');
+  assert.equal(groupState(selected, curie[1].values), 'some', 'Hématologie est cochée, pas Pharmacovigilance');
+});
+
+test('the count of a C.U.R.I.E group ignores the skills ticked in the skills menu, but not the other filters, the search or the scope', () => {
+  const contacts = [
+    { nom: 'Alice', labels: { curie: ['Groupe C'], competences: ['Oncologie'], instances: ['CME'] }, etablissement_fondateur: true },
+    { nom: 'Bob', labels: { curie: ['Groupe C', 'Groupe U'], competences: ['Oncologie', 'Pharmacovigilance'], instances: ['COVIRIS'] }, etablissement_partenaire: true },
+    { nom: 'Chloe', labels: { curie: ['Groupe U'], competences: ['Pharmacovigilance'], instances: ['CME'] }, etablissement_fondateur: true }
+  ];
+  const scope = { fondateur: true, partenaire: true };
+  const activeFilters = createEmptyFilterState();
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).curie, { 'groupe c': 2, 'groupe u': 2 });
+  activeFilters.competences.add('Oncologie');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).curie, { 'groupe c': 2, 'groupe u': 2 }, 'sa propre sélection');
+  activeFilters.instances.add('CME');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, '', scope).curie, { 'groupe c': 1, 'groupe u': 1 }, 'autre filtre');
+  assert.deepEqual(computeFilterCounts(contacts, activeFilters, 'chlo', scope).curie, { 'groupe u': 1 }, 'recherche');
+  assert.deepEqual(computeFilterCounts(contacts, createEmptyFilterState(), '', { fondateur: true, partenaire: false }).curie,
+    { 'groupe c': 1, 'groupe u': 1 }, 'interrupteur');
+});
+

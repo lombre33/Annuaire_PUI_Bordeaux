@@ -97,6 +97,19 @@ export function withoutOptionalColumns(tables) {
   return copy;
 }
 
+// Le référentiel C.U.R.I.E (1.37.0) : la colonne facultative `referenciel_C_U_R_I_E` de Competences, qui range les compétences d'une autre
+// façon que les domaines. Avec ces données (périmètre par défaut ; Bob est partenaire) :
+//   Groupe C        → Oncologie (Ana)
+//   Groupe U        → Hématologie (Ana) et Pharmacovigilance (Bob), la seconde écrite « groupe u » : les deux orthographes n'en font qu'un
+//   Hors C.U.R.I.E  → Divers (Gina), que la colonne ne classe pas
+// Les domaines restent ceux de la base (Cancérologie : Oncologie, Hématologie ; Pharmacie : Pharmacovigilance ; Autres : Divers), de quoi
+// voir qu'un groupe C.U.R.I.E coupe un domaine en deux.
+export function withCurie(tables = sampleTables()) {
+  const copy = structuredClone(tables);
+  copy.Competences.referenciel_C_U_R_I_E = ['Groupe C', 'Groupe U', 'groupe u', ''];
+  return copy;
+}
+
 // Le document avec une ligne de plus dans Etablissements : `row` donne sa valeur à chaque colonne (id, acronyme, …).
 export function withEtablissement(tables, row) {
   const copy = structuredClone(tables);

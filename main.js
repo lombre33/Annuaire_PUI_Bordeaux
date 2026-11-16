@@ -175,8 +175,9 @@ function currentCounts() {
 }
 
 function rebuildFilterUI() {
+  // `selection` et `counts` : ce que le menu Compétences relit quand on change d'onglet (« Classique », « C.U.R.I.E »), au moment du clic.
   createFilterUI(elements.filtersContainer, state.filterReferenceMaps, state.activeFilters,
-    { onToggle: toggleFilter, onToggleGroup: toggleFilterGroup }, currentCounts());
+    { onToggle: toggleFilter, onToggleGroup: toggleFilterGroup, selection: key => state.activeFilters[key], counts: currentCounts }, currentCounts());
 }
 
 // Met les menus d'accord avec ce que Grist a donné et avec les interrupteurs Fondateurs/Partenaires :
@@ -235,7 +236,8 @@ elements.skipLink.addEventListener('click', event => {
 
 // Un seul écouteur pour tous les boutons « Modifier » et les photos à agrandir : les cartes sont
 // reconstruites à chaque filtre. Les cartes étant redessinées après un enregistrement, le focus revient
-// au bouton de la même fiche et non à celui, disparu, qui a ouvert la fenêtre.
+// au bouton de la même fiche et non à celui, disparu, qui a ouvert la fenêtre ; quand la fiche n'est plus
+// dans l'annuaire (un administrateur vient de la masquer), au nombre de résultats, d'où l'on retrouve les cartes.
 elements.grid.addEventListener('click', event => {
   const zoom = event.target.closest('.avatar-zoom');
   if (zoom) {
@@ -245,7 +247,7 @@ elements.grid.addEventListener('click', event => {
   const edit = event.target.closest('.card-edit');
   if (edit) {
     const rowId = Number(edit.dataset.rowId);
-    openProfile(rowId, () => elements.grid.querySelector(`.card-edit[data-row-id="${rowId}"]`)?.focus());
+    openProfile(rowId, () => (elements.grid.querySelector(`.card-edit[data-row-id="${rowId}"]`) ?? elements.resultCount).focus());
     return;
   }
   const etabEdit = event.target.closest('.etab-edit');
@@ -634,7 +636,9 @@ function openProfile(rowId, returnFocus) {
     draft: draftOf(model),
     evaluate: draft => evaluateDraft(row, draft, admin),
     review: draft => reviewProfile(row, draft, admin),
-    hiddenNotice: review => describeHiddenFiche(review.visibility, { own: rights === 'own', etablissement: etablissementName(review.after) }),
+    hiddenNotice: review => describeHiddenFiche(review.visibility, {
+      own: rights === 'own', etablissement: etablissementName(review.after), withdrawn: review.champs?.Accepte_apparaitre?.apres === false
+    }),
     fieldWarning: (key, value) => (key === 'Etablissement' ? etablissementWarning(value) : ''),
     save: (review, draft) => saveReviewed(row, review, draft, admin),
     renderCard: (contact, marks) => renderPreviewCard(elements.template, contact, marks, cardLogos()),

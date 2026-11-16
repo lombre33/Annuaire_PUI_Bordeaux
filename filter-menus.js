@@ -3,13 +3,30 @@
 import { CATEGORIES, FILTERS } from './constants.js';
 import { compareLabels, normalize, ownValue, sortWithCheckedFirst, uniqueLabels } from './grist-data.js';
 import { isFocusVisible } from './dom.js';
-import { groupState, menuGroups, selectionCount } from './filters.js';
+import { groupState, menuViews, selectionCount } from './filters.js';
 
 // ===== Menus de filtres =====
 
-// Les menus rangés par groupe (les compétences par domaine) gardent leurs groupes ici,
-// pour que le badge et les cases des groupes se recalculent sans les relire dans le DOM.
-const groupsByMenu = new WeakMap();
+// Les menus rangés par groupe (les compétences par domaine, ou par groupe C.U.R.I.E) gardent ici leurs rangements et celui qu'ils
+// montrent, pour que le badge et les cases des groupes se recalculent sans les relire dans le DOM : { views: [{ grouping, groups }],
+// active } (la clé du rangement montré).
+const viewsByMenu = new WeakMap();
+
+// Les groupes que le menu montre, ceux de son rangement actif ; `undefined` pour un menu à plat.
+function activeGroups(menu) {
+  const state = viewsByMenu.get(menu);
+  return state?.views.find(({ grouping }) => grouping === state.active).groups;
+}
+
+// Le rangement qu'une personne a choisi dans le menu d'un filtre (clé du filtre → clé du regroupement) : un menu reconstruit (« Réinitialiser »,
+// un libellé qui change dans Grist) rouvre sur le même onglet plutôt que de revenir au premier.
+const chosenViews = new Map();
+
+// Le rangement par lequel un menu s'ouvre : celui que la personne a choisi s'il existe encore, sinon le premier.
+function startingView(filter, views) {
+  const wanted = chosenViews.get(filter.key);
+  return views.some(({ grouping }) => grouping === wanted) ? wanted : views[0].grouping;
+}
 
 // Le badge d'un menu compte les valeurs cochées et disparaît à zéro. Un nombre nu ne dit rien à un lecteur d'écran : le nom
 // du bouton le dit en toutes lettres (« Compétences (2 sélectionnés) »), en commençant par le libellé qu'on lit à l'écran.
@@ -38,20 +55,21 @@ function orderedValues(values, selected) {
 }
 
 // Un menu rangé par groupe dit ce qu'il offre (infobulle du bouton, champ de recherche) avec
-// les mots de son regroupement : « domaine » ou « action ». Resté à plat (colonne absente de
-// Grist, aucune ligne classée), il garde les textes par défaut, qui ne parlent d'aucun groupe.
-function groupingWording(filter, grouped) {
-  return grouped ? CATEGORIES[filter.grouping] : {};
+// les mots de son regroupement : « domaine », « groupe C.U.R.I.E » ou « action ». Resté à plat (colonne absente de
+// Grist, aucune ligne classée), il garde les textes par défaut, qui ne parlent d'aucun groupe : `grouping` est alors absent.
+function groupingWording(grouping) {
+  return grouping ? CATEGORIES[grouping] : {};
 }
 
-// `menuId` : le menu que le bouton ouvre (aria-controls) ; il part fermé (aria-expanded), setFilterOpen() le tient à jour.
-function buildFilterButton(filter, selectedCount, grouped, menuId) {
+// `grouping` : le rangement par lequel le menu s'ouvre (rien pour un menu à plat). `menuId` : le menu que le bouton ouvre
+// (aria-controls) ; il part fermé (aria-expanded), setFilterOpen() le tient à jour.
+function buildFilterButton(filter, selectedCount, grouping, menuId) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'filter-button';
   button.setAttribute('aria-expanded', 'false');
   button.setAttribute('aria-controls', menuId);
-  const { hint } = groupingWording(filter, grouped);
+  const { hint } = groupingWording(grouping);
   if (hint) button.title = hint;
 
   const dot = document.createElement('span');
@@ -93,13 +111,13 @@ function buildMenuSearch(filter, menu) {
   const search = document.createElement('input');
   search.type = 'text';
   search.className = 'filter-search-input';
-  search.placeholder = groupingWording(filter, groupsByMenu.has(menu)).placeholder || `Rechercher dans ${filter.label}…`;
+  search.placeholder = groupingWording(viewsByMenu.get(menu)?.active).placeholder || `Rechercher dans ${filter.label}…`;
   search.setAttribute('aria-label', `Rechercher dans ${filter.label}`);
   search.autocomplete = 'off';
   search.addEventListener('input', () => {
     // Même normalisation que la recherche principale : « competence » trouve « Compétence ».
     const term = normalize(search.value);
-    if (groupsByMenu.has(menu)) {
+    if (viewsByMenu.has(menu)) {
       searchGroups(menu, term);
       return;
     }
@@ -110,22 +128,57 @@ function buildMenuSearch(filter, menu) {
   return search;
 }
 
-// Le haut d'un menu : la recherche, qui reste là quand la liste défile (style.css, .filter-menu-head). Avec trente options le menu
-// fait mille pixels pour trois cents visibles, et la recherche sortait de la vue au premier défilement (audit UI/UX, U37).
-function buildMenuHead(filter, menu) {
+// Les onglets d'un menu qui se range de plusieurs façons (« Classique » et « C.U.R.I.E » pour les compétences) : un onglet par rangement,
+// au-dessus de la recherche. Ils suivent le schéma des onglets (WAI-ARIA) : un seul est dans l'ordre de tabulation, les flèches gauche et
+// droite (Début, Fin) passent de l'un à l'autre et le montrent aussitôt ; la liste des groupes en dessous est leur panneau.
+// `show(rangement)` : ce que le menu fait de ce choix (showView).
+function buildViewTabs(filter, menu, show) {
+  const bar = document.createElement('div');
+  bar.className = 'view-tabs';
+  bar.setAttribute('role', 'tablist');
+  bar.setAttribute('aria-label', filter.viewsLabel);
+  const tabs = viewsByMenu.get(menu).views.map(({ grouping }) => {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'view-tab';
+    tab.id = `filter-tab-${filter.key}-${grouping}`;
+    tab.dataset.grouping = grouping;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-controls', `filter-groups-${filter.key}`);
+    tab.textContent = CATEGORIES[grouping].tab;
+    tab.addEventListener('click', () => show(grouping));
+    return tab;
+  });
+  bar.addEventListener('keydown', event => {
+    const at = tabs.indexOf(document.activeElement);
+    const next = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[event.key];
+    if (at < 0 || next === undefined) return;
+    event.preventDefault();
+    const target = tabs[(next + tabs.length) % tabs.length];
+    show(target.dataset.grouping);
+    target.focus();
+  });
+  bar.append(...tabs);
+  return bar;
+}
+
+// Le haut d'un menu : les onglets s'il y en a, puis la recherche, qui reste là quand la liste défile (style.css, .filter-menu-head). Avec
+// trente options le menu fait mille pixels pour trois cents visibles, et la recherche sortait de la vue au premier défilement (audit UI/UX,
+// U37). `show` : voir buildViewTabs.
+function buildMenuHead(filter, menu, show) {
   const head = document.createElement('div');
   head.className = 'filter-menu-head';
+  if (viewsByMenu.get(menu)?.views.length > 1) head.appendChild(buildViewTabs(filter, menu, show));
   head.appendChild(buildMenuSearch(filter, menu));
   return head;
 }
 
 // L'aide d'un menu rangé par groupe (« Cochez un domaine pour toutes ses compétences… »), écrite dans le menu et lue avec lui : elle
-// n'était que l'infobulle du bouton, qu'on ne voit ni au toucher ni au clavier (audit UI/UX, U27).
+// n'était que l'infobulle du bouton, qu'on ne voit ni au toucher ni au clavier (audit UI/UX, U27). Son texte suit le rangement (paintView).
 function buildMenuHelp(filter, menu) {
   const help = document.createElement('p');
   help.className = 'filter-help';
   help.id = `filter-help-${filter.key}`;
-  help.textContent = groupingWording(filter, true).hint;
   menu.setAttribute('aria-describedby', help.id);
   return help;
 }
@@ -195,13 +248,13 @@ function paintGroup(section, state) {
   section.dataset.state = state;
 }
 
-// Un groupe : sa case, son nom, le nombre de cartes qui ont l'une de ses valeurs, et un
+// Un groupe du rangement `grouping` : sa case, son nom, le nombre de cartes qui ont l'une de ses valeurs, et un
 // bouton qui déplie le détail. Replié au départ. `index` est sa place d'origine.
-function buildGroup(filter, group, index, selected, counts, { onToggle, onToggleGroup }) {
+function buildGroup(filter, grouping, group, index, selected, counts, { onToggle, onToggleGroup }) {
   const section = document.createElement('div');
   section.className = 'filter-group';
   section.dataset.value = group.label;
-  section.dataset.grouping = filter.grouping;
+  section.dataset.grouping = grouping;
   section.dataset.index = String(index);
 
   const head = document.createElement('div');
@@ -216,7 +269,7 @@ function buildGroup(filter, group, index, selected, counts, { onToggle, onToggle
   label.textContent = group.label;
   const countElement = document.createElement('span');
   countElement.className = 'option-count';
-  countElement.textContent = String(countFor(counts, filter.grouping, group.label));
+  countElement.textContent = String(countFor(counts, grouping, group.label));
   describeByCount(checkbox, countElement);
   option.append(checkbox, label, countElement);
 
@@ -246,14 +299,58 @@ function buildGroup(filter, group, index, selected, counts, { onToggle, onToggle
   return section;
 }
 
-function buildGroupedMenu(filter, groups, selected, counts, handlers) {
+// Met le menu d'accord avec son rangement actif : sa couleur de groupe, son aide, le texte de sa recherche, ses groupes et l'onglet allumé.
+// Les groupes d'un autre rangement n'existent pas dans le DOM tant qu'on ne l'a pas choisi : un onglet de plus ne double pas les cases.
+function paintView(menu, filter, selected, counts, handlers) {
+  const { views, active } = viewsByMenu.get(menu);
+  const { groups } = views.find(({ grouping }) => grouping === active);
+  const wording = CATEGORIES[active];
+  menu.dataset.grouping = active;
+  menu.style.setProperty('--group-color', wording.color);
+  menu.querySelector('.filter-help').textContent = wording.hint;
+  menu.querySelector('.filter-search-input').placeholder = wording.placeholder;
+  const panel = menu.querySelector('.filter-groups');
+  panel.replaceChildren(...groups.map((group, index) => buildGroup(filter, active, group, index, selected, counts, handlers)));
+  menu.querySelectorAll('.view-tab').forEach(tab => {
+    const shown = tab.dataset.grouping === active;
+    tab.setAttribute('aria-selected', String(shown));
+    tab.tabIndex = shown ? 0 : -1; // un seul onglet dans l'ordre de tabulation ; les flèches passent de l'un à l'autre
+    if (shown) panel.setAttribute('aria-labelledby', tab.id);
+  });
+}
+
+// Un clic (ou une flèche) sur un onglet : le menu range ses valeurs autrement. La sélection ne change pas, seuls les groupes : la recherche
+// déjà tapée s'applique au nouveau rangement, qui s'ouvre comme le menu à l'ouverture (ce qui est coché devant, un groupe à moitié coché
+// déplié) et en haut de la liste. Le badge compte comme le rangement le fait (un groupe entier pour un), l'infobulle du bouton le dit.
+function showView(menu, filter, grouping, handlers) {
+  const state = viewsByMenu.get(menu);
+  if (state.active === grouping) return;
+  state.active = grouping;
+  chosenViews.set(filter.key, grouping);
+  const selected = handlers.selection(filter.key);
+  paintView(menu, filter, selected, handlers.counts(), handlers);
+  searchGroups(menu, normalize(menu.querySelector('.filter-search-input').value));
+  settleGroupedMenu(menu);
+  menu.scrollTop = 0;
+  const button = menu.closest('.filter').querySelector('.filter-button');
+  button.title = CATEGORIES[grouping].hint;
+  setBadge(button, selectionCount(selected, activeGroups(menu)));
+}
+
+// `views` : menuViews() de ce menu, au moins un rangement ; `active` : celui par lequel il s'ouvre (startingView).
+function buildGroupedMenu(filter, views, active, selected, counts, handlers) {
   const menu = document.createElement('div');
   menu.className = 'filter-menu filter-menu-groups';
   menu.style.borderTopColor = filter.color;
-  menu.style.setProperty('--group-color', CATEGORIES[filter.grouping].color);
-  groupsByMenu.set(menu, groups);
-  menu.append(buildMenuHead(filter, menu), buildMenuHelp(filter, menu));
-  groups.forEach((group, index) => menu.appendChild(buildGroup(filter, group, index, selected, counts, handlers)));
+  viewsByMenu.set(menu, { views, active });
+  menu.classList.toggle('has-tabs', views.length > 1); // l'en-tête collant est plus haut (style.css, --menu-head)
+  // La liste des groupes : le panneau des onglets quand il y en a (WAI-ARIA).
+  const panel = document.createElement('div');
+  panel.className = 'filter-groups';
+  panel.id = `filter-groups-${filter.key}`;
+  if (views.length > 1) panel.setAttribute('role', 'tabpanel');
+  menu.append(buildMenuHead(filter, menu, grouping => showView(menu, filter, grouping, handlers)), buildMenuHelp(filter, menu), panel);
+  paintView(menu, filter, selected, counts, handlers);
   return menu;
 }
 
@@ -276,7 +373,7 @@ function settleGroupedMenu(menu) {
       option => option.classList.contains('checked'));
     if (section.dataset.state === 'some') setGroupOpen(section, true);
   });
-  arrange(menu, sections, section => section.dataset.state !== 'none');
+  arrange(menu.querySelector('.filter-groups'), sections, section => section.dataset.state !== 'none');
 }
 
 // Marge laissée entre un menu ouvert et le bord du cadre du widget.
@@ -327,11 +424,14 @@ function buildFilter(filter, referenceMaps, selected, counts, handlers) {
   // (ce qui fermerait ceux qui sont ouverts).
   wrapper.dataset.filterKey = filter.key;
 
-  const groups = menuGroups(filter, referenceMaps);
+  // Un menu à plat (aucun rangement que Grist remplisse), ou rangé par groupe, avec des onglets quand il se range de plusieurs façons.
+  const views = menuViews(filter, referenceMaps);
+  const active = views.length > 0 ? startingView(filter, views) : null;
+  const groups = active && views.find(({ grouping }) => grouping === active).groups;
   const menuId = `filter-menu-${filter.key}`;
-  const button = buildFilterButton(filter, selectionCount(selected, groups), Boolean(groups), menuId);
-  const menu = groups
-    ? buildGroupedMenu(filter, groups, selected, counts, handlers)
+  const button = buildFilterButton(filter, selectionCount(selected, groups), active, menuId);
+  const menu = active
+    ? buildGroupedMenu(filter, views, active, selected, counts, handlers)
     : buildFilterMenu(filter, referenceMaps, selected, counts, handlers.onToggle);
   // Un groupe de cases nommé comme son bouton, que celui-ci désigne (aria-controls).
   menu.id = menuId;
@@ -344,7 +444,7 @@ function buildFilter(filter, referenceMaps, selected, counts, handlers) {
     const open = !wrapper.classList.contains('open');
     setFilterOpen(wrapper, open);
     if (open) {
-      if (groups) settleGroupedMenu(menu);
+      if (active) settleGroupedMenu(menu);
       keepMenuInView(menu);
     }
   });
@@ -356,8 +456,9 @@ function buildFilter(filter, referenceMaps, selected, counts, handlers) {
   return wrapper;
 }
 
-// `handlers` : { onToggle(filterKey, value), onToggleGroup(filterKey, values) } ; le
-// second sert aux menus par groupe, qui cochent un groupe entier d'un clic.
+// `handlers` : { onToggle(filterKey, value), onToggleGroup(filterKey, values), selection(filterKey), counts() } ; le
+// second sert aux menus par groupe, qui cochent un groupe entier d'un clic ; les deux derniers donnent à un menu qui change de
+// rangement (onglet) la sélection et les nombres du moment, pas ceux de sa construction.
 export function createFilterUI(container, referenceMaps, activeFilters, handlers, counts) {
   if (!container) return;
   container.innerHTML = '';
@@ -412,7 +513,7 @@ export function updateFilterUI(container, filterKey, activeFilters) {
 
   const selected = activeFilters[filterKey];
   const menu = wrapper.querySelector('.filter-menu');
-  const groups = groupsByMenu.get(menu);
+  const groups = activeGroups(menu);
   if (groups) syncGroupedMenu(menu, selected);
   else syncFlatMenu(menu, selected);
   setBadge(wrapper.querySelector('.filter-button'), selectionCount(selected, groups));

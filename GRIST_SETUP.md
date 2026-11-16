@@ -40,12 +40,14 @@ Le widget écrit dans `BDD` dans quatre cas :
   la case « Apparaître dans l’annuaire », cochée d'avance) et les colonnes qu'elle a
   remplies parmi celles du cas précédent, sauf `Avatar` : la photo s'ajoute ensuite ;
 - quand un administrateur, mode admin allumé, enregistre la fiche d'une autre
-  personne : les mêmes colonnes que pour la modification d'une fiche, plus `email` et
-  `Etablissement`.
+  personne : les mêmes colonnes que pour la modification d'une fiche, plus `email`,
+  `Etablissement` et, depuis la 1.37.0, `Accepte_apparaitre` (la case « Accepte
+  d’apparaître dans l’annuaire », en tête de sa fenêtre).
 
 Jamais `perimetre` (le widget ne le lit ni ne l'écrit plus depuis la 1.27.0), ni
-`Accepte_apparaitre` depuis la fenêtre de modification (seulement avec l'interrupteur, ou à la
-création d'une fiche). Une fiche créée apparaît tout de suite dans l'annuaire quand rien ne la
+`Accepte_apparaitre` depuis la fenêtre de modification de sa propre fiche (seulement avec
+l'interrupteur, ou à la création d'une fiche) : seul un administrateur, sur la fiche d'une
+autre personne, l'écrit depuis cette fenêtre. Une fiche créée apparaît tout de suite dans l'annuaire quand rien ne la
 masque : l'établissement choisi a validé sa présence (`ok_pour_apparaitre`) et est fondateur ou
 partenaire, la case est restée cochée, et la fiche a un prénom ou un nom. Sinon elle est créée,
 masquée, et la personne le lit.

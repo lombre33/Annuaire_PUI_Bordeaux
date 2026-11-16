@@ -1,5 +1,6 @@
-// Le formulaire de la fenêtre de modification d'une fiche, première étape : le bloc d'identité, la photo de profil, les champs,
-// les listes de pastilles, la case « Apparaître dans l'annuaire » d'une fiche qu'on crée, et ce qui se remet à jour à chaque
+// Le formulaire de la fenêtre de modification d'une fiche, première étape : le bloc d'identité, la case « Accepte d'apparaître » (un
+// administrateur sur la fiche d'une autre personne), la photo de profil, les champs, les listes de pastilles, la case « Apparaître
+// dans l'annuaire » d'une fiche qu'on crée, et ce qui se remet à jour à chaque
 // saisie (erreurs, « Ce qui va changer », résumé du pied, bouton « Relire »). Textes et mise en page suivent la maquette v5.
 // DOM seulement ; profile-ui.js tient l'état de la fenêtre et enchaîne les étapes.
 //
@@ -25,6 +26,10 @@ const PHOTO_HELP = 'Elle remplace les initiales sur la carte et s’agrandit au 
 // La case de la fiche qu'on crée (CONSENT_LABEL) : elle décide de publier la fiche tout de suite (cochée d'avance) ou
 // de la créer masquée, et elle écrit Accepte_apparaitre avec la fiche.
 const PUBLISH_HELP = 'Décochée, votre fiche est créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page.';
+
+// La même case sur la fiche d'une autre personne, pour un administrateur (1.37.0) : elle règle la colonne que la personne règle elle-même
+// avec l'interrupteur de son bandeau.
+const ADMIN_CONSENT_HELP = 'Décochée, la fiche n’apparaît pas dans l’annuaire. La personne règle aussi ce choix elle-même, avec l’interrupteur de son bandeau.';
 
 const fieldsChanged = count => `${count} champ${count > 1 ? 's' : ''} modifié${count > 1 ? 's' : ''}`;
 const fieldsFilled = count => `${count} champ${count > 1 ? 's' : ''} rempli${count > 1 ? 's' : ''}`;
@@ -363,18 +368,19 @@ function picker(ctx, field) {
   return section;
 }
 
-// La case de la fiche qu'on crée, cochée d'avance (voir CONSENT_LABEL). Même présentation que la case de la fiche
-// d'établissement : son nom en gras, ce qu'elle change en dessous.
-function publishField(ctx) {
+// La case « apparaître » : celle de la fiche qu'on crée, cochée d'avance (voir CONSENT_LABEL), ou celle qu'un administrateur règle sur la
+// fiche d'une autre personne. Même présentation que la case de la fiche d'établissement : son nom en gras, ce qu'elle change en dessous.
+// Elle lit et écrit `draft.Accepte_apparaitre`, un booléen ; le formulaire n'a jamais les deux à la fois.
+function consentBox(ctx, label, helpText) {
   const id = `profile-${CONSENT_COLUMN}`;
   const box = el('label', 'es-chk');
   const input = document.createElement('input');
   input.type = 'checkbox';
   input.id = id;
   input.checked = ctx.draft[CONSENT_COLUMN] === true;
-  const name = el('span', 'es-chk-label', CONSENT_LABEL);
+  const name = el('span', 'es-chk-label', label);
   name.id = `${id}-label`;
-  const help = el('span', 'es-chk-sub', PUBLISH_HELP);
+  const help = el('span', 'es-chk-sub', helpText);
   help.id = `${id}-help`;
   input.setAttribute('aria-labelledby', name.id);
   input.setAttribute('aria-describedby', help.id);
@@ -387,6 +393,13 @@ function publishField(ctx) {
   box.append(input, text);
   return box;
 }
+
+const publishField = ctx => consentBox(ctx, CONSENT_LABEL, PUBLISH_HELP);
+const consentField = (ctx, field) => {
+  const box = consentBox(ctx, field.label, ADMIN_CONSENT_HELP);
+  box.classList.add('es-chk-lead');
+  return box;
+};
 
 // ===== Le formulaire =====
 
@@ -402,14 +415,16 @@ export function buildForm(ctx) {
   const grid = el('div', 'fld-grid');
   const pickers = [];
   let photo = null;
+  let consent = null;
   ctx.session.model.forEach(field => {
-    if (field.kind === 'image') photo = photoSection(ctx);
+    if (field.kind === 'consent') consent = consentField(ctx, field);
+    else if (field.kind === 'image') photo = photoSection(ctx);
     else if (field.kind === 'text' || field.kind === 'phone' || field.kind === 'email') grid.append(textField(ctx, field));
     else if (field.kind === 'reference') grid.append(referenceField(ctx, field));
     else pickers.push(picker(ctx, field));
   });
   const publish = ctx.creating && typeof draft[CONSENT_COLUMN] === 'boolean' ? [publishField(ctx)] : [];
-  return [ui.alert, identityBlock(ctx), ...(photo ? [photo] : []), grid, ...pickers, ...publish, ui.recap];
+  return [ui.alert, identityBlock(ctx), ...(consent ? [consent] : []), ...(photo ? [photo] : []), grid, ...pickers, ...publish, ui.recap];
 }
 
 // Le résumé du pied de fenêtre quand le brouillon est refusé : le premier problème, dans

@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert, { plain } from './support/assert.mjs';
 import { loadDirectory, DirectoryLoadError, describeLoadFailure } from '../grist-data.js';
 import { FILTERS } from '../constants.js';
-import { computeFilterCounts, createEmptyFilterState, filterContacts, menuGroups } from '../filters.js';
+import { computeFilterCounts, createEmptyFilterState, filterContacts, menuGroups, menuViews } from '../filters.js';
 import {
-  sampleTables, unrankableTaskTables, withDuplicateCHU, withoutOptionalColumns, withTaskActions, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME
+  sampleTables, unrankableTaskTables, withCurie, withDuplicateCHU, withoutOptionalColumns, withTaskActions, DEFAULT_CARD_NAMES, HOSTILE_FIRST_NAME
 } from './fixtures.mjs';
 
 // ===== loadDirectory : lecture de Grist → contacts affichables =====
@@ -365,6 +365,83 @@ test('loadDirectory reuses the previous skills and domains together when the Com
 
   const firstLoad = await load(sampleTables(), { docApi: { failing: ['Competences'] } });
   assert.deepEqual([firstLoad.referenceMaps.macro, firstLoad.referenceMaps.competences], [{}, {}]);
+});
+
+// ===== Compétences C.U.R.I.E : une colonne facultative de plus de la table Competences (1.37.0) =====
+
+// Les avertissements de la console qui parlent des compétences : ceux du reste de l'annuaire d'exemple (Eve n'a pas d'établissement) n'y sont pas.
+const aboutSkills = warnings => warnings.filter(args => /Competences|C_U_R_I_E/.test(String(args[0])));
+
+test('loadDirectory gives each contact the C.U.R.I.E groups of its skills, once each, from the optional referenciel_C_U_R_I_E column', async () => {
+  const docApi = fakeDocApi(withCurie());
+  const log = recordingLog();
+  const { contacts, referenceMaps, issues } = await loadDirectory(docApi, { log });
+  assert.equal(docApi.calls.Competences, 1, 'la même table, lue une seule fois');
+  assert.deepEqual(referenceMaps.curie, { 1: 'Groupe C', 2: 'Groupe U', 3: 'Groupe U', 4: 'Hors C.U.R.I.E' },
+    'deux écritures d\'un groupe n\'en font qu\'un ; la compétence non classée sous « Hors C.U.R.I.E »');
+  assert.deepEqual(referenceMaps.macro, { 1: 'Cancérologie', 2: 'Cancérologie', 3: 'Pharmacie', 4: 'Autres' }, 'les domaines restent ceux d\'avant');
+  const byName = Object.fromEntries(contacts.map(c => [c.nom, c.labels]));
+  assert.deepEqual(byName.Martin.curie, ['Groupe C', 'Groupe U'], 'Ana : une compétence dans chaque groupe');
+  assert.deepEqual(byName.Martin.macro, ['Cancérologie'], 'les mêmes deux compétences sont d\'un seul domaine');
+  assert.deepEqual(byName.Durand.curie, ['Groupe U']);
+  assert.deepEqual(byName['Bergonié'].curie, ['Hors C.U.R.I.E']);
+  assert.deepEqual(byName.Bernard.curie, [], 'aucune compétence : aucun groupe');
+  assert.deepEqual(issues, [], 'rien à signaler au bandeau');
+  assert.deepEqual(aboutSkills(log.warnings), []);
+  const info = log.infos.find(args => String(args[0]).includes('sans regroupement pour curie'));
+  assert.ok(info && info[0].includes('Hors C.U.R.I.E'), 'la console dit quelles compétences la colonne ne classe pas');
+  assert.deepEqual(info[1], ['4']);
+});
+
+test('loadDirectory offers the skills menu both rankings once the column is filled: the menu gets two tabs', async () => {
+  const { referenceMaps } = await load(withCurie());
+  const skills = FILTERS.find(filter => filter.key === 'competences');
+  assert.deepEqual(menuViews(skills, referenceMaps).map(view => view.grouping), ['macro', 'curie']);
+  assert.deepEqual(menuGroups(skills, referenceMaps, 'curie').map(group => group.label), ['Groupe C', 'Groupe U', 'Hors C.U.R.I.E']);
+});
+
+test('loadDirectory without the referenciel_C_U_R_I_E column offers no C.U.R.I.E ranking: no banner, no warning, only a line in the console', async () => {
+  const log = recordingLog();
+  const { contacts, referenceMaps, issues } = await loadDirectory(fakeDocApi(sampleTables()), { log });
+  assert.deepEqual(referenceMaps.curie, {}, 'pas de faux groupe « Hors C.U.R.I.E » pour tout le monde');
+  assert.deepEqual(issues, [], 'une colonne facultative n\'est pas une anomalie : aucun bandeau');
+  assert.deepEqual(aboutSkills(log.warnings), [], 'ni avertissement');
+  assert.ok(log.infos.some(args => String(args[0]).includes('referenciel_C_U_R_I_E')), 'mais la console le dit');
+  assert.ok(contacts.every(c => c.labels.curie.length === 0));
+  const skills = FILTERS.find(filter => filter.key === 'competences');
+  assert.deepEqual(menuViews(skills, referenceMaps).map(view => view.grouping), ['macro'], 'le menu reste celui d\'avant, sans onglets');
+});
+
+test('loadDirectory with the referenciel_C_U_R_I_E column left empty offers no C.U.R.I.E ranking either, rather than one group with every skill', async () => {
+  const tables = withCurie();
+  tables.Competences.referenciel_C_U_R_I_E = ['', '', '', ''];
+  const log = recordingLog();
+  const { contacts, referenceMaps, issues } = await loadDirectory(fakeDocApi(tables), { log });
+  assert.deepEqual(referenceMaps.curie, {});
+  assert.deepEqual(issues, []);
+  assert.deepEqual(aboutSkills(log.warnings), []);
+  assert.ok(log.infos.some(args => String(args[0]).includes('referenciel_C_U_R_I_E') && String(args[0]).includes('vide')), 'la console dit que la colonne est vide');
+  assert.ok(contacts.every(c => c.labels.curie.length === 0));
+  const skills = FILTERS.find(filter => filter.key === 'competences');
+  assert.deepEqual(menuViews(skills, referenceMaps).map(view => view.grouping), ['macro']);
+});
+
+test('loadDirectory reads a choice list of the referenciel_C_U_R_I_E column as one text, without its list marker', async () => {
+  const tables = withCurie();
+  tables.Competences.referenciel_C_U_R_I_E = [['L', 'C', 'R'], ['L', 'U'], 'U', ['L']];
+  const { referenceMaps } = await load(tables);
+  assert.deepEqual(referenceMaps.curie, { 1: 'C / R', 2: 'U', 3: 'U', 4: 'Hors C.U.R.I.E' }, '« L » n\'est pas une valeur : c\'est le marqueur de liste de Grist');
+});
+
+test('loadDirectory keeps the C.U.R.I.E groups with the skills when the Competences table cannot be read, and none when it never gave any', async () => {
+  const previous = (await load(withCurie())).referenceMaps;
+  const kept = await load(withCurie(), { docApi: { failing: ['Competences'] }, load: { previousMaps: previous } });
+  assert.deepEqual(kept.referenceMaps.curie, previous.curie);
+  assert.deepEqual(kept.referenceMaps.competences, previous.competences);
+
+  const without = (await load(sampleTables())).referenceMaps;
+  const stillWithout = await load(sampleTables(), { docApi: { failing: ['Competences'] }, load: { previousMaps: without } });
+  assert.deepEqual(stillWithout.referenceMaps.curie, {}, 'une lecture ratée ne range pas toutes les compétences sous « Hors C.U.R.I.E »');
 });
 
 // ===== Tâches rangées par action : le numéro avant le point du libellé =====
