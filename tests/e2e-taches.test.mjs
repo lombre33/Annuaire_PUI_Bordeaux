@@ -1,13 +1,12 @@
-// Test navigateur du menu Actions rangé par groupe : charge le vrai index.html dans Chromium,
+// Test navigateur du menu Tâches rangé par action : charge le vrai index.html dans Chromium,
 // avec le faux document Grist de tests/support/fake-grist.js, et vérifie ce que voit la
-// personne. Depuis la 1.39.0 les « tâches » de la table Taches s'appellent « Actions » à l'écran (demande d'Antoine du
-// 16 novembre 2026), et le bouton « Actions » d'avant (la colonne BDD.Actions) n'existe plus. Le menu est celui des
-// compétences rangées par domaine (e2e.test.mjs) : une case par groupe d'actions (« Action 1 : Vaccination »), qui coche
-// toutes ses actions, un bouton qui déplie le détail, une recherche qui trouve un groupe comme une action. Ce fichier
-// vérifie que les actions s'en servent bien, et que le menu Compétences n'en est pas changé.
+// personne. Le menu est celui des compétences rangées par domaine (e2e.test.mjs) : une case
+// par action, qui coche toutes ses tâches, un bouton qui déplie le détail, une recherche qui
+// trouve une action comme une tâche. Ce fichier vérifie que les tâches s'en servent bien, et
+// que ni le filtre Actions ni le menu Compétences n'en sont changés.
 //
-// Aucune colonne ne relie une action à son groupe : le numéro avant le point du libellé de l'action
-// (« 1.2 Rappel vaccinal ») est celui de son groupe (« Action 1 : Vaccination »).
+// Aucune colonne ne relie une tâche à son action : le numéro avant le point du libellé de la
+// tâche (« 1.2 Rappel vaccinal ») est celui de l'action (« Action 1 : Vaccination »).
 //
 // Avec withTaskActions (tests/fixtures.mjs), périmètre par défaut ; Bob est partenaire :
 //   Action 1 : Vaccination  → 1.1 Relecture (Ana), 1.2 Rappel vaccinal (Gina)
@@ -19,11 +18,12 @@
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
 import { unrankableTaskTables, withTaskActions, withIdentity, ANA_EMAIL } from './fixtures.mjs';
-import { skip, reload, until, waitForCards, cardNames, gridCard, openOwn, withWidget } from './support/browser.mjs';
+import { skip, reload, waitForCards, cardNames, gridCard, openOwn, withWidget } from './support/browser.mjs';
 import { assertKeyboardWalk, groupedMenu, optionCounts } from './support/grouped-menu.mjs';
 
 const tasks = groupedMenu('taches');
 const skills = groupedMenu('competences');
+const actionsFilter = page => page.locator('.filter[data-filter-key="actions"]');
 
 const VACCINATION = 'Action 1 : Vaccination';
 const AUDIT = 'Action 2 : Audit';
@@ -47,20 +47,22 @@ const consoleLines = async logs => (await Promise.all([...logs.warnings, ...logs
 
 // ===== Le menu : des actions repliées, « Sans action » en dernier =====
 
-test('la barre compte sept boutons : le menu Actions est celui des tâches, ses groupes n\'ont pas de bouton, et il n\'y a plus de bouton Actions à plat (1.39.0)', { skip }, () =>
+test('la barre garde huit boutons : les actions rangent le menu Tâches sans avoir le leur, et le filtre Actions ne change pas', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     assert.deepEqual(await page.locator('.filter-button > span:nth-child(2)').allTextContents(),
-      ['Actions', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement', 'Rôle dans le PUI']);
+      ['Actions', 'Tâches', 'Communautés', 'GT', 'Compétences', 'Instances', 'Établissement', 'Rôle PUI']);
     assert.equal(await page.locator('.filter[data-filter-key="macroTaches"]').count(), 0);
-    assert.equal(await page.locator('.filter[data-filter-key="actions"]').count(), 0, 'l\'ancien filtre Actions (la colonne BDD.Actions) a disparu');
-    assert.equal(await tasks.filter(page).locator('.filter-button').getAttribute('data-filter-key') ?? 'taches', 'taches');
     assert.match(await tasks.filter(page).locator('.filter-button').getAttribute('title'), /action/);
     assert.equal(await tasks.search(page).getAttribute('placeholder'), 'Action ou tâche…');
-    assert.equal(await tasks.search(page).getAttribute('aria-label'), 'Rechercher dans Actions');
+
+    assert.equal(await actionsFilter(page).locator('.filter-group').count(), 0, 'le filtre Actions reste à plat');
+    assert.deepEqual(await actionsFilter(page).locator('.filter-option .option-label').allTextContents(), [VACCINATION, AUDIT]);
+    assert.equal(await actionsFilter(page).locator('.filter-search-input').getAttribute('placeholder'), 'Rechercher dans Actions…');
+    assert.equal(await actionsFilter(page).locator('.filter-button').getAttribute('title'), null);
   }));
 
-test('le menu Actions range les actions par groupe, repliés, « Sans action » en dernier, avec le nombre de cartes de chacun', { skip }, () =>
+test('le menu Tâches range les tâches par action, repliées, « Sans action » en dernier, avec le nombre de cartes de chacune', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     await tasks.open(page);
@@ -106,6 +108,7 @@ test('cocher une action coche toutes ses tâches : ses cartes, un badge à 1, et
     assert.equal(await tasks.box(page, VACCINATION).evaluate(box => box.indeterminate), false);
     assert.equal(await tasks.filter(page).locator('.filter-option input:checked').count(), 2, 'ses deux tâches sont cochées');
     assert.equal(await tasks.box(page, AUDIT).isChecked(), false);
+    assert.equal(await actionsFilter(page).locator('input:checked').count(), 0, 'le filtre Actions n\'est pas touché');
     assert.equal(await tasks.filter(page).evaluate(filter => filter.classList.contains('open')), true);
 
     await tasks.box(page, VACCINATION).uncheck();
@@ -157,6 +160,23 @@ test('les actions et les tâches s\'additionnent (OU), et le tout se cumule (ET)
     assert.deepEqual(await cardNames(page), [GINA], 'ET avec le menu Compétences');
   }));
 
+test('le filtre Actions reste un filtre à part, qui se cumule (ET) avec le menu Tâches sans que l\'un coche l\'autre', { skip }, () =>
+  withWidget({ tables: withTaskActions() }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await tasks.open(page);
+    await tasks.box(page, VACCINATION).check(); // les tâches de l'action 1 : Ana et Gina
+    await waitForCards(page, 2);
+    await page.mouse.click(5, 5);
+
+    await actionsFilter(page).locator('.filter-button').click();
+    await actionsFilter(page).locator('.filter-option', { hasText: 'Vaccination' }).locator('input').check(); // la fiche d'Ana
+    await waitForCards(page, 1);
+    assert.deepEqual(await cardNames(page), [ANA], 'ET entre le filtre Actions et le menu Tâches');
+    assert.equal(await actionsFilter(page).locator('.filter-count').textContent(), '1');
+    assert.equal(await tasks.badge(page).textContent(), '1');
+    assert.equal(await tasks.box(page, VACCINATION).isChecked(), true, 'cocher l\'action d\'une fiche ne décoche pas les tâches de l\'action');
+  }));
+
 // ===== Les nombres, la recherche, les tags =====
 
 test('les nombres des actions tiennent compte de l\'interrupteur Partenaires et des autres filtres, pas des tâches cochées', { skip }, () =>
@@ -182,7 +202,7 @@ test('les nombres des actions tiennent compte de l\'interrupteur Partenaires et 
     assert.deepEqual(await tasks.groupCounts(page), { [VACCINATION]: '0', [AUDIT]: '1', [NONE]: '0' }, 'un autre filtre s\'applique aux actions');
   }));
 
-test('la recherche du menu Actions trouve un groupe, une action ou un numéro, sans tenir compte des accents ni de la casse', { skip }, () =>
+test('la recherche du menu Tâches trouve une action, une tâche ou un numéro, sans tenir compte des accents ni de la casse', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     await tasks.open(page);
@@ -218,7 +238,7 @@ test('la recherche du menu Actions trouve un groupe, une action ou un numéro, s
     assert.equal((await cardNames(page)).length, 4);
   }));
 
-test('une pastille de carte coche l\'action, et à l\'ouverture suivante son groupe passe devant', { skip }, () =>
+test('un tag de carte coche la tâche, et à l\'ouverture suivante son action passe devant', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     await page.locator('.contact-card', { hasText: 'Hugo' }).locator('.tag-taches').click(); // Veille
@@ -232,7 +252,7 @@ test('une pastille de carte coche l\'action, et à l\'ouverture suivante son gro
       'une action complète reste repliée : sa case dit tout');
   }));
 
-test('Réinitialiser décoche les groupes, referme le détail et vide la recherche du menu Actions', { skip }, () =>
+test('Réinitialiser décoche les actions, referme le détail et vide la recherche du menu Tâches', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     await tasks.open(page);
@@ -310,13 +330,13 @@ test('quand une action est complète et que Grist renomme une action, le menu es
 // ===== Sans numéro, le menu reste à plat =====
 
 for (const [name, tables] of Object.entries(unrankableTaskTables())) {
-  test(`${name} : le menu Actions reste à plat, sans bandeau ni texte de groupe, et la console dit pourquoi`, { skip }, () =>
+  test(`${name} : le menu Tâches reste à plat, sans bandeau ni texte d'action, et la console dit pourquoi`, { skip }, () =>
     withWidget({ tables }, async ({ page, logs }) => {
       await waitForCards(page, 4);
       assert.equal(await page.locator('#statusBanner').isHidden(), true, 'ce n\'est pas une anomalie : pas de bandeau');
       assert.equal(await tasks.filter(page).locator('.filter-group').count(), 0, 'pas de faux groupe « Sans action » pour tout le monde');
       assert.equal(await tasks.filter(page).locator('.filter-option').count(), 4, 'les quatre tâches, à plat');
-      assert.equal(await tasks.search(page).getAttribute('placeholder'), 'Rechercher dans Actions…');
+      assert.equal(await tasks.search(page).getAttribute('placeholder'), 'Rechercher dans Tâches…');
       assert.equal(await tasks.filter(page).locator('.filter-button').getAttribute('title'), null, 'aucune action à cocher : pas d\'infobulle qui en parle');
 
       await tasks.open(page);
@@ -330,7 +350,7 @@ for (const [name, tables] of Object.entries(unrankableTaskTables())) {
     }));
 }
 
-test('sans action ni groupe numéroté, comme dans la base de départ, le menu Actions est à plat et sans bandeau', { skip }, () =>
+test('sans action ni tâche numérotée, comme dans la base de départ, le menu Tâches est à plat et sans bandeau', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
     assert.equal(await page.locator('#statusBanner').isHidden(), true);
@@ -350,7 +370,7 @@ test('les tâches à plat gardent l\'ordre des numéros : 1.2 avant 1.10', { ski
   });
 });
 
-test('le menu Actions se range aussi quand les libellés sont écrits « T1.1 » et « Action 1: », sans espace avant les deux-points', { skip }, () => {
+test('le menu Tâches se range aussi quand les libellés sont écrits « T1.1 » et « Action 1: », sans espace avant les deux-points', { skip }, () => {
   const tables = withTaskActions();
   tables.Actions.Actions = ['Action 1: Vaccination', 'Action 2: Audit'];
   tables.Taches.Taches = ['T1.1 Relecture', 'T1.2 rappel vaccinal', 'Tâche 2.1 : Inspection', 'Veille'];
@@ -363,82 +383,22 @@ test('le menu Actions se range aussi quand les libellés sont écrits « T1.1 »
   });
 });
 
-test('la carte range les actions par numéro, une rangée par action du groupe, sans bandeau ni groupe sur la carte (1.39.0)', { skip }, () =>
+test('le rangement des tâches ne change rien d\'autre : mêmes cartes, mêmes tags (le détail des tâches, pas les actions), aucun bandeau', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     assert.equal(await page.locator('#statusBanner').isHidden(), true);
     const tagsByGroup = await gridCard(page, ANA).locator('.tag-group').evaluateAll(groups =>
       groups.map(group => [group.querySelector('.tag-group-title').textContent,
         [...group.querySelectorAll('.tag')].map(tag => tag.textContent)]));
-    assert.deepEqual(tagsByGroup.filter(([title]) => title === 'Actions'), [['Actions', [RELECTURE, INSPECTION]]],
-      'la carte garde le détail des actions, pas le nom de leur groupe');
-    assert.equal(tagsByGroup.some(([title]) => title === 'Tâches'), false, 'plus de section « Tâches »');
-    assert.equal(tagsByGroup.flatMap(([, tags]) => tags).includes('Vaccination'), false, 'la colonne BDD.Actions n\'est plus lue');
-    // Une rangée par numéro d'action : « 1.1 » sur la première, « 2.1 » sur la suivante.
-    const rows = await gridCard(page, ANA).locator('.tag-group[aria-label="Actions"] .tag-row')
-      .evaluateAll(lines => lines.map(line => [...line.querySelectorAll('.tag')].map(tag => tag.textContent)));
-    assert.deepEqual(rows, [[RELECTURE], [INSPECTION]], 'une rangée par numéro d\'action');
+    assert.deepEqual(tagsByGroup.filter(([title]) => title === 'Tâches'), [['Tâches', [RELECTURE, INSPECTION]]],
+      'la carte garde le détail des tâches, pas les actions');
+    assert.deepEqual(tagsByGroup.filter(([title]) => title === 'Actions'), [['Actions', [VACCINATION]]], 'les actions de la fiche (BDD.Actions) y sont toujours');
     assert.deepEqual(await Promise.all(logs.errors), []);
-  }));
-
-test('une rangée de la carte réunit les actions du même numéro (1.2 et 1.3), les actions sans numéro font la dernière rangée', { skip }, () => {
-  const tables = withTaskActions();
-  tables.Taches = {
-    id: [1, 2, 3, 4, 5],
-    Taches: ['1.2 Rappel', '1.3 Relance', '3.5 Bilan', 'Veille', '1.1 Cadrage'],
-    Taches_corrige: ['', '', '', '', ''],
-    Taches_role: ['', '', '', '', '']
-  };
-  tables.BDD.Taches[0] = ['L', 4, 3, 2, 1, 5]; // Ana, dans le désordre
-  return withWidget({ tables }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const rows = await gridCard(page, ANA).locator('.tag-group[aria-label="Actions"] .tag-row')
-      .evaluateAll(lines => lines.map(line => [...line.querySelectorAll('.tag')].map(tag => tag.textContent)));
-    assert.deepEqual(rows, [['1.1 Cadrage', '1.2 Rappel', '1.3 Relance'], ['3.5 Bilan'], ['Veille']]);
-    const layout = await gridCard(page, ANA).locator('.tag-group[aria-label="Actions"] .tag-group-values').evaluate(values => ({
-      direction: getComputedStyle(values).flexDirection, rows: [...values.children].map(row => row.getBoundingClientRect().top)
-    }));
-    assert.equal(layout.direction, 'column', 'les rangées s\'empilent : un retour à la ligne à chaque nouveau numéro');
-    assert.deepEqual(layout.rows, [...layout.rows].sort((a, b) => a - b));
-    assert.equal(new Set(layout.rows).size, 3, 'trois lignes distinctes');
-  });
-});
-
-test('« Membre d\'une action » suit les actions : une personne qui en a une le lit après son rôle choisi, une personne sans action ne l\'a pas', { skip }, () =>
-  withWidget({ tables: withTaskActions() }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const roles = name => gridCard(page, name).locator('.tag-group[aria-label="Rôle dans le PUI"] .tag').allTextContents();
-    const sections = name => gridCard(page, name).locator('.tag-group[aria-label="Actions"]').count();
-    assert.deepEqual([await roles(ANA), await sections(ANA)], [['Référent qualité', 'Membre d’une action'], 1], 'Ana : son rôle, puis celui que ses actions lui donnent');
-    assert.deepEqual([await roles(GINA), await sections(GINA)], [['Membre d’une action'], 1], 'Gina : une action, pas de rôle choisi');
-    assert.deepEqual([await roles(HUGO), await sections(HUGO)], [['Membre d’une action'], 1], 'Hugo : sa seule action n\'a pas de numéro, c\'en est bien une');
-    assert.deepEqual([await roles('Hostile'), await sections('Hostile')], [[], 0], 'sans action ni rôle : ni section Rôle, ni section Actions');
-
-    // Il se retire de lui-même avec la dernière action, sans que personne n'écrive dans Grist.
-    await page.evaluate(() => { window.__tables.BDD.Taches[8] = ['L']; });
-    await reload(page);
-    await until(async () => (await sections(GINA)) === 0, 'l\'annuaire n\'a pas été relu : Gina garde son action');
-    assert.deepEqual([await roles(GINA), await sections(GINA)], [[], 0], 'plus d\'action : plus de rôle calculé');
-  }));
-
-test('le filtre Rôle dans le PUI propose « Membre d\'une action », même quand la table des rôles ne l\'a pas, et il garde les personnes qui ont une action', { skip }, () =>
-  withWidget({ tables: withTaskActions() }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const role = page.locator('.filter[data-filter-key="role"]');
-    await role.locator('.filter-button').click();
-    assert.deepEqual(await role.locator('.filter-option .option-label').allTextContents(), ['Membre d’une action', 'Référent qualité']);
-    assert.deepEqual(await role.locator('.filter-option .option-count').allTextContents(), ['3', '1'], 'Ana, Gina et Hugo ; Ana');
-    await role.locator('.filter-option', { hasText: 'Membre d’une action' }).locator('input').check();
-    await waitForCards(page, 3);
-    assert.deepEqual(await cardNames(page), [GINA, HUGO, ANA]);
-    await page.mouse.click(5, 5);
-    await gridCard(page, HUGO).locator('.tag-group[aria-label="Rôle dans le PUI"] .tag').click(); // la pastille se décoche d'un clic
-    await waitForCards(page, 4);
   }));
 
 // ===== Deux menus rangés par groupe dans la même barre =====
 
-test('les menus Actions et Compétences sont indépendants : un seul ouvert à la fois, un badge chacun, des listes qui ne se confondent pas', { skip }, () =>
+test('les menus Tâches et Compétences sont indépendants : un seul ouvert à la fois, un badge chacun, des listes qui ne se confondent pas', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     await tasks.open(page);
@@ -466,7 +426,7 @@ test('les menus Actions et Compétences sont indépendants : un seul ouvert à l
     assert.equal(await page.locator('.filter-group input:checked, .filter-group input:indeterminate').count(), 0);
   }));
 
-test('le menu Actions reste utilisable au clavier : cases et boutons atteignables, état de dépli annoncé', { skip }, () =>
+test('le menu Tâches reste utilisable au clavier : cases et boutons atteignables, état de dépli annoncé', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     await assertKeyboardWalk(page, tasks, { group: VACCINATION, cardsAfterTick: 2, firstItem: RELECTURE });
@@ -481,13 +441,13 @@ const unnamedControls = snapshot => snapshot.split('\n')
   .filter(match => match && !match[2].startsWith(' "'))
   .map(match => match[0].trim());
 
-test('le menu Actions ouvert n\'a aucun contrôle sans nom : recherche, case de groupe, flèche de détail, actions', { skip }, () =>
+test('le menu Tâches ouvert n\'a aucun contrôle sans nom : recherche, case d\'action, flèche de détail, tâches', { skip }, () =>
   withWidget({ tables: withTaskActions() }, async ({ page }) => {
     await waitForCards(page, 4);
     await tasks.open(page);
     await tasks.toggle(page, VACCINATION).click();
     const snapshot = await tasks.filter(page).locator('.filter-menu').ariaSnapshot();
-    assert.ok(snapshot.includes('textbox "Rechercher dans Actions"'), 'la recherche du menu est nommée');
+    assert.ok(snapshot.includes('textbox "Rechercher dans Tâches"'), 'la recherche du menu est nommée');
     assert.ok(snapshot.includes(`button "Détail de ${VACCINATION}" [expanded]`), 'la flèche d\'une action dépliée porte son nom et son état');
     assert.ok(snapshot.includes(`button "Détail de ${AUDIT}"`), 'celle d\'une action repliée aussi');
     assert.ok(snapshot.includes(`checkbox "${RELECTURE}"`), 'une tâche dépliée est une case nommée par son libellé, sans le nombre de fiches (1.30.0)');
@@ -499,27 +459,26 @@ test('le menu Actions ouvert n\'a aucun contrôle sans nom : recherche, case de 
 const profilePicker = (page, label) => page.locator('#profileDialog .grp')
   .filter({ has: page.locator('.grp-title', { hasText: new RegExp(`^${label}$`) }) });
 
-test('le formulaire de profil range les actions par groupe, comme le menu, et n\'a plus la liste des actions d\'avant', { skip }, () => {
+test('le formulaire de profil range les tâches par action, comme le menu, et laisse la liste des actions à plat', { skip }, () => {
   const tables = withIdentity(withTaskActions());
   tables.ACL.admin[0] = false;
   return withWidget({ tables, user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
-    assert.deepEqual(await profilePicker(page, 'Actions').locator('.subgrp-title').allTextContents(), [VACCINATION, AUDIT, NONE]);
-    const pressed = await profilePicker(page, 'Actions').locator('.pick').evaluateAll(chips =>
+    assert.deepEqual(await profilePicker(page, 'Tâches').locator('.subgrp-title').allTextContents(), [VACCINATION, AUDIT, NONE]);
+    const pressed = await profilePicker(page, 'Tâches').locator('.pick').evaluateAll(chips =>
       chips.map(chip => [chip.textContent, chip.getAttribute('aria-pressed')]));
     assert.deepEqual(pressed, [[RELECTURE, 'true'], [RAPPEL, 'false'], [INSPECTION, 'true'], [VEILLE, 'false']],
-      'les actions d\'Ana sont cochées, rangées par groupe');
-    assert.equal(await page.locator('#profileDialog .grp-title', { hasText: /^Actions$/ }).count(), 1, 'une seule liste « Actions » : celle des tâches');
-    assert.equal(await page.locator('#profileDialog .grp-title', { hasText: /^Tâches$/ }).count(), 0, 'plus de liste « Tâches »');
+      'les tâches d\'Ana sont cochées, rangées par action');
+    assert.equal(await profilePicker(page, 'Actions').locator('.subgrp').count(), 0, 'la liste des actions reste à plat');
   });
 });
 
-test('le formulaire de profil garde les actions à plat quand aucune n\'est rattachée à un groupe', { skip }, () => {
+test('le formulaire de profil garde les tâches à plat quand aucune n\'est rattachée à une action', { skip }, () => {
   const tables = withIdentity();
   tables.ACL.admin[0] = false;
   return withWidget({ tables, user: ANA_EMAIL }, async ({ page }) => {
     await openOwn(page);
-    assert.equal(await profilePicker(page, 'Actions').locator('.subgrp').count(), 0);
-    assert.deepEqual(await profilePicker(page, 'Actions').locator('.pick').allTextContents(), ['Relecture']);
+    assert.equal(await profilePicker(page, 'Tâches').locator('.subgrp').count(), 0);
+    assert.deepEqual(await profilePicker(page, 'Tâches').locator('.pick').allTextContents(), ['Relecture']);
   });
 });
