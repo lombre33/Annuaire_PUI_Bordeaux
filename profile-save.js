@@ -13,6 +13,7 @@
 
 import { avatarIdOf } from './attachments.js';
 import { CONSENT_COLUMN, CONSENT_LABEL, MAIN_TABLE, PROFILE_FIELDS } from './constants.js';
+import { DOC_REFS } from './doc-refs.js';
 import { describeVisibility, formatPhone, hasAccepted, normalizeEmail, safeValues, tableToRows, text } from './grist-data.js';
 import { classifyWriteError } from './presence.js';
 import { describeChanges, diffProfile, rebaseChanges } from './profile.js';
@@ -118,7 +119,7 @@ const FAILURES = {
   gone: 'Cette fiche n\'existe plus dans Grist : rien n\'a été modifié.',
   denied: 'Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche. Contactez un administrateur.',
   emailTaken: 'Cette adresse e-mail est maintenant celle d\'une autre fiche : rien n\'a été modifié. Revenez à la fiche et choisissez-en une autre.',
-  formula: 'Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md.',
+  formula: `Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget (voir le ${DOC_REFS.columns.text}).`,
   other: 'La modification n\'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
   noFile: 'La photo choisie n\'est plus disponible : choisissez-la de nouveau.'
 };

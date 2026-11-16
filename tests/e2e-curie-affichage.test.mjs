@@ -3,7 +3,7 @@
 // En 1.38.0, les tests passaient et le menu montrait « — aucune correspondance — » en tête, puis des titres « 0 », « 3 », « 13 », dans un cadre
 // d'onglets plus lourd que le reste du menu : les tests avaient des données imaginées (« Groupe C ») et contrôlaient ce que le code faisait, pas ce
 // que la personne voit. En 1.41.1 le menu montrait « N° 3 », « N° 13 » : Antoine n'y comprenait rien, la colonne est une Référence vers
-// `Referentiel_competences_CURIE` et ces numéros sont ses lignes (1.42.1). Ici : les valeurs du vrai document (withCurieCodes, tests/fixtures.mjs), et des contrôles sur le menu rendu
+// `Referentiel_competences_CURIE` et ces numéros sont ses lignes (1.43.1). Ici : les valeurs du vrai document (withCurieCodes, tests/fixtures.mjs), et des contrôles sur le menu rendu
 // (tests/support/menu-checks.mjs). La mécanique des onglets (clavier, sélection partagée, nombres) est dans tests/e2e-curie.test.mjs.
 // Charge le vrai index.html dans Chromium avec le faux document Grist (optionnel : voir TESTING.md).
 

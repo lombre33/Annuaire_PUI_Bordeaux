@@ -33,18 +33,29 @@ import { avatarIdOf, createAttachments } from './attachments.js';
 import { createBrandingUI, createLogoImage } from './branding-ui.js';
 import { createLogoReport } from './logos-report.js';
 import { createAvatar, createPhotoViewer, createThumb } from './avatar-ui.js';
+import { createDocViewer } from './docs-ui.js';
+import { setDocOpener } from './dom.js';
 
 // Le numéro de la version qui s'exécute, en bas de page (voir VERSION et index.html). Le cache de GitHub Pages garde chaque fichier dix
 // minutes : un index.html ancien sans cette ligne ne doit pas empêcher le code neuf de démarrer.
 const versionNote = document.getElementById('versionNote');
 if (versionNote) versionNote.textContent = `Version ${VERSION}`;
 
-// Le lien « Documentation » de l'en-tête (DOCS_URL, constants.js) : caché dans index.html, il n'apparaît qu'avec son adresse. Sans adresse,
-// ou avec un index.html ancien qui n'a pas ce lien (cache de GitHub Pages), il n'y en a pas et rien d'autre n'en dépend.
+// Le bouton « Documentation » de l'en-tête (DOCS_URL, constants.js) : caché dans index.html, il n'apparaît qu'avec son adresse, et ouvre la
+// fenêtre qui lit les documents du dépôt (docs-ui.js) ; DOCS_URL est la page de GitHub qu'elle propose à côté. Sans adresse il n'y a
+// pas de bouton ; avec un index.html ancien (cache de GitHub Pages) qui n'a pas la fenêtre, c'est le lien d'avant, vers DOCS_URL. Les messages
+// du widget qui citent la documentation (doc-refs.js) en font un lien qui ouvre la même fenêtre à la bonne section (dom.js, setDocOpener).
 const docLink = document.getElementById('docLink');
+const docDialog = document.getElementById('docDialog');
 if (docLink && DOCS_URL) {
-  docLink.href = DOCS_URL;
   docLink.hidden = false;
+  if (docDialog) {
+    const docs = createDocViewer(docDialog, { externalUrl: DOCS_URL });
+    docLink.addEventListener('click', () => docs.open());
+    setDocOpener(target => docs.open(target));
+  } else {
+    docLink.href = DOCS_URL;
+  }
 }
 
 const state = {

@@ -8,7 +8,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 
 - [L'annuaire en bref](#lannuaire-en-bref)
 - [Lexique du PUI](#lexique-du-pui)
-- [Découvrir l'écran](#découvrir-lécran)
+- [Découvrir l'écran](#découvrir-lécran), dont [Lire la documentation](#lire-la-documentation)
 - [Lire une carte](#lire-une-carte), dont [La photo de profil](#la-photo-de-profil)
 - [Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)
 - [Rechercher une personne](#rechercher-une-personne)
@@ -69,7 +69,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | Élément | À quoi il sert |
 |---|---|
 | **Titre et compteur** (en haut à gauche, « PUI Bordeaux » et « 14 contacts ») | Le compteur indique combien de cartes sont affichées avec la recherche et les filtres actuels (« 1 234 contacts » : une espace sépare les milliers). Dès qu'une recherche ou un filtre écarte des contacts, il dit **sur combien** : « 3 sur 14 contacts ». Le second nombre est celui des contacts que les interrupteurs Fondateurs et Partenaires laissent voir ([Fondateurs et Partenaires](#fondateurs-et-partenaires)), pas celui de tout l'annuaire : activer Partenaires compte les contacts des deux statuts, sans « sur ». Tant que Grist n'a pas répondu, il dit « Chargement… » |
-| **Documentation** (sous le slogan, à gauche de l'en-tête) | Ouvre dans un autre onglet la documentation de l'annuaire : ce guide, la documentation technique, la sécurité et la maintenance. Le bouton est absent quand le widget n'a pas d'adresse à ouvrir |
+| **Documentation** (sous le slogan, à gauche de l'en-tête) | Ouvre, dans une fenêtre du widget, la documentation de l'annuaire : ce guide, l'installation de Grist, la sécurité, la maintenance et la documentation technique ([Lire la documentation](#lire-la-documentation)). Le bouton est absent quand le widget n'a pas d'adresse à proposer |
 | **Financeurs** (au centre de l'en-tête) | La phrase de financement et les logos des financeurs ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)). Les responsables d'un établissement y trouvent aussi le bouton **Mon établissement** ([La fiche de mon établissement](#la-fiche-de-mon-établissement)), les administrateurs le bouton **Mode admin** ([Pour les administrateurs](#pour-les-administrateurs)). Si aucune fiche ne porte l'adresse de votre compte, il le dit, n'a ni interrupteur ni bouton « Modifier mon profil » et propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
@@ -87,6 +87,16 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 **Quand on fait défiler la page.** Quand la zone que Grist donne au widget fait au moins 1 180 px de large et 560 px de haut (un écran de PC, un panneau Grist large), la barre de recherche et de filtres **reste en haut de l'écran** : on change une recherche ou un filtre sans remonter. Son fond devient opaque dès que la page a défilé, pour que le texte des cartes qui passent dessous ne se lise pas à travers. Dans une zone plus étroite ou moins haute (un téléphone, un panneau étroit), elle défile avec la page, comme avant. Dans tous les cas, dès que la page a défilé au-delà de la place de la barre, une **pastille** apparaît en bas à droite : le nombre de contacts et un bouton **Haut de page**, qui remonte tout en haut. Au clavier, ce que **Tab** amène à l'écran s'arrête sous la barre fixe, jamais caché derrière elle.
 
 ![La page défilée sur un écran de PC : la barre de recherche et de filtres reste en haut de l'écran, au fond opaque, les cartes passent dessous, et la pastille « 14 contacts » avec le bouton « Haut de page » est en bas à droite](images/barre-fixe.png)
+
+### Lire la documentation
+
+Le bouton **Documentation** ouvre une fenêtre **dans l'annuaire** : on y lit les guides sans quitter la page et sans passer par GitHub.
+
+- **Passer d'un document à un autre.** La barre du haut propose la présentation, ce guide, l'installation de Grist, la sécurité, la maintenance, la documentation technique, les essais, le cahier des charges et l'historique des versions. Un lien d'un document vers un autre s'ouvre dans la même fenêtre ; **← Retour** revient au document d'avant, à l'endroit où vous l'aviez laissé.
+- **Les messages qui renvoient à l'installation de Grist sont des liens.** Quand l'annuaire dit « voir le guide d'installation Grist, étape 4 « Règles d'accès » », un clic ouvre la fenêtre à cette étape, par-dessus ce que vous faisiez. **Échap** ou **Fermer** la referme et vous rend votre fenêtre telle que vous l'aviez laissée : rien n'est perdu.
+- **Ouvrir sur GitHub** ouvre la page du dépôt dans un autre onglet. Elle sert surtout pour les schémas : la fenêtre en montre le texte source sous « Schéma », GitHub les dessine.
+- **Si la documentation ne s'affiche pas** (réseau coupé, documents absents du site qui publie le widget), la fenêtre le dit, propose **Réessayer** et la page de GitHub.
+- **Ce que la fenêtre ne fait pas.** Elle n'affiche que les images du dépôt (les pastilles d'un site extérieur sont remplacées par leur texte), n'ouvre un lien vers un autre site que dans un nouvel onglet, et ne montre rien d'un document qui n'est pas dans sa liste.
 
 ## Lire une carte
 
@@ -491,7 +501,7 @@ Un échec n'est jamais muet : un message apparaît en haut de la fenêtre. Les �
 | « La fiche n'a pas pu être relue dans Grist : rien n'a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Grist n'a pas répondu quand l'annuaire a voulu relire la fiche, à la relecture ou au moment de « Valider » | Réessayez ; si cela persiste, prévenez l'administrateur des données |
 | « Cette fiche n'existe plus dans Grist : rien n'a été modifié. » | La fiche a été supprimée pendant que vous la modifiiez | Fermez la fenêtre, rechargez la page et prévenez l'administrateur des données |
 | « Grist a refusé la modification : vos droits ne permettent pas de changer cette fiche. Contactez un administrateur. » | Une règle d'accès de Grist refuse l'écriture sur cette fiche. La relecture reste ouverte | Contactez l'administrateur des données |
-| « Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md. » | Un réglage du document Grist est à revoir | Prévenez l'administrateur des données |
+| « Une colonne de la fiche est une colonne à formule : elle ne peut pas être modifiée depuis le widget (voir le guide d’installation Grist, étape 1 « Les colonnes que le widget écrit »). » | Un réglage du document Grist est à revoir | Prévenez l'administrateur des données |
 | « La modification n'a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Une panne passagère, ou un réglage à revoir | Réessayez ; si cela persiste, prévenez l'administrateur des données |
 | « Ces modifications sont déjà dans la fiche : il n'y a rien à enregistrer. » | Quelqu'un a déjà enregistré les mêmes valeurs | Rien à faire : fermez la fenêtre |
 | « Ces modifications ne peuvent pas être enregistrées : … » | La suite du message dit pourquoi : par exemple une liste de la fiche contient autre chose que des identifiants de ligne, ou la fiche n'aurait plus ni prénom ni nom | Selon la suite du message : à corriger dans Grist par l'administrateur des données, ou remettez un prénom ou un nom |
@@ -644,7 +654,7 @@ Un échec n'est jamais muet : un message s'affiche en haut de la fenêtre, qui r
 | « La fiche de l’établissement n’a pas pu être relue dans Grist : rien n’a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Grist n'a pas répondu à la lecture de la fiche | Réessayez ; si cela persiste, prévenez l'administrateur des données |
 | « Cet établissement n’existe plus dans Grist : rien n’a été modifié. » | La ligne de l'établissement a été supprimée pendant que vous la modifiiez | Fermez la fenêtre, rechargez la page, prévenez l'administrateur des données |
 | « Grist a refusé la modification : vos droits ne permettent pas de changer cet établissement ou la liste de ses responsables. Contactez un administrateur. » | Une règle d'accès de Grist refuse l'écriture, par exemple parce que vous n'êtes plus responsable de cet établissement | Contactez un autre responsable ou l'administrateur des données |
-| « Une colonne de l’établissement est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md. » | Un réglage du document Grist est à revoir | Prévenez l'administrateur des données |
+| « Une colonne de l’établissement est une colonne à formule : elle ne peut pas être modifiée depuis le widget (voir le guide d’installation Grist, étape 1 « Les colonnes que le widget écrit »). » | Un réglage du document Grist est à revoir | Prévenez l'administrateur des données |
 | « Ces modifications sont déjà dans la fiche de l’établissement : il n’y a rien à enregistrer. » | Quelqu'un a déjà enregistré les mêmes valeurs | Rien à faire : fermez la fenêtre |
 | « La modification n’a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Une panne passagère, ou un réglage à revoir | Réessayez ; si cela persiste, prévenez l'administrateur des données |
 | « L'opération n'a pas pu aboutir. Le détail est dans la console du navigateur. » | Une erreur inattendue | Réessayez ; si cela persiste, prévenez l'administrateur des données |
@@ -664,9 +674,9 @@ L'**envoi** du fichier à Grist se fait au clic sur « Enregistrer », avant l'�
 
 | Message | Ce que cela veut dire |
 |---|---|
-| « Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. Déposez le fichier directement dans Grist (voir GRIST_SETUP.md). » | Grist a refusé de donner à l'annuaire le droit d'envoyer un fichier |
-| « L’envoi du fichier à Grist a échoué : le navigateur n’a pas pu joindre le serveur, ou l’a refusé. Déposez le fichier directement dans Grist (voir GRIST_SETUP.md). » | Panne de réseau, ou serveur qui refuse la requête de l'annuaire |
-| « Grist n’a pas répondu à temps à l’envoi du fichier. Réessayez ; déposez le fichier directement dans Grist (voir GRIST_SETUP.md). » | Le serveur n'a pas répondu en 30 secondes |
+| « Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. Déposez le fichier directement dans Grist (voir le guide d’installation Grist, étape 5 « Les logos des établissements »). » | Grist a refusé de donner à l'annuaire le droit d'envoyer un fichier |
+| « L’envoi du fichier à Grist a échoué : le navigateur n’a pas pu joindre le serveur, ou l’a refusé. Déposez le fichier directement dans Grist (voir le guide d’installation Grist, étape 5 « Les logos des établissements »). » | Panne de réseau, ou serveur qui refuse la requête de l'annuaire |
+| « Grist n’a pas répondu à temps à l’envoi du fichier. Réessayez ; déposez le fichier directement dans Grist (voir le guide d’installation Grist, étape 5 « Les logos des établissements »). » | Le serveur n'a pas répondu en 30 secondes |
 | « Grist a refusé le fichier : vos droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. » | Votre compte ne peut pas ajouter de pièce jointe |
 | « Grist a refusé le fichier : il est trop volumineux. » | Le serveur refuse la taille du fichier |
 

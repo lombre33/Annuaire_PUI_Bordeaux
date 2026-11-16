@@ -99,7 +99,7 @@ export function withoutOptionalColumns(tables) {
 }
 
 // Le référentiel C.U.R.I.E (1.38.0) : la colonne facultative `referenciel_C_U_R_I_E` de Competences, qui range les compétences d'une autre
-// façon que les domaines. Comme dans le VRAI document (structure et capture d'Antoine du 16 novembre 2026, 1.42.1), c'est une Référence vers la
+// façon que les domaines. Comme dans le VRAI document (structure et capture d'Antoine du 16 novembre 2026, 1.43.1), c'est une Référence vers la
 // table `Referentiel_competences_CURIE` (colonne `Competence`) : Grist n'envoie que le numéro de ligne de cette table (3, 13…), 0 quand la
 // Référence est vide, et le texte « — aucune correspondance — » quand elle est invalide. Les tests de la 1.38.0 avaient des noms de groupe que
 // j'avais imaginés (« Groupe C ») ; ceux de la 1.41.1 avaient des numéros qu'ils croyaient être les groupes : le menu montrait « N° 13 ».

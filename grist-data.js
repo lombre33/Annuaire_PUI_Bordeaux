@@ -216,7 +216,7 @@ export function isNoMatch(value) {
 // Le libellé du groupe d'après la valeur de la colonne d'un référentiel, '' quand la valeur ne nomme rien (la ligne n'a pas de groupe) :
 // - un numéro (un nombre de Grist, ou un texte de chiffres) est celui d'une ligne du référentiel : on prend son libellé dans `names`
 //   (id → libellé, voir readReferentialNames). 0 (une Référence vide), une ligne que la table n'a pas ou sans libellé : aucun groupe, jamais
-//   « 13 » ni « N° 13 » comme titre (1.41.1 : « N° 13 » ne disait rien à Antoine, 1.42.1) ;
+//   « 13 » ni « N° 13 » comme titre (1.41.1 : « N° 13 » ne disait rien à Antoine, 1.43.1) ;
 // - un texte est son propre libellé (une colonne de texte ou de choix, ou une valeur écrite à la main), sauf s'il dit « rien ».
 export function referentialLabel(value, names = {}) {
   const raw = Array.isArray(value) ? refId(value) : value;

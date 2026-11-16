@@ -18,6 +18,7 @@
 // référence : l'erreur le dit (`leftover`) pour que la personne en soit informée.
 
 import { ACL_COLUMNS, ACL_TABLE, ETABLISSEMENT_COLUMNS, ETABLISSEMENT_TABLE } from './constants.js';
+import { DOC_REFS } from './doc-refs.js';
 import { KEEP_ONE, etablissementOf, responsablesOf } from './etablissement.js';
 import { isEmptyReference, normalizeEmail, tableToRows } from './grist-data.js';
 import { classifyWriteError } from './presence.js';
@@ -38,7 +39,7 @@ const FAILURES = {
   aclRead: 'La liste des responsables n’a pas pu être relue dans Grist : rien n’a été modifié. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
   gone: 'Cet établissement n’existe plus dans Grist : rien n’a été modifié.',
   denied: 'Grist a refusé la modification : vos droits ne permettent pas de changer cet établissement ou la liste de ses responsables. Contactez un administrateur.',
-  formula: 'Une colonne de l’établissement est une colonne à formule : elle ne peut pas être modifiée depuis le widget. Voir GRIST_SETUP.md.',
+  formula: `Une colonne de l’établissement est une colonne à formule : elle ne peut pas être modifiée depuis le widget (voir le ${DOC_REFS.columns.text}).`,
   other: 'La modification n’a pas pu être enregistrée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
   notResponsable: 'Cette modification ne peut pas être enregistrée : vous n’êtes pas responsable de cet établissement.',
   nothing: 'Aucun changement à enregistrer.',
@@ -118,7 +119,7 @@ function rebaseRow(row, plan) {
     if (!change) return;
     const column = ETABLISSEMENT_COLUMNS[key];
     if (!(column in row)) {
-      throw new EtablissementSaveError(`Ces modifications ne peuvent pas être enregistrées : la colonne ${column} n’existe pas dans ${ETABLISSEMENT_TABLE}${key === 'logo' ? ' (GRIST_SETUP.md, étape 5)' : ''}.`);
+      throw new EtablissementSaveError(`Ces modifications ne peuvent pas être enregistrées : la colonne ${column} n’existe pas dans ${ETABLISSEMENT_TABLE}${key === 'logo' ? ` (voir le ${DOC_REFS.logos.text})` : ''}.`);
     }
     const now = row[column] ?? null;
     if (key === 'logo') {

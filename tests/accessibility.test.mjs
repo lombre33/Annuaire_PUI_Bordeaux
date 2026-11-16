@@ -43,7 +43,9 @@ const OUTLINE_REMOVED_ALLOWED = {
   // Le titre de la fenêtre reçoit le focus pour être annoncé : ce n'est pas un contrôle.
   '.dlg-head h2:focus': null,
   // Le compteur reçoit le focus quand la carte qui l'avait disparaît du dessin : ce n'est pas un contrôle non plus.
-  '.result-count:focus': null
+  '.result-count:focus': null,
+  // Un titre de la documentation reçoit le focus quand un lien du document y mène (docs-ui.js) : il est annoncé, ce n'est pas un contrôle.
+  '.md-h:focus': null
 };
 
 test('aucune règle ne supprime l’anneau de focus sans le remplacer (WCAG 2.4.7)', () => {
