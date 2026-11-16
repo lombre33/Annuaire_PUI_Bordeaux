@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.38.1';
+export const VERSION = '1.41.1';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -149,9 +149,14 @@ export const DOCS_URL = 'https://github.com/lombre33/Annuaire_PUI_Bordeaux#docum
 // Les libellés lus de Grist sont rangés par clé de catégorie (referenceMaps),
 // pas par table : deux catégories peuvent lire la même table.
 export const CATEGORIES = {
-  actions: { label: 'Actions', color: '#c84e0f', table: 'Actions', field: ['Actions_corrigees', 'Actions'], corrected: true, column: 'Actions' },
+  // Depuis la 1.39.0, la table `Actions` nomme les groupes du menu « Actions » (voir `taches` et `macroTaches`) : elle n'a ni filtre, ni liste dans la
+  // fenêtre de profil. Depuis la 1.41.0 la carte montre encore l'action de la personne quand la colonne `BDD.Actions` la lui donne et qu'aucune de ses
+  // tâches n'en est (ACTIONS_COLUMN) : sans cela, les personnes qui n'ont une action que là n'avaient plus rien sur leur carte.
+  actions: { label: 'Intitulés des actions', color: '#c84e0f', table: 'Actions', field: ['Actions_corrigees', 'Actions'], corrected: true },
+  // Les « actions » de la personne : ses tâches, que le widget appelait « Tâches » jusqu'à la 1.36.0 (demande d'Antoine du 16 novembre 2026). Le nom
+  // de la clé (`taches`), de la table (`Taches`) et de la colonne de BDD (`Taches`) ne change pas : seul ce que la personne lit change de nom.
   taches: {
-    label: 'Tâches', color: '#a96500', table: 'Taches', field: ['Taches_corrige', 'Taches'], corrected: true, column: 'Taches',
+    label: 'Actions', color: '#a96500', table: 'Taches', field: ['Taches_corrige', 'Taches'], corrected: true, column: 'Taches',
     groupings: ['macroTaches']
   },
   communautes: { label: 'Communautés', color: '#cf3788', table: 'Communautes', field: ['communautes_corrigees', 'communautes'], corrected: true, column: 'Communautes' },
@@ -170,7 +175,7 @@ export const CATEGORIES = {
   // le second onglet du menu Compétences. Même table, même colonne de BDD et mêmes valeurs que le rangement par domaine, seul le groupe change.
   // Un groupe par valeur de la colonne, sans rien inventer : dans le document d'Antoine (capture du 16 novembre 2026) elle porte des numéros
   // (0, 3, 13…) et « — aucune correspondance — », d'où `referential` ; sans `fallback`, une compétence que le référentiel ne classe pas
-  // n'est pas montrée sous cet onglet (1.38.1), elle l'est sous « Classique ».
+  // n'est pas montrée sous cet onglet (1.41.1), elle l'est sous « Classique ».
   curie: {
     label: 'C.U.R.I.E', color: '#00697f', table: 'Competences', field: ['referenciel_C_U_R_I_E'], column: 'Competences',
     groups: 'competences', tab: 'C.U.R.I.E', optional: true, referential: true,
@@ -178,14 +183,14 @@ export const CATEGORIES = {
     placeholder: 'Groupe ou compétence…'
   },
   macroTaches: {
-    label: 'Actions des tâches', color: '#9a3412', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
+    label: 'Groupes d’actions', color: '#9a3412', table: 'Taches', field: ['Taches_corrige', 'Taches'], column: 'Taches',
     groups: 'taches', fallback: 'Sans action', numberedIn: 'actions',
     hint: 'Cochez une action pour toutes ses tâches, ou dépliez-la pour choisir parmi elles',
     placeholder: 'Action ou tâche…'
   },
   instances: { label: 'Instances', color: '#2271e2', table: 'INSTANCES', field: ['Instances_Corrigees', 'Instances'], corrected: true, column: 'Instances' },
   etablissement: { label: 'Établissement', color: '#147c72', table: 'Etablissements', field: ['acronyme', 'nom_complet'] },
-  role: { label: 'Rôle PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
+  role: { label: 'Rôle dans le PUI', color: '#8b5fc4', table: 'Role_Dans_le_PUI', field: 'Role' }
 };
 
 // Clé, parmi les libellés lus de Grist (referenceMaps), des noms complets des établissements
@@ -203,16 +208,32 @@ export const ETABLISSEMENT_NAMES = 'etablissementNom';
 export const TASK_ROLE_COLUMN = 'Taches_role';
 export const TASK_ROLES = 'tachesRole';
 
+// La colonne de BDD où Grist garde les actions de la personne telles que la 1.38.0 les montrait (« [ PUI ] Action 2 : Processus métiers »), une liste
+// de références vers la table `Actions`. Depuis la 1.39.0 les actions de la carte sont les tâches (BDD.Taches), rangées par action ; cette colonne ne
+// filtre plus et ne s'écrit pas, mais elle se lit encore, pour une seule chose : la carte d'une personne qui a une action dans cette colonne et aucune
+// tâche de ce numéro montre l'action elle-même (grist-data.js, heldActionsOf). La 1.39.0 l'avait cessé de la lire : les personnes qui n'ont une action
+// que là n'avaient plus rien sur leur carte (retour d'Antoine du 16 novembre 2026, la 1.39.0 a été retirée le jour même).
+export const ACTIONS_COLUMN = 'Actions';
+
+// La colonne de BDD où la personne dit de quelles actions elle est responsable (1.40.0, demande d'Antoine du 16 novembre 2026 : « sur le profil,
+// sur chaque tâche, pouvoir cocher si on est responsable »). Une liste de références vers les lignes de `Taches`, comme `BDD.Taches` : le widget
+// la crée quand elle manque (schema.js, createResponsibleColumn) et la personne n'écrit que sa propre ligne, comme pour le reste de sa fiche. Elle
+// ne compte que pour les actions que la personne a aussi : le rôle « Responsable de l'action 1.2 » se calcule à chaque lecture (grist-data.js,
+// responsibleActions), comme « Membre d'une action », et n'est écrit nulle part. `RESPONSIBLE_LABEL` : le titre du bloc de la fenêtre de profil.
+export const RESPONSIBLE_COLUMN = 'Taches_responsable';
+export const RESPONSIBLE_LABEL = 'Responsable de';
+
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
-// groupes du menu Compétences, les actions celles du menu Tâches. Rôle PUI en a un depuis la
-// 1.24.0 (demande d'Antoine du 13 octobre 2026).
-const FILTER_KEYS = ['actions', 'taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role'];
+// groupes du menu Compétences, les actions (les intitulés de la table `Actions`) ceux du menu Actions. Rôle dans
+// le PUI en a un depuis la 1.24.0 (demande d'Antoine du 13 octobre 2026). Il n'y a plus de bouton « Actions » à part
+// depuis la 1.39.0 : le menu des tâches porte ce nom, et cocher le nom d'une action coche toutes ses tâches.
+const FILTER_KEYS = ['taches', 'communautes', 'gt', 'competences', 'instances', 'etablissement', 'role'];
 
 // Les sections de tags d'une carte, dans l'ordre. Établissement a son badge dédié ; les
-// regroupements n'y figurent pas : la carte garde le détail des compétences et des tâches.
-// Rôle PUI est dans la liste (c'est un tag, et la relecture compare ses libellés) mais la carte
-// le dessine en texte à droite de la ligne de l'e-mail, pas dans le bas (render.js, fillRole).
-const TAG_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role'];
+// regroupements n'y figurent pas : la carte garde le détail des compétences et des actions. Le rôle dans le PUI
+// est une section comme les autres depuis la 1.39.0 (il était écrit en texte à droite de la ligne de l'e-mail
+// de la 1.27.1 à la 1.36.0), en tête : une personne en a plusieurs (voir roleEntries dans grist-data.js).
+const TAG_KEYS = ['role', 'instances', 'taches', 'gt', 'competences', 'communautes'];
 
 const withKey = key => ({ key, ...CATEGORIES[key] });
 
@@ -259,7 +280,9 @@ export const LIST_CATEGORIES = Object.entries(CATEGORIES)
 //             peuvent la porter, contrairement à `email`
 //   labelsFrom  la table de libellés à proposer, quand ce n'est pas celle de la catégorie
 //   required  une référence qu'on ne peut pas vider
-const LIST_FIELD_KEYS = ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches'];
+//   companionOf  une liste qui complète celle de la colonne nommée : le formulaire la montre sous elle (« Responsable de », sous les actions),
+//             à cocher parmi les valeurs que la personne a choisies, et la retire d'elle-même d'une valeur qu'on décoche
+const LIST_FIELD_KEYS = ['instances', 'gt', 'competences', 'communautes', 'taches'];
 
 export const PROFILE_FIELDS = [
   // Au début de la fenêtre d'un administrateur sur la fiche d'une autre personne (1.38.0). Pas à la création : la personne y a sa propre case
@@ -275,7 +298,11 @@ export const PROFILE_FIELDS = [
   { key: 'email_affiche', label: 'E-mail affiché', kind: 'email', optional: true },
   { key: 'numero_de_telephone', label: 'Téléphone', kind: 'phone' },
   { key: 'Role_dans_le_PUI', label: 'Rôle dans le PUI', kind: 'reference', category: 'role' },
-  ...LIST_FIELD_KEYS.map(category => ({ key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category }))
+  ...LIST_FIELD_KEYS.flatMap(category => {
+    const field = { key: CATEGORIES[category].column, label: CATEGORIES[category].label, kind: 'list', category };
+    // Sous les actions, de quelles actions la personne est responsable (colonne facultative : absente de BDD, le formulaire ne la propose pas).
+    return category === 'taches' ? [field, { key: RESPONSIBLE_COLUMN, label: RESPONSIBLE_LABEL, kind: 'list', category, companionOf: field.key }] : [field];
+  })
 ];
 
 // Les champs que le formulaire propose : ceux de tout le monde, plus ceux de l'administrateur

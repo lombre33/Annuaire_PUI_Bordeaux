@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
-import { enrich, labelsOf } from '../grist-data.js';
+import { automaticRoles, enrich, filterableRoles, idsInText, isIdListText, labelMapFromRows, labelsOf, listItems, MEMBER_ROLE, recordedLabelsOf, RESPONSIBLE_ROLE, responsibleActions, responsibleText, roleEntries, tagText, taskCode } from '../grist-data.js';
 
 test('enrich: etablissement_label resolves BDD.Etablissement, a direct Reference, in any of the shapes Grist can send', () => {
   const referenceMaps = { etablissement: { 2: 'UBM' } };
@@ -27,7 +27,7 @@ test('enrich: labels.role resolves Role_dans_le_PUI as an array, like every othe
   assert.deepEqual(enrich({ Role_dans_le_PUI: 999 }, referenceMaps).labels.role, [], 'référence introuvable: liste vide, pas de valeur fantôme');
 });
 
-test('enrich: list-reference categories (Instances/Actions/GT/Communautés/Tâches/Compétences) drop ids that fail to resolve, instead of leaking the raw numeric id as a fake label', () => {
+test('enrich: list-reference categories (Instances/GT/Communautés/Actions/Compétences) drop ids that fail to resolve, instead of leaking the raw numeric id as a fake label', () => {
   const referenceMaps = { instances: { 7: 'CME' } };
   assert.deepEqual(enrich({ Instances: ['L', 7, 999] }, referenceMaps).labels.instances, ['CME'],
     'id 999 introuvable dans la table de référence: ignoré, pas affiché comme "999"');
@@ -44,7 +44,6 @@ test('enrich: list-reference categories resolve correctly when Grist sends pre-r
 test('enrich: each list-reference category reads its own BDD column and its own reference table, not another\'s', () => {
   const referenceMaps = {
     instances: { 1: 'Instance A' },
-    actions: { 2: 'Action B' },
     gt: { 3: 'GT C' },
     communautes: { 4: 'Communauté D' },
     taches: { 5: 'Tâche E' },
@@ -52,7 +51,6 @@ test('enrich: each list-reference category reads its own BDD column and its own 
   };
   const contact = {
     Instances: ['L', 1],
-    Actions: ['L', 2],
     GT: ['L', 3],
     Communautes: ['L', 4],
     Taches: ['L', 5],
@@ -60,11 +58,136 @@ test('enrich: each list-reference category reads its own BDD column and its own 
   };
   const result = enrich(contact, referenceMaps);
   assert.deepEqual(result.labels.instances, ['Instance A']);
-  assert.deepEqual(result.labels.actions, ['Action B']);
   assert.deepEqual(result.labels.gt, ['GT C']);
   assert.deepEqual(result.labels.communautes, ['Communauté D']);
   assert.deepEqual(result.labels.taches, ['Tâche E']);
   assert.deepEqual(result.labels.competences, ['Compétence F']);
+});
+
+// Depuis la 1.39.0 les actions d'une carte sont les tâches de la personne ; une action de la colonne BDD.Actions s'y ajoute tant qu'aucune de ses
+// tâches n'est de ce numéro (1.41.0 : la 1.39.0 faisait disparaître l'action de qui n'a pas le détail des tâches, retour d'Antoine du 16 novembre 2026).
+const HELD_MAPS = {
+  actions: { 2: 'Action 2 : Audit', 3: 'Action 3 : Pilotage', 4: 'Transverse' },
+  taches: { 5: '1.2 Tâche E', 6: '3.1 Tâche F' }
+};
+
+test('enrich: there is no « actions » category any more: the actions of a card are its tasks', () => {
+  const result = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, HELD_MAPS);
+  assert.equal(result.labels.actions, undefined, 'plus de catégorie « actions » dans les libellés d\'une personne');
+  assert.deepEqual(enrich({ Taches: ['L', 5] }, HELD_MAPS).labels.taches, ['1.2 Tâche E']);
+});
+
+test('enrich: an action of BDD.Actions stays on the card when none of the person\'s tasks has its number (the 1.39.0 regression)', () => {
+  const onlyAction = enrich({ Actions: ['L', 2] }, HELD_MAPS);
+  assert.deepEqual(onlyAction.labels.taches, ['Action 2 : Audit'], 'que des actions de renseignées : on affiche les actions');
+  assert.deepEqual(onlyAction.heldActions, ['Action 2 : Audit'], 'la carte sait lesquelles sont des actions sans tâche');
+  const mixed = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, HELD_MAPS);
+  assert.deepEqual(mixed.labels.taches, ['1.2 Tâche E', 'Action 2 : Audit'], 'l\'action 2 n\'a aucune tâche chez elle : elle s\'affiche avec la tâche de l\'action 1');
+  assert.deepEqual(mixed.heldActions, ['Action 2 : Audit']);
+});
+
+test('enrich: a task covers the action of its number: the task alone is shown, never both', () => {
+  const result = enrich({ Actions: ['L', 3], Taches: ['L', 6] }, HELD_MAPS);
+  assert.deepEqual(result.labels.taches, ['3.1 Tâche F'], '« 3.1 » est une tâche de l\'action 3');
+  assert.deepEqual(result.heldActions, []);
+  const several = enrich({ Actions: ['L', 2, 3], Taches: ['L', 6] }, HELD_MAPS);
+  assert.deepEqual(several.labels.taches, ['3.1 Tâche F', 'Action 2 : Audit'], 'une action recouverte, l\'autre non');
+});
+
+test('enrich: an action with no number is always shown, and a label that a task already carries is not shown twice', () => {
+  assert.deepEqual(enrich({ Actions: ['L', 4], Taches: ['L', 5] }, HELD_MAPS).labels.taches, ['1.2 Tâche E', 'Transverse']);
+  const same = { actions: { 1: '1.2 Tâche E' }, taches: { 5: '1.2 Tâche E' } };
+  const result = enrich({ Actions: ['L', 1], Taches: ['L', 5] }, same);
+  assert.deepEqual(result.labels.taches, ['1.2 Tâche E']);
+  assert.deepEqual(result.heldActions, [], 'la même ligne, une seule fois : la tâche garde son filtre');
+});
+
+test('enrich: an action already resolved to text, an unknown id and an empty list are read like any list of references', () => {
+  assert.deepEqual(enrich({ Actions: ['L', 'Action 2 : Audit'] }, HELD_MAPS).labels.taches, ['Action 2 : Audit']);
+  assert.deepEqual(enrich({ Actions: ['L', 999] }, HELD_MAPS).labels.taches, [], 'id introuvable : ni valeur fantôme ni identifiant à l\'écran');
+  assert.deepEqual(enrich({ Actions: ['L'] }, HELD_MAPS).labels.taches, []);
+  assert.deepEqual(enrich({}, HELD_MAPS).labels.taches, [], 'sans colonne Actions, rien');
+  assert.deepEqual(enrich({ Actions: ['L', 2] }, {}).labels.taches, [], 'sans la table des actions, rien à nommer');
+  assert.deepEqual(enrich({ Actions: ['L', 2] }, HELD_MAPS).labels.taches.length, 1);
+});
+
+test('enrich: a person who only has an action is « Membre d\'une action » too', () => {
+  const maps = { ...HELD_MAPS, role: { 1: 'Référent qualité' } };
+  assert.deepEqual(enrich({ Actions: ['L', 2] }, maps).labels.role, [MEMBER_ROLE]);
+  assert.deepEqual(enrich({ Actions: ['L', 2], Role_dans_le_PUI: 1 }, maps).labels.role, ['Référent qualité', MEMBER_ROLE]);
+  assert.deepEqual(enrich({ Actions: ['L'], Taches: ['L'] }, maps).labels.role, [], 'aucune action, aucun rôle de membre');
+});
+
+test('enrich: the responsibility of a person only counts for the tasks she holds, never for an action the card adds', () => {
+  const maps = { ...HELD_MAPS, role: {} };
+  const person = enrich({ Actions: ['L', 2], Taches: ['L', 5], Taches_responsable: ['L', 5] }, maps);
+  assert.deepEqual(Object.values(person.roleTexts), ['Responsable de l’action 1.2']);
+  assert.deepEqual(enrich({ Actions: ['L', 2], Taches_responsable: ['L', 5] }, maps).roleTexts, {}, 'responsable d\'une tâche qu\'elle n\'a pas : rien');
+});
+
+test('recordedLabelsOf gives the labels a profile modifies, without the actions the card adds by itself', () => {
+  const mixed = enrich({ Actions: ['L', 2], Taches: ['L', 5] }, HELD_MAPS);
+  assert.deepEqual(labelsOf(mixed, 'taches'), ['1.2 Tâche E', 'Action 2 : Audit']);
+  assert.deepEqual(recordedLabelsOf(mixed, 'taches'), ['1.2 Tâche E']);
+  assert.deepEqual(recordedLabelsOf(mixed, 'instances'), [], 'les autres catégories n\'ont rien à écarter');
+  assert.deepEqual(recordedLabelsOf({}, 'taches'), []);
+});
+
+// Du texte fait de numéros entre crochets n'est jamais un libellé (retour d'Antoine du 16 novembre 2026 : la pastille « [0,14,21,30] »).
+test('isIdListText recognises a text of numbers and nothing that a person could read as a label', () => {
+  for (const unreadable of ['[0,14,21,30]', ' [0, 14, 21, 30] ', '[]', '[ ]', '[1]', '[0;14]', '0,14,21,30', '14, 21']) {
+    assert.equal(isIdListText(unreadable), true, unreadable);
+  }
+  for (const label of ['', '14', '2024', 'CME', '1.2 Tâche E', '[ PUI ] Action 2 : Audit', '[PUI]', 'Tâche 1,5', 'GT 2, GT 3', '[1.2]', '(0,14)', null, undefined, 14]) {
+    assert.equal(isIdListText(label), false, String(label));
+  }
+});
+
+// Ce que désignent ces numéros : des numéros de ligne de la table liée, le 0 d'une recherche de formule qui n'a rien trouvé ne désignant rien.
+test('idsInText reads the row numbers of a bracketed text, drops the 0 of a lookup that found nothing, and refuses the rest', () => {
+  assert.deepEqual(idsInText('[0,14,21,30]'), [14, 21, 30]);
+  assert.deepEqual(idsInText(' [ 14 , 21 ] '), [14, 21]);
+  assert.deepEqual(idsInText('[0;14]'), [14]);
+  assert.deepEqual(idsInText('[0]'), []);
+  assert.deepEqual(idsInText('[]'), []);
+  for (const other of ['14, 21', '0,14,21,30', '14', 'CME', '[1.2]', '[a,1]', '[PUI]', '', null, undefined, 14]) {
+    assert.equal(idsInText(other), null, String(other));
+  }
+  assert.deepEqual(listItems('[0,14,21,30]'), [14, 21, 30]);
+  assert.deepEqual(listItems(['L', 14, 21]), [14, 21]);
+  assert.deepEqual(listItems('14, 21'), ['14, 21'], 'un texte sans crochets reste un texte : isIdListText l\'écarte ensuite');
+  assert.deepEqual(listItems(null), []);
+});
+
+// Le cas d'Antoine (16 novembre 2026) : BDD.Taches d'une personne contient le texte « [0,14,21,30] » ; les lignes 14, 21 et 30 de Taches sont des
+// tâches de membre d'équipe (Tâche 2.3, 4.2, 7.1), le 0 est la recherche de la formule `Taches.lookupOne(...)` qui n'a rien trouvé.
+test('enrich: a bracketed text of row numbers in BDD.Taches shows the tasks those rows are, never the numbers', () => {
+  const maps = { ...HELD_MAPS, taches: { 14: 'Tâche 2.3 : Dispositif d’incitation', 21: 'Tâche 4.2 : Plan tactiques', 30: 'Tâche 7.1 : Détection' } };
+  const person = enrich({ Taches: '[0,14,21,30]', Actions: ['L', 2, 3] }, maps);
+  assert.deepEqual(person.labels.taches, ['Tâche 2.3 : Dispositif d’incitation', 'Tâche 4.2 : Plan tactiques', 'Tâche 7.1 : Détection', 'Action 3 : Pilotage']);
+  assert.deepEqual(person.heldActions, ['Action 3 : Pilotage'], 'l\'action 2 est recouverte par la tâche 2.3, l\'action 3 n\'a aucune tâche de son numéro');
+  assert.deepEqual(enrich({ Taches: '[0,14,21,30]', Actions: ['L', 2] }, { ...HELD_MAPS, taches: { 14: '2.3 Tâche X' } }).labels.taches, ['2.3 Tâche X'],
+    'un numéro qu\'aucune ligne ne porte ne montre rien');
+  assert.deepEqual(enrich({ Taches: '[0]', Actions: ['L', 2] }, maps).labels.taches, ['Action 2 : Audit'], 'le 0 seul ne désigne rien : la personne montre ses actions');
+});
+
+test('enrich: other unreadable texts of numbers show nothing: never the numbers, whatever the column', () => {
+  const maps = { ...HELD_MAPS, instances: { 7: 'CME' }, gt: { 1: 'GT 1' }, role: { 1: 'Référent qualité' } };
+  const row = { Taches: '14, 21', GT: ['L', '[0,14]'], Actions: '0,2', Role_dans_le_PUI: '[1]' };
+  const result = enrich(row, maps);
+  assert.deepEqual([result.labels.taches, result.labels.gt, result.labels.role], [[], [], []]);
+  assert.deepEqual(result.heldActions, []);
+  assert.deepEqual(enrich({ Taches: '14, 21', Actions: ['L', 2] }, HELD_MAPS).labels.taches, ['Action 2 : Audit'], 'la personne dont les tâches sont illisibles montre ses actions');
+  // Une liste ordinaire de textes déjà résolus (CHANGELOG 1.5.1) et une liste de lignes dont l'une est un texte de numéros : la seconde ne montre pas les numéros.
+  assert.deepEqual(enrich({ Taches: 'Relecture' }, HELD_MAPS).labels.taches, ['Relecture'], 'un texte qui se lit reste un libellé (texte déjà résolu)');
+  assert.deepEqual(enrich({ Instances: '[7]' }, maps).labels.instances, ['CME'], 'une liste de références écrite en texte se lit sous toute colonne de liste');
+});
+
+test('a label made of numbers, in a reference table, is not a label either: the next column is read, or the row is ignored', () => {
+  const fields = ['Taches_corrige', 'Taches'];
+  assert.deepEqual(labelMapFromRows([{ id: 1, Taches_corrige: '[0,14,21,30]', Taches: '1.1 Relecture' }], fields), { 1: '1.1 Relecture' });
+  assert.deepEqual(labelMapFromRows([{ id: 1, Taches_corrige: '[0,14,21,30]', Taches: '' }, { id: 2, Taches_corrige: '1.2 Rappel', Taches: '' }], fields), { 2: '1.2 Rappel' });
+  assert.deepEqual(labelMapFromRows([{ id: 1, Taches_corrige: ['L', 14, 21], Taches: '' }], fields), { 1: '14 / 21' }, 'une liste de choix garde son sens, sans crochets');
 });
 
 // Les domaines (compétences macro) se lisent depuis BDD.Competences : même
@@ -134,8 +257,150 @@ test('enrich: a task already resolved to text is found by its label, never taken
 });
 
 test('enrich: the same label twice in one category appears once (a contact is counted once per option)', () => {
-  const referenceMaps = { actions: { 1: 'Vaccination', 2: 'vaccination' } };
-  assert.deepEqual(enrich({ Actions: ['L', 1, 2] }, referenceMaps).labels.actions, ['Vaccination']);
+  const referenceMaps = { taches: { 1: '1.1 Vaccination', 2: '1.1 vaccination' } };
+  assert.deepEqual(enrich({ Taches: ['L', 1, 2] }, referenceMaps).labels.taches, ['1.1 Vaccination']);
+});
+
+// Les rôles dans le PUI (1.39.0) : celui que la personne a choisi, plus « Membre d'une action » calculé à chaque lecture d'après ses actions.
+const ROLE_MAPS = {
+  role: { 1: 'Coordinateur de communauté', 2: 'Responsable d\'une action', 3: 'Membre d\'une action' },
+  taches: { 1: '1.1 Relecture', 2: '2.1 Inspection' }
+};
+
+test('enrich: a person who has at least one action is « Membre d\'une action », whatever role she chose, and loses it with her last action', () => {
+  assert.deepEqual(enrich({ Taches: ['L', 1] }, ROLE_MAPS).labels.role, ['Membre d\'une action'], 'aucun rôle choisi : le rôle calculé seul');
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 1, Taches: ['L', 1, 2] }, ROLE_MAPS).labels.role, ['Coordinateur de communauté', 'Membre d\'une action'],
+    'le rôle choisi d\'abord, le rôle calculé ensuite, une seule fois même avec plusieurs actions');
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 1, Taches: ['L'] }, ROLE_MAPS).labels.role, ['Coordinateur de communauté'], 'plus d\'action : le rôle calculé disparaît');
+  assert.deepEqual(enrich({ Taches: ['L', 999] }, ROLE_MAPS).labels.role, [], 'une action introuvable n\'est pas une action');
+  assert.deepEqual(enrich({}, ROLE_MAPS).labels.role, []);
+});
+
+test('enrich: « Membre d\'une action » written in BDD is ignored, only the computed one counts: the person has it once, or not at all', () => {
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 3, Taches: ['L', 1] }, ROLE_MAPS).labels.role, ['Membre d\'une action']);
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 3 }, ROLE_MAPS).labels.role, [], 'écrit à la main mais aucune action : retiré');
+  assert.deepEqual(enrich({ Role_dans_le_PUI: 'MEMBRE D’UNE ACTION', Taches: ['L', 1] }, ROLE_MAPS).labels.role, ['Membre d\'une action'],
+    'texte déjà résolu : casse et apostrophe ignorées, le rôle n\'est pas écrit deux fois');
+});
+
+test('enrich: the member role takes the name the table of the roles gives it, or « Membre d\'une action » when it has none', () => {
+  const named = { role: { 1: 'Coordinateur de communauté', 2: 'Membre de l\'action' }, taches: { 1: '1.1 Relecture' } };
+  assert.equal(automaticRoles(named.role).member, 'Membre de l\'action');
+  assert.equal(automaticRoles(named.role).known, true);
+  assert.deepEqual(enrich({ Taches: ['L', 1] }, named).labels.role, ['Membre de l\'action']);
+  const without = { role: { 1: 'Coordinateur de communauté' } };
+  assert.deepEqual([automaticRoles(without.role).member, automaticRoles(without.role).known], [MEMBER_ROLE, false]);
+  assert.deepEqual(automaticRoles(undefined), { member: MEMBER_ROLE, known: false, responsible: RESPONSIBLE_ROLE, responsibleKnown: false },
+    'table des rôles illisible : les noms par défaut');
+  assert.equal(MEMBER_ROLE, 'Membre d’une action');
+});
+
+test('roleEntries: the stored role first, then the member role if the person has an action; a stored role that is the member role is not repeated', () => {
+  const roleMap = { 1: 'Membre d\'une action' };
+  assert.deepEqual(roleEntries('Référent qualité', true, roleMap), ['Référent qualité', 'Membre d\'une action']);
+  assert.deepEqual(roleEntries('Référent qualité', false, roleMap), ['Référent qualité']);
+  assert.deepEqual(roleEntries('Membre d\'une action', true, roleMap), ['Membre d\'une action']);
+  assert.deepEqual(roleEntries('Membre d\'une action', false, roleMap), []);
+  assert.deepEqual(roleEntries('', true, roleMap), ['Membre d\'une action']);
+  assert.deepEqual(roleEntries('', false, roleMap), []);
+});
+
+test('filterableRoles: the roles table, plus « Membre d\'une action » when the table does not have it, and « Responsable d\'une action » only when the document has the column that makes it exist', () => {
+  const roleMap = { 1: 'Coordinateur de communauté' };
+  assert.deepEqual(Object.values(filterableRoles(roleMap)), ['Coordinateur de communauté', 'Membre d’une action'],
+    'sans la colonne Taches_responsable, personne ne peut être responsable : pas d\'option qui ne filtre rien');
+  assert.deepEqual(Object.values(filterableRoles(roleMap, { responsible: true })), ['Coordinateur de communauté', 'Membre d’une action', 'Responsable d’une action']);
+  assert.deepEqual(roleMap, { 1: 'Coordinateur de communauté' }, 'la table lue n\'est pas modifiée');
+  const memberOnly = { 1: 'Coordinateur de communauté', 2: 'Membre d\'une action' };
+  assert.equal(filterableRoles(memberOnly), memberOnly, 'la table qui a le rôle de membre, sans la colonne : telle quelle');
+  assert.deepEqual(Object.values(filterableRoles(memberOnly, { responsible: true })), ['Coordinateur de communauté', 'Membre d\'une action', 'Responsable d’une action']);
+  const has = { 1: 'Coordinateur de communauté', 2: 'Membre d\'une action', 3: 'Responsable d\'une tâche' };
+  assert.equal(filterableRoles(has), has, 'la table qui les a déjà reste telle quelle');
+  assert.equal(filterableRoles(has, { responsible: true }), has, 'avec la colonne aussi : le libellé de la table sert');
+  assert.deepEqual(Object.values(filterableRoles(undefined)), ['Membre d’une action']);
+  assert.deepEqual(Object.values(filterableRoles(undefined, { responsible: true })), ['Membre d’une action', 'Responsable d’une action']);
+});
+
+// Responsable d'une action (1.40.0) : les actions que la personne a cochées « Responsable de » dans son profil (BDD.Taches_responsable), parmi
+// celles qu'elle a. La ligne 4 est une seconde ligne brute de la même action que la ligne 2 : on compare les libellés, pas les lignes.
+const RESPONSIBLE_MAPS = {
+  role: ROLE_MAPS.role,
+  taches: { 1: 'Tâche 1.1 : Pilotage', 2: 'Tâche 1.2 : Suivi', 3: 'Tâche 1.10 : Bilan', 4: 'Tâche 1.2 : Suivi', 5: 'Veille', 6: 'Tâche 2.1 : Audit' }
+};
+
+test('taskCode: the number of an action, « 1.3 », from « 1.3 Animer », « T1.3 », « Tâche n° 1.3 : … » or after a bracketed prefix; null without one', () => {
+  assert.equal(taskCode('1.3 Animer le réseau'), '1.3');
+  assert.equal(taskCode('T1.3'), '1.3');
+  assert.equal(taskCode('Tâche n° 1.3 : Pilotage/Suivi'), '1.3');
+  assert.equal(taskCode('[ PUI ] Tâche 2.10 : Bilan'), '2.10');
+  assert.equal(taskCode('Tâche 01.02'), '1.2', 'les zéros de tête ne comptent pas');
+  assert.equal(taskCode('Veille'), null);
+  assert.equal(taskCode('12 réunions'), null);
+  assert.equal(taskCode(''), null);
+  assert.equal(taskCode(undefined), null);
+});
+
+test('responsibleText: « Responsable de l\'action 1.2 » for one action, « Responsable des actions 1.2, 1.3 » for several; an action without a number is written by its label', () => {
+  assert.equal(responsibleText(['Tâche 1.2 : Suivi']), 'Responsable de l’action 1.2');
+  assert.equal(responsibleText(['Tâche 1.2 : Suivi', '1.3 Réseau']), 'Responsable des actions 1.2, 1.3');
+  assert.equal(responsibleText(['Veille']), 'Responsable de l’action Veille');
+  assert.equal(responsibleText(['Tâche 1.2 : Suivi', 'T1.2 Suivi bis']), 'Responsable de l’action 1.2', 'deux libellés du même numéro : un seul numéro');
+});
+
+test('responsibleActions: the actions ticked « Responsable de » that the person also has, by label, in the order of their numbers', () => {
+  const held = ['Tâche 1.1 : Pilotage', 'Tâche 1.2 : Suivi', 'Tâche 1.10 : Bilan'];
+  assert.deepEqual(responsibleActions({ Taches_responsable: ['L', 3, 1] }, RESPONSIBLE_MAPS, held), ['Tâche 1.1 : Pilotage', 'Tâche 1.10 : Bilan'], 'ordre naturel : 1.1 avant 1.10');
+  assert.deepEqual(responsibleActions({ Taches_responsable: ['L', 4] }, RESPONSIBLE_MAPS, held), ['Tâche 1.2 : Suivi'], 'une autre ligne brute de la même action : même libellé');
+  assert.deepEqual(responsibleActions({ Taches_responsable: ['L', 2, 4] }, RESPONSIBLE_MAPS, held), ['Tâche 1.2 : Suivi'], 'deux lignes de la même action : une seule fois');
+  assert.deepEqual(responsibleActions({ Taches_responsable: ['L', 6] }, RESPONSIBLE_MAPS, held), [], 'une action cochée qu\'elle n\'a pas ne compte pas');
+  assert.deepEqual(responsibleActions({ Taches_responsable: ['L', 999] }, RESPONSIBLE_MAPS, held), [], 'une ligne sans libellé est ignorée');
+  assert.deepEqual(responsibleActions({ Taches_responsable: ['L', 1] }, RESPONSIBLE_MAPS, []), [], 'sans action');
+  assert.deepEqual(responsibleActions({ Taches_responsable: ['L'] }, RESPONSIBLE_MAPS, held), []);
+  assert.deepEqual(responsibleActions({ Taches_responsable: null }, RESPONSIBLE_MAPS, held), []);
+  assert.deepEqual(responsibleActions({}, RESPONSIBLE_MAPS, held), [], 'colonne absente de BDD');
+});
+
+test('enrich: a person responsible for some of her actions has the role « Responsable d\'une action », written with the numbers of those actions', () => {
+  const one = enrich({ Role_dans_le_PUI: 1, Taches: ['L', 1, 2], Taches_responsable: ['L', 2] }, RESPONSIBLE_MAPS);
+  assert.deepEqual(one.labels.role, ['Coordinateur de communauté', 'Membre d\'une action', 'Responsable d\'une action'],
+    'le rôle choisi, puis « Membre d\'une action », puis « Responsable d\'une action » : le filtre lit ces libellés');
+  assert.equal(tagText(one, 'role', 'Responsable d\'une action'), 'Responsable de l’action 1.2');
+  assert.equal(tagText(one, 'role', 'Membre d\'une action'), 'Membre d\'une action', 'les autres rôles s\'écrivent tels quels');
+  assert.equal(tagText(one, 'role', 'Coordinateur de communauté'), 'Coordinateur de communauté');
+  assert.equal(tagText(one, 'taches', 'Tâche 1.2 : Suivi'), 'Tâche 1.2 : Suivi', 'seul le rôle a un texte à lui');
+  assert.equal(tagText({}, 'role', 'Membre d\'une action'), 'Membre d\'une action', 'un contact sans texte de rôle');
+
+  const several = enrich({ Taches: ['L', 1, 2, 3], Taches_responsable: ['L', 3, 1] }, RESPONSIBLE_MAPS);
+  assert.equal(tagText(several, 'role', 'Responsable d\'une action'), 'Responsable des actions 1.1, 1.10');
+  assert.deepEqual(several.labels.role, ['Membre d\'une action', 'Responsable d\'une action']);
+});
+
+test('enrich: the actions ticked but not held, an empty or missing Taches_responsable and a person without actions make nobody responsible', () => {
+  assert.deepEqual(enrich({ Taches: ['L', 1], Taches_responsable: ['L', 6] }, RESPONSIBLE_MAPS).labels.role, ['Membre d\'une action']);
+  assert.deepEqual(enrich({ Taches: ['L', 1], Taches_responsable: ['L'] }, RESPONSIBLE_MAPS).labels.role, ['Membre d\'une action']);
+  assert.deepEqual(enrich({ Taches: ['L', 1] }, RESPONSIBLE_MAPS).labels.role, ['Membre d\'une action'], 'la colonne n\'existe pas encore');
+  assert.deepEqual(enrich({ Taches: ['L'], Taches_responsable: ['L', 1] }, RESPONSIBLE_MAPS).labels.role, [], 'plus aucune action : plus de responsabilité');
+  assert.deepEqual(enrich({ Taches: ['L', 1], Taches_responsable: ['L', 6] }, RESPONSIBLE_MAPS).roleTexts, {});
+});
+
+test('enrich: the responsible role takes the name of the table when it has one, and « Responsable d\'une action » when it has none', () => {
+  const named = { role: { 1: 'Responsable de tâche' }, taches: RESPONSIBLE_MAPS.taches };
+  const contact = enrich({ Taches: ['L', 1], Taches_responsable: ['L', 1] }, named);
+  assert.deepEqual(contact.labels.role, ['Membre d’une action', 'Responsable de tâche']);
+  assert.equal(tagText(contact, 'role', 'Responsable de tâche'), 'Responsable de l’action 1.1');
+  const without = enrich({ Taches: ['L', 1], Taches_responsable: ['L', 1] }, { role: { 1: 'Coordinateur de communauté' }, taches: RESPONSIBLE_MAPS.taches });
+  assert.deepEqual(without.labels.role, ['Membre d’une action', 'Responsable d’une action']);
+  assert.equal(tagText(without, 'role', 'Responsable d’une action'), 'Responsable de l’action 1.1');
+});
+
+test('roleEntries: a « Responsable d\'une action » chosen by hand stays when no action is ticked, and gives way to the computed role when one is', () => {
+  const roleMap = { 1: 'Membre d\'une action', 2: 'Responsable d\'une action' };
+  assert.deepEqual(roleEntries('Responsable d\'une action', true, roleMap, false), ['Responsable d\'une action', 'Membre d\'une action'],
+    'aucune action cochée : le rôle choisi reste, tel quel');
+  assert.deepEqual(roleEntries('Responsable d\'une action', true, roleMap, true), ['Membre d\'une action', 'Responsable d\'une action'], 'une seule fois');
+  assert.deepEqual(roleEntries('RESPONSABLE D’UNE ACTION', true, roleMap, true), ['Membre d\'une action', 'Responsable d\'une action'], 'casse et apostrophe ignorées');
+  assert.deepEqual(roleEntries('Référent qualité', true, roleMap, true), ['Référent qualité', 'Membre d\'une action', 'Responsable d\'une action']);
+  assert.deepEqual(roleEntries('', false, roleMap, false), []);
 });
 
 test('enrich: the old columns of the Annuaire table (competences_1..15, Communautee_s_, Etablissement2) are no longer read', () => {

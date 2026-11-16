@@ -4,7 +4,8 @@
 // pastilles). Le plafond de pastilles « +N » (audit U35) a été écarté par Antoine le 20 octobre 2026 : les cartes restent comme avant.
 //
 // Les tests chargent le vrai index.html dans Chromium (optionnel : voir TESTING.md). Ana, la dernière carte de la grille, porte des listes
-// longues (withLongTagLists, tests/fixtures.mjs) : 9 compétences, 6 actions, 5 communautés et une instance.
+// longues (withLongTagLists, tests/fixtures.mjs) : 9 compétences, 6 actions, 5 communautés, une instance et deux rôles dans le PUI (1.39.0 : le
+// rôle est une section de pastilles comme les autres, la première).
 
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
@@ -23,7 +24,9 @@ test('une carte montre toutes ses pastilles, sans plafond ni bouton « +N » (au
     await waitForCards(page, 4);
     const ana = gridCard(page, 'Ana');
     assert.deepEqual(await group(ana, 'Compétences').locator('.tag').allTextContents(), names('Compétence', 1, 9));
-    assert.deepEqual(await group(ana, 'Actions').locator('.tag').allTextContents(), names('Action', 1, 6));
+    // Ses six actions numérotées, puis « Vaccination » : l'action sans numéro que BDD.Actions lui donne (1.41.0) s'affiche toujours, en dernière rangée.
+    assert.deepEqual(await group(ana, 'Actions').locator('.tag').allTextContents(), [...names('Action', 1, 6), 'Vaccination']);
+    assert.deepEqual(await group(ana, 'Rôle dans le PUI').locator('.tag').allTextContents(), ['Référent qualité', 'Membre d’une action']);
     assert.equal(await ana.locator('.tag[hidden]').count(), 0, 'aucune pastille cachée');
     assert.equal(await ana.locator('.tag').filter({ hasText: /^\+\d/ }).count(), 0, 'aucun bouton « +N »');
     assert.equal(await ana.locator('.card-tags .tag').evaluateAll(tags => tags.filter(tag => tag.getClientRects().length === 0).length), 0, 'et toutes sont à l\'écran');
@@ -44,7 +47,7 @@ test('la carte de relecture d\'une modification n\'a ni barre d\'outils ni pasti
         focusable: card.querySelectorAll('.card-tags [tabindex]').length
       };
     });
-    assert.deepEqual(preview, { tags: 21, toolbar: null, focusable: 0 });
+    assert.deepEqual(preview, { tags: 24, toolbar: null, focusable: 0 });
   }));
 
 // ===== U22 : un arrêt de tabulation par carte =====
@@ -63,8 +66,8 @@ test('les pastilles d\'une carte forment une barre d\'outils nommée, avec un se
     const ana = gridCard(page, 'Ana');
     assert.equal(await ana.locator('.card-tags').getAttribute('role'), 'toolbar');
     assert.equal(await ana.locator('.card-tags').getAttribute('aria-label'), `Filtrer par une valeur de la fiche de ${ANA}`);
-    assert.equal(await tabbablePills(ana).first().textContent(), 'CME', 'le premier arrêt est la première pastille');
-    assert.ok(await ana.locator('.card-tags button.tag').count() > 15, 'les autres pastilles existent, hors de la tabulation');
+    assert.equal(await tabbablePills(ana).first().textContent(), 'Référent qualité', 'le premier arrêt est la première pastille : le rôle dans le PUI');
+    assert.equal(await ana.locator('.card-tags button.tag').count(), 23, 'les autres pastilles existent, hors de la tabulation');
 
     // Ce que le navigateur en fait : une barre d'outils nommée qui contient les boutons.
     const tree = await accessibilityTree(page);
@@ -83,7 +86,7 @@ test('à la tabulation, on traverse une carte en peu d\'arrêts : l\'établissem
       await page.keyboard.press('Tab');
       if (!(await page.evaluate(() => document.activeElement.closest('.contact-card')?.querySelector('.name')?.textContent.includes('Ana')))) break;
     }
-    assert.ok(stops <= 6, `${stops} arrêts dans la carte d'Ana (21 pastilles, son badge, son e-mail) : au plus 6`);
+    assert.ok(stops <= 6, `${stops} arrêts dans la carte d'Ana (23 pastilles, son badge, son e-mail) : au plus 6`);
   }));
 
 test('les flèches gauche et droite passent d\'une pastille à l\'autre, et la dernière pastille touchée devient l\'arrêt de la carte (audit U22)', { skip }, () =>
@@ -92,11 +95,11 @@ test('les flèches gauche et droite passent d\'une pastille à l\'autre, et la d
     const ana = gridCard(page, 'Ana');
     const focused = () => page.evaluate(() => document.activeElement.firstChild.textContent);
     await tabbablePills(ana).first().focus();
-    assert.equal(await focused(), 'CME');
+    assert.equal(await focused(), 'Référent qualité');
 
-    // Dans l'ordre de la carte : l'instance, les six actions, les neuf compétences, les cinq communautés.
-    const path = ['CME', ...names('Action', 1, 6), ...names('Compétence', 1, 9), ...names('Communauté', 1, 5)];
-    const seen = ['CME'];
+    // Dans l'ordre de la carte : les deux rôles, l'instance, les six actions, les neuf compétences, les cinq communautés.
+    const path = ['Référent qualité', 'Membre d’une action', 'CME', ...names('Action', 1, 6), ...names('Compétence', 1, 9), ...names('Communauté', 1, 5)];
+    const seen = ['Référent qualité'];
     for (let step = 1; step < path.length; step += 1) {
       await page.keyboard.press('ArrowRight');
       seen.push(await focused());
@@ -110,7 +113,7 @@ test('les flèches gauche et droite passent d\'une pastille à l\'autre, et la d
     await page.keyboard.press('ArrowLeft');
     assert.equal(await focused(), 'Communauté 4');
     for (let step = 0; step < 30; step += 1) await page.keyboard.press('ArrowLeft');
-    assert.equal(await focused(), 'CME', 'au début, la flèche reste sur la première pastille');
+    assert.equal(await focused(), 'Référent qualité', 'au début, la flèche reste sur la première pastille');
     assert.deepEqual(logs.pageErrors, [], 'aux deux bouts, la flèche ne cherche pas une pastille qui n\'existe pas');
   }));
 
@@ -121,8 +124,7 @@ test('Tab sort de la barre d\'outils de la carte pour la carte suivante et Maj+T
     await page.setViewportSize({ width: 1280, height: 2400 });
     const copy = gridCard(page, 'Copie 1');
     await tabbablePills(copy).first().focus();
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowRight');
+    for (let step = 0; step < 4; step += 1) await page.keyboard.press('ArrowRight'); // les deux rôles, CME, « Action 1 », puis « Action 2 »
     const focusedPill = () => page.evaluate(() => document.activeElement.firstChild.textContent);
     assert.equal(await focusedPill(), 'Action 2');
 
@@ -142,15 +144,17 @@ test('Tab sort de la barre d\'outils de la carte pour la carte suivante et Maj+T
     assert.equal(prevented, true);
   }));
 
-test('une flèche sur le rôle d\'une carte, qui n\'est pas dans la barre de pastilles, ne fait rien : ni déplacement du focus, ni erreur (audit U22, garde)', { skip }, () =>
+test('le rôle dans le PUI est la première pastille de la barre d\'outils de la carte : Entrée coche le filtre Rôle dans le PUI, le focus reste sur elle (1.39.0)', { skip }, () =>
   withWidget({ tables: withLongTagLists() }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    const role = gridCard(page, 'Ana').locator('.role-col button.tag');
-    assert.equal(await role.count(), 1, 'Ana porte un rôle');
+    const role = gridCard(page, 'Ana').locator('.card-tags button.tag').first();
+    assert.equal(await role.textContent(), 'Référent qualité', 'Ana porte un rôle, en tête de ses pastilles');
+    assert.equal(await role.getAttribute('tabindex'), '0', 'c\'est l\'arrêt de la carte, comme la première pastille de la 1.31.0');
     await role.focus();
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowLeft');
-    assert.equal(await page.evaluate(() => document.activeElement.classList.contains('role-tag')), true, 'le focus est resté sur le rôle');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.getElementById('resultCount').textContent === '1 sur 4 contacts');
+    assert.equal(await page.locator('.filter[data-filter-key="role"] .filter-count').textContent(), '1');
+    assert.equal(await page.evaluate(() => document.activeElement.firstChild.textContent), 'Référent qualité', 'le focus est resté sur la pastille');
     assert.deepEqual(logs.pageErrors, []);
   }));
 
@@ -159,8 +163,7 @@ test('Entrée sur une pastille filtre, et le focus reste dans la barre d\'outils
     await waitForCards(page, 4);
     const ana = () => gridCard(page, 'Ana');
     await tabbablePills(ana()).first().focus();
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowRight');
+    for (let step = 0; step < 4; step += 1) await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Enter'); // « Action 2 » : filtre Actions
     await page.waitForFunction(() => document.getElementById('resultCount').textContent === '1 sur 4 contacts');
     assert.equal(await page.evaluate(() => document.activeElement.firstChild.textContent), 'Action 2', 'le focus est resté sur la pastille');

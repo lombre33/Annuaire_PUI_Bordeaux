@@ -1,4 +1,4 @@
-// Les contrôles d'interface des menus de filtre (1.38.1) : ce que la personne VOIT dans un menu ouvert, vérifié sur le menu rendu, pas sur
+// Les contrôles d'interface des menus de filtre (1.41.1) : ce que la personne VOIT dans un menu ouvert, vérifié sur le menu rendu, pas sur
 // les données qui l'ont produit. La 1.38.0 passait ses tests et montrait un « — aucune correspondance — » en tête de l'onglet C.U.R.I.E, puis
 // des titres « 0 », « 3 », « 13 » : ses tests lisaient des données et des libellés que j'avais imaginés, et personne ne regardait le menu.
 // Sans effet de bord : ce module ne lance pas de navigateur.
@@ -30,7 +30,7 @@ export function assertReadableMenu({ groups, options }, where) {
 
 // Les cadres que dessine la partie de l'en-tête d'un menu qui précède le champ de recherche (les onglets) : un élément a un cadre quand il a un
 // contour sur l'un de ses côtés autre que le bas (le bas est un trait, pas un cadre), une ombre, un fond ou des angles arrondis. Le menu a déjà
-// le sien, et la recherche le sien : les onglets, eux, se reconnaissent à un trait (1.38.1, « l'onglet dans l'onglet dans l'onglet »).
+// le sien, et la recherche le sien : les onglets, eux, se reconnaissent à un trait (1.41.1, « l'onglet dans l'onglet dans l'onglet »).
 export async function framesAboveSearch(filter) {
   return filter.evaluate(element => {
     const head = element.querySelector('.filter-menu-head');

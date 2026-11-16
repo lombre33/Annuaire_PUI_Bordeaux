@@ -61,28 +61,27 @@ test('sur le papier, sans graphiques d\'arrière-plan, tout texte d\'une carte s
     const texts = await page.evaluate(() => [...document.querySelectorAll('.contact-card *')]
       .filter(element => element.getClientRects().length > 0 && [...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim()))
       .map(element => ({ label: `${element.className} « ${element.textContent.trim().slice(0, 20)} »`, color: getComputedStyle(element).color })));
-    assert.ok(texts.length > 30, `assez de textes mesurés (${texts.length})`);
+    assert.ok(texts.length > 25, `assez de textes mesurés (${texts.length})`);
     const unreadable = texts.map(({ label, color }) => ({ label, ratio: contrastRatio(parseColor(color), WHITE_PAPER) }))
       .filter(({ ratio }) => ratio < MIN_TEXT_CONTRAST).map(({ label, ratio }) => `${label} : ${ratio.toFixed(2)}:1`);
     assert.deepEqual(unreadable, [], 'ces textes seraient illisibles sans fond (blanc sur blanc)');
   }));
 
-test('sur le papier : les pastilles, les initiales et les badges d\'établissement ont un bord ; le rôle PUI reste un texte', { skip }, () =>
+test('sur le papier : les pastilles (le rôle dans le PUI comme les autres), les initiales et les badges d\'établissement ont un bord', { skip }, () =>
   withWidget({ tables: sampleTables() }, async ({ page }) => {
     await waitForCards(page, 4);
     await onPaper(page);
-    const borders = await page.evaluate(() => Object.fromEntries(['.tag:not(.role-tag)', '.avatar', '.etablissement-tag.visible:not(.has-logo)', '.role-tag']
+    const borders = await page.evaluate(() => Object.fromEntries(['.tag', '.tag-role', '.avatar', '.etablissement-tag.visible:not(.has-logo)']
       .map(selector => {
         const element = document.querySelector(`.contact-card ${selector}`);
         return [selector, element ? [getComputedStyle(element).borderTopWidth, getComputedStyle(element).backgroundColor] : null];
       })));
     assert.deepEqual(borders, {
-      '.tag:not(.role-tag)': ['1px', 'rgb(255, 255, 255)'],
+      '.tag': ['1px', 'rgb(255, 255, 255)'],
+      '.tag-role': ['1px', 'rgb(255, 255, 255)'], // Ana porte un rôle : sa pastille a le bord des autres (1.39.0)
       '.avatar': ['1px', 'rgb(255, 255, 255)'],
-      '.etablissement-tag.visible:not(.has-logo)': ['1px', 'rgb(255, 255, 255)'],
-      '.role-tag': borders['.role-tag'] // le rôle : pas de bord (s'il y en a un dans ces données)
+      '.etablissement-tag.visible:not(.has-logo)': ['1px', 'rgb(255, 255, 255)']
     });
-    if (borders['.role-tag']) assert.equal(borders['.role-tag'][0], '0px');
   }));
 
 // Un PDF commence par `%PDF` et liste ses pages (`/Type /Page`) : de quoi vérifier, sans lecteur de PDF, que la page s'imprime en

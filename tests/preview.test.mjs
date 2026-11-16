@@ -54,11 +54,11 @@ test('diffContacts reads the phone as the card shows it: the same number in two 
 
 test('diffContacts lists the tags added and removed, category by category', () => {
   const before = card({ labels: { instances: ['CME', 'COVIRIS'], competences: ['Oncologie'], role: ['Référent qualité'] } });
-  const after = card({ labels: { instances: ['CME', 'CLIN'], competences: ['Oncologie', 'Hématologie'], actions: ['Audit'] } });
+  const after = card({ labels: { instances: ['CME', 'CLIN'], competences: ['Oncologie', 'Hématologie'], taches: ['1.1 Audit'] } });
   const { tags, texts } = diffContacts(before, after);
   assert.deepEqual(tags, {
     instances: { added: ['CLIN'], removed: ['COVIRIS'] },
-    actions: { added: ['Audit'], removed: [] },
+    taches: { added: ['1.1 Audit'], removed: [] },
     competences: { added: ['Hématologie'], removed: [] },
     role: { added: [], removed: ['Référent qualité'] }
   });
@@ -75,7 +75,7 @@ test('diffContacts only looks at the groups of tags the card shows', () => {
   const marks = diffContacts(card({ labels: { etablissement: ['CHU'], macro: ['Cancérologie'] } }),
     card({ labels: { etablissement: ['UBM'], macro: ['Pharmacie'] } }));
   assert.deepEqual(marks, { texts: {}, tags: {} });
-  assert.deepEqual(TAG_GROUPS.map(group => group.key), ['instances', 'actions', 'gt', 'competences', 'communautes', 'taches', 'role']);
+  assert.deepEqual(TAG_GROUPS.map(group => group.key), ['role', 'instances', 'taches', 'gt', 'competences', 'communautes']);
 });
 
 test('diffContacts keeps the labels of the card, in the order the card shows them', () => {
@@ -98,7 +98,7 @@ test('previewOf gives the card after with the values that will be written, enric
   assert.equal(after.Fonction, 'Cheffe de service');
   assert.equal(after.numero_de_telephone, 536499013);
   assert.deepEqual(after.labels.competences, ['Hématologie', 'Pharmacovigilance']);
-  assert.deepEqual(after.labels.role, []);
+  assert.deepEqual(after.labels.role, ['Membre d’une action'], 'plus de rôle choisi : reste le rôle calculé, la personne ayant une action');
   assert.deepEqual(after.labels.macro, ['Cancérologie', 'Pharmacie'], 'les domaines suivent les compétences');
   assert.equal(after.etablissement_label, 'CHU', 'ce qu\'on ne modifie pas reste');
   assert.equal(after.etablissement_fondateur, true);

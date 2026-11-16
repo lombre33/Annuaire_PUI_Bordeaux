@@ -499,7 +499,7 @@ test('« Modifier mon profil » ouvre le formulaire avec les valeurs de la fiche
     assert.equal(await chosenOf(page, 'Role_dans_le_PUI'), 'Référent qualité');
 
     assert.deepEqual(await dialog(page).locator('.grp-title').allTextContents(),
-      ['Instances', 'Actions', 'GT', 'Compétences', 'Communautés', 'Tâches']);
+      ['Instances', 'GT', 'Compétences', 'Communautés', 'Actions']);
     assert.equal(await isPressed(page, 'Instances', 'CME'), true);
     assert.equal(await isPressed(page, 'Instances', 'COVIRIS'), false);
     assert.equal(await isPressed(page, 'Compétences', 'Oncologie'), true);
@@ -665,8 +665,10 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     // Avant : la carte de l'annuaire, sans aucun repère.
     assert.equal(await before.locator('.name').textContent(), 'Ana Martin');
     assert.equal(await before.locator('.fonction').textContent(), 'Pharmacienne');
-    // Le rôle est le premier tag de la carte : sa boîte (.role-col) précède celle des tags.
-    assert.deepEqual(await before.locator('.tag').allTextContents(), ['Référent qualité', 'CME', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur']);
+    // Le rôle est la première section de pastilles de la carte (1.39.0) ; Ana a une action dans la colonne Actions de BDD, sans tâche : elle
+    // s'affiche (1.41.0) et fait d'elle un « Membre d'une action ».
+    assert.deepEqual(await before.locator('.tag').allTextContents(),
+      ['Référent qualité', 'Membre d’une action', 'CME', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur']);
     assert.equal(await before.locator('.mk, .mk-gone, .mk-pill, .tag-add, .tag-del, .rv-ring').count(), 0);
 
     // Après : ce qui change se voit (contour, pastille écrite pour un texte, « + » pour un tag
@@ -679,7 +681,8 @@ test('la relecture montre la carte avant et la carte après, ce qui change est r
     assert.deepEqual(await after.locator('.tag.tag-del').allTextContents(), ['CME (retiré)']);
     assert.equal(await after.locator('.name .mk, .tel .mk, .email .mk, .rv-ring').count(), 0, 'ce qui ne change pas n\'est pas repéré');
     assert.deepEqual(await after.locator('.tag:not(.tag-add):not(.tag-del)').allTextContents(),
-      ['Référent qualité', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur']);
+      ['Référent qualité', 'Membre d’une action', 'Vaccination', 'Oncologie', 'Hématologie', 'Réseau douleur'],
+      'l\'action de la colonne Actions n\'est pas une modification de la fiche : ni ajoutée ni retirée');
 
     // Le titre de chaque groupe de pastilles garde 8 px sous lui, la mise en page validée : il les perdit en 1.33.0, quand les titres
     // de groupe cessèrent d'être des `h3` que `.rv-col h3` atteignait (et reprirent les 3 px de la grille), et la fenêtre baissa de 30 px.
@@ -777,7 +780,7 @@ test('« Valider » écrit en une seule action Grist, confirme, puis l\'annuaire
     await until(async () => (await gridCard(page, 'Ana Martin').locator('.fonction').textContent()) === 'Cheffe de service',
       'la carte de l\'annuaire n\'a pas été mise à jour');
     assert.deepEqual(await gridCard(page, 'Ana Martin').locator('.tag').allTextContents(),
-      ['Référent qualité', 'COVIRIS', 'Vaccination', 'Oncologie', 'Hématologie', 'Pharmacovigilance', 'Réseau douleur']);
+      ['Référent qualité', 'Membre d’une action', 'COVIRIS', 'Vaccination', 'Oncologie', 'Hématologie', 'Pharmacovigilance', 'Réseau douleur']);
 
     await waitForCards(page, 4);
     await focusReturnsTo(page, '#accountBar .account-edit');
@@ -1301,7 +1304,7 @@ test('changer le rôle ou le nom se voit sur la carte après, et le retirer barr
     assert.equal(await after.locator('.name').textContent(), 'Anna Martin modifié');
     assert.equal(await after.locator('.name .mk').textContent(), 'Anna Martin');
     assert.deepEqual(await after.locator('.tag.tag-del').allTextContents(), ['Référent qualité (retiré)']);
-    assert.equal(await after.locator('.role-col .role-tag.tag-del').count(), 1, 'le rôle retiré reste barré, dans la boîte du rôle de la carte');
+    assert.equal(await after.locator('.tag-group[aria-label="Rôle dans le PUI"] .tag-role.tag-del').count(), 1, 'le rôle retiré reste barré, dans la section du rôle de la carte');
     await validateWith(page, 'Vos modifications sont enregistrées.');
     assert.deepEqual((await bddCalls(page)).map(call => call.values), [{ prenom: 'Anna', Role_dans_le_PUI: 0 }]);
     await until(async () => (await page.locator('#cardsGrid .name').allTextContents()).includes('Anna Martin'), 'le prénom n\'a pas été mis à jour');

@@ -388,7 +388,7 @@ test('groupLabelMap ignores rows that are not in the detailed map and works with
   assert.deepEqual(groupLabelMap({}, {}, 'Autres'), {});
 });
 
-// ===== La colonne d'un référentiel (C.U.R.I.E, 1.38.1) =====
+// ===== La colonne d'un référentiel (C.U.R.I.E, 1.41.1) =====
 // Dans le vrai document, `referenciel_C_U_R_I_E` porte des numéros (0, 3, 13…) et « — aucune correspondance — » : le menu en faisait un groupe
 // « — aucune correspondance — » en tête de liste et des titres « 0 », « 3 », « 13 » (capture d'Antoine, 16 novembre 2026).
 
