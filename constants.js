@@ -56,7 +56,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.43.2';
+export const VERSION = '1.44.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -90,6 +90,18 @@ export const PUI_URL = 'https://www.u-bordeaux.fr/universite/notre-strategie/nos
 // autre site que le dépôt). Une chaîne vide retire le bouton « Documentation » : à employer si la page n'est pas lisible sans compte.
 // Toujours en https, et son serveur est nommé dans docs/securite.md (tests/docs.test.mjs).
 export const DOCS_URL = 'https://github.com/lombre33/Annuaire_PUI_Bordeaux#documentation';
+
+// L'adresse que Grist donne à qui n'est pas connecté, dans ses formules (`user.Email`) comme dans ses règles d'accès : celle d'un visiteur
+// d'un lien public, la même pour tous. Ce n'est l'adresse de personne : identity.js n'identifie jamais qui l'a (1.44.0), et le widget lui
+// propose de se connecter (login.js, login-ui.js).
+export const ANONYMOUS_EMAIL = 'anon@getgrist.com';
+
+// La fenêtre « Se connecter » d'un visiteur sans compte (1.44.0). `LOGIN_RETURN_STYLE` : le style de page de Grist (`?style=…`) où la
+// personne est ramenée une fois connectée, « singlePage » pour une page qui montre le seul annuaire, sans le cadre de Grist ; vide, Grist la
+// ramène à la page sans style. `LOGIN_AUTO_OPEN` : la fenêtre s'ouvre d'elle-même, une fois, à l'arrivée d'un visiteur sans compte (le
+// bouton « Se connecter » de l'en-tête la rouvre) ; faux, seul ce bouton la propose.
+export const LOGIN_RETURN_STYLE = 'singlePage';
+export const LOGIN_AUTO_OPEN = true;
 
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.

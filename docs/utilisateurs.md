@@ -8,7 +8,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 
 - [L'annuaire en bref](#lannuaire-en-bref)
 - [Lexique du PUI](#lexique-du-pui)
-- [Découvrir l'écran](#découvrir-lécran), dont [Lire la documentation](#lire-la-documentation)
+- [Découvrir l'écran](#découvrir-lécran), dont [Lire la documentation](#lire-la-documentation) et [Se connecter quand on n'a pas de compte](#se-connecter-quand-on-na-pas-de-compte)
 - [Lire une carte](#lire-une-carte), dont [La photo de profil](#la-photo-de-profil)
 - [Les logos et le bandeau du bas](#les-logos-et-le-bandeau-du-bas)
 - [Rechercher une personne](#rechercher-une-personne)
@@ -70,6 +70,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 |---|---|
 | **Titre et compteur** (en haut à gauche, « PUI Bordeaux » et « 14 contacts ») | Le compteur indique combien de cartes sont affichées avec la recherche et les filtres actuels (« 1 234 contacts » : une espace sépare les milliers). Dès qu'une recherche ou un filtre écarte des contacts, il dit **sur combien** : « 3 sur 14 contacts ». Le second nombre est celui des contacts que les interrupteurs Fondateurs et Partenaires laissent voir ([Fondateurs et Partenaires](#fondateurs-et-partenaires)), pas celui de tout l'annuaire : activer Partenaires compte les contacts des deux statuts, sans « sur ». Tant que Grist n'a pas répondu, il dit « Chargement… » |
 | **Documentation** (sous le slogan, à gauche de l'en-tête) | Ouvre, dans une fenêtre du widget, la documentation de l'annuaire : ce guide, l'installation de Grist, la sécurité, la maintenance et la documentation technique ([Lire la documentation](#lire-la-documentation)). Le bouton est absent quand le widget n'a pas d'adresse à proposer |
+| **Se connecter** (à droite de « Documentation », seulement si Grist ne vous connaît pas) | Rouvre la fenêtre « Se connecter à Grist » ([Se connecter quand on n'a pas de compte](#se-connecter-quand-on-na-pas-de-compte)) |
 | **Financeurs** (au centre de l'en-tête) | La phrase de financement et les logos des financeurs ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
 | **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)). Les responsables d'un établissement y trouvent aussi le bouton **Mon établissement** ([La fiche de mon établissement](#la-fiche-de-mon-établissement)), les administrateurs le bouton **Mode admin** ([Pour les administrateurs](#pour-les-administrateurs)). Si aucune fiche ne porte l'adresse de votre compte, il le dit, n'a ni interrupteur ni bouton « Modifier mon profil » et propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
@@ -97,6 +98,16 @@ Le bouton **Documentation** ouvre une fenêtre **dans l'annuaire** : on y lit le
 - **Ouvrir sur GitHub** ouvre la page du dépôt dans un autre onglet. Elle sert surtout pour les schémas : la fenêtre en montre le texte source sous « Schéma », GitHub les dessine.
 - **Si la documentation ne s'affiche pas** (réseau coupé, documents absents du site qui publie le widget), la fenêtre le dit, propose **Réessayer** et la page de GitHub.
 - **Ce que la fenêtre ne fait pas.** Elle n'affiche que les images du dépôt (les pastilles d'un site extérieur sont remplacées par leur texte), n'ouvre un lien vers un autre site que dans un nouvel onglet, et ne montre rien d'un document qui n'est pas dans sa liste.
+
+### Se connecter quand on n'a pas de compte
+
+Quand vous ouvrez l'annuaire par un **lien public**, sans être connecté(e) à Grist, l'annuaire ne sait pas qui vous êtes : il ne peut ni vous montrer « Ma présence » ni vous laisser modifier votre fiche. Une fenêtre **« Se connecter à Grist »** s'ouvre alors d'elle-même.
+
+- **« Se connecter »** ouvre la page de connexion de Grist (dans le même onglet, pas dans le petit cadre de l'annuaire). Une fois connecté(e), vous **revenez sur la page de l'annuaire**, sans le cadre de Grist : l'annuaire apparaît en pleine page, et reconnaît votre compte.
+- **« Continuer sans me connecter »**, la touche Échap ou la croix referment la fenêtre. Le bouton **« Se connecter »**, à droite de « Documentation » dans l'en-tête, la rouvre quand vous le voulez.
+- **Ce que vous voyez sans compte** dépend des réglages de l'annuaire : selon eux, les fiches qui ont accepté d'apparaître sont lisibles, ou rien ne l'est avant connexion. Dans les deux cas, aucun bouton « ✎ Modifier » n'est proposé.
+- **Si vous êtes déjà connecté(e) à Grist et que la fenêtre s'ouvre quand même**, Grist refuse à votre compte l'accès que l'annuaire lui demande pour vous reconnaître : prévenez la personne qui gère l'annuaire.
+- **Si l'annuaire vous a été envoyé en lecture seule** (lien « Lecteur »), il ne vous propose pas de vous connecter : il n'a aucun moyen de savoir que vous n'êtes pas connecté(e). Ouvrez le document depuis Grist avec votre compte.
 
 ## Lire une carte
 

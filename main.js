@@ -8,15 +8,18 @@
 // etablissement-save.js (la logique), upload.js et image-prep.js (le logo, la photo)
 // avec etablissement-ui.js (la fenêtre), branding.js, attachments.js, branding-ui.js
 // et logos-report.js (les logos : cartes, fondateurs, bilan de la console) et
-// avatar-ui.js (les photos de profil), status-ui.js (le bandeau d'état et l'écran « Aucun contact »).
+// avatar-ui.js (les photos de profil), status-ui.js (le bandeau d'état et l'écran « Aucun contact »), login.js et
+// login-ui.js (la fenêtre de connexion d'un visiteur sans compte).
 
-import { CATEGORIES, CONSENT_COLUMN, DOCS_URL, ETABLISSEMENT_NAMES, RESPONSIBLE_COLUMN, SEARCH_DELAY_MS, VERSION } from './constants.js';
+import { CATEGORIES, CONSENT_COLUMN, DOCS_URL, ETABLISSEMENT_NAMES, LOGIN_AUTO_OPEN, RESPONSIBLE_COLUMN, SEARCH_DELAY_MS, VERSION } from './constants.js';
 import { loadDirectory, describeLoadFailure, debounce, filterableRoles, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, describeEmptyResults, filterContacts, countInScope, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
 import { attachTagNavigation, attachTagNotes, focusFirstResult, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
 import { createScrollTools } from './scroll-tools.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
+import { findLoginUrl } from './login.js';
+import { createLoginPrompt } from './login-ui.js';
 import { createResponsibleColumn } from './schema.js';
 import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { createAccountBar } from './account-ui.js';
@@ -56,6 +59,19 @@ if (docLink && DOCS_URL) {
   } else {
     docLink.href = DOCS_URL;
   }
+}
+
+// La fenêtre « Se connecter » d'un visiteur sans compte (1.44.0, login-ui.js) : le bouton de l'en-tête et la fenêtre sont cachés tant que
+// l'identité n'a pas dit que la personne est sans compte (applyIdentity). Avec un index.html ancien (cache de GitHub Pages) qui n'a pas
+// la fenêtre, rien n'est proposé : l'annuaire se lit comme avant.
+const loginDialog = document.getElementById('loginDialog');
+const loginButton = document.getElementById('loginLink');
+const loginPrompt = loginDialog && loginButton ? createLoginPrompt(loginDialog, loginButton) : null;
+
+async function offerLogin() {
+  if (!loginPrompt) return;
+  const url = await findLoginUrl(window.grist.docApi, { search: window.location.search });
+  loginPrompt.show(url, { autoOpen: LOGIN_AUTO_OPEN });
 }
 
 const state = {
@@ -529,6 +545,7 @@ function applyIdentity(identity) {
   refreshAccount();
   refreshCards(); // les boutons « Modifier » apparaissent sur les cartes concernées
   ensureResponsibleColumn();
+  if (identity.status === 'anonymous') offerLogin(); // un visiteur sans compte : la fenêtre qui mène à la connexion de Grist
 }
 
 readIdentity(window.grist.docApi, { readOnly: READ_ONLY }).then(applyIdentity);

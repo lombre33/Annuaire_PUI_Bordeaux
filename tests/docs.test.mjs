@@ -821,13 +821,40 @@ test('l\'envoi d\'un logo garde ses protections, et la page de sécurité les d�
   // Le jeton en écriture n'est demandé que là ; celui des logos, en lecture seule, que par attachments.js.
   const sources = WIDGET_SOURCES().map(({ name, code }) => ({ name, code: withoutComments(code) }));
   assert.deepEqual(sources.filter(({ code }) => /readOnly:\s*false/.test(code)).map(({ name }) => name), ['upload.js']);
-  assert.deepEqual(sources.filter(({ code }) => /getAccessToken\(\{ readOnly: true \}\)/.test(code)).map(({ name }) => name), ['attachments.js']);
+  assert.deepEqual(sources.filter(({ code }) => /getAccessToken\(\{ readOnly: true \}\)/.test(code)).map(({ name }) => name), ['attachments.js', 'login.js']);
 
   const security = read('docs/securite.md');
   const missing = ['`upload.js`', 'getAccessToken({ readOnly: false })', '`credentials: \'omit\'`', '`referrerPolicy: \'no-referrer\'`', '`AbortController`', '30 secondes', 'image-prep.js', 'PNG']
     .filter(phrase => !security.includes(phrase));
   assert.deepEqual(missing, [], 'docs/securite.md (« L\'envoi d\'un fichier et le jeton en écriture ») doit décrire ces éléments de l\'envoi.');
   assert.match(security, /seule requête réseau/, 'docs/securite.md doit dire que l\'envoi est la seule requête réseau du code.');
+});
+
+// La fenêtre « Se connecter à Grist » d'un visiteur sans compte (1.44.0, docs/securite.md, « La fenêtre de connexion d'un visiteur sans compte ») :
+// elle n'émet aucune requête (un lien que le navigateur suit), ne garde ni ne journalise le jeton en lecture seule dont elle ne lit que l'adresse
+// de l'API, ne compose son adresse qu'à partir de la réponse de Grist et de chiffres, et la page de sécurité le dit.
+test('la fenêtre de connexion ne fait aucune requête, ne garde pas le jeton, et la page de sécurité la décrit', () => {
+  const login = withoutComments(read('login.js'));
+  const ui = withoutComments(read('login-ui.js'));
+  for (const [name, code] of [['login.js', login], ['login-ui.js', ui]]) {
+    assert.doesNotMatch(code, /\bfetch\s*\(|\bfetchImpl\b|XMLHttpRequest|sendBeacon|WebSocket/, `${name} n'émet aucune requête réseau.`);
+    assert.doesNotMatch(code, /\b(?:sessionStorage|localStorage|document\.cookie)\b/, `${name} ne garde rien dans le navigateur.`);
+    assert.doesNotMatch(code, /\binnerHTML\b|\binsertAdjacentHTML\b/, `${name} ne construit aucun HTML.`);
+  }
+  assert.match(login, /\.\s*baseUrl\b|\{\s*baseUrl\b/, 'login.js lit l\'adresse de l\'API dans la réponse de Grist.');
+  assert.doesNotMatch(login, /\.\s*accessToken\b|\{\s*[^}]*\baccessToken\b/, 'login.js ne lit jamais le jeton lui-même.');
+  const logged = [...login.matchAll(/\blog\.(?:info|warn|error)\(([^;]*)\);/g)].map(match => match[1]);
+  assert.ok(logged.length >= 2, 'login.js a ses avertissements [CONNEXION].');
+  assert.ok(logged.every(call => !/\$\{(?!error\b)|baseUrl|\burl\b|token/i.test(call)), 'login.js n\'écrit ni le jeton ni l\'adresse dans la console.');
+  assert.match(login, /encodeURIComponent/, 'Le chemin de retour est encodé.');
+  assert.match(login, /\\d\{1,6\}/, 'Le numéro de page ne peut être que des chiffres.');
+  assert.match(ui, /target\s*=\s*'_top'/, 'Le lien de connexion change la page entière, pas le cadre du widget.');
+  assert.match(ui, /rel\s*=\s*'noopener'/, 'Le lien de connexion porte rel="noopener".');
+
+  const security = read('docs/securite.md');
+  const missing = ['`login.js`', '`findLoginUrl()`', '`loginUrl()`', '`ANONYMOUS_EMAIL`', '`anonymous`', 'getAccessToken({ readOnly: true })', '`[CONNEXION]`', 'Pas de redirection ouverte', 'encodeURIComponent']
+    .filter(phrase => !security.includes(phrase));
+  assert.deepEqual(missing, [], 'docs/securite.md (« La fenêtre de connexion d\'un visiteur sans compte ») doit décrire ces éléments.');
 });
 
 // La seconde requête réseau du widget, la lecture des documents de la fenêtre « Documentation » (docs/securite.md, « Les documents de la

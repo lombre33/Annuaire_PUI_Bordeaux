@@ -15,12 +15,20 @@
 //
 // Dans le doute, personne n'est identifié : sans table-sonde, sans formule qui
 // répond, ou si Grist refuse l'écriture (compte Lecteur, règle d'accès), le
-// widget n'offre simplement aucune modification.
+// widget n'offre simplement aucune modification. Un visiteur sans compte (lien
+// public) n'est jamais identifié non plus : l'adresse anon@getgrist.com que Grist lui
+// donne est celle de tous les visiteurs, et le widget lui propose de se connecter (1.44.0).
 
-import { PROBE_RESPONSABLE_COLUMN, PROBE_TABLE } from './constants.js';
+import { ANONYMOUS_EMAIL, PROBE_RESPONSABLE_COLUMN, PROBE_TABLE } from './constants.js';
 import { normalizeEmail, tableToRows, text } from './grist-data.js';
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/;
+
+// L'adresse que Grist donne à un visiteur sans compte (un lien public) n'a pas la forme d'une erreur, mais n'est celle de personne.
+const isAnonymousEmail = email => normalizeEmail(email) === ANONYMOUS_EMAIL;
+
+// Ce que Grist répond quand une règle d'accès refuse une écriture : « Blocked by table create access rules ».
+const ACCESS_REFUSED = /blocked by .*access rules/i;
 
 // La table-sonde telle que GRIST_SETUP.md (étape 2) la décrit. Chaque colonne est une colonne de DONNÉES
 // (`isFormula: false`) dont `formula` est une formule de déclenchement : sans `recalcWhen` ni `recalcDeps`,
@@ -58,7 +66,9 @@ export function isReadOnlyAddress(search) {
   }
 }
 
-const unavailable = reason => ({ status: 'unavailable', email: '', admin: false, etablissements: [], reason });
+const without = (status, reason) => ({ status, email: '', admin: false, etablissements: [], reason });
+const unavailable = reason => without('unavailable', reason);
+const anonymous = reason => without('anonymous', reason);
 
 // Les établissements dont la personne est responsable : la colonne `Responsable_de` de la sonde
 // donne leurs identifiants de ligne (« 1,3 », ou une liste de références). Tout ce qui n'est pas un
@@ -75,6 +85,9 @@ export function responsableIds(cell) {
 //                         liste les identifiants des établissements dont la personne est
 //                         responsable (vide sans la colonne `Responsable_de`)
 //   status 'viewer'       compte Lecteur : aucune écriture possible
+//   status 'anonymous'    visiteur sans compte (1.44.0) : Grist lui donne l'adresse anon@getgrist.com, ou ses règles d'accès lui
+//                         refusent la ligne de la sonde (une règle `user.IsLoggedIn`). Un compte connecté que la règle de la sonde
+//                         refuse est pris pour lui : la fenêtre de connexion le dit (login-ui.js) et la console donne la raison
 //   status 'unavailable'  `reason` dit pourquoi (pour la console)
 // Ne lève jamais : une identité introuvable n'est pas une panne du widget.
 export async function readIdentity(docApi, { readOnly = false, log = console, cleanupWaitMs = CLEANUP_WAIT_MS } = {}) {
@@ -90,9 +103,16 @@ export async function readIdentity(docApi, { readOnly = false, log = console, cl
     const tables = await docApi.listTables();
     if (!tables.includes(PROBE_TABLE)) {
       const failure = await createProbeTable(docApi, log);
-      if (failure) return reportUnavailable(log, failure);
+      if (failure?.refused) return reportAnonymous(log, failure.reason);
+      if (failure) return reportUnavailable(log, failure.reason);
     }
-    const added = await docApi.applyUserActions([['AddRecord', PROBE_TABLE, null, {}]]);
+    let added;
+    try {
+      added = await docApi.applyUserActions([['AddRecord', PROBE_TABLE, null, {}]]);
+    } catch (error) {
+      if (!ACCESS_REFUSED.test(String(error?.message || error))) throw error;
+      return reportAnonymous(log, `Grist refuse la ligne de ${PROBE_TABLE} (${error?.message || error})`, 'règle d\'accès : la ligne de la sonde est refusée');
+    }
     rowId = added?.retValues?.[0];
     if (!Number.isInteger(rowId)) {
       rowId = null;
@@ -104,6 +124,10 @@ export async function readIdentity(docApi, { readOnly = false, log = console, cl
     const email = text(row.Email);
     if (!EMAIL_SHAPE.test(email)) {
       return reportUnavailable(log, `la formule user.Email de ${PROBE_TABLE} n'a renvoyé aucune adresse`);
+    }
+    if (isAnonymousEmail(email)) {
+      log.info('[IDENTITE] visiteur sans compte (Grist lui donne l\'adresse anonyme que tous les visiteurs sans compte partagent) : personne n\'est identifié, le widget propose de se connecter.');
+      return anonymous('Grist ne connaît pas cette personne (adresse anonyme)');
     }
     older = rows.filter(other => other.id < rowId && normalizeEmail(other.Email) === normalizeEmail(email)).map(other => other.id);
     const admin = row.Admin === true;
@@ -174,8 +198,10 @@ async function removeProbeRows(docApi, rowId, older, log) {
   else log.info(`[IDENTITE] ${older.length} ancienne(s) ligne(s) de ${PROBE_TABLE} à votre adresse, laissées par un chargement précédent, supprimées.`);
 }
 
-// Crée la table-sonde absente. Renvoie '' si elle existe désormais, sinon la raison de l'échec (par
-// exemple un compte sans droit sur la structure du document : Grist refuse). Si une autre personne l'a
+// Crée la table-sonde absente. Renvoie null si elle existe désormais, sinon { reason, refused } : la raison
+// de l'échec et si ce sont les règles d'accès de Grist qui refusent (un compte sans droit sur la structure
+// du document). Un visiteur sans compte ne voit pas la table-sonde, que ses règles cachent (elle manque
+// alors à la liste des tables qu'il lit), et la structure lui est fermée : il tombe ici. Si une autre personne l'a
 // créée au même instant, Grist numérote la nôtre (« Annuaire_Sonde2 ») : on la retire, la table
 // d'origine sert à tous.
 async function createProbeTable(docApi, log) {
@@ -188,13 +214,25 @@ async function createProbeTable(docApi, log) {
     } else {
       log.info(`[IDENTITE] table « ${PROBE_TABLE} » absente : créée (GRIST_SETUP.md, étape 2).`);
     }
-    return '';
+    return null;
   } catch (error) {
-    return `table « ${PROBE_TABLE} » introuvable, et Grist n'a pas permis de la créer : ${error?.message || error} (voir GRIST_SETUP.md)`;
+    return {
+      reason: `table « ${PROBE_TABLE} » introuvable, et Grist n'a pas permis de la créer : ${error?.message || error} (voir GRIST_SETUP.md)`,
+      refused: ACCESS_REFUSED.test(String(error?.message || error))
+    };
   }
 }
 
 function reportUnavailable(log, reason) {
   log.warn(`[IDENTITE] ${reason}`);
   return unavailable(reason);
+}
+
+// Les règles d'accès de Grist refusent la sonde à cette personne : un visiteur sans compte, quand la règle de la sonde exige `user.IsLoggedIn`
+// (GRIST_SETUP.md, étape 4). Rien ne dit qu'une personne connectée à qui la même règle s'applique en est une autre : le widget lui propose
+// de se connecter, et la console dit quoi revoir. `detail` : ce que la console dit du refus de Grist ; `reason` : ce que l'identité en retient.
+function reportAnonymous(log, detail, reason = detail) {
+  log.warn(`[IDENTITE] ${detail} : le widget prend cette personne pour un visiteur sans compte et lui propose de se connecter. `
+    + 'Si elle est connectée, la règle d\'accès de la sonde (ou le droit de créer la table) est à revoir (GRIST_SETUP.md, étapes 2 et 4).');
+  return anonymous(reason);
 }

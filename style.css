@@ -227,6 +227,18 @@ h1 {
 .doc-link:hover {
   border-color: var(--violet);
 }
+/* « Se connecter » (1.44.0) : à côté de « Documentation », pour un visiteur sans compte seulement (login-ui.js) ; plein, pour qu'on le voie. */
+.doc-link + .login-link {
+  margin-left: 8px;
+}
+.login-link {
+  color: #fff;
+  background: var(--violet);
+  border-color: var(--violet);
+}
+.login-link:hover {
+  background: #5348c9;
+}
 .result-count {
   padding: 10px 16px;
   color: #443aaf;
@@ -1405,6 +1417,10 @@ button.avatar:hover {
   .doc-link:hover {
     border-color: #c9c5f7;
   }
+  .login-link:hover {
+    background: var(--violet);
+    border-color: var(--violet);
+  }
 }
 .status-banner {
   display: flex;
@@ -1908,7 +1924,8 @@ button.avatar:hover {
   .admin-strip,
   .card-actions,
   .status-action,
-  .doc-link {
+  .doc-link,
+  .login-link {
     display: none !important; /* plusieurs de ces règles d'affichage sont plus précises que celle-ci (`.page-header > .account-bar`) */
   }
   body {

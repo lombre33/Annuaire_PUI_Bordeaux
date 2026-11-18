@@ -170,11 +170,12 @@ export async function createHarness({ keepScrollbars = false } = {}) {
   // que la page n'a pas rattrapées, sans les messages d'erreur de sa console ; `logs.cspViolations` : ce que la politique de
   // sécurité de contenu de index.html a refusé à la page (voir assertNoCspViolation). `holdReads` : aucune lecture de Grist
   // n'aboutit avant `window.__releaseReads()` (un document lent à répondre) ; `apiBlocked` : le script de l'API de Grist ne se charge
-  // pas (réseau coupé, pare-feu, extension), `window.grist` n'existe pas.
+  // pas (réseau coupé, pare-feu, extension), `window.grist` n'existe pas. `search` : ce qui suit le « ? » de l'adresse du widget
+  // (`page=7`, comme Antoine l'écrit dans l'adresse du widget de son document).
   async function openWidget({
     tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, denyStructure = false, delay = 0, readOnly = false,
     accessToken, withoutMethods = [], downloadCors = true, downloadHold = false, downloadFirst = null, initScript = null,
-    contextOptions = {}, holdReads = false, apiBlocked = false
+    contextOptions = {}, holdReads = false, apiBlocked = false, search = ''
   } = {}) {
     const context = await browser.newContext(contextOptions);
     // Hermétique : seuls le serveur local, l'API Grist simulée et ses pièces jointes répondent.
@@ -235,7 +236,9 @@ export async function createHarness({ keepScrollbars = false } = {}) {
     // Le widget lit Grist dès son démarrage : ses cartes et leurs logos sont dans la page avant l'événement « load », qui attend les
     // images. Quand un fichier est retenu ou ne reçoit jamais de réponse, il ne viendrait pas : la navigation n'attend alors que le document.
     const downloadsStall = downloadHold || downloadFirst === 'hang' || downloadCors === 'hang';
-    await page.goto(`${baseUrl}/index.html${readOnly ? '?readonly=true' : ''}`, { waitUntil: downloadsStall ? 'domcontentloaded' : 'load' });
+    const query = new URLSearchParams(search);
+    if (readOnly) query.set('readonly', 'true');
+    await page.goto(`${baseUrl}/index.html${query.size > 0 ? `?${query}` : ''}`, { waitUntil: downloadsStall ? 'domcontentloaded' : 'load' });
     await fontsLoaded(page);
     return { page, context, logs, files };
   }
