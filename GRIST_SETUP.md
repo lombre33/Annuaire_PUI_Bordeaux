@@ -12,6 +12,7 @@ la faire et comment vérifier qu'elle a marché.
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, depuis la 1.17.0 une fiche d'établissement aussi, et depuis la 1.18.0 une personne crée elle-même sa fiche |
 | 5 | Les logos des établissements : colonnes `logo` et `ordre_bandeau` dans `Etablissements` (facultatif) ; le remplacement d'un logo depuis le widget en dépend. Les financeurs n'en dépendent pas : ce sont deux images fixes du widget | les noms remplacent les logos : la pastille de toujours sur les cartes, la liste des fondateurs en texte dans le bandeau du bas ; un responsable ne peut plus changer le logo de son établissement depuis le widget (la fenêtre le dit) ; rien d'autre ne change |
 | 6 | La photo de profil : colonne `Avatar` (Pièces jointes) dans `BDD` (facultatif) | les cartes gardent les initiales et le formulaire de modification n'a pas de carte « Photo de profil » ; rien d'autre ne change |
+| 7 | La fenêtre de connexion des visiteurs sans compte (facultatif, 1.44.0) : le numéro de la page dans l'adresse du widget (`index.html?page=4`) ; elle suppose les règles de l'étape 4 | le visiteur voit toujours la fenêtre, mais, une fois connecté, il revient à la **première** page du document au lieu de celle de l'annuaire |
 
 Le widget ne modifie jamais la structure du document (règle d'accès, colonne existante) et ne crée
 qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2), et qu'une seule colonne,
@@ -234,7 +235,8 @@ Si le bandeau manque ou ne propose pas de fiche, la console dit pourquoi :
 |---|---|---|
 | `table « Annuaire_Sonde » introuvable, et Grist n'a pas permis de la créer` | la table n'existait pas, et le compte qui a ouvert le widget n'a pas le droit de créer une table (règle d'accès, compte qui n'est pas propriétaire) | faites ouvrir le widget par un propriétaire du document, ou créez la table à la main (étape 2) |
 | `la sonde n'a pas de colonne « Responsable_de » : pas de fiche d'établissement` | la colonne facultative n'existe pas : personne ne peut modifier de fiche d'établissement | colonne `Responsable_de`, étape 2 (point 4) |
-| `la formule user.Email de Annuaire_Sonde n'a renvoyé aucune adresse` | la formule n'est pas une formule de déclenchement, ou le compte est anonyme | reprendre la colonne `Email` |
+| `la formule user.Email de Annuaire_Sonde n'a renvoyé aucune adresse` | la formule n'est pas une formule de déclenchement | reprendre la colonne `Email` |
+| `visiteur sans compte (Grist lui donne l'adresse anonyme…)` ou `Grist refuse la ligne de Annuaire_Sonde (Blocked by table create access rules)…` | la personne n'est pas connectée à Grist (lien public) : le widget lui propose de se connecter (étape 7). Si elle **est** connectée, c'est la règle de la sonde (étape 4) qui la refuse à tort | rien pour un visiteur sans compte ; sinon revoir la règle de la sonde (étape 4) |
 | `lecture impossible : …` | Grist a refusé l'écriture ou la lecture (règle d'accès) | étape 4 |
 | `Aucune ligne de BDD ne porte l'adresse…` | la personne est connectée mais son adresse n'est pas dans `BDD.email` : le bandeau dit « Compte absent de l'annuaire » | corriger l'adresse dans `BDD` |
 | `BDD n'a pas de colonne « email »` | la colonne n'existe pas ou a un autre nom : le bandeau dit « Fiche introuvable » | la rajouter sous ce nom |
@@ -477,7 +479,7 @@ par défaut suffit.
 **Ce que cela change pour le widget.** Un compte Éditeur voit l'annuaire, modifie sa fiche, crée la sienne
 s'il n'en a pas, et rien d'autre ; un référent y ajoute la fiche de son établissement ; un administrateur
 (case `admin` d'`ACL`) corrige toutes les fiches ; un visiteur sans compte n'a droit à rien (annuaire
-vide ou erreur de lecture : le widget n'a pas de message dédié) ; les propriétaires gardent tout. Un
+vide), et le widget lui propose de se connecter (étape 7) ; les propriétaires gardent tout. Un
 administrateur d'`ACL` qui n'est pas propriétaire du document ne voit pas les tables techniques et ne
 touche pas à la structure.
 
@@ -678,6 +680,74 @@ un clic l'agrandit, et la console ne montre ni avertissement `[LOGOS]` (la ligne
 | « Grist n’a pas donné au widget l’autorisation d’envoyer un fichier. Contactez un administrateur si le problème persiste. » (ou l'un de ses voisins) à la validation | L'instance Grist ne donne pas de jeton en écriture, refuse la requête du navigateur ou ne répond pas : l'envoi n'a pas pu être essayé dans un vrai Grist | Lire la ligne `[ENVOI]` de la console ; poser la photo dans la cellule ; signaler au mainteneur |
 | « Grist a refusé le fichier : vos droits ne permettent pas d’ajouter une pièce jointe au document. Contactez un administrateur. » | Une règle d'accès interdit à cette personne d'ajouter une pièce jointe | Revoir l'étape 4 |
 | Des pièces jointes qui ne servent plus s'accumulent | Des photos retirées, remplacées ou jamais utilisées : le widget ne supprime pas de fichier | Les repérer et les supprimer dans Grist |
+
+## 7. La fenêtre de connexion des visiteurs sans compte (facultatif)
+
+Avec un lien public (étape 4, « Le mode de partage »), une personne arrive dans l'annuaire **sans compte Grist**.
+Depuis la 1.44.0, le widget la reconnaît et lui ouvre une fenêtre **« Se connecter à Grist »** ; son bouton mène à la
+page de connexion de votre instance, puis la **ramène à la même page de l'annuaire**, sans le cadre de Grist
+(`?style=singlePage`). Un bouton « Se connecter » de l'en-tête rouvre la fenêtre quand on l'a fermée ; « Continuer sans
+me connecter » la ferme. Ce que le visiteur voit ensuite dépend de **vos règles de lecture** : avec les règles de
+l'étape 4 (lecture réservée aux comptes connectés), un annuaire vide et la fenêtre pour seul chemin ; avec une lecture
+publique des fiches qui acceptent d'apparaître, l'annuaire se consulte et la fenêtre sert à se connecter pour modifier
+sa fiche. Rien n'est à créer dans le document ; une seule chose est à régler, le numéro de la page.
+
+**Comment le widget sait qu'une personne n'a pas de compte.** Par la sonde de l'étape 2, sans rien de nouveau dans
+le document : Grist lui rend l'adresse `anon@getgrist.com` (celle de tout visiteur d'un lien public), ou **refuse** la
+ligne qu'il ajoute à `Annuaire_Sonde` (« Blocked by table create access rules ») parce que la règle de l'étape 4 exige
+`user.IsLoggedIn`. Les règles de l'étape 4 ne sont donc pas indispensables à la fenêtre (l'adresse anonyme suffit), mais
+elles sont indispensables à l'annuaire : sans elles un visiteur lit tout. Une panne qui n'est pas un refus des règles
+d'accès (réseau, colonne manquante) ne l'ouvre pas.
+
+**Régler le numéro de la page (une fois, par page qui porte le widget).** Un widget ne sait pas sur quelle page du
+document il est, et la page de connexion de Grist veut cette adresse pour y revenir. Ouvrez la page de l'annuaire dans
+Grist : l'adresse du navigateur est de la forme `https://<instance>/<document>/<nom-de-la-page>/p/4` ; le nombre après
+`/p/` est le numéro. Dans les options du widget (« Enter Custom URL », étape du `README.md`), ajoutez `?page=` et ce
+nombre à l'adresse :
+
+```
+https://lombre33.github.io/Annuaire_PUI_Bordeaux/index.html?page=4
+```
+
+Sans ce paramètre, la fenêtre fonctionne mais renvoie à la **première page** du document (en style « single page »).
+Un nombre invalide est ignoré de même. Pour une instance en équipe (`/o/<équipe>/…`), rien de plus à faire : le widget
+le lit dans l'adresse de l'API du document que Grist lui donne.
+
+**Les deux réglages du code** (`constants.js`) : `LOGIN_AUTO_OPEN` (`true` : la fenêtre s'ouvre à l'arrivée ; `false` :
+seul le bouton de l'en-tête la propose) et `LOGIN_RETURN_STYLE` (`'singlePage'` ; une chaîne vide ne demande aucun
+style).
+
+**Verrouiller la structure du document.** Tant que la case « Allow Editors to edit structure » (étape 4, point A) est
+cochée, un visiteur sans compte qui ouvre l'annuaire peut faire créer à Grist une table `Annuaire_SondeN` vide : le
+widget essaie de créer sa table quand il ne la voit pas, et un visiteur ne voit pas la sienne. Ce n'est pas propre à
+cette version, mais la fenêtre rend le cas fréquent. Décocher la case est le réglage que l'étape 4 demande déjà ; **son
+effet sur ce cas précis n'a pas pu être constaté** dans l'essai local (la création restait possible malgré la règle
+posée pour l'essai), à vérifier sur votre document. Les tables en trop (`Annuaire_Sonde2`…) se suppriment à la main.
+
+**Ce qui ne se règle pas.**
+
+- Un **lien public en lecture seule (Lecteur)** : Grist donne la même chose à un visiteur sans compte et à un compte
+  Lecteur connecté ; le widget ne peut pas les distinguer et **n'ouvre aucune fenêtre**. Avec un lien public, donnez-le
+  en **Éditeur** (étape 4 : ce sont les règles qui limitent les droits).
+- Une personne **connectée** mais **refusée par la règle de la sonde** (règle trop stricte), ou qui n'a pas le droit de
+  créer la table, voit la même fenêtre. Le texte lui dit de prévenir un administrateur si elle est déjà connectée, et la
+  console le dit (`[IDENTITE] Grist refuse la ligne de Annuaire_Sonde…`).
+- Le **retour** vers la page de l'annuaire est fait par la page de connexion de Grist (paramètre `next`). Le widget l'écrit
+  correctement, mais une instance dont l'authentification perd ce paramètre (certains serveurs d'authentification
+  placés devant Grist) ramène à son accueil : à constater sur votre instance (`TESTING.md`, section 30).
+
+**Vérifier.** Fenêtre de navigation privée, sans connexion à Grist : ouvrez le lien public de l'annuaire. La fenêtre
+« Se connecter à Grist » s'ouvre ; la console dit `[IDENTITE] Grist refuse la ligne de Annuaire_Sonde (…) : le widget
+prend cette personne pour un visiteur sans compte…` (ou `visiteur sans compte (Grist lui donne l'adresse anonyme…)`).
+« Se connecter » ouvre la page de connexion de Grist dans l'onglet entier ; après la connexion, vous revenez sur la page
+de l'annuaire sans le cadre de Grist. Connecté, aucune fenêtre ni bouton « Se connecter » n'apparaît.
+
+| Ce que vous voyez | Cause | Remède |
+|---|---|---|
+| Pas de fenêtre pour un visiteur sans compte | Lien public en **Lecteur** ; ou pas de règle `user.IsLoggedIn` sur la sonde (étape 4) ; ou `index.html` ancien en cache | Lien en Éditeur ; règles de l'étape 4 ; recharger |
+| La fenêtre explique la connexion mais n'a pas de bouton « Se connecter » | Grist n'a pas donné l'adresse de l'API du document (`[CONNEXION]` dans la console) | Recharger ; sinon la connexion se fait depuis l'adresse du document |
+| Après la connexion, on arrive sur la première page, ou sur le cadre de Grist | `?page=` manquant dans l'adresse du widget ; ou le serveur d'authentification perd le chemin de retour (`next`) ou son `?style=singlePage` | Étape ci-dessus ; instance : voir « Ce qui ne se règle pas » |
+| Une personne connectée voit la fenêtre | Règle de la sonde trop stricte, ou droit de création de la table refusé | Revoir l'étape 2 et l'étape 4 (la console dit laquelle) |
 
 ## À savoir
 

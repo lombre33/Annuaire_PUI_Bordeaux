@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from './support/assert.mjs';
 import { readIdentity, isReadOnlyAddress, responsableIds } from '../identity.js';
 import { createFakeGrist } from './support/fake-grist.js';
-import { PROBE_TABLE } from '../constants.js';
+import { ANONYMOUS_EMAIL, PROBE_TABLE } from '../constants.js';
 import { withIdentity, ANA_EMAIL, BOB_EMAIL, ADMIN_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 
 // ===== readIdentity : qui est connecté ? (table-sonde à formules déclenchées) =====
@@ -263,14 +263,17 @@ test('readIdentity creates the missing probe table with the documented trigger-f
   assert.match(s.log.infos[0][0], /\[IDENTITE\].*Annuaire_Sonde.*créée/);
 });
 
-test('readIdentity fails closed, never throws, when Grist refuses to create the missing probe table', async () => {
+test('readIdentity fails closed, never throws, when Grist refuses to create the missing probe table: the person is taken for a visitor without an account', async () => {
+  // Un visiteur sans compte ne voit pas la sonde (ses règles la cachent) et la structure lui est fermée ; un compte connecté qui trouve le
+  // document sans sonde, sans le droit de la créer, est dans le même cas : la fenêtre de connexion lui dit de prévenir un administrateur.
   const s = session(ANA_EMAIL, withoutProbe(), { denyWrites: ['Annuaire_Sonde'] });
   const identity = await identify(s);
-  assert.equal(identity.status, 'unavailable');
+  assert.equal(identity.status, 'anonymous');
   assert.equal(identity.email, '');
   assert.equal(identity.admin, false);
   assert.match(identity.reason, /Annuaire_Sonde.*introuvable.*créer/);
   assert.match(s.log.warnings[0][0], /\[IDENTITE\].*Annuaire_Sonde.*GRIST_SETUP\.md/);
+  assert.match(s.log.warnings[0][0], /visiteur sans compte/);
   assert.equal(s.tables.Annuaire_Sonde, undefined, 'rien n\'a été créé');
   assert.deepEqual(s.calls.map(call => [call.action, call.table, call.ok]), [['AddTable', 'Annuaire_Sonde', false]]);
 });
@@ -303,12 +306,81 @@ test('readIdentity rejects a stamped value that is not an e-mail address', async
   }
 });
 
-test('readIdentity fails closed when Grist refuses the probe write (access rule): no identity, no exception', async () => {
+test('readIdentity fails closed when Grist refuses the probe write (access rule): no identity, no exception, and the person is taken for a visitor without an account', async () => {
   const s = session(ANA_EMAIL, withIdentity(), { denyWrites: ['Annuaire_Sonde'] });
   const identity = await identify(s);
-  assert.equal(identity.status, 'unavailable');
-  assert.equal(identity.admin, false);
+  assert.deepEqual(identity, { status: 'anonymous', email: '', admin: false, etablissements: [], reason: 'règle d\'accès : la ligne de la sonde est refusée' });
   assert.match(s.log.warnings[0][0], /\[IDENTITE\]/);
+  assert.match(s.log.warnings[0][0], /Blocked by table \w+ access rules/, 'la console cite le refus de Grist');
+  assert.match(s.log.warnings[0][0], /Si elle est connectée, la règle d'accès de la sonde .* est à revoir/, 'et dit quoi revoir si la personne est connectée');
+  assert.ok(!JSON.stringify(s.log.warnings).includes('@'), 'aucune adresse dans la console');
+});
+
+test('readIdentity keeps a failure to create the probe table that is not an access rule as « unavailable »', async () => {
+  const s = session(ANA_EMAIL, withoutProbe());
+  s.docApi.applyUserActions = async () => { throw new Error('Network error'); };
+  const identity = await identify(s);
+  assert.equal(identity.status, 'unavailable');
+  assert.match(identity.reason, /Annuaire_Sonde.*introuvable.*Network error/);
+});
+
+test('readIdentity recognises the refusal a real Grist 1.7 sends to a visitor without an account', async () => {
+  // Relevé dans un vrai Grist (1.7.22), lien public en Éditeur, règle `user.IsLoggedIn` sur la sonde, visiteur sans compte.
+  const s = session(ANA_EMAIL);
+  s.docApi.applyUserActions = async () => { throw new Error('Blocked by table create access rules'); };
+  assert.equal((await identify(s)).status, 'anonymous');
+});
+
+test('readIdentity keeps a refusal that is not an access rule as « unavailable » (a network failure is not a visitor)', async () => {
+  for (const message of ['Network error', 'timeout', 'Table not found: Annuaire_Sonde']) {
+    const s = session(ANA_EMAIL);
+    s.docApi.applyUserActions = async () => { throw new Error(message); };
+    const identity = await identify(s);
+    assert.equal(identity.status, 'unavailable', message);
+    assert.match(identity.reason, /lecture impossible/);
+  }
+});
+
+// ===== Le visiteur sans compte : Grist lui donne l'adresse anon@getgrist.com, la même pour tous =====
+
+test('readIdentity does not identify anyone behind the anonymous address Grist gives to visitors without an account', async () => {
+  for (const stamped of [ANONYMOUS_EMAIL, ' ANON@getgrist.com ', 'Anon@GetGrist.com']) {
+    const s = session(stamped);
+    const identity = await identify(s);
+    assert.deepEqual(identity, { status: 'anonymous', email: '', admin: false, etablissements: [], reason: 'Grist ne connaît pas cette personne (adresse anonyme)' }, JSON.stringify(stamped));
+    assert.ok(!JSON.stringify(s.log.infos).includes('@') && !JSON.stringify(s.log.warnings).includes('@'), 'aucune adresse dans la console');
+    assert.match(s.log.infos[0][0], /visiteur sans compte/);
+  }
+});
+
+test('readIdentity cleans up the probe row of a visitor without an account, and leaves the rows of the other visitors alone', async () => {
+  // Tous les visiteurs sans compte portent la même adresse : une ligne de la sonde à cette adresse n'est pas forcément la leur, et peut être
+  // celle d'un visiteur qui n'a pas fini sa lecture.
+  const tables = withIdentity();
+  tables.Annuaire_Sonde = { id: [7], Email: [ANONYMOUS_EMAIL], Admin: [false], Responsable_de: [''] };
+  const s = session(ANONYMOUS_EMAIL, tables);
+  const identity = await identify(s);
+  await settle();
+  assert.equal(identity.status, 'anonymous');
+  assert.deepEqual(s.tables.Annuaire_Sonde.id, [7], 'sa propre ligne est partie, celle d\'un autre visiteur est restée');
+  assert.deepEqual(s.calls.filter(call => call.action === 'RemoveRecord').map(call => call.table), [PROBE_TABLE]);
+  assert.ok(!s.calls.some(call => call.action === 'BulkRemoveRecord'), 'aucune suppression en lot');
+});
+
+test('readIdentity never gives administrator rights to the anonymous address, even when a row of ACL carries it', async () => {
+  const tables = withIdentity();
+  tables.ACL = { id: [1], email: [ANONYMOUS_EMAIL], Responsable_de_l_Etablissement: [1], admin: [true] };
+  const identity = await identify(session(ANONYMOUS_EMAIL, tables));
+  assert.equal(identity.status, 'anonymous');
+  assert.equal(identity.admin, false);
+  assert.deepEqual(identity.etablissements, []);
+});
+
+test('readIdentity still answers « viewer » to a read-only frame, without a probe write', async () => {
+  const s = session(ANONYMOUS_EMAIL);
+  const identity = await identify(s, { readOnly: true });
+  assert.equal(identity.status, 'viewer');
+  assert.deepEqual(s.calls, [], 'rien n\'est écrit : un compte Lecteur et un visiteur d\'un lien Lecteur ne se distinguent pas');
 });
 
 test('readIdentity fails closed when the probe row cannot be read back, and still cleans it up', async () => {

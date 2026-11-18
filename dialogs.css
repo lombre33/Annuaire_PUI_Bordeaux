@@ -1391,6 +1391,21 @@ a.btn {
   text-decoration: none;
 }
 
+/* La fenêtre de connexion d'un visiteur sans compte (1.44.0, login-ui.js) : deux paragraphes et deux boutons, plus étroite que les
+   fenêtres de saisie. */
+.dlg.login-dlg {
+  width: min(520px, calc(100vw - 32px));
+}
+.login-lead {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.login-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
 .md {
   max-width: 80ch;
   margin: 0 auto;

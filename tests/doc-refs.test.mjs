@@ -36,12 +36,14 @@ test('aucun message montré à une personne ne nomme un fichier de documentation
   // Les messages de la console (une ligne qui passe par `log.` ou `console.`, ou qui porte un préfixe [XXX]) nomment le fichier : une console
   // n'a pas de lien, et celui qui la lit tient le document sous la main.
   const consoleLine = /\blog\.(?:info|warn|error)\b|\bconsole\.|(['"`])\[[A-Z-]{3,}\]\s/;
-  // Quatre messages nomment encore le fichier, parce qu'aucune personne ne les lit à l'écran : la raison d'une sonde indisponible est « pour
-  // la console » (identity.js, état unavailable), celle d'une colonne qu'on n'a pas pu créer est « à dire dans la console » (schema.js) et
-  // l'avertissement des logos part dans console.warn (render.js).
+  // Cinq messages nomment encore le fichier, parce qu'aucune personne ne les lit à l'écran : la raison d'une sonde indisponible est « pour
+  // la console » (identity.js, état unavailable), l'avertissement d'un visiteur sans compte est écrit dans la console (identity.js, 1.44.0),
+  // celle d'une colonne qu'on n'a pas pu créer est « à dire dans la console » (schema.js) et l'avertissement des logos part dans
+  // console.warn (render.js).
   const consoleOnly = [
     ['identity.js', /introuvable, et Grist n'a pas permis de la créer/],
     ['identity.js', /règles d\\'accès de la sonde\s*:\s*la personne doit pouvoir supprimer/],
+    ['identity.js', /Si elle est connectée, la règle d\\'accès de la sonde/],
     ['schema.js', /Créez-la à la main, en liste de références/],
     ['render.js', /\(GRIST_SETUP\.md, étape 5\)\. Autres causes/]
   ];

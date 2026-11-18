@@ -341,6 +341,13 @@ citent le guide d'installation nomment une étape qui existe encore, et aucun me
 `tests/e2e-etablissement.test.mjs` essaie le lien d'un message (la liste des responsables illisible) dans une vraie fenêtre : un clic
 ouvre la documentation à l'étape 4 par-dessus la fiche de l'établissement, Échap ne ferme que la documentation.
 
+La fenêtre de connexion d'un visiteur sans compte (1.44.0) a deux fichiers de tests : `tests/login.test.mjs` (9 tests, sans navigateur :
+le numéro de page lu dans l'adresse du widget, l'adresse de connexion avec ou sans page, avec équipe, avec port, style, adresses refusées,
+jeton refusé) et `tests/e2e-login.test.mjs` (15 scénarios dans Chromium : la fenêtre et son lien, le numéro de page, la fermeture par trois
+chemins et la réouverture, les trois causes d'un visiteur sans compte, une personne connectée sans fenêtre, un cadre en lecture seule, une
+sonde illisible, un jeton refusé, l'impression, un `index.html` ancien, `LOGIN_AUTO_OPEN = false`) ; `tests/identity.test.mjs` y ajoute 7
+scénarios (statut `anonymous`) et `tests/docs.test.mjs` le contrôle de ses protections (aucune requête, jeton jamais gardé).
+
 `tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
 (au-dessus, dans le cadre, refermée en la quittant), au clavier (Échap, cartes redessinées) et, sur un écran
@@ -2040,3 +2047,43 @@ contrôle de la fenêtre dans le cadre réel de Grist : les tests automatiques s
 - [ ] **Sur un téléphone.** La fenêtre prend tout l'écran, la barre des documents défile, le pied reste visible.
 - [ ] **Après un déménagement du dépôt** (migration vers le GitHub de production) : les documents se lisent toujours dans la fenêtre, à
       l'adresse du nouveau site, et « Ouvrir sur GitHub » mène au nouveau dépôt (`DOCS_URL`, `constants.js`).
+
+## 30. La fenêtre « Se connecter à Grist » d'un visiteur sans compte (1.44.0)
+
+À jouer dans le **vrai Grist**, sur une copie du document, console ouverte (F12). **Rien de ce protocole n'a encore été joué dans le
+document d'Antoine** : les tests automatiques simulent Grist, et un essai a été fait dans un Grist local (image officielle, lien public
+en Éditeur, règles de `GRIST_SETUP.md`), où la page de connexion gardait le chemin de retour mais perdait son `?style=singlePage`.
+
+*Préparation.* Le lien public en **Éditeur** est activé (menu de partage de Grist). L'adresse du widget porte le numéro de la page
+(`index.html?page=N`, `GRIST_SETUP.md`, étape 7 : le nombre après `/p/` dans l'adresse de la page de l'annuaire).
+
+- [ ] **Visiteur sans compte.** Dans une **fenêtre de navigation privée** (aucune session Grist), ouvrir le lien public de l'annuaire. La
+      fenêtre « Se connecter à Grist » s'ouvre d'elle-même ; le bouton « Se connecter » est aussi dans l'en-tête, à droite de
+      « Documentation ». La console dit `[IDENTITE] …` (une ligne qui parle d'un visiteur sans compte, sans aucune adresse) et aucune
+      erreur rouge.
+- [ ] **Le lien.** Survoler « Se connecter » : l'adresse est `https://<instance>/login?next=…` (ou `…/o/<équipe>/login?…`) et le chemin de
+      retour contient `/p/<N>` et `style=singlePage` (la barre d'état du navigateur ou « Copier l'adresse du lien »). Avec une adresse de
+      widget sans `?page=`, le retour mène à la première page (`/<document>?style=singlePage`).
+- [ ] **La connexion.** Cliquer « Se connecter » : c'est **l'onglet entier** qui va sur la page de connexion de Grist (pas le petit cadre du
+      widget). Se connecter avec un compte de l'annuaire. **Constater où l'on arrive** : la page de l'annuaire, sans le cadre de Grist
+      (barre latérale et en-tête de Grist absents) ? Si l'on arrive à l'accueil de Grist ou sur la page avec le cadre, noter la
+      réponse : c'est l'authentification de l'instance qui perd le chemin de retour ou son `?style=singlePage`, pas le widget.
+- [ ] **Après la connexion.** Le bandeau « Ma présence » (ou « Compte absent de l'annuaire ») apparaît ; **la fenêtre et le bouton « Se
+      connecter » n'apparaissent plus** ; la fiche de la personne a son bouton « Modifier ».
+- [ ] **Continuer sans se connecter.** Retour en navigation privée : « Continuer sans me connecter », la touche Échap et la croix ferment la
+      fenêtre ; le bouton « Se connecter » de l'en-tête la rouvre. Le focus revient sur ce bouton à la fermeture.
+- [ ] **Ce que voit le visiteur.** Avec les règles de l'étape 4 (lecture réservée aux comptes connectés), l'annuaire est vide pour lui (le
+      widget n'a pas de message dédié) ; avec une lecture publique des fiches visibles, il les voit. Dans les deux cas, **aucun bouton
+      « Modifier »** ni bandeau « Ma présence ».
+- [ ] **Une personne connectée.** Avec un compte de l'annuaire, puis avec un compte Grist qui n'y figure pas : **ni fenêtre ni bouton** « Se
+      connecter ». Si l'un des deux la voit, la console dit pourquoi (`[IDENTITE] Grist refuse la ligne de Annuaire_Sonde…` : règle de la
+      sonde trop stricte) : à corriger dans l'étape 4.
+- [ ] **Lien public en lecture seule (Lecteur).** Visiteur sans compte avec un lien Lecteur : **aucune fenêtre** (Grist ne le distingue pas
+      d'un compte connecté en lecture seule). C'est voulu.
+- [ ] **Les tables en trop.** Après le passage d'un visiteur sans compte, regarder si Grist a créé une table `Annuaire_Sonde2` (ou
+      voisine) : si oui, la structure n'est pas verrouillée (« Allow Editors to edit structure ») ; la verrouiller (`GRIST_SETUP.md`,
+      étape 4, point A), supprimer les tables en trop, et rejouer ce point.
+- [ ] **Impression.** Le bouton « Se connecter » de l'en-tête ne s'imprime pas (aperçu avant impression d'un visiteur sans compte).
+- [ ] **Téléphone.** Sur un téléphone, la fenêtre tient dans l'écran et « Se connecter » est atteignable au pouce ; après la connexion on
+      revient sur l'annuaire.
+
