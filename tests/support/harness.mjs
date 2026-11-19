@@ -42,6 +42,8 @@ window.__fake = createFakeGrist({
   denyWrites: () => window.__denyWrites,
   denyRows: () => window.__denyRows,
   denyStructure: () => window.__denyStructure,
+  denyListTables: () => window.__denyListTables,
+  denyReads: () => window.__denyReads,
   delay: () => window.__delay,
   readGate: () => window.__readGate,
   accessToken: () => window.__accessToken
@@ -156,8 +158,10 @@ export async function createHarness({ keepScrollbars = false } = {}) {
     server?.close();
   });
 
-  // `user` : l'adresse de la personne connectée (null : compte anonyme) ; `readOnly` :
-  // le cadre d'un compte Lecteur (?readonly=true) ; `denyRows` : { table: [identifiants] } ; `denyStructure` : vrai, Grist refuse de changer
+  // `user` : l'adresse de la personne connectée. Sans valeur, c'est l'adresse de la première fiche de `BDD` : depuis la 1.45.2
+  // l'annuaire est fermé à un compte que le widget n'identifie pas, et la plupart des tests lisent les cartes (`null` : aucun compte, l'écran
+  // « Compte non reconnu ») ; `readOnly` :
+  // le cadre d'un compte Lecteur (?readonly=true) ; `denyRows` : { table: [identifiants] } ; `denyReads` : les tables que Grist refuse de lire (règle d'accès) ; `denyListTables` : vrai, Grist refuse la liste des tables (la règle par défaut « tout refusé sauf au propriétaire ») ; `denyStructure` : vrai, Grist refuse de changer
   // la structure du document (un éditeur sans ce droit : AddTable, AddColumn…).
   // Les logos sont des pièces jointes : `files` (tests/support/fake-attachments.mjs) compte les
   // fichiers qui ont été téléchargés et les jetons employés ; `accessToken` est la réponse de
@@ -173,10 +177,12 @@ export async function createHarness({ keepScrollbars = false } = {}) {
   // pas (réseau coupé, pare-feu, extension), `window.grist` n'existe pas. `search` : ce qui suit le « ? » de l'adresse du widget
   // (`page=7`, comme Antoine l'écrit dans l'adresse du widget de son document).
   async function openWidget({
-    tables = sampleTables(), failTables = [], user = null, denyWrites = [], denyRows = {}, denyStructure = false, delay = 0, readOnly = false,
+    tables = sampleTables(), failTables = [], user = undefined, denyWrites = [], denyRows = {}, denyStructure = false, denyListTables = false, denyReads = [], delay = 0, readOnly = false,
     accessToken, withoutMethods = [], downloadCors = true, downloadHold = false, downloadFirst = null, initScript = null,
     contextOptions = {}, holdReads = false, apiBlocked = false, search = ''
   } = {}) {
+    // Sans `user`, la personne connectée est la première fiche du document : elle y figure, donc l'annuaire s'ouvre pour elle (voir plus haut).
+    if (user === undefined) user = tables?.BDD?.email?.find(Boolean) ?? null;
     const context = await browser.newContext(contextOptions);
     // Hermétique : seuls le serveur local, l'API Grist simulée et ses pièces jointes répondent.
     await context.route(url => !['127.0.0.1', 'docs.getgrist.com'].includes(url.hostname), route => route.abort());
@@ -227,11 +233,13 @@ export async function createHarness({ keepScrollbars = false } = {}) {
       window.__denyWrites = values.denyWrites;
       window.__denyRows = values.denyRows;
       window.__denyStructure = values.denyStructure;
+      window.__denyListTables = values.denyListTables;
+      window.__denyReads = values.denyReads;
       window.__delay = values.delay;
       window.__readGate = values.holdReads ? new Promise(resolve => { window.__releaseReads = resolve; }) : null;
       window.__accessToken = values.accessToken;
       window.__withoutMethods = values.withoutMethods;
-    }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, denyStructure, delay, accessToken, withoutMethods, holdReads });
+    }, { tables, failTables, user: user && { email: user }, denyWrites, denyRows, denyStructure, denyListTables, denyReads, delay, accessToken, withoutMethods, holdReads });
     if (initScript) await page.addInitScript(initScript);
     // Le widget lit Grist dès son démarrage : ses cartes et leurs logos sont dans la page avant l'événement « load », qui attend les
     // images. Quand un fichier est retenu ou ne reçoit jamais de réponse, il ne viendrait pas : la navigation n'attend alors que le document.

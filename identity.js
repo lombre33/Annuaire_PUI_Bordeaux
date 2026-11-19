@@ -30,6 +30,16 @@ const isAnonymousEmail = email => normalizeEmail(email) === ANONYMOUS_EMAIL;
 // Ce que Grist répond quand une règle d'accès refuse une écriture : « Blocked by table create access rules ».
 const ACCESS_REFUSED = /blocked by .*access rules/i;
 
+// Une erreur de Grist (ou celle qui l'enveloppe : `cause`) dit-elle qu'une règle d'accès a refusé la lecture ou l'écriture ?
+export function isAccessRefused(error) {
+  for (let current = error, depth = 0; current && depth < 4; current = current.cause, depth += 1) {
+    if (ACCESS_REFUSED.test(String(current?.message ?? current))) return true;
+  }
+  return false;
+}
+// Ce que Grist (ou le faux Grist des tests) répond à une écriture dans une table qui n'existe pas.
+const MISSING_TABLE = /keyerror|invalid table|table .*(not found|inconnue|introuvable|does not exist)|no such table/i;
+
 // La table-sonde telle que GRIST_SETUP.md (étape 2) la décrit. Chaque colonne est une colonne de DONNÉES
 // (`isFormula: false`) dont `formula` est une formule de déclenchement : sans `recalcWhen` ni `recalcDeps`,
 // Grist ne la calcule qu'à la création d'une ligne, avec l'identité de qui la crée.
@@ -100,8 +110,15 @@ export async function readIdentity(docApi, { readOnly = false, log = console, cl
   let rowId = null;
   let older = []; // les lignes à l'adresse de la personne qu'un chargement précédent a laissées
   try {
-    const tables = await docApi.listTables();
-    if (!tables.includes(PROBE_TABLE)) {
+    // La liste des tables (_grist_Tables) est refusée à qui les règles d'accès privent de la lecture par défaut (« tout refusé sauf au propriétaire ») :
+    // le widget ne sait alors pas si la sonde existe, et l'essaie directement (1.45.2, constaté dans un Grist local par le fil des permissions).
+    let tables = null;
+    try {
+      tables = await docApi.listTables();
+    } catch (error) {
+      log.info(`[IDENTITE] la liste des tables est illisible pour ce compte (${error?.message || error}) : la table ${PROBE_TABLE} est essayée directement.`);
+    }
+    if (tables && !tables.includes(PROBE_TABLE)) {
       const failure = await createProbeTable(docApi, log);
       if (failure?.refused) return reportAnonymous(log, failure.reason);
       if (failure) return reportUnavailable(log, failure.reason);
@@ -110,8 +127,16 @@ export async function readIdentity(docApi, { readOnly = false, log = console, cl
     try {
       added = await docApi.applyUserActions([['AddRecord', PROBE_TABLE, null, {}]]);
     } catch (error) {
-      if (!ACCESS_REFUSED.test(String(error?.message || error))) throw error;
-      return reportAnonymous(log, `Grist refuse la ligne de ${PROBE_TABLE} (${error?.message || error})`, 'règle d\'accès : la ligne de la sonde est refusée');
+      const detail = String(error?.message || error);
+      if (ACCESS_REFUSED.test(detail)) {
+        return reportAnonymous(log, `Grist refuse la ligne de ${PROBE_TABLE} (${detail})`, 'règle d\'accès : la ligne de la sonde est refusée');
+      }
+      // Sans liste des tables, une table absente se reconnaît à la réponse de Grist ; elle est alors créée, comme avec la liste.
+      if (tables || !MISSING_TABLE.test(detail)) throw error;
+      const failure = await createProbeTable(docApi, log);
+      if (failure?.refused) return reportAnonymous(log, failure.reason);
+      if (failure) return reportUnavailable(log, failure.reason);
+      added = await docApi.applyUserActions([['AddRecord', PROBE_TABLE, null, {}]]);
     }
     rowId = added?.retValues?.[0];
     if (!Number.isInteger(rowId)) {

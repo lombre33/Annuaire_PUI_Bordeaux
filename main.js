@@ -12,13 +12,13 @@
 // login-ui.js (la fenêtre de connexion d'un visiteur sans compte), gate.js et gate-ui.js (qui voit l'annuaire : seulement qui y figure, 1.45.0),
 // requests.js et requests-ui.js (les fiches créées par les personnes elles-mêmes, que les administrateurs valident ou refusent).
 
-import { CATEGORIES, CONSENT_COLUMN, DOCS_URL, ETABLISSEMENT_NAMES, LOGIN_AUTO_OPEN, RESPONSIBLE_COLUMN, SEARCH_DELAY_MS, VERSION } from './constants.js';
+import { CATEGORIES, CONSENT_COLUMN, DOCS_URL, ETABLISSEMENT_NAMES, IDENTITY_WAIT_MS, LOGIN_AUTO_OPEN, RESPONSIBLE_COLUMN, SEARCH_DELAY_MS, VERSION } from './constants.js';
 import { loadDirectory, describeLoadFailure, debounce, filterableRoles, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
 import { createEmptyFilterState, describeEmptyResults, filterContacts, countInScope, pruneStaleFilters, computeFilterCounts, toggleGroup } from './filters.js';
 import { closeFilterMenus, createFilterUI, updateFilterUI, updateFilterCounts } from './filter-menus.js';
 import { attachTagNavigation, attachTagNotes, focusFirstResult, keepFocus, renderCards, renderPreviewCard, initials } from './render.js';
 import { createScrollTools } from './scroll-tools.js';
-import { readIdentity, isReadOnlyAddress } from './identity.js';
+import { readIdentity, isReadOnlyAddress, isAccessRefused } from './identity.js';
 import { findLoginUrl } from './login.js';
 import { createLoginPrompt } from './login-ui.js';
 import { createPendingColumn, createResponsibleColumn } from './schema.js';
@@ -118,7 +118,10 @@ const state = {
   // dire à un administrateur si l'adresse d'une demande est celle de l'établissement choisi.
   etablissementRows: [],
   // Qui voit l'annuaire (gate.js) : { open: true }, ou l'écran qui le remplace pour une personne qui n'y figure pas encore.
-  gate: { open: true }
+  gate: { open: true },
+  // La dernière lecture de l'annuaire a échoué (1.45.2), et `directoryRefused` : une règle d'accès l'a refusée : l'écran le dit plutôt que d'attendre une lecture qui ne vient pas.
+  directoryFailed: false,
+  directoryRefused: false
 };
 
 // Le bandeau d'état (rouge) et l'écran « Aucun contact » (status-ui.js).
@@ -426,10 +429,15 @@ function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissem
 // Références en texte, alors que fetchTable() renvoie la table complète, les
 // Références en identifiants.
 async function reloadDirectory() {
+  // Un visiteur sans compte ne verra pas l'annuaire (gate.js) et Grist le lui refuse d'ordinaire : le lire ne ferait qu'ajouter un bandeau d'erreur
+  // derrière la fenêtre de connexion (1.45.2).
+  if (state.identity?.status === 'anonymous') return 'stale';
   const requestId = recordsSequencer.next();
   try {
     const directory = await loadDirectory(window.grist.docApi, { previousMaps: state.referenceMaps });
     if (!recordsSequencer.isLatest(requestId)) return 'stale'; // une invocation plus récente a démarré : résultat périmé
+    state.directoryFailed = false;
+    state.directoryRefused = false;
     applyDirectory(directory);
     statusBanner.show(directory.issues);
     return 'applied';
@@ -437,6 +445,10 @@ async function reloadDirectory() {
     if (!recordsSequencer.isLatest(requestId)) return 'stale';
     console.error('Erreur dans le traitement des contacts:', error);
     showLoadError(error);
+    // Sans annuaire lu, un compte qui n'est ni administrateur ni responsable lit « Annuaire illisible » au lieu d'un écran qui attend (gate.js, 1.45.2).
+    state.directoryFailed = true;
+    state.directoryRefused = isAccessRefused(error);
+    refreshGate();
     return 'failed';
   }
 }
@@ -499,19 +511,31 @@ function ensureColumns() {
 // décident (GRIST_SETUP.md).
 function refreshGate() {
   const gate = gatePanel
-    ? describeGate({ identity: state.identity, people: state.people, etablissementRows: state.etablissementRows })
+    ? describeGate({ identity: state.identity, people: state.people, etablissementRows: state.etablissementRows, directoryFailed: state.directoryFailed, directoryRefused: state.directoryRefused })
     : { open: true };
   state.gate = gate;
   if (gate.open) {
     gatePanel?.hide();
     return;
   }
-  warnOnce(`gate-${gate.kind}`, `[IDENTITE] L'annuaire n'est pas montré à cette personne (${gate.kind}) : elle n'y figure pas encore (GRIST_SETUP.md, règles d'accès).`);
+  // « checking » n'est qu'une attente : la console ne dit rien. Les autres écrans disent pourquoi l'annuaire est fermé (fermé par défaut, 1.45.2).
+  if (gate.kind !== 'checking') {
+    warnOnce(`gate-${gate.kind}`, `[IDENTITE] L'annuaire n'est pas montré à cette personne (${gate.kind}${identityReason()}) : voir GRIST_SETUP.md, règles d'accès.`);
+  }
   gatePanel.show(gate);
+  accountBar.hide(); // ni bandeau ni place réservée sous un écran fermé : l'écran dit déjà où en est la personne
+  if (gate.kind === 'anonymous') statusBanner.show([]); // une lecture ratée avant que l'identité soit connue : le bandeau d'erreur n'a plus de raison d'être
   elements.grid.replaceChildren();
   elements.grid.removeAttribute('aria-busy');
   emptyState.hide();
   elements.resultCount.textContent = gate.count;
+}
+refreshGate(); // dès l'ouverture : l'annuaire est fermé tant que l'identité n'est pas lue
+
+// Pourquoi l'identité n'a pas pu être lue, pour la ligne de console de refreshGate (jamais l'adresse : elle ne va pas dans la console).
+function identityReason() {
+  const reason = state.identity?.reason;
+  return reason && state.identity.status !== 'ready' ? ` ; identité : ${reason}` : '';
 }
 
 // Les établissements dont la personne connectée est responsable (identifiants de ligne).
@@ -660,7 +684,16 @@ function applyIdentity(identity) {
   if (identity.status === 'anonymous') offerLogin(); // un visiteur sans compte : la fenêtre qui mène à la connexion de Grist
 }
 
-readIdentity(window.grist.docApi, { readOnly: READ_ONLY }).then(applyIdentity);
+// Fermé par défaut (1.45.2) : tant que l'identité n'est pas lue, l'annuaire reste derrière l'écran « Vérification de votre accès ». Une réponse de Grist
+// qui ne vient jamais ne doit pas le laisser là pour toujours : passé IDENTITY_WAIT_MS, la personne est « non reconnue » (écran qui le dit) ; si
+// l'identité arrive ensuite, elle prend la place.
+const identityTimer = setTimeout(() => {
+  if (!state.identity) applyIdentity({ status: 'unavailable', email: '', admin: false, etablissements: [], reason: 'Grist n\'a pas répondu à temps' });
+}, IDENTITY_WAIT_MS);
+readIdentity(window.grist.docApi, { readOnly: READ_ONLY }).then(identity => {
+  clearTimeout(identityTimer);
+  applyIdentity(identity);
+});
 
 // ===== Modifier une fiche =====
 

@@ -15,9 +15,41 @@ async function gateFor(identity, tables = withValidation(withIdentity())) {
 }
 const ready = (email, extra = {}) => ({ status: 'ready', email, admin: false, etablissements: [], ...extra });
 
-test('nothing is closed before the identity is read, or for a reader or a document without probe (the widget cannot tell who they are)', async () => {
-  assert.deepEqual(await gateFor(null), { open: true });
-  for (const status of ['viewer', 'unavailable']) assert.deepEqual(await gateFor({ status }), { open: true });
+test('closed by default: nothing is shown before the identity is read, nor to a reader, nor to an account the widget could not identify', async () => {
+  const checking = await gateFor(null);
+  assert.equal(checking.open, false);
+  assert.equal(checking.kind, 'checking');
+  assert.equal(checking.title, 'Vérification de votre accès');
+  assert.equal(checking.count, 'Vérification…');
+  const reader = await gateFor({ status: 'viewer' });
+  assert.equal(reader.open, false);
+  assert.equal(reader.kind, 'readonly');
+  assert.match(reader.text, /lecture seule/);
+  const unknown = await gateFor({ status: 'unavailable', reason: 'lecture impossible' });
+  assert.equal(unknown.open, false);
+  assert.equal(unknown.kind, 'unidentified');
+  assert.equal(unknown.title, 'Compte non reconnu');
+  assert.match(unknown.text, /n’a pas pu lire quel est votre compte/);
+  // Un statut que le widget ne connaît pas est refusé de la même façon : jamais ouvert à l'aveugle.
+  assert.equal((await gateFor({ status: 'whatever' })).kind, 'unidentified');
+});
+
+test('an identified account waits for the directory, and is told when Grist refuses to give it', async () => {
+  const waiting = describeGate({ identity: ready(NEW_EMAIL), people: null, etablissementRows: [] });
+  assert.equal(waiting.open, false);
+  assert.equal(waiting.kind, 'checking');
+  const refused = describeGate({ identity: ready(NEW_EMAIL), people: null, etablissementRows: [], directoryFailed: true, directoryRefused: true });
+  assert.equal(refused.open, false);
+  assert.equal(refused.kind, 'unreadable');
+  assert.equal(refused.title, 'Annuaire illisible');
+  // Une panne (Grist indisponible, colonne absente) n'est pas un refus : l'écran le dit, le bandeau d'état offre « Réessayer ».
+  const failed = describeGate({ identity: ready(NEW_EMAIL), people: null, etablissementRows: [], directoryFailed: true });
+  assert.equal(failed.open, false);
+  assert.equal(failed.kind, 'loadfailed');
+  assert.equal(failed.count, 'Chargement impossible');
+  // Un administrateur ou un responsable d'établissement n'attend pas la lecture de l'annuaire pour être reconnu.
+  assert.deepEqual(describeGate({ identity: ready(ADMIN_EMAIL, { admin: true }), people: null, etablissementRows: [] }), { open: true });
+  assert.deepEqual(describeGate({ identity: ready('responsable@example.test', { etablissements: [1] }), people: null, etablissementRows: [], directoryFailed: true }), { open: true });
 });
 
 test('a visitor without an account gets the sign-in screen, even before the directory is read', () => {
@@ -78,7 +110,13 @@ test('without the column of domains the widget cannot tell, and the directory st
   assert.equal(gate.title, 'Vérification impossible');
 });
 
-test('a document with no « email » column in BDD is not judged (the widget cannot find anyone)', () => {
+test('a document whose BDD has no « email » column for this account cannot find anyone: closed, and the screen says why', () => {
   const people = { hasEmailColumn: false, findByEmail: () => [] };
-  assert.deepEqual(describeGate({ identity: ready(NEW_EMAIL), people, etablissementRows: [] }), { open: true });
+  const gate = describeGate({ identity: ready(NEW_EMAIL), people, etablissementRows: [] });
+  assert.equal(gate.open, false);
+  assert.equal(gate.kind, 'noemail');
+  assert.equal(gate.title, 'Vérification impossible');
+  assert.match(gate.text, /colonne « email »/);
+  // Un administrateur, lui, reste reconnu par la sonde.
+  assert.deepEqual(describeGate({ identity: ready(ADMIN_EMAIL, { admin: true }), people, etablissementRows: [] }), { open: true });
 });

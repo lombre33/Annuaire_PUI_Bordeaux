@@ -16,6 +16,7 @@ export function createGatePanel(root, { onCreate }) {
       text.textContent = gate.text;
       action.hidden = gate.kind !== 'create';
       root.dataset.kind = gate.kind;
+      root.setAttribute('aria-busy', String(gate.kind === 'checking'));
       root.hidden = false;
       document.body.classList.add('gated');
     },
@@ -23,6 +24,7 @@ export function createGatePanel(root, { onCreate }) {
     hide() {
       root.hidden = true;
       delete root.dataset.kind;
+      root.removeAttribute('aria-busy');
       document.body.classList.remove('gated');
     },
 

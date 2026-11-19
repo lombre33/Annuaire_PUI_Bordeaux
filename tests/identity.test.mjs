@@ -448,3 +448,44 @@ test('isReadOnlyAddress is true only when the frame address says readonly=true (
   assert.equal(isReadOnlyAddress(undefined), false);
   assert.equal(isReadOnlyAddress(null), false);
 });
+
+// ===== 1.45.2 : la liste des tables refusée par la règle par défaut =====
+
+test('readIdentity still identifies the person when Grist refuses the list of tables (the default rule « everything refused but to the owner »)', async () => {
+  const s = session(BOB_EMAIL, withIdentity(), { denyListTables: true });
+  const identity = await identify(s);
+  await settle();
+  assert.deepEqual(identity, { status: 'ready', email: BOB_EMAIL, admin: false, etablissements: [2], reason: '' });
+  assert.match(s.log.infos[0][0], /\[IDENTITE\] la liste des tables est illisible pour ce compte \(Blocked by table read access rules\) : la table Annuaire_Sonde est essayée directement/);
+  assert.ok(!JSON.stringify(s.log.infos).includes('@'), 'aucune adresse dans la console');
+  assert.deepEqual(s.calls.map(call => [call.action, call.table]), [['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']], 'aucune table créée');
+});
+
+test('readIdentity creates the probe table once Grist says it is missing, even without the list of tables', async () => {
+  const tables = withIdentity();
+  delete tables.Annuaire_Sonde;
+  const s = session(BOB_EMAIL, tables, { denyListTables: true });
+  const identity = await identify(s);
+  await settle();
+  assert.equal(identity.status, 'ready');
+  assert.equal(identity.email, BOB_EMAIL);
+  assert.deepEqual(s.calls.map(call => [call.action, call.table, call.ok]),
+    [['AddRecord', 'Annuaire_Sonde', false], ['AddTable', 'Annuaire_Sonde', true], ['AddRecord', 'Annuaire_Sonde', true], ['RemoveRecord', 'Annuaire_Sonde', true]]);
+});
+
+test('readIdentity takes a person for a visitor when the probe table is missing, cannot be created, and the list of tables is refused', async () => {
+  const tables = withIdentity();
+  delete tables.Annuaire_Sonde;
+  const s = session(BOB_EMAIL, tables, { denyListTables: true, denyStructure: true });
+  const identity = await identify(s);
+  assert.equal(identity.status, 'anonymous');
+  assert.match(identity.reason, /Annuaire_Sonde.*introuvable/);
+});
+
+test('readIdentity does not mistake another failure of the probe row for a missing table when the list of tables is refused', async () => {
+  const s = session(BOB_EMAIL, withIdentity(), { denyListTables: true });
+  s.docApi.applyUserActions = async () => { throw new Error('Grist indisponible'); };
+  const identity = await identify(s);
+  assert.equal(identity.status, 'unavailable');
+  assert.match(identity.reason, /Grist indisponible/);
+});

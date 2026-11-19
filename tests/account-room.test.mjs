@@ -1,7 +1,7 @@
 // Le bandeau « Ma présence » garde sa place (1.35.0, audit UI/UX U50). La personne connectée n'est connue qu'après une écriture dans la
-// table-sonde ; quand elle arrive après les cartes, le bandeau les repoussait (jusqu'à 172 px sur un téléphone). Il leur réserve
-// maintenant sa place dès le départ avec une copie grisée de lui-même (account-ui.js). Chaque test échoue sur le code de la 1.34.0, sauf les
-// gardes qui disent ce qui ne change pas (un compte Lecteur n'a jamais de bandeau, donc rien à réserver).
+// table-sonde ; quand elle arrivait après les cartes, le bandeau les repoussait (jusqu'à 172 px sur un téléphone). Il leur réservait donc sa
+// place dès le départ avec une copie grisée de lui-même (account-ui.js). Depuis la 1.45.2 l'annuaire est fermé tant que l'identité n'est pas
+// lue : les cartes et le bandeau arrivent ensemble, et la copie grisée ne se montre plus sous l'écran d'attente (gate.js).
 //
 // Les tests chargent le vrai index.html dans Chromium (optionnel : voir TESTING.md). La sonde est ralentie (`delay`) : l'identité arrive
 // bien après les cartes, comme dans un Grist lent.
@@ -32,44 +32,25 @@ const placeOfBar = page => page.evaluate(() => {
 const barArrived = page => page.waitForFunction(() => !document.getElementById('accountBar').hidden);
 const resizeTo = (page, width) => page.setViewportSize({ width, height: 900 });
 
-test('la première carte ne bouge pas quand le bandeau arrive après elle, à toutes les largeurs (audit U50)', { skip }, () =>
-  withWidget({ tables: sampleTables(), user: ANA_EMAIL, delay: SLOW_PROBE, contextOptions: VIEWPORT(1280) }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const waiting = {};
-    for (const width of WIDTHS) {
-      await resizeTo(page, width);
-      waiting[width] = await placeOfBar(page);
-      assert.equal(waiting[width].real, 0, `${width} px : le vrai bandeau n'est pas encore là`);
-      assert.ok(waiting[width].room >= 70, `${width} px : la copie grisée tient la place (${waiting[width].room} px)`);
-    }
+test('l\'annuaire est fermé tant que l\'identité n\'est pas lue : ni carte, ni bandeau, ni place réservée ; puis la carte et le bandeau arrivent ensemble et rien ne bouge (audit U50)', { skip }, () =>
+  withWidget({ tables: sampleTables(), user: ANA_EMAIL, delay: SLOW_PROBE, contextOptions: VIEWPORT(390) }, async ({ page }) => {
+    await page.locator('#gatePanel[data-kind="checking"]').waitFor();
+    const waiting = await placeOfBar(page);
+    assert.deepEqual({ real: waiting.real, room: waiting.room, top: waiting.top }, { real: 0, room: 0, top: null }, 'sous « Vérification de votre accès » : aucune carte, aucun bandeau, aucune copie grisée');
     await barArrived(page);
-    for (const width of WIDTHS) {
-      await resizeTo(page, width);
-      const arrived = await placeOfBar(page);
-      assert.equal(arrived.room, 0, `${width} px : la copie a disparu`);
-      assert.equal(arrived.real, waiting[width].room, `${width} px : la copie a la hauteur du vrai bandeau`);
-      assert.equal(arrived.top, waiting[width].top, `${width} px : la première carte est restée où elle était`);
-    }
+    await waitForCards(page, 4);
+    const arrived = await placeOfBar(page);
+    assert.ok(arrived.real >= 70, 'le vrai bandeau est là');
+    assert.equal(arrived.room, 0);
+    await page.waitForTimeout(400);
+    assert.deepEqual(await placeOfBar(page), arrived, 'et rien ne bouge ensuite');
   }));
 
-test('la copie qui garde la place n\'est ni lue ni atteignable, et le bandeau n\'est jamais en double (audit U50)', { skip }, () =>
+test('pendant l\'attente, un lecteur d\'écran ne trouve ni interrupteur ni région « Ma présence » ; le bandeau arrivé n\'est jamais en double (audit U50)', { skip }, () =>
   withWidget({ tables: sampleTables(), user: ANA_EMAIL, delay: SLOW_PROBE }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const room = await page.evaluate(() => {
-      const copy = document.querySelector('.account-bar[data-pending]');
-      return {
-        id: copy.id,
-        hiddenFromReaders: copy.getAttribute('aria-hidden'),
-        label: copy.getAttribute('aria-label'),
-        inert: copy.inert,
-        reachable: [...copy.querySelectorAll('button')].filter(button => { button.focus(); return document.activeElement === button; }).length,
-        text: copy.textContent.trim()
-      };
-    });
-    assert.deepEqual({ ...room, text: '' }, { id: '', hiddenFromReaders: 'true', label: null, inert: true, reachable: 0, text: '' });
-
+    await page.locator('#gatePanel[data-kind="checking"]').waitFor();
     const tree = await accessibilityTree(page);
-    assert.equal(accessibleNode(tree, 'switch', 'Apparaître dans l\'annuaire'), undefined, 'un lecteur d\'écran ne voit pas l\'interrupteur de la copie');
+    assert.equal(accessibleNode(tree, 'switch', 'Apparaître dans l\'annuaire'), undefined, 'pas d\'interrupteur');
     assert.equal(accessibleNode(tree, 'button', 'Modifier mon profil'), undefined, 'ni son bouton');
     assert.equal(tree.filter(node => node.role === 'region' && /présence/i.test(node.name)).length, 0, 'ni une région « Ma présence » : le vrai bandeau n\'est pas encore là');
 
@@ -79,23 +60,20 @@ test('la copie qui garde la place n\'est ni lue ni atteignable, et le bandeau n\
     assert.equal(after.filter(node => node.role === 'region' && /présence/i.test(node.name)).length, 1, 'et une seule région « Ma présence »');
   }));
 
-test('un compte Lecteur n\'a jamais de bandeau : rien n\'est réservé, rien ne s\'affiche puis disparaît (garde)', { skip }, () =>
+test('un compte Lecteur n\'a jamais de bandeau et lit « Compte en lecture seule » : rien n\'est réservé, rien ne s\'affiche puis disparaît', { skip }, () =>
   withWidget({ tables: sampleTables(), user: ANA_EMAIL, readOnly: true, delay: SLOW_PROBE, contextOptions: VIEWPORT(390) }, async ({ page }) => {
-    await waitForCards(page, 4);
+    await page.locator('#gatePanel[data-kind="readonly"]').waitFor();
     const before = await placeOfBar(page);
-    assert.deepEqual({ real: before.real, room: before.room, copies: before.copies }, { real: 0, room: 0, copies: 1 }, 'ni bandeau ni copie');
+    assert.deepEqual({ real: before.real, room: before.room, top: before.top }, { real: 0, room: 0, top: null }, 'ni bandeau ni copie, ni carte');
     await page.waitForTimeout(400);
     assert.deepEqual(await placeOfBar(page), before, 'et rien ne bouge ensuite');
   }));
 
-test('si personne n\'est identifié, la place réservée est rendue (audit U50) et le bandeau ne paraît pas', { skip }, () =>
+test('si personne n\'est identifié, la place réservée est rendue (audit U50), le bandeau ne paraît pas et l\'annuaire reste fermé', { skip }, () =>
   withWidget({ tables: sampleTables(), user: null, delay: 700, contextOptions: VIEWPORT(390) }, async ({ page }) => {
-    await waitForCards(page, 4);
-    const waiting = await placeOfBar(page);
-    assert.ok(waiting.room > 0, 'en attendant l\'identité, la place est tenue');
-    await page.waitForFunction(() => document.querySelector('.account-bar[data-pending]').hidden);
+    await page.locator('#gatePanel[data-kind="unidentified"]').waitFor();
     const settled = await placeOfBar(page);
-    assert.deepEqual({ real: settled.real, room: settled.room }, { real: 0, room: 0 }, 'compte anonyme : pas de bandeau, pas de place gardée');
+    assert.deepEqual({ real: settled.real, room: settled.room, top: settled.top }, { real: 0, room: 0, top: null }, 'compte non reconnu : pas de bandeau, pas de place gardée, pas de carte');
   }));
 
 test('si l\'annuaire ne se charge pas, la place du bandeau n\'est pas gardée sous le message d\'erreur (audit U50)', { skip }, () =>

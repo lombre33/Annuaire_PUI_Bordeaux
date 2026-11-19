@@ -114,8 +114,9 @@ test('personne d’autre n’a de bouton d’établissement : ni une personne sa
   const cases = [
     ['une personne qui n’est responsable de rien', { user: IRIS_EMAIL }],
     ['un administrateur sans établissement, même en mode admin', { user: ADMIN_EMAIL, adminMode: true }],
-    ['un compte anonyme', { user: null }],
-    ['un compte Lecteur', { user: ANA_EMAIL, readOnly: true }],
+    // Depuis la 1.45.2 ils ne voient pas non plus l'annuaire : l'écran réservé remplace les cartes.
+    ['un compte anonyme', { user: null, closed: true }],
+    ['un compte Lecteur', { user: ANA_EMAIL, readOnly: true, closed: true }],
     // Depuis la 1.45.0, une adresse inconnue ne voit pas l'annuaire : l'écran réservé remplace les cartes (gate.js).
     ['une adresse inconnue de l’annuaire et d’ACL', { user: 'inconnu@exemple.example', closed: true }]
   ];

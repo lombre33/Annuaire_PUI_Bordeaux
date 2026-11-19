@@ -28,7 +28,7 @@ const marks = page => page.evaluate(() => [...document.querySelectorAll('.contac
 const kept = list => list.filter(mark => mark !== null);
 
 test('chercher puis effacer la recherche rend les mêmes cartes, sans les reconstruire', { skip }, () =>
-  withWidget({ tables: crowd(), user: null }, async ({ page }) => {
+  withWidget({ tables: crowd() }, async ({ page }) => {
     await waitForCards(page, ALL_CARDS);
     await markCards(page);
     const before = await marks(page);
@@ -46,7 +46,7 @@ test('chercher puis effacer la recherche rend les mêmes cartes, sans les recons
   }));
 
 test('un filtre, l\'interrupteur Partenaires et « Réinitialiser » réutilisent aussi les cartes', { skip }, () =>
-  withWidget({ tables: crowd(), user: null }, async ({ page }) => {
+  withWidget({ tables: crowd() }, async ({ page }) => {
     await waitForCards(page, ALL_CARDS);
     await markCards(page);
     await page.locator('.scope-btn[data-scope="partenaire"]').click();
@@ -66,7 +66,7 @@ test('un filtre, l\'interrupteur Partenaires et « Réinitialiser » réutilisen
   }));
 
 test('une relecture de Grist reconstruit toutes les cartes : elles montrent les données nouvelles', { skip }, () =>
-  withWidget({ tables: crowd(), user: null }, async ({ page }) => {
+  withWidget({ tables: crowd() }, async ({ page }) => {
     await waitForCards(page, ALL_CARDS);
     await markCards(page);
     await changeFonction(page, { row: 0, name: 'Ana', fonction: 'Cheffe de pôle' });
@@ -93,24 +93,21 @@ test('les droits de la personne connectée : seules les cartes dont les droits c
     assert.equal(kept(now).length, 1, 'les autres, de nouveau reconstruites, sans bouton');
   }));
 
-test('une identité qui arrive après les cartes : seules les cartes concernées sont refaites, avec le bouton de l\'établissement', { skip }, () =>
-  // Une écriture lente (celle de la sonde) retarde l'identité de la personne : les cartes sont déjà dessinées quand elle arrive.
+test('fermé par défaut (1.45.2) : aucune carte avant l\'identité, puis les cartes de l\'établissement dont la personne est responsable naissent avec leur bouton', { skip }, () =>
+  // Une écriture lente (celle de la sonde) retarde l'identité de la personne : jusqu'à son arrivée, l'annuaire reste fermé et aucune carte n'est dessinée,
+  // donc aucune carte n'est refaite ensuite pour recevoir son bouton.
   withWidget({ tables: crowdWithAna(), user: ANA_EMAIL, delay: 1200 }, async ({ page }) => {
-    await waitForCards(page, ALL_CARDS);
     const buttons = page.locator('#cardsGrid .etab-edit');
-    assert.equal(await buttons.count(), 0, 'l\'identité n\'est pas encore arrivée : aucun bouton sous les logos');
-    await markCards(page);
-    const ginaIndex = (await page.locator('.contact-card .name').allTextContents()).findIndex(name => name.includes('Gina'));
-
+    assert.equal(await page.locator('#cardsGrid .contact-card').count(), 0, 'l\'identité n\'est pas encore arrivée : aucune carte');
+    await waitForCards(page, ALL_CARDS);
     // Ana est responsable du CHU : « ✎ Modifier » sous le logo des 63 cartes du CHU, pas sous celui de Gina (Bergonié).
-    await until(async () => (await buttons.count()) === ALL_CARDS - 1, 'le bouton de l\'établissement apparaît sur les cartes déjà dessinées');
-    const now = await marks(page);
-    assert.equal(now[ginaIndex], ginaIndex, 'la carte de Gina, dont rien ne change, est gardée');
-    assert.equal(kept(now).length, 1, 'les 63 cartes du CHU sont refaites avec leur bouton');
+    await until(async () => (await buttons.count()) === ALL_CARDS - 1, 'le bouton de l\'établissement est là dès que les cartes le sont');
+    const ginaIndex = (await page.locator('.contact-card .name').allTextContents()).findIndex(name => name.includes('Gina'));
+    assert.equal(await page.locator('.contact-card').nth(ginaIndex).locator('.etab-edit').count(), 0, 'la carte de Gina (Bergonié) n\'a pas de bouton');
   }));
 
 test('renderCards reconstruit une carte dès que l\'un de ses ingrédients change (gabarit, onToggle, droits, jeton, logo, droit sur l\'établissement), et seulement alors', { skip }, () =>
-  withWidget({ tables: withBranding(sampleTables()), user: null }, async ({ page }) => {
+  withWidget({ tables: withBranding(sampleTables()) }, async ({ page }) => {
     await waitForCards(page, 4);
     // On appelle renderCards() avec les modules de la page, sur une grille à part, et on compte les cartes qui ne sont plus celles du
     // dessin précédent. Un geste du widget ne change pas ces ingrédients sans changer aussi le contact : c'est le contrat de
@@ -168,7 +165,7 @@ test('renderCards reconstruit une carte dès que l\'un de ses ingrédients chang
   }));
 
 test('une rafale d\'éditions dans Grist n\'entraîne qu\'une relecture, 250 ms après la dernière, et les cartes montrent la donnée de la fin', { skip }, () =>
-  withWidget({ tables: crowd(), user: null }, async ({ page }) => {
+  withWidget({ tables: crowd() }, async ({ page }) => {
     await waitForCards(page, ALL_CARDS);
     const reads = () => page.evaluate(() => window.__bddReads);
     await page.evaluate(() => {
@@ -192,7 +189,7 @@ test('une rafale d\'éditions dans Grist n\'entraîne qu\'une relecture, 250 ms 
   }));
 
 test('les cartes hors de l\'écran sont différées par le navigateur, celles de l\'écran ne le sont pas', { skip }, () =>
-  withWidget({ tables: crowd(), user: null }, async ({ page }) => {
+  withWidget({ tables: crowd() }, async ({ page }) => {
     await waitForCards(page, ALL_CARDS);
     // Ce que le navigateur diffère, c'est l'intérieur de la carte : la carte, elle, a sa place dans la grille.
     const skipped = index => page.locator('.contact-card').nth(index).evaluate(card =>
@@ -230,7 +227,7 @@ test('les deux cartes de la relecture ne sont pas différées : la colonne « Av
   }));
 
 test('au clavier, Tab atteint toutes les cartes, celles que le navigateur différait comprises', { skip, timeout: 120000 }, () =>
-  withWidget({ tables: withClones(sampleTables(), 30), user: null }, async ({ page }) => {
+  withWidget({ tables: withClones(sampleTables(), 30) }, async ({ page }) => {
     const total = 4 + 30;
     await waitForCards(page, total);
     // Chaque carte a au moins un contrôle au clavier : son établissement est un bouton.

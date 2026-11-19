@@ -2145,3 +2145,27 @@ Grist **sans fiche** dont l'adresse est celle d'un établissement, un compte Gri
       réservé) : l'ajouter à `ACL` avec la case `admin`.
 - [ ] **Console.** Aucune adresse e-mail dans la console, aucune erreur rouge, pendant tout ce qui précède.
 - [ ] **Téléphone.** L'écran réservé et la fenêtre « Demandes à valider » tiennent dans l'écran, sans défilement horizontal.
+
+## 32. L'annuaire fermé par défaut (1.45.2)
+
+Antoine, 19 novembre 2026 : une personne connectée que le widget n'avait pas reconnue voyait l'annuaire, sans « Créer ma fiche ». Depuis la
+1.45.2 le widget le ferme à tout compte qu'il n'a pas identifié et dit pourquoi. **Rien de cela n'a été essayé dans le vrai Grist d'Antoine** ;
+le fil des permissions a seulement joué le widget 1.45.0 dans un Grist local. À passer avec les règles de
+[`GRIST_SETUP.md`](GRIST_SETUP.md) (étape 4) saisies, sur une copie du document :
+
+- [ ] **Un membre** (fiche validée, ni administrateur ni responsable) : « Vérification de votre accès » un instant, puis l'annuaire et le
+      bandeau « Ma présence » arrivent **ensemble** ; aucune carte ne bouge ensuite.
+- [ ] **Compte sans fiche, domaine reconnu** : « Créer ma fiche ». **Domaine non reconnu** : « Annuaire réservé », avec le domaine
+      lu dans la phrase, sans bouton ni carte.
+- [ ] **Compte que les règles empêchent d'écrire dans `Annuaire_Sonde`** : « Compte non reconnu », la console dit `[IDENTITE] L'annuaire n'est
+      pas montré à cette personne (unidentified ; identité : …)` ; aucune carte, aucune erreur rouge.
+- [ ] **Règle par défaut « tout refusé sauf au propriétaire »** : la console dit `la liste des tables est illisible pour ce compte` et le
+      compte est **quand même reconnu** (membre : l'annuaire ; sans fiche : l'écran qui convient).
+- [ ] **Compte Lecteur** (invitation en lecture) : « Compte en lecture seule ».
+- [ ] **Compte hors annuaire à qui les règles ferment `Etablissements` ou une liste de référence** : « Annuaire illisible » avec le bandeau
+      d'erreur ; rouvrir ces tables en lecture à tout compte connecté.
+- [ ] **Visiteur sans compte** (fenêtre privée) : la page **se charge** (en-tête visible), « Annuaire réservé », la fenêtre de connexion ;
+      pas de bandeau rouge derrière elle. Une page entièrement blanche veut dire que les règles refusent `BDD` en bloc à ce visiteur
+      (GRIST_SETUP.md, étape 4, 1.45.2).
+- [ ] **Console.** Aucune adresse e-mail, aucune erreur rouge hors celles que ces cas annoncent.
+

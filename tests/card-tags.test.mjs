@@ -33,7 +33,7 @@ test('une carte montre toutes ses pastilles, sans plafond ni bouton « +N » (au
   }));
 
 test('la carte de relecture d\'une modification n\'a ni barre d\'outils ni pastille dans la tabulation (audit U22, garde)', { skip }, () =>
-  withWidget({ tables: withLongTagLists(), user: null }, async ({ page }) => {
+  withWidget({ tables: withLongTagLists() }, async ({ page }) => {
     await waitForCards(page, 4);
     const preview = await page.evaluate(async () => {
       const { renderPreviewCard } = await import('/render.js');
@@ -211,7 +211,7 @@ test('le lien « Aller aux résultats » est le premier arrêt de la page, cach�
   }));
 
 test('focusFirstResult va au premier contrôle que la tabulation atteint : ni un contrôle caché ni une pastille hors tabulation, et de carte en carte (audit U22)', { skip }, () =>
-  withWidget({ tables: sampleTables(), user: null }, async ({ page }) => {
+  withWidget({ tables: sampleTables() }, async ({ page }) => {
     await waitForCards(page, 4);
     const landed = await page.evaluate(async () => {
       const { focusFirstResult } = await import('/render.js');
