@@ -45,6 +45,7 @@ test('aucun message montré à une personne ne nomme un fichier de documentation
     ['identity.js', /règles d\\'accès de la sonde\s*:\s*la personne doit pouvoir supprimer/],
     ['identity.js', /Si elle est connectée, la règle d\\'accès de la sonde/],
     ['schema.js', /Créez-la à la main, en liste de références/],
+    ['schema.js', /Créez-la à la main, en case à cocher/],
     ['render.js', /\(GRIST_SETUP\.md, étape 5\)\. Autres causes/]
   ];
   const offenders = fs.readdirSync(ROOT).filter(name => name.endsWith('.js') && !['docs-source.js', 'markdown.js', 'markdown-dom.js', 'doc-refs.js'].includes(name))

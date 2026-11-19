@@ -313,6 +313,31 @@ export function withShownEmail(tables = sampleTables()) {
   return copy;
 }
 
+// Le document complété de ce qu'exige la validation des nouvelles fiches (1.45.0) : la colonne `En_attente_validation` de BDD (une case à cocher,
+// fausse pour toutes les fiches existantes : des fiches validées) et la colonne des domaines d'Etablissements, qui donne à chaque établissement le
+// domaine des adresses de l'exemple (le CHU : `chu-bordeaux.example`, etc.). `pending` : { identifiant de ligne de BDD → vrai } pour les
+// demandes en attente.
+export const DOMAIN_COLUMN = ['nom', 'de', 'domaine'].join('_');
+export function withValidation(tables = sampleTables(), { pending = {} } = {}) {
+  const copy = structuredClone(tables);
+  copy.BDD.En_attente_validation = copy.BDD.id.map(id => pending[id] === true);
+  copy.Etablissements[DOMAIN_COLUMN] = ['chu-bordeaux.example', 'u-bordeaux-montaigne.example', 'clinique.example', 'inserm.example', 'bergonie.example'];
+  return copy;
+}
+
+// Une demande en attente de plus dans BDD (une fiche créée par la personne), avec la forme des autres lignes. `values` : ce qui la distingue.
+export function withRequest(tables, values) {
+  const copy = structuredClone(tables);
+  const id = Math.max(...copy.BDD.id) + 1;
+  Object.keys(copy.BDD).forEach(column => {
+    const template = copy.BDD[column].at(-1);
+    copy.BDD[column].push(column in values ? values[column] : Array.isArray(template) ? ['L'] : typeof template === 'boolean' ? false : template === null ? null : typeof template === 'number' ? 0 : '');
+  });
+  copy.BDD.id[copy.BDD.id.length - 1] = id;
+  copy.BDD.En_attente_validation[copy.BDD.id.length - 1] = true;
+  return copy;
+}
+
 // Le document complété des deux tables que le widget lit pour identifier la
 // personne connectée (GRIST_SETUP.md) : ACL, et la table-sonde, vide au repos.
 export function withIdentity(tables = sampleTables()) {

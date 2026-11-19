@@ -91,6 +91,20 @@ export function describeUnknownAccount({ email, admin, emailColumn = true }) {
   };
 }
 
+// Ce que le bandeau dit à la personne dont la seule fiche est une demande en attente de validation (1.45.0) : il n'y a ni interrupteur ni fiche à
+// modifier tant qu'un administrateur ne l'a pas validée. Un administrateur y trouve quand même le « mode admin ».
+export function describePending(person) {
+  return {
+    name: person?.name || 'Ma demande',
+    initials: person?.initials ?? '?',
+    photo: person?.photo ?? 0,
+    accepted: false,
+    switchable: false,
+    tone: 'info',
+    message: 'Votre fiche est en attente de validation par un administrateur : elle apparaîtra dans l\u2019annuaire une fois validée.'
+  };
+}
+
 // Ce que la relecture d'une modification dit d'une fiche absente de l'annuaire : la
 // carte « Après » montre une carte que personne ne verra dans la grille tant que la
 // cause demeure. `status` vient de describeVisibility() ; `own` dit si la fiche est celle
@@ -105,6 +119,10 @@ export function describeUnknownAccount({ email, admin, emailColumn = true }) {
 // la fiche figure dans l'annuaire.
 export function describeHiddenFiche(status, { own, etablissement = '', creating = false, withdrawn = false }) {
   if (status.visible) return '';
+  if (status.pending) {
+    if (creating) return 'Votre fiche sera envoyée à un administrateur, qui doit la valider avant qu\u2019elle apparaisse dans l\u2019annuaire.';
+    return own ? 'Votre fiche est en attente de validation par un administrateur.' : 'Cette fiche est une demande en attente de validation.';
+  }
   if (status.etablissement === 'not_validated' && status.named) {
     return own
       ? 'Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire.'
@@ -122,11 +140,15 @@ export function describeHiddenFiche(status, { own, etablissement = '', creating 
   return `${own ? 'Votre fiche reste masquée' : 'Cette fiche reste masquée'} de l'annuaire${why}.`;
 }
 
-// Ce que la personne lit une fois sa fiche créée. `accepted` : elle a coché « Apparaître dans l'annuaire » ;
-// `status` : describeVisibility() de sa fiche relue dans Grist, null quand elle n'a pas pu l'être. Une fiche
-// publiée apparaît tout de suite ; si quelque chose la retient (son établissement n'a pas validé sa présence),
-// elle existe mais reste masquée, et le message le dit au lieu de promettre qu'elle apparaît.
-export function describeCreated(status, accepted) {
+// Ce que la personne lit une fois sa fiche créée. Depuis la 1.45.0, une fiche créée par la personne est une DEMANDE : elle attend la validation d'un
+// administrateur et n'apparaît pas avant (colonne En_attente_validation). `accepted` : elle a coché « Apparaître dans l'annuaire » ; `status` :
+// describeVisibility() de sa fiche relue dans Grist, null quand elle n'a pas pu l'être. Le message dit d'abord que la demande est envoyée ; une fiche
+// que Grist montre déjà comme validée (un administrateur l'a validée aussitôt) garde les messages d'avant : elle apparaît, ou une cause la retient.
+export function describeCreated(status, accepted, { pending = true } = {}) {
+  if (status?.pending || (!status && pending)) {
+    return 'Votre demande est envoyée : un administrateur doit valider votre fiche, qui apparaîtra ensuite dans l\u2019annuaire'
+      + `${accepted ? '' : ' (une fois l\u2019interrupteur « Apparaître dans l\'annuaire » activé)'}. Revenez plus tard.`;
+  }
   if (!accepted) return 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
   if (!status) return 'Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire.';
   if (status.visible) return 'Votre fiche est publiée : elle apparaît dans l’annuaire.';

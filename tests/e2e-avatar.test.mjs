@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert, { plain } from './support/assert.mjs';
-import { sampleTables, withAvatars, withBranding, withIdentity, withSchema, ANA_EMAIL, IRIS_EMAIL, NEW_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
+import { sampleTables, withAvatars, withBranding, withIdentity, withSchema, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL, HOSTILE_FIRST_NAME } from './fixtures.mjs';
 import {
   assertNoSecretLogged, bddCalls, bddCell, changeFonction, focusReturnsTo, gridCard, openOwn, skip, tokenRequests, toast, until, waitForCards,
   waitForEditButtons, withWidget
@@ -1048,7 +1048,7 @@ async function closeAll(page) {
 }
 
 test('« Créer ma fiche » n\'offre pas la photo, qui s\'ajoute ensuite : la fiche créée n\'a pas de colonne Avatar écrite, et « Modifier mon profil » a la carte', { skip }, () =>
-  withWidget({ tables: world(), user: NEW_EMAIL }, async ({ page, logs }) => {
+  withWidget({ tables: world(), user: ADMIN_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     const create = page.locator('#accountBar .account-create');
     await create.waitFor();

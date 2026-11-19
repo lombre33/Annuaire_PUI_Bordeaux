@@ -229,8 +229,9 @@ Sans dépendance, un fichier de tests par module :
   le lit et non le seul HTML, pour `tests/accessibility-filters.test.mjs` (1.30.0).
 - `tests/constants.test.mjs` — cohérence de la taxonomie (`constants.js`),
   table principale `BDD`, libellé corrigé avant le libellé brut.
-- `tests/rules.test.mjs` — règle du projet : aucun fichier de code ne lit la
-  colonne `nom_de_domaine`.
+- `tests/rules.test.mjs` — règle du projet : seul `constants.js` écrit le nom de la
+  colonne des domaines (exception de la 1.45.0 : celle d'`Etablissements`, en lecture seule),
+  que seuls `domains.js` et `requests.js` importent ; celle de `BDD` n'est jamais lue.
 - `tests/docs.test.mjs` — la documentation ne se périme pas : liens, ancres et images de
   `README.md` et de `docs/`, fichiers et fonctions cités, jeu de données fictif et serveur de
   démonstration, phrases du guide utilisateur, schéma des imports, préfixes de la console et
@@ -347,6 +348,16 @@ jeton refusé) et `tests/e2e-login.test.mjs` (15 scénarios dans Chromium : la f
 chemins et la réouverture, les trois causes d'un visiteur sans compte, une personne connectée sans fenêtre, un cadre en lecture seule, une
 sonde illisible, un jeton refusé, l'impression, un `index.html` ancien, `LOGIN_AUTO_OPEN = false`) ; `tests/identity.test.mjs` y ajoute 7
 scénarios (statut `anonymous`) et `tests/docs.test.mjs` le contrôle de ses protections (aucune requête, jeton jamais gardé).
+
+L'annuaire réservé et les fiches à valider (1.45.0) ont quatre fichiers sans navigateur et un dans Chromium : `tests/domains.test.mjs`
+(`cleanDomain()`, `domainsOf()`, `domainMatches()`, `etablissementsForEmail()` : les formes de la colonne des domaines, les
+sous-domaines, fermé par défaut), `tests/gate.test.mjs` (`describeGate()` : qui voit l'annuaire et chaque écran fermé),
+`tests/requests.test.mjs` (`describeRequests()`, `approveRequest()` et `refuseRequest()` avec le faux Grist : seule la case est
+écrite, la ligne supprimée, une demande déjà traitée, une écriture refusée), `tests/validation.test.mjs` (le modèle de données :
+une demande n'est dans aucune carte, `pendingRequests()`, `createPendingColumn()`) et `tests/e2e-validation.test.mjs` (les écrans, la
+demande de fiche, la pastille et la fenêtre des administrateurs). `tests/profile-save.test.mjs` y ajoute la création en demande
+(domaine relu deux fois, colonne de validation absente, adresse du compte à la lettre) et `tests/rules.test.mjs` la règle du nom de
+colonne.
 
 `tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
 `tests/support/task-role-tables.mjs`) : le rôle écrit dans l'étiquette et lu avec la tâche, la bulle à la souris
@@ -2072,9 +2083,8 @@ en Éditeur, règles de `GRIST_SETUP.md`), où la page de connexion gardait le c
       connecter » n'apparaissent plus** ; la fiche de la personne a son bouton « Modifier ».
 - [ ] **Continuer sans se connecter.** Retour en navigation privée : « Continuer sans me connecter », la touche Échap et la croix ferment la
       fenêtre ; le bouton « Se connecter » de l'en-tête la rouvre. Le focus revient sur ce bouton à la fermeture.
-- [ ] **Ce que voit le visiteur.** Avec les règles de l'étape 4 (lecture réservée aux comptes connectés), l'annuaire est vide pour lui (le
-      widget n'a pas de message dédié) ; avec une lecture publique des fiches visibles, il les voit. Dans les deux cas, **aucun bouton
-      « Modifier »** ni bandeau « Ma présence ».
+- [ ] **Ce que voit le visiteur.** Depuis la 1.45.0, l'écran « Annuaire réservé » (compteur « Connexion requise ») : ni cartes, ni
+      recherche, ni filtres, **aucun bouton « Modifier »** ni bandeau « Ma présence » (section 31).
 - [ ] **Une personne connectée.** Avec un compte de l'annuaire, puis avec un compte Grist qui n'y figure pas : **ni fenêtre ni bouton** « Se
       connecter ». Si l'un des deux la voit, la console dit pourquoi (`[IDENTITE] Grist refuse la ligne de Annuaire_Sonde…` : règle de la
       sonde trop stricte) : à corriger dans l'étape 4.
@@ -2087,3 +2097,48 @@ en Éditeur, règles de `GRIST_SETUP.md`), où la page de connexion gardait le c
 - [ ] **Téléphone.** Sur un téléphone, la fenêtre tient dans l'écran et « Se connecter » est atteignable au pouce ; après la connexion on
       revient sur l'annuaire.
 
+## 31. L'annuaire réservé et les fiches à valider (1.45.0)
+
+Antoine, 19 novembre 2026 : lien public en Éditeur, l'annuaire fermé à qui n'y est pas, domaine d'adresse = domaine d'un établissement
+pour demander sa fiche, validation par un administrateur. **Rien de cela n'a été essayé dans le vrai Grist d'Antoine** : le protocole
+est à passer sur une **copie complète** du document, avec les règles de [`GRIST_SETUP.md`](GRIST_SETUP.md) (étape 4, « Annuaire fermé
+et fiches à valider ») saisies, et au moins quatre comptes : un administrateur d'`ACL`, un membre dont la fiche est validée, un compte
+Grist **sans fiche** dont l'adresse est celle d'un établissement, un compte Grist sans fiche dont l'adresse n'est celle d'aucun
+établissement ; plus une fenêtre privée sans connexion.
+
+- [ ] **La colonne des domaines.** Ouvrir `Etablissements` dans Grist et **regarder le format réel de la colonne des domaines** : un
+      domaine par cellule (`u-bordeaux.fr`), plusieurs séparés, avec ou sans `@` ou `www.`, une liste ? Noter les cellules vides. Le
+      widget lit tous ces formats ; si une forme n'est pas reconnue, la dire.
+- [ ] **La colonne de validation.** Ouvrir l'annuaire avec l'administrateur : la console dit `[SCHEMA] colonne « En_attente_validation »
+      absente de BDD : créée…` (une seule fois). Dans `BDD`, la colonne existe, de type Case à cocher, vide pour toutes les fiches
+      d'avant. Si la structure est verrouillée et que le compte n'est pas propriétaire, la console dit que Grist a refusé : créer la
+      colonne à la main.
+- [ ] **Les règles.** Avec les règles saisies, l'administrateur et le membre voient l'annuaire comme avant ; **aucune fiche ne disparaît**
+      (une fiche d'avant n'est pas « en attente »).
+- [ ] **Visiteur sans compte** (fenêtre privée) : l'écran « Annuaire réservé », compteur « Connexion requise », la fenêtre de connexion
+      s'ouvre ; dans les données brutes de Grist (lien du document), **aucune ligne** de `BDD` ne se lit.
+- [ ] **Compte sans fiche, adresse d'un établissement.** L'écran « Vous n’êtes pas encore dans l’annuaire » et le bouton « Créer ma
+      fiche » ; ni cartes, ni filtres, ni bandeau. « Créer ma fiche » : la liste des établissements **ne propose que celui du domaine** ;
+      « Envoyer ma demande » écrit **une** ligne : dans Grist, `email` est l'adresse du compte **à la lettre** (casse comprise),
+      `En_attente_validation` est cochée. Le message dit que la demande est envoyée ; l'écran devient « Votre demande est en attente ».
+      **Si Grist refuse l'écriture**, la fenêtre le dit (règle de création de `BDD` mal saisie : GRIST_SETUP.md, règle 3).
+- [ ] **Compte sans fiche, autre adresse.** « Annuaire réservé », **sans bouton**. Avec le même compte, forcer la création depuis la
+      console du navigateur : Grist accepte **une** ligne « en attente » (le contrôle du domaine ne peut pas être une règle) ; la
+      refuser ensuite comme administrateur.
+- [ ] **Une seule demande.** Avec le compte dont la demande attend : aucune lecture des autres fiches, aucune modification de sa ligne
+      (modifier sa ligne dans Grist est refusé), pas de seconde création.
+- [ ] **La pastille.** Avec l'administrateur, **mode classique** : le bouton « Mode admin » porte la pastille du nombre de demandes.
+      Mode admin allumé : le bouton « Demandes à valider (N) » ouvre la fenêtre ; elle montre le nom, l'adresse, l'établissement et
+      l'avis sur le domaine.
+- [ ] **Valider.** « Valider » : la case `En_attente_validation` est décochée, la pastille baisse, la liste se met à jour. Le compte
+      concerné recharge la page : l'annuaire s'ouvre, sa carte apparaît (s'il a accepté d'apparaître et si son établissement est validé).
+- [ ] **Refuser.** « Refuser » demande une confirmation, puis **supprime la ligne** de `BDD` (Grist l'accepte pour une demande, jamais
+      pour une fiche validée). Le compte refusé retrouve « Vous n’êtes pas encore dans l’annuaire » et peut redemander.
+- [ ] **Deux administrateurs.** L'un valide une demande pendant que l'autre a la fenêtre ouverte : l'autre lit « … n'était plus à
+      traiter : un autre administrateur s'en est occupé. » et rien n'est écrit.
+- [ ] **Un administrateur sans fiche.** « Créer ma fiche » dans son bandeau : pas de contrôle de domaine, tous les établissements,
+      « Publier ma fiche », la fiche est publiée tout de suite.
+- [ ] **Un propriétaire du document qui n'est ni dans `ACL.admin` ni dans `BDD`** est traité comme une personne sans fiche (écran
+      réservé) : l'ajouter à `ACL` avec la case `admin`.
+- [ ] **Console.** Aucune adresse e-mail dans la console, aucune erreur rouge, pendant tout ce qui précède.
+- [ ] **Téléphone.** L'écran réservé et la fenêtre « Demandes à valider » tiennent dans l'écran, sans défilement horizontal.

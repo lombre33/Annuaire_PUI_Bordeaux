@@ -64,5 +64,6 @@ test('le glyphe ☎ n\'entre dans aucun nom ni texte lu, et ✦ (état vide) est
     assert.deepEqual(tree.filter(node => /[☎✦✓]/.test(node.name)).map(node => `${node.role} « ${node.name} »`), [],
       'aucun nœud de l\'arbre d\'accessibilité ne porte un glyphe dans son nom');
     assert.equal(await page.locator('.contact-card .tel .glyph').first().getAttribute('aria-hidden'), 'true');
-    assert.equal(await page.locator('.empty-mark').getAttribute('aria-hidden'), 'true');
+    assert.equal(await page.locator('#emptyState .empty-mark').getAttribute('aria-hidden'), 'true');
+    assert.equal(await page.locator('#gatePanel .empty-mark').getAttribute('aria-hidden'), 'true', 'l\'écran réservé (1.45.0) masque son glyphe de la même façon');
   }));

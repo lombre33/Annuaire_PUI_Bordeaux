@@ -21,6 +21,7 @@ function accountParts(root) {
     editButton: part('.account-edit'),
     etabButton: part('.account-etab'),
     adminButton: part('.account-admin'),
+    requestsButton: part('.account-requests'),
     actions: part('.account-actions'),
     status: part('.account-status'),
     failure: part('.account-error')
@@ -44,7 +45,7 @@ function avatarPainter(avatar, attachments) {
 // nom. Le second de ces deux boutons, s'ils sont là tous deux, passe sur une troisième rangée.
 // Sans interrupteur (un compte qui n'a pas de fiche), les boutons se rangent sur la deuxième
 // rangée. La feuille de style lit `data-corner` et `no-switch` pour placer le nom et les boutons.
-function buttonPlacer(root, { switchButton, adminButton, etabButton, createButton, editButton, actions }) {
+function buttonPlacer(root, { switchButton, adminButton, etabButton, createButton, editButton, requestsButton, actions }) {
   return () => {
     const withSwitch = !switchButton.hidden;
     const corner = !withSwitch ? '' : !adminButton.hidden ? 'admin' : !etabButton.hidden ? 'etab' : '';
@@ -53,7 +54,7 @@ function buttonPlacer(root, { switchButton, adminButton, etabButton, createButto
     root.classList.toggle('no-switch', !withSwitch);
     // Le bloc des boutons, vide, ne prend aucune place : même sans rien dedans, un élément de la
     // ligne ou de la grille coûte un écart (audit UI/UX, U46).
-    actions.hidden = createButton.hidden && editButton.hidden && etabButton.hidden && adminButton.hidden;
+    actions.hidden = createButton.hidden && editButton.hidden && etabButton.hidden && adminButton.hidden && requestsButton.hidden;
   };
 }
 
@@ -128,7 +129,7 @@ const focusIfShown = target => () => {
 
 // Les clics des boutons du bandeau. Pendant une écriture l'interrupteur est « hors service » (`aria-disabled`) sans être désactivé :
 // un bouton désactivé perd le focus, et le clavier repartirait du haut de la page.
-function bindClicks({ switchButton, createButton, editButton, etabButton, adminButton }, { onToggle, onEdit, onCreate, onEtab, onAdminMode }) {
+function bindClicks({ switchButton, createButton, editButton, etabButton, adminButton, requestsButton }, { onToggle, onEdit, onCreate, onEtab, onAdminMode, onRequests }) {
   switchButton.addEventListener('click', () => {
     if (switchButton.getAttribute('aria-disabled') !== 'true') onToggle();
   });
@@ -136,17 +137,34 @@ function bindClicks({ switchButton, createButton, editButton, etabButton, adminB
   editButton.addEventListener('click', () => onEdit());
   etabButton.addEventListener('click', () => onEtab());
   adminButton.addEventListener('click', () => onAdminMode());
+  requestsButton.addEventListener('click', () => onRequests());
 }
+
+// La pastille du nombre de demandes de fiche en attente, sur le bouton « Mode admin » (1.45.0) : un administrateur la voit même quand le mode
+// admin est éteint. Un seul élément, réutilisé : la copie grisée du bandeau (buildRoom) part d'un bandeau qui l'a déjà.
+function badgeOf(adminButton) {
+  const existing = adminButton.querySelector('.account-badge');
+  if (existing) return existing;
+  const badge = document.createElement('span');
+  badge.className = 'account-badge';
+  badge.hidden = true;
+  badge.setAttribute('aria-hidden', 'true');
+  adminButton.append(badge);
+  return badge;
+}
+
+const PENDING_SENTENCE = count => `${count} demande${count > 1 ? 's' : ''} de fiche à valider`;
 
 // `root` : l'élément #accountBar de index.html. `onToggle` : appelé quand la
 // personne clique sur l'interrupteur (jamais pendant une écriture). `onEdit` : appelé
 // par le bouton « Modifier mon profil », `onCreate` par « Créer ma fiche » (un compte qui n'a pas
 // de fiche). `onEtab` : appelé par le bouton « Mon établissement ».
-// `onAdminMode` : appelé par le bouton « Mode admin ». `attachments` (attachments.js) : de quoi
+// `onAdminMode` : appelé par le bouton « Mode admin », `onRequests` par « Demandes à valider ». `attachments` (attachments.js) : de quoi
 // montrer la photo de profil de la personne à la place de ses initiales.
-export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noop, onEtab = noop, onAdminMode = noop, attachments = null }) {
+export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noop, onEtab = noop, onAdminMode = noop, onRequests = noop, attachments = null }) {
   const parts = accountParts(root);
-  const { name, detail, switchButton, createButton, editButton, etabButton, adminButton } = parts;
+  const { name, detail, switchButton, createButton, editButton, etabButton, adminButton, requestsButton } = parts;
+  const badge = badgeOf(adminButton);
   const paintAvatar = avatarPainter(parts.avatar, attachments);
   const placeButtons = buttonPlacer(root, parts);
   const { setStatus, announce, clearStale } = statusLine(parts.status, parts.failure);
@@ -154,8 +172,9 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
   const focusEdit = focusIfShown(editButton);
   const focusCreate = focusIfShown(createButton);
   const focusEtab = focusIfShown(etabButton);
+  const focusRequests = focusIfShown(requestsButton);
 
-  bindClicks(parts, { onToggle, onEdit, onCreate, onEtab, onAdminMode });
+  bindClicks(parts, { onToggle, onEdit, onCreate, onEtab, onAdminMode, onRequests });
 
   return {
     // `view` : { name, initials, photo, accepted, tone, message } (voir describePresence ; `photo` :
@@ -185,17 +204,25 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
     // la personne est identifiée sans ambiguïté. « Créer ma fiche » : montré seulement quand elle
     // n'en a pas. « Mon établissement » : montré aux responsables
     // d'au moins un établissement, que sa carte soit affichée ou non. « Mode admin » : montré aux
-    // seuls administrateurs ; `adminMode` dit s'il est allumé.
-    setActions({ create = false, edit = false, etab = false, admin = false, adminMode = false } = {}) {
+    // seuls administrateurs ; `adminMode` dit s'il est allumé. `pending` : le nombre de demandes de fiche à valider (1.45.0), en pastille sur
+    // « Mode admin » même éteint ; `requests` : montrer « Demandes à valider » (en mode admin).
+    setActions({ create = false, edit = false, etab = false, admin = false, adminMode = false, pending = 0, requests = false } = {}) {
       createButton.hidden = !create;
       editButton.hidden = !edit;
       etabButton.hidden = !etab;
       adminButton.hidden = !admin;
+      requestsButton.hidden = !(admin && requests);
+      const waiting = admin ? pending : 0;
+      badge.hidden = waiting === 0;
+      badge.textContent = waiting === 0 ? '' : waiting > 99 ? '99+' : String(waiting);
+      requestsButton.textContent = waiting > 0 ? `Demandes à valider (${waiting})` : 'Demandes à valider';
+      if (waiting > 0) adminButton.setAttribute('aria-label', `Mode admin, ${PENDING_SENTENCE(waiting)}`);
+      else adminButton.removeAttribute('aria-label');
       placeButtons();
       adminButton.setAttribute('aria-pressed', String(admin && adminMode));
-      adminButton.title = adminMode
+      adminButton.title = (adminMode
         ? 'Quitter le mode admin'
-        : 'Mode admin : modifier la fiche de n\'importe quelle personne';
+        : 'Mode admin : modifier la fiche de n\'importe quelle personne') + (waiting > 0 ? `. ${PENDING_SENTENCE(waiting)}.` : '');
     },
 
     // Le focus revient au bouton « Modifier mon profil », « Créer ma fiche » (quand la fenêtre se ferme sans que la
@@ -203,6 +230,7 @@ export function createAccountBar(root, { onToggle, onEdit = noop, onCreate = noo
     focusEdit,
     focusCreate,
     focusEtab,
+    focusRequests,
 
     // Pendant une écriture l'interrupteur est gelé : un deuxième clic ne doit pas
     // partir avant que le premier ait abouti. Il garde le focus (voir plus haut).

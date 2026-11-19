@@ -169,11 +169,19 @@ test('describeCreated says whether a fiche that was just created appears in the 
     'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre établissement n\'est pas reconnu. Contactez un administrateur.');
   assert.equal(describeCreated(status('dan@inserm.example'), true),
     'Votre fiche est publiée, mais elle reste masquée de l’annuaire : votre établissement n\'a pas encore été validé. Contactez un administrateur.');
-  assert.equal(describeCreated(null, true), 'Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire.', 'la fiche relue manque : on ne dit pas qu\'elle apparaît');
+  assert.equal(describeCreated(null, true, { pending: false }), 'Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire.', 'la fiche relue manque : on ne dit pas qu\'elle apparaît');
+  // Depuis la 1.45.0, la fiche qu'une personne crée est une demande : on le lui dit d'abord, qu'elle ait pu être relue ou non.
+  const sent = 'Votre demande est envoyée : un administrateur doit valider votre fiche, qui apparaîtra ensuite dans l’annuaire. Revenez plus tard.';
+  assert.equal(describeCreated(null, true), sent);
+  assert.equal(describeCreated({ pending: true, visible: false }, true), sent);
+  assert.match(describeCreated({ pending: true, visible: false }, false), /une fois l’interrupteur « Apparaître dans l'annuaire » activé\)\. Revenez plus tard\.$/);
   const private_ = 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
-  assert.equal(describeCreated(status(IRIS_EMAIL), false), private_);
-  assert.equal(describeCreated(null, false), private_);
-  assert.equal(describeCreated(status(ANA_EMAIL), false), private_, 'sans accord, la phrase ne dépend pas de ce que dit la fiche');
+  const direct = { pending: false }; // un administrateur crée sa fiche : pas de validation
+  assert.equal(describeCreated(status(IRIS_EMAIL), false, direct), private_);
+  assert.equal(describeCreated(null, false, direct), private_);
+  assert.equal(describeCreated(status(ANA_EMAIL), false, direct), private_, 'sans accord, la phrase ne dépend pas de ce que dit la fiche');
+  // Une demande, case décochée : la phrase dit aussi que l'interrupteur reste à activer.
+  assert.match(describeCreated(null, false), /^Votre demande est envoyée/);
 });
 
 test('describeHiddenFiche lists every reason, and does not change what describePresence says', async () => {

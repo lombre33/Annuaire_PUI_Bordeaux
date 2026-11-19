@@ -9,7 +9,8 @@
 // avec etablissement-ui.js (la fenêtre), branding.js, attachments.js, branding-ui.js
 // et logos-report.js (les logos : cartes, fondateurs, bilan de la console) et
 // avatar-ui.js (les photos de profil), status-ui.js (le bandeau d'état et l'écran « Aucun contact »), login.js et
-// login-ui.js (la fenêtre de connexion d'un visiteur sans compte).
+// login-ui.js (la fenêtre de connexion d'un visiteur sans compte), gate.js et gate-ui.js (qui voit l'annuaire : seulement qui y figure, 1.45.0),
+// requests.js et requests-ui.js (les fiches créées par les personnes elles-mêmes, que les administrateurs valident ou refusent).
 
 import { CATEGORIES, CONSENT_COLUMN, DOCS_URL, ETABLISSEMENT_NAMES, LOGIN_AUTO_OPEN, RESPONSIBLE_COLUMN, SEARCH_DELAY_MS, VERSION } from './constants.js';
 import { loadDirectory, describeLoadFailure, debounce, filterableRoles, filterVisibleEstablishments, createRequestSequencer, contactCountText, normalizeEmail, referenceMapsEqual, refId, text } from './grist-data.js';
@@ -20,8 +21,12 @@ import { createScrollTools } from './scroll-tools.js';
 import { readIdentity, isReadOnlyAddress } from './identity.js';
 import { findLoginUrl } from './login.js';
 import { createLoginPrompt } from './login-ui.js';
-import { createResponsibleColumn } from './schema.js';
-import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
+import { createPendingColumn, createResponsibleColumn } from './schema.js';
+import { describeCreated, describeHiddenFiche, describePending, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
+import { describeGate } from './gate.js';
+import { createGatePanel } from './gate-ui.js';
+import { RequestError, approveRequest, describeRequests, refuseRequest } from './requests.js';
+import { createRequestsDialog } from './requests-ui.js';
 import { createAccountBar } from './account-ui.js';
 import { createEmptyState, createStatusBanner } from './status-ui.js';
 import { rightsFor, profileFormModel, draftOf, diffProfile, describeChanges, blankFiche } from './profile.js';
@@ -107,7 +112,12 @@ const state = {
   etabRights: () => false,
   // Indicateurs des établissements, pour montrer la fiche « après » telle que
   // l'annuaire la présentera.
-  etabFlags: null
+  etabFlags: null,
+  // Les lignes d'Etablissements (avec la colonne des domaines quand elle existe) : de quoi vérifier l'adresse d'une personne qui crée sa fiche et
+  // dire à un administrateur si l'adresse d'une demande est celle de l'établissement choisi.
+  etablissementRows: [],
+  // Qui voit l'annuaire (gate.js) : { open: true }, ou l'écran qui le remplace pour une personne qui n'y figure pas encore.
+  gate: { open: true }
 };
 
 // Le bandeau d'état (rouge) et l'écran « Aucun contact » (status-ui.js).
@@ -150,6 +160,7 @@ const accountBar = createAccountBar(document.getElementById('accountBar'), {
   onCreate: openCreation,
   onEtab: openMyEtablissement,
   onAdminMode: toggleAdminMode,
+  onRequests: openRequests,
   attachments
 });
 
@@ -160,6 +171,13 @@ if (!READ_ONLY) accountBar.pending();
 
 const profileDialog = createProfileDialog(document.getElementById('profileDialog'));
 const etablissementDialog = createEtablissementDialog(document.getElementById('etabDialog'));
+
+// L'écran des personnes qui ne figurent pas encore dans l'annuaire et la fenêtre des demandes à valider (1.45.0). Avec un index.html ancien
+// (cache de GitHub Pages) qui ne les a pas, rien n'est fermé ni proposé : l'annuaire se lit comme avant.
+const gatePanelRoot = document.getElementById('gatePanel');
+const gatePanel = gatePanelRoot ? createGatePanel(gatePanelRoot, { onCreate: openCreation }) : null;
+const requestsDialogRoot = document.getElementById('requestsDialog');
+const requestsDialog = requestsDialogRoot ? createRequestsDialog(requestsDialogRoot, { list: currentRequests, decide: decideRequest }) : null;
 
 const photoViewer = createPhotoViewer(document.getElementById('photoDialog'), attachments);
 const brandingUI = createBrandingUI({
@@ -247,6 +265,7 @@ function syncResetButton() {
 
 function refreshCards() {
   if (!state.loaded) return; // la frappe est gardée (state.searchTerm) : elle s'applique à l'arrivée de l'annuaire
+  if (!state.gate.open) return; // l'écran de la personne remplace l'annuaire (refreshGate) : aucune carte n'est dessinée
   const filtered = filterContacts(state.allContacts, state.activeFilters, state.searchTerm, state.scope);
   keepFocus(elements.grid, elements.resultCount, () =>
     renderCards(elements.grid, elements.template, filtered, toggleFilter, state.rightsOf, cardLogos(), state.etabRights));
@@ -387,12 +406,15 @@ function applyDirectory({ contacts, referenceMaps, etabFlags, people, etablissem
   state.etabFlags = etabFlags;
   state.allContacts = contacts;
   state.people = people;
+  state.etablissementRows = etablissementRows ?? [];
   applyBranding({ etablissementRows });
+  refreshGate();
   refreshFilterMenus();
   refreshCards();
   refreshAccount();
+  requestsDialog?.refresh();
   accountBar.clearStale();
-  ensureResponsibleColumn();
+  ensureColumns();
 }
 
 // Relit Grist et met l'affichage à jour. Renvoie 'applied', 'stale' (une lecture
@@ -454,6 +476,43 @@ async function ensureResponsibleColumn() {
   else await reloadDirectory();
 }
 
+// La colonne `En_attente_validation` de BDD (1.45.0) : sans elle, personne ne peut demander de fiche (profile-save.js refuse plutôt que de
+// publier sans validation). Créée comme `Taches_responsable`, par un administrateur qui ouvre l'annuaire, une fois par chargement.
+let pendingColumnTried = false;
+async function ensurePendingColumn() {
+  if (pendingColumnTried || !isAdmin() || !state.people) return;
+  if (state.people.hasPendingColumn || !state.people.hasEmailColumn) return;
+  pendingColumnTried = true;
+  const failure = await createPendingColumn(window.grist.docApi);
+  if (failure) console.info(`[SCHEMA] ${failure}`);
+  else await reloadDirectory();
+}
+
+function ensureColumns() {
+  ensureResponsibleColumn();
+  ensurePendingColumn();
+}
+
+// Qui voit l'annuaire (gate.js). Fermé, l'écran de la personne prend la place de la recherche, des filtres et des cartes (gate-ui.js) et le
+// compteur du titre dit où elle en est. Ce n'est qu'un contrôle d'interface : ce que Grist donne au widget, ce sont ses règles d'accès qui le
+// décident (GRIST_SETUP.md).
+function refreshGate() {
+  const gate = gatePanel
+    ? describeGate({ identity: state.identity, people: state.people, etablissementRows: state.etablissementRows })
+    : { open: true };
+  state.gate = gate;
+  if (gate.open) {
+    gatePanel?.hide();
+    return;
+  }
+  warnOnce(`gate-${gate.kind}`, `[IDENTITE] L'annuaire n'est pas montré à cette personne (${gate.kind}) : elle n'y figure pas encore (GRIST_SETUP.md, règles d'accès).`);
+  gatePanel.show(gate);
+  elements.grid.replaceChildren();
+  elements.grid.removeAttribute('aria-busy');
+  emptyState.hide();
+  elements.resultCount.textContent = gate.count;
+}
+
 // Les établissements dont la personne connectée est responsable (identifiants de ligne).
 const myEtablissements = () => (state.identity?.status === 'ready' ? state.identity.etablissements : []);
 
@@ -467,15 +526,28 @@ function refreshAccount() {
     return;
   }
   if (!state.identity || !state.people) return;
+  if (!state.gate.open) {
+    accountBar.hide(); // l'écran de la personne dit où elle en est (refreshGate)
+    return;
+  }
   const persons = myPersons();
   const admin = isAdmin();
+  // Un administrateur voit le nombre de demandes en pastille sur « Mode admin », éteint ou non, et « Demandes à valider » une fois le mode allumé.
+  const adminActions = { admin, adminMode: state.adminMode, pending: admin ? state.people.pendingRequests().length : 0, requests: state.adminMode };
   if (persons.length === 0) {
     warnOnce('no-row', state.people.hasEmailColumn
       ? '[IDENTITE] Aucune ligne de BDD ne porte l\'adresse de la personne connectée : pas de bouton « Modifier mon profil ».'
       : '[IDENTITE] BDD n\'a pas de colonne « email » : impossible de relier la personne connectée à sa fiche.');
     accountBar.show(describeUnknownAccount({ email: state.identity.email, admin, emailColumn: state.people.hasEmailColumn }));
     // Sans colonne « email », la fiche créée ne pourrait pas être reliée à la personne : rien à proposer.
-    accountBar.setActions({ create: state.people.hasEmailColumn, etab: myEtablissements().length > 0, admin, adminMode: state.adminMode });
+    accountBar.setActions({ create: state.people.hasEmailColumn, etab: myEtablissements().length > 0, ...adminActions });
+    return;
+  }
+  // La seule fiche de la personne est une demande en attente : ni interrupteur ni fiche à modifier tant qu'un administrateur ne l'a pas validée
+  // (seul un administrateur arrive jusqu'ici : les autres personnes ont l'écran de refreshGate).
+  if (persons.every(person => person.status.pending)) {
+    accountBar.show(describePending({ name: persons[0].name, initials: initials(persons[0].row), photo: avatarIdOf(persons[0].row.Avatar) }));
+    accountBar.setActions({ etab: myEtablissements().length > 0, ...adminActions });
     return;
   }
   if (persons.length > 1) {
@@ -490,7 +562,7 @@ function refreshAccount() {
     ...describePresence(persons)
   });
   // Plusieurs fiches pour la même adresse : on ne sait pas laquelle ouvrir depuis le bandeau.
-  accountBar.setActions({ edit: persons.length === 1, etab: myEtablissements().length > 0, admin, adminMode: state.adminMode });
+  accountBar.setActions({ edit: persons.length === 1, etab: myEtablissements().length > 0, ...adminActions });
 }
 
 // Allume ou éteint le « mode admin » : les boutons « Modifier la fiche » des autres cartes
@@ -502,6 +574,44 @@ function toggleAdminMode() {
   elements.adminStrip.hidden = !state.adminMode;
   refreshAccount();
   refreshCards();
+}
+
+// Les demandes de fiche en attente, lues dans l'annuaire, avec ce qui aide à décider (requests.js).
+function currentRequests() {
+  return describeRequests(state.people?.pendingRequests() ?? [], state.etablissementRows);
+}
+
+// La phrase qui confirme une décision (requests-ui.js la lit sous le titre de la fenêtre), d'après ce que requests.js a fait.
+function requestMessage(result, request) {
+  const who = request.name;
+  if (result.status === 'validated') return `La fiche de ${who} est validée.`;
+  if (result.status === 'refused') return `La demande de ${who} est refusée et supprimée.`;
+  return `La demande de ${who} n'était plus à traiter : un autre administrateur s'en est occupé.`;
+}
+
+// Valide ou refuse une demande, puis relit l'annuaire. Fermé par défaut : seulement un administrateur qui a allumé le mode admin ; Grist, lui,
+// n'écrit que si ses règles d'accès le permettent. Les erreurs attendues (RequestError) portent une phrase française, les autres sont consignées.
+async function decideRequest(kind, request) {
+  if (!isAdmin() || !state.adminMode) throw new Error('Seul un administrateur en mode admin peut traiter une demande.');
+  let result;
+  try {
+    result = kind === 'approve'
+      ? await approveRequest(window.grist.docApi, request)
+      : await refuseRequest(window.grist.docApi, request);
+  } catch (error) {
+    if (error instanceof RequestError) throw error;
+    console.error('[PROFIL] Erreur inattendue :', error);
+    throw new Error('La demande n\'a pas pu être traitée. Le détail est dans la console du navigateur.');
+  }
+  const outcome = await reloadDirectory();
+  const stale = outcome === 'failed' ? ' L\'annuaire n\'a pas pu être rechargé : la liste n\'est peut-être plus à jour.' : '';
+  return { message: requestMessage(result, request) + stale };
+}
+
+// Le bouton « Demandes à valider » (mode admin).
+function openRequests() {
+  if (!isAdmin() || !state.adminMode || !requestsDialog) return;
+  requestsDialog.open(() => { if (!accountBar.focusRequests()) elements.searchInput.focus(); });
 }
 
 let togglePending = false;
@@ -542,9 +652,10 @@ function applyIdentity(identity) {
   state.identity = identity;
   state.rightsOf = rightsFor(identity, { adminMode: state.adminMode });
   state.etabRights = etablissementRightsFor(identity);
+  refreshGate();
   refreshAccount();
   refreshCards(); // les boutons « Modifier » apparaissent sur les cartes concernées
-  ensureResponsibleColumn();
+  ensureColumns();
   if (identity.status === 'anonymous') offerLogin(); // un visiteur sans compte : la fenêtre qui mène à la connexion de Grist
 }
 
@@ -723,7 +834,7 @@ function openOwnProfile() {
 // que le formulaire a montrée.
 function reviewCreation(blank, draft) {
   return speaking(userFacing, () => prepareCreation(window.grist.docApi, blank, draft, {
-    email: state.identity.email, referenceMaps: state.referenceMaps, etabFlags: state.etabFlags
+    email: state.identity.email, referenceMaps: state.referenceMaps, etabFlags: state.etabFlags, admin: isAdmin()
   }));
 }
 
@@ -740,21 +851,28 @@ async function saveCreation(review) {
     lines: review.lines,
     leftovers,
     reloaded: outcome !== 'failed',
-    notice: describeCreated(saved?.status ?? null, review.accepted)
+    notice: describeCreated(saved?.status ?? null, review.accepted, { pending: review.pending !== false })
   };
 }
 
 // Le bouton « Créer ma fiche » du bandeau : la personne connectée n'a aucune ligne dans BDD. Elle remplit la
 // même fenêtre que pour modifier sa fiche, et choisit en plus son établissement ; son e-mail est celui de son
-// compte. La fiche est une ligne ajoutée à BDD, jamais une table. Fermé par défaut : seulement sans fiche.
+// compte. La fiche est une ligne ajoutée à BDD, jamais une table. Fermé par défaut : seulement sans fiche. Depuis la 1.45.0 la fiche est une
+// demande qu'un administrateur valide, et la personne n'en choisit que parmi les établissements dont un domaine est celui de son adresse
+// (gate.js : l'écran « create » les donne) ; un administrateur crée la sienne sans l'un ni l'autre.
 function openCreation() {
   if (state.identity?.status !== 'ready' || !state.people?.hasEmailColumn || myPersons().length > 0) return;
+  const admin = isAdmin();
+  if (!admin && state.gate.kind !== 'create') return;
   const email = state.identity.email;
-  const blank = blankFiche(state.people.columns, normalizeEmail(email));
-  const model = profileFormModel(blank, state.referenceMaps, { creating: true, etabFlags: state.etabFlags });
+  const blank = blankFiche(state.people.columns, text(email));
+  const model = profileFormModel(blank, state.referenceMaps, {
+    creating: true, etabFlags: state.etabFlags, allowedEtablissements: admin ? null : state.gate.allowed
+  });
   profileDialog.open({
     mode: 'create',
-    viewerAdmin: isAdmin(),
+    validation: !admin,
+    viewerAdmin: admin,
     person: { name: 'Nouvelle fiche', email, initials: '+' },
     etablissement: '',
     model,
@@ -769,7 +887,7 @@ function openCreation() {
     renderAvatar,
     notify: showToast,
     // La fiche créée, c'est « Modifier mon profil » qui reprend le focus ; sinon le bouton qui a ouvert la fenêtre.
-    onClose: () => { if (!accountBar.focusEdit()) accountBar.focusCreate(); }
+    onClose: () => { if (!accountBar.focusEdit() && !accountBar.focusCreate() && !gatePanel?.focusAction()) elements.resultCount.focus(); }
   });
 }
 

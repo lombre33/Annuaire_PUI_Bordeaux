@@ -27,9 +27,9 @@
 # document pour un nouveau logo ou une nouvelle photo de profil. Il lit aussi les métadonnées _grist_Tables et
 # _grist_Tables_column pour écrire le téléphone dans la forme de sa
 # colonne. Il ne modifie jamais une colonne existante. Il ne crée qu'une seule table,
-# Annuaire_Sonde, quand elle manque (depuis la 1.20.0), et qu'une seule colonne, Taches_responsable
-# de BDD, quand elle manque et qu'un administrateur ouvre l'annuaire (depuis la 1.40.0) : voir
-# GRIST_SETUP.md pour les créer à la main.
+# Annuaire_Sonde, quand elle manque (depuis la 1.20.0), et que deux colonnes de BDD, Taches_responsable
+# (depuis la 1.40.0) et En_attente_validation (depuis la 1.45.0), quand elles manquent et qu'un
+# administrateur ouvre l'annuaire : voir GRIST_SETUP.md pour les créer à la main.
 #
 # Les logos des établissements (1.14.0) sont des pièces jointes du document : le widget lit les
 # colonnes facultatives logo et ordre_bandeau d'Etablissements. Les financeurs (le visuel du haut de
@@ -43,8 +43,11 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
   prenom, nom       : Text          OBLIGATOIRES (sans l'une d'elles, erreur explicite)
   Etablissement     : Reference(Etablissements)   OBLIGATOIRE
     Référence directe vers la ligne de l'établissement. Le widget n'utilise
-    JAMAIS la colonne nom_de_domaine (règle du projet) : ni celle de BDD, ni
-    celle d'Etablissements.
+    JAMAIS la colonne nom_de_domaine de BDD (règle du projet). Une seule exception
+    (1.45.0, Antoine, 19 novembre 2026) : la colonne des domaines d'Etablissements,
+    lue en LECTURE SEULE pour la liste blanche des personnes qui créent leur fiche
+    (domains.js ; ETABLISSEMENT_DOMAIN_COLUMN, constants.js). L'établissement d'un
+    contact vient toujours de cette référence.
     Avec fetchTable, une Référence arrive normalement en identifiant de ligne
     (0 quand elle est vide). Les formes ['R', 'Etablissements', id] et « texte
     déjà résolu » restent tolérées : ne jamais supposer une seule forme pour
@@ -113,6 +116,15 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
                                      schema.js) ; si Grist refuse, il s'en passe, sans message à
                                      l'écran : GRIST_SETUP.md, étape 1, pour la créer à la main.
                                      Voir responsibleActions() dans grist-data.js)
+  En_attente_validation : Bool (case à cocher)   (depuis la 1.45.0 : VRAIE, la ligne est une
+                                     DEMANDE de fiche qu'un administrateur valide ; elle n'apparaît
+                                     dans aucune carte, pas même celle de son auteur. VIDE ou
+                                     FAUSSE : une fiche validée, donc rien à migrer. Colonne de
+                                     DONNÉES, que seuls un propriétaire ou un administrateur
+                                     écrivent. Le widget la crée quand elle manque et qu'un
+                                     administrateur ouvre l'annuaire (AddColumn, schema.js) ;
+                                     sans elle, personne ne peut créer sa fiche. Voir
+                                     isPendingRow() dans grist-data.js)
 
 Tables de référence (id -> libellé, chargées via fetchTable)
   Chaque table porte un libellé brut (issu de l'import) et un libellé corrigé :

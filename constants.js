@@ -34,6 +34,11 @@ export const BRANDING = {
 // par responsable et par établissement) ; il n'écrit jamais `admin`, ni le sigle, ni le statut.
 export const ETABLISSEMENT_TABLE = 'Etablissements';
 export const ETABLISSEMENT_COLUMNS = { name: 'nom_complet', visible: 'ok_pour_apparaitre', logo: BRANDING.logoColumn };
+// La liste blanche des adresses (1.45.0, Antoine, 19 novembre 2026 : « il faut que leur e-mail soit dans ceux whitelistés des établissements
+// (comparaison nom de domaine) »). Seule exception à la règle du projet « jamais la colonne du nom de domaine » : celle d'`Etablissements`
+// (jamais celle de `BDD`), lue en lecture seule par domains.js, et seulement pour dire quels établissements une personne sans fiche peut
+// choisir en créant la sienne. Elle ne dit jamais à qui appartient une fiche : cela reste la référence `BDD.Etablissement`.
+export const ETABLISSEMENT_DOMAIN_COLUMN = 'nom_de_domaine';
 export const ACL_TABLE = 'ACL';
 export const ACL_COLUMNS = { email: 'email', etablissement: 'Responsable_de_l_Etablissement', admin: 'admin' };
 
@@ -56,7 +61,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.44.0';
+export const VERSION = '1.45.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -240,6 +245,13 @@ export const ROLE_COLUMN = 'Role_dans_le_PUI';
 // responsibleActions), comme « Membre d'une action », et n'est écrit nulle part. `RESPONSIBLE_LABEL` : le titre du bloc de la fenêtre de profil.
 export const RESPONSIBLE_COLUMN = 'Taches_responsable';
 export const RESPONSIBLE_LABEL = 'Responsable de';
+
+// La demande de fiche en attente (1.45.0, Antoine, 19 novembre 2026 : une fiche créée par la personne elle-même est soumise à validation d'un
+// administrateur). Une case à cocher de BDD : vraie, la fiche est une DEMANDE en attente (invisible de l'annuaire, de son auteur compris, et
+// de tous sauf des administrateurs) ; vide ou fausse, la fiche est validée. Les fiches qui existaient déjà n'ont donc rien à migrer. Le widget
+// la crée quand elle manque (schema.js, createPendingColumn) et ne l'écrit que dans trois cas : une fiche qu'une personne crée (vraie), la
+// validation d'un administrateur (fausse), et le refus d'un administrateur supprime la ligne.
+export const PENDING_COLUMN = 'En_attente_validation';
 
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
 // groupes du menu Compétences, les actions (les intitulés de la table `Actions`) ceux du menu Actions. Rôle dans

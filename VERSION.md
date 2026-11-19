@@ -1,4 +1,4 @@
-# Version 1.44.0 — Un visiteur sans compte voit une fenêtre « Se connecter à Grist » qui le ramène à l'annuaire en style « single page » (voir CHANGELOG.md)
+# Version 1.45.0 — L'annuaire n'est vu que par ses membres : les nouvelles fiches (domaine d'un établissement) attendent la validation d'un administrateur (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en

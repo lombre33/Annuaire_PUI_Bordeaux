@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { ACTIONS_COLUMN, CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, ROLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
+import { ACTIONS_COLUMN, CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, PENDING_COLUMN, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, ROLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -685,10 +685,17 @@ export function hasAccepted(record) {
   return record[CONSENT_COLUMN] === true;
 }
 
-// `rows` : les lignes de BDD. Une personne apparaît si elle a accepté (Accepte_apparaitre), si elle a un nom
-// ou un prénom et si son établissement est éligible : rien d'autre ne compte, pas même `perimetre`.
+// Une demande de fiche attend la validation d'un administrateur (1.45.0, BDD.En_attente_validation) : seul `true` vaut attente. Vide, faux ou
+// colonne absente : la fiche est validée, comme toutes celles qui existaient avant la colonne.
+export function isPendingRow(record) {
+  return record?.[PENDING_COLUMN] === true;
+}
+
+// `rows` : les lignes de BDD. Une personne apparaît si sa fiche est validée (pas une demande en attente), si elle a accepté (Accepte_apparaitre),
+// si elle a un nom ou un prénom et si son établissement est éligible : rien d'autre ne compte, pas même `perimetre`.
 export function buildContacts(rows, referenceMaps, etabFlags) {
   return rows
+    .filter(row => !isPendingRow(row))
     .filter(hasAccepted)
     .map(row => enrich(row, referenceMaps, etabFlags))
     .filter(contact => contact.nom || contact.prenom)
@@ -704,6 +711,7 @@ export function buildContacts(rows, referenceMaps, etabFlags) {
 //                              (ok_pour_apparaitre) ou 'not_eligible' (ni fondateur
 //                              ni partenaire)
 //   partnerOnly                affichée seulement avec l'interrupteur Partenaires
+//   pending                    la fiche est une demande qui attend la validation d'un administrateur (1.45.0)
 //   visible                    tous les critères sont réunis
 export function describeVisibility(row, referenceMaps, etabFlags) {
   const contact = enrich(row, referenceMaps, etabFlags);
@@ -718,12 +726,14 @@ export function describeVisibility(row, referenceMaps, etabFlags) {
   }
   const accepted = hasAccepted(row);
   const named = Boolean(contact.nom || contact.prenom);
+  const pending = isPendingRow(row);
   return {
     accepted,
     named,
     etablissement,
     partnerOnly: eligible && !contact.etablissement_fondateur,
-    visible: accepted && named && eligible
+    pending,
+    visible: !pending && accepted && named && eligible
   };
 }
 
@@ -768,6 +778,12 @@ export function createPeopleIndex(rows, referenceMaps, etabFlags, columns = rows
     findById(id) {
       return byId.has(id) ? entry(byId.get(id)) : null;
     },
+    // Les demandes de fiche en attente de validation (1.45.0), de la plus ancienne à la plus récente (l'ordre des lignes de BDD). Un
+    // administrateur les voit ; les autres personnes n'en lisent d'ordinaire aucune (règles d'accès, GRIST_SETUP.md).
+    pendingRequests() {
+      return rows.filter(isPendingRow).map(entry);
+    },
+    hasPendingColumn: columns.includes(PENDING_COLUMN),
     // `ids` : les lignes de BDD dont Grist a enregistré le choix `accepted`.
     rememberConsent(ids, accepted) {
       ids.forEach(id => written.set(id, accepted));
@@ -1119,13 +1135,16 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   referenceMaps[ETABLISSEMENT_NAMES] = labelMapFromRows(etablissementRows, ['nom_complet', 'acronyme']);
   const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const contacts = buildContacts(rows, referenceMaps, etabFlags);
-  log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length})`);
+  // Les demandes en attente (1.45.0) ne sont ni des contacts ni une anomalie : les avertissements ne parlent que des fiches validées.
+  const validated = rows.filter(row => !isPendingRow(row));
+  const waiting = rows.length - validated.length;
+  log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length}${waiting ? `, demandes en attente : ${waiting}` : ''})`);
   reportHeldActions(contacts, log);
   warnAboutTextInLists(rows, log);
-  warnAboutMissingEtablissement(rows, log);
-  logWithoutConsent(rows, log);
+  warnAboutMissingEtablissement(validated, log);
+  logWithoutConsent(validated, log);
 
-  const empty = describeEmptyDirectory(rows, contacts);
+  const empty = describeEmptyDirectory(validated, contacts);
   if (empty) log.warn(`[GRIST] ${empty.detail}`);
   // Les colonnes de BDD viennent de la table elle-même : une table vide en a aussi.
   const mainTable = results[MAIN_TABLE].value;

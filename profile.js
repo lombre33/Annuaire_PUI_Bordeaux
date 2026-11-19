@@ -220,8 +220,10 @@ function choosableRoles(options, row, referenceMaps) {
 
 // Ce qu'une référence simple propose : les établissements se restreignent (voir plus haut), les autres références proposent tout. (Les rôles,
 // une liste depuis la 1.42.0, se restreignent par choosableRoles.)
-function choosable(field, options, row, etabFlags) {
-  return field.category === 'etablissement' ? choosableEtablissements(options, row, etabFlags) : options;
+function choosable(field, options, row, etabFlags, allowedEtablissements) {
+  if (field.category !== 'etablissement') return options;
+  const choosableOnes = choosableEtablissements(options, row, etabFlags);
+  return allowedEtablissements ? choosableOnes.filter(option => allowedEtablissements.includes(option.id)) : choosableOnes;
 }
 
 // Le formulaire de modification d'une fiche : un champ par PROFILE_FIELDS, avec la
@@ -229,8 +231,10 @@ function choosable(field, options, row, etabFlags) {
 // `category` et les valeurs proposées (`options`). `admin` : un administrateur modifie la
 // fiche d'une autre personne, et change aussi son e-mail et son établissement. `creating` : la
 // personne crée sa fiche (blankFiche) et choisit son établissement. `etabFlags` : les indicateurs des
-// établissements (etablissementFlagsFromRows), qui restreignent la liste des établissements.
-export function profileFormModel(row, referenceMaps, { admin = false, creating = false, etabFlags = null } = {}) {
+// établissements (etablissementFlagsFromRows), qui restreignent la liste des établissements. `allowedEtablissements` (1.45.0) : les
+// identifiants des établissements dont l'un des domaines est celui de l'adresse de la personne (domains.js) ; une personne qui crée sa
+// fiche n'en choisit pas d'autre. null : aucune restriction (un administrateur).
+export function profileFormModel(row, referenceMaps, { admin = false, creating = false, etabFlags = null, allowedEtablissements = null } = {}) {
   // Une colonne facultative absente de BDD n'est pas proposée (rien à modifier).
   return fieldsFor(admin, creating).filter(field => field.key in row).map(field => {
     const base = {
@@ -244,7 +248,7 @@ export function profileFormModel(row, referenceMaps, { admin = false, creating =
     if (field.kind === 'consent') return { ...base, value: row[field.key] === true };
     const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: field.kind === 'list' });
     if (field.kind === 'reference') {
-      return { ...base, options: choosable(field, options, row, etabFlags), value: refId(row[field.key]) || 0 };
+      return { ...base, options: choosable(field, options, row, etabFlags, allowedEtablissements), value: refId(row[field.key]) || 0 };
     }
     const offered = field.category === 'role' ? choosableRoles(options, row, referenceMaps) : options;
     return { ...base, options: offered, value: knownIds(row[field.key], offered) };

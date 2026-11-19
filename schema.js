@@ -2,7 +2,7 @@
 // pour une seule chose : écrire un numéro de téléphone dans la forme de sa colonne
 // (nombre ou texte).
 
-import { CATEGORIES, MAIN_TABLE, RESPONSIBLE_COLUMN } from './constants.js';
+import { CATEGORIES, MAIN_TABLE, PENDING_COLUMN, RESPONSIBLE_COLUMN } from './constants.js';
 import { tableToRows } from './grist-data.js';
 
 // { colonne → type } d'une table (« Text », « Numeric », « Ref:Etablissements »…).
@@ -47,5 +47,28 @@ export async function createResponsibleColumn(docApi, { log = console } = {}) {
   } catch (error) {
     return `la colonne « ${RESPONSIBLE_COLUMN} » manque dans ${MAIN_TABLE} et Grist n'a pas permis de la créer (${error?.message || error}) : `
       + `la case « Responsable de » du profil n'est pas proposée. Créez-la à la main, en liste de références vers ${target} (GRIST_SETUP.md, étape 1).`;
+  }
+}
+
+// Crée la colonne `En_attente_validation` de BDD quand elle manque (1.45.0, Antoine, 19 novembre 2026 : une fiche créée par la personne elle-même
+// attend la validation d'un administrateur). Une colonne de DONNÉES (`isFormula: false`) de type case à cocher : vraie, la ligne est une demande
+// (invisible dans l'annuaire, y compris pour son auteur) ; vide ou fausse, c'est une fiche validée, si bien que les lignes existantes n'ont rien à
+// changer. Comme `Taches_responsable`, elle n'est créée qu'à l'ouverture de l'annuaire par un administrateur (main.js, ensureColumns) : Grist la
+// refuse à qui n'a pas le droit de changer la structure. Sans elle, la création d'une fiche est refusée (profile-save.js) plutôt que de publier une
+// fiche sans validation. Renvoie '' si la colonne existe désormais, sinon la raison de l'échec, à dire dans la console.
+export async function createPendingColumn(docApi, { log = console } = {}) {
+  try {
+    const created = await docApi.applyUserActions([['AddColumn', MAIN_TABLE, PENDING_COLUMN, { type: 'Bool', isFormula: false }]]);
+    const made = created?.retValues?.[0]?.colId;
+    if (typeof made === 'string' && made !== PENDING_COLUMN) {
+      await Promise.resolve(docApi.applyUserActions([['RemoveColumn', MAIN_TABLE, made]])).catch(() => {});
+      log.info(`[SCHEMA] colonne « ${PENDING_COLUMN} » déjà créée par une autre personne.`);
+    } else {
+      log.info(`[SCHEMA] colonne « ${PENDING_COLUMN} » absente de ${MAIN_TABLE} : créée, une case à cocher (GRIST_SETUP.md, étape 1).`);
+    }
+    return '';
+  } catch (error) {
+    return `la colonne « ${PENDING_COLUMN} » manque dans ${MAIN_TABLE} et Grist n'a pas permis de la créer (${error?.message || error}) : `
+      + 'personne ne peut créer sa fiche tant qu\'elle manque. Créez-la à la main, en case à cocher (GRIST_SETUP.md, étape 1).';
   }
 }
