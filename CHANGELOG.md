@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.45.6 — La page sécurité décrit les six écritures de la 1.45 : demande de fiche en attente, validation ou refus par un administrateur
+
+Demande d'Antoine du 19 novembre 2026, relayée par le coordinateur, dans la suite de la 1.45.5 : la ligne du tableau des risques de `docs/securite.md` qui compte les écritures du widget disait encore « cinq cas » et « la création de sa propre fiche ».
+
+- **Ce qui change** (`docs/securite.md` seulement, aucun code).
+  - Le tableau des risques (« Écriture involontaire ou détournée dans le document ») dit **six cas** : s'ajoutent la colonne `En_attente_validation` créée quand elle manque, la demande de fiche (une ligne « en attente » qu'un administrateur valide ; un administrateur crée la sienne sans validation) et la validation ou le refus d'une demande par un administrateur.
+  - La réponse « Le widget écrit-il dans le document Grist ? » (cas 4) et l'inventaire des écritures (point 4, `createProfile()`) ne disent plus « Publier ma fiche » pour tout le monde ni « ni validation par un administrateur » : une personne ordinaire clique sur « Envoyer ma demande », sa ligne porte `En_attente_validation` vrai et le widget vérifie le domaine de son adresse.
+  - « Dans le doute, il n'écrit pas » : une personne que le widget n'identifie pas ne voit plus « l'annuaire comme avant » (fermé par défaut depuis la 1.45.2 : un écran dit pourquoi).
+  - Le bouton « Créer ma fiche » n'est proposé qu'à une adresse dont le domaine est celui d'un établissement (sauf à un administrateur) ; l'essai « Créer ma fiche » de la liste des points à vérifier parle d'une demande en attente.
+- **Ce qui ne change pas.** Les titres et leurs ancres ; aucun code.
+- **Ce que cette version ne garantit pas.** Les textes sont relus d'après le code (`profile-save.js`, `gate.js`) : rien n'a été essayé dans le Grist d'Antoine.
+- Fichiers : `constants.js` (`VERSION`), `docs/securite.md`, `CHANGELOG.md`, `VERSION.md`.
+
 ## 1.45.5 — Le guide utilisateur décrit le parcours de la 1.45 : demande de fiche, validation par un administrateur, annuaire fermé
 
 Demande d'Antoine du 19 novembre 2026, relayée par le coordinateur : les questions fréquentes du guide parlaient encore de « Publier ma fiche » ; les mettre à jour avec le parcours de la 1.45.
