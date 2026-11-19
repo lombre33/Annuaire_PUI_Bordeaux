@@ -1391,21 +1391,6 @@ a.btn {
   text-decoration: none;
 }
 
-/* La fenêtre de connexion d'un visiteur sans compte (1.44.0, login-ui.js) : deux paragraphes et deux boutons, plus étroite que les
-   fenêtres de saisie. */
-.dlg.login-dlg {
-  width: min(520px, calc(100vw - 32px));
-}
-.login-lead {
-  margin: 0 0 12px;
-  font-size: 14px;
-}
-.login-note {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12.5px;
-}
-
 /* La fenêtre « Demandes à valider » (1.45.0, requests-ui.js) : une ligne par demande, avec ses deux boutons. */
 .dlg.requests-dlg {
   width: min(680px, calc(100vw - 32px));

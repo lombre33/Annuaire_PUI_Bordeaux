@@ -227,7 +227,8 @@ h1 {
 .doc-link:hover {
   border-color: var(--violet);
 }
-/* « Se connecter » (1.44.0) : à côté de « Documentation », pour un visiteur sans compte seulement (login-ui.js) ; plein, pour qu'on le voie. */
+/* « Se connecter » (1.44.0) : à côté de « Documentation », pour un visiteur sans compte seulement (login-ui.js) ; plein, pour qu'on le voie.
+   Depuis la 1.45.1 c'est un lien vers la connexion de Grist (un bouton qui rouvre la fenêtre quand l'adresse manque). */
 .doc-link + .login-link {
   margin-left: 8px;
 }
@@ -1979,7 +1980,8 @@ body.gated .scroll-tools {
   .card-actions,
   .status-action,
   .doc-link,
-  .login-link {
+  .login-link,
+  .acces {
     display: none !important; /* plusieurs de ces règles d'affichage sont plus précises que celle-ci (`.page-header > .account-bar`) */
   }
   body {

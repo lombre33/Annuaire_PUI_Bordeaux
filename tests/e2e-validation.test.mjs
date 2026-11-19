@@ -90,7 +90,7 @@ test('un visiteur sans compte ne voit pas l\'annuaire : l\'écran réservé et l
     await waitForGate(page, 'anonymous');
     assert.equal(await page.locator('#resultCount').textContent(), 'Connexion requise');
     assert.equal(await cards(page).count(), 0);
-    await page.locator('#loginDialog[open]').waitFor();
+    await page.locator('#acces[open]').waitFor();
     assert.equal(await page.locator('#loginLink').isVisible(), true);
   }));
 

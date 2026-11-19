@@ -2059,7 +2059,7 @@ contrôle de la fenêtre dans le cadre réel de Grist : les tests automatiques s
 - [ ] **Après un déménagement du dépôt** (migration vers le GitHub de production) : les documents se lisent toujours dans la fenêtre, à
       l'adresse du nouveau site, et « Ouvrir sur GitHub » mène au nouveau dépôt (`DOCS_URL`, `constants.js`).
 
-## 30. La fenêtre « Se connecter à Grist » d'un visiteur sans compte (1.44.0)
+## 30. La fenêtre de connexion d'un visiteur sans compte (1.44.0, refaite à l'identique de celle de l'agenda partagé en 1.45.1)
 
 À jouer dans le **vrai Grist**, sur une copie du document, console ouverte (F12). **Rien de ce protocole n'a encore été joué dans le
 document d'Antoine** : les tests automatiques simulent Grist, et un essai a été fait dans un Grist local (image officielle, lien public
@@ -2069,9 +2069,11 @@ en Éditeur, règles de `GRIST_SETUP.md`), où la page de connexion gardait le c
 (`index.html?page=N`, `GRIST_SETUP.md`, étape 7 : le nombre après `/p/` dans l'adresse de la page de l'annuaire).
 
 - [ ] **Visiteur sans compte.** Dans une **fenêtre de navigation privée** (aucune session Grist), ouvrir le lien public de l'annuaire. La
-      fenêtre « Se connecter à Grist » s'ouvre d'elle-même ; le bouton « Se connecter » est aussi dans l'en-tête, à droite de
-      « Documentation ». La console dit `[IDENTITE] …` (une ligne qui parle d'un visiteur sans compte, sans aucune adresse) et aucune
-      erreur rouge.
+      fenêtre « Connectez-vous pour accéder à l'annuaire » s'ouvre d'elle-même, **une fois** : bandeau magenta, police Bitter, trois
+      étapes numérotées avec leur dessin, une note, « Continuer sans me connecter » et « Se connecter ». **La comparer côte à côte avec
+      la fenêtre de l'agenda partagé** : même carte, mêmes couleurs, mêmes dessins pour les étapes 1 et 2 ; seuls les textes (le nom du
+      produit) et le dessin de l'étape 3 diffèrent. Le lien « Se connecter » est aussi dans l'en-tête, à droite de « Documentation ».
+      La console dit `[IDENTITE] …` (une ligne qui parle d'un visiteur sans compte, sans aucune adresse) et aucune erreur rouge.
 - [ ] **Le lien.** Survoler « Se connecter » : l'adresse est `https://<instance>/login?next=…` (ou `…/o/<équipe>/login?…`) et le chemin de
       retour contient `/p/<N>` et `style=singlePage` (la barre d'état du navigateur ou « Copier l'adresse du lien »). Avec une adresse de
       widget sans `?page=`, le retour mène à la première page (`/<document>?style=singlePage`).
@@ -2081,8 +2083,9 @@ en Éditeur, règles de `GRIST_SETUP.md`), où la page de connexion gardait le c
       réponse : c'est l'authentification de l'instance qui perd le chemin de retour ou son `?style=singlePage`, pas le widget.
 - [ ] **Après la connexion.** Le bandeau « Ma présence » (ou « Compte absent de l'annuaire ») apparaît ; **la fenêtre et le bouton « Se
       connecter » n'apparaissent plus** ; la fiche de la personne a son bouton « Modifier ».
-- [ ] **Continuer sans se connecter.** Retour en navigation privée : « Continuer sans me connecter », la touche Échap et la croix ferment la
-      fenêtre ; le bouton « Se connecter » de l'en-tête la rouvre. Le focus revient sur ce bouton à la fermeture.
+- [ ] **Continuer sans se connecter.** Retour en navigation privée : « Continuer sans me connecter », la touche Échap et un clic à côté de
+      la carte ferment la fenêtre, et rien ne la rouvre (une modification dans le document ne la remet pas) ; le lien « Se connecter » de
+      l'en-tête mène directement à la connexion de Grist.
 - [ ] **Ce que voit le visiteur.** Depuis la 1.45.0, l'écran « Annuaire réservé » (compteur « Connexion requise ») : ni cartes, ni
       recherche, ni filtres, **aucun bouton « Modifier »** ni bandeau « Ma présence » (section 31).
 - [ ] **Une personne connectée.** Avec un compte de l'annuaire, puis avec un compte Grist qui n'y figure pas : **ni fenêtre ni bouton** « Se
@@ -2093,7 +2096,7 @@ en Éditeur, règles de `GRIST_SETUP.md`), où la page de connexion gardait le c
 - [ ] **Les tables en trop.** Après le passage d'un visiteur sans compte, regarder si Grist a créé une table `Annuaire_Sonde2` (ou
       voisine) : si oui, la structure n'est pas verrouillée (« Allow Editors to edit structure ») ; la verrouiller (`GRIST_SETUP.md`,
       étape 4, point A), supprimer les tables en trop, et rejouer ce point.
-- [ ] **Impression.** Le bouton « Se connecter » de l'en-tête ne s'imprime pas (aperçu avant impression d'un visiteur sans compte).
+- [ ] **Impression.** Le lien « Se connecter » de l'en-tête et la fenêtre ne s'impriment pas (aperçu avant impression d'un visiteur sans compte).
 - [ ] **Téléphone.** Sur un téléphone, la fenêtre tient dans l'écran et « Se connecter » est atteignable au pouce ; après la connexion on
       revient sur l'annuaire.
 

@@ -787,10 +787,12 @@ un clic l'agrandit, et la console ne montre ni avertissement `[LOGOS]` (la ligne
 ## 7. La fenêtre de connexion des visiteurs sans compte (facultatif)
 
 Avec un lien public (étape 4, « Le mode de partage »), une personne arrive dans l'annuaire **sans compte Grist**.
-Depuis la 1.44.0, le widget la reconnaît et lui ouvre une fenêtre **« Se connecter à Grist »** ; son bouton mène à la
-page de connexion de votre instance, puis la **ramène à la même page de l'annuaire**, sans le cadre de Grist
-(`?style=singlePage`). Un bouton « Se connecter » de l'en-tête rouvre la fenêtre quand on l'a fermée ; « Continuer sans
-me connecter » la ferme. Ce que le visiteur voit ensuite dépend de **vos règles de lecture** : avec les règles de
+Depuis la 1.44.0, le widget la reconnaît et lui ouvre une fenêtre ; depuis la 1.45.1 c'est **la fenêtre du widget « agenda
+partagé », à l'identique** (« Connectez-vous pour accéder à l'annuaire » : trois étapes dessinées, une note, deux boutons ;
+son service de connexion et son service de référence se règlent dans `constants.js`, `LOGIN_SERVICE` et `LOGIN_REFERENCE`).
+Son bouton « Se connecter » mène à la page de connexion de votre instance, puis la **ramène à la même page de l'annuaire**,
+sans le cadre de Grist (`?style=singlePage`). La fenêtre s'ouvre une fois ; « Continuer sans me connecter », Échap ou un clic
+à côté la ferment, et le lien « Se connecter » de l'en-tête mène directement à la connexion. Ce que le visiteur voit ensuite dépend de **vos règles de lecture** : avec les règles de
 l'étape 4 (lecture réservée aux comptes connectés), un annuaire vide et la fenêtre pour seul chemin ; avec une lecture
 publique des fiches qui acceptent d'apparaître, l'annuaire se consulte et la fenêtre sert à se connecter pour modifier
 sa fiche. Rien n'est à créer dans le document ; une seule chose est à régler, le numéro de la page.
@@ -840,15 +842,15 @@ posée pour l'essai), à vérifier sur votre document. Les tables en trop (`Annu
   placés devant Grist) ramène à son accueil : à constater sur votre instance (`TESTING.md`, section 30).
 
 **Vérifier.** Fenêtre de navigation privée, sans connexion à Grist : ouvrez le lien public de l'annuaire. La fenêtre
-« Se connecter à Grist » s'ouvre ; la console dit `[IDENTITE] Grist refuse la ligne de Annuaire_Sonde (…) : le widget
+« Connectez-vous pour accéder à l'annuaire » s'ouvre ; la console dit `[IDENTITE] Grist refuse la ligne de Annuaire_Sonde (…) : le widget
 prend cette personne pour un visiteur sans compte…` (ou `visiteur sans compte (Grist lui donne l'adresse anonyme…)`).
-« Se connecter » ouvre la page de connexion de Grist dans l'onglet entier ; après la connexion, vous revenez sur la page
+« Se connecter » (dans la fenêtre ou dans l'en-tête) ouvre la page de connexion de Grist dans l'onglet entier ; après la connexion, vous revenez sur la page
 de l'annuaire sans le cadre de Grist. Connecté, aucune fenêtre ni bouton « Se connecter » n'apparaît.
 
 | Ce que vous voyez | Cause | Remède |
 |---|---|---|
 | Pas de fenêtre pour un visiteur sans compte | Lien public en **Lecteur** ; ou pas de règle `user.IsLoggedIn` sur la sonde (étape 4) ; ou `index.html` ancien en cache | Lien en Éditeur ; règles de l'étape 4 ; recharger |
-| La fenêtre explique la connexion mais n'a pas de bouton « Se connecter » | Grist n'a pas donné l'adresse de l'API du document (`[CONNEXION]` dans la console) | Recharger ; sinon la connexion se fait depuis l'adresse du document |
+| La fenêtre explique la connexion mais n'a pas de bouton « Se connecter » (son seul bouton est « J'ai compris ») | Grist n'a pas donné l'adresse de l'API du document (`[CONNEXION]` dans la console) | Recharger ; sinon la connexion se fait depuis l'adresse du document |
 | Après la connexion, on arrive sur la première page, ou sur le cadre de Grist | `?page=` manquant dans l'adresse du widget ; ou le serveur d'authentification perd le chemin de retour (`next`) ou son `?style=singlePage` | Étape ci-dessus ; instance : voir « Ce qui ne se règle pas » |
 | Une personne connectée voit la fenêtre | Règle de la sonde trop stricte, ou droit de création de la table refusé | Revoir l'étape 2 et l'étape 4 (la console dit laquelle) |
 

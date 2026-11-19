@@ -1,4 +1,4 @@
-# Version 1.45.0 — L'annuaire n'est vu que par ses membres : les nouvelles fiches (domaine d'un établissement) attendent la validation d'un administrateur (voir CHANGELOG.md)
+# Version 1.45.1 — La fenêtre de connexion des visiteurs est celle de l'agenda partagé, à l'identique (mise en page, dessins, style, comportement) (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en

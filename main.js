@@ -66,12 +66,13 @@ if (docLink && DOCS_URL) {
   }
 }
 
-// La fenêtre « Se connecter » d'un visiteur sans compte (1.44.0, login-ui.js) : le bouton de l'en-tête et la fenêtre sont cachés tant que
-// l'identité n'a pas dit que la personne est sans compte (applyIdentity). Avec un index.html ancien (cache de GitHub Pages) qui n'a pas
-// la fenêtre, rien n'est proposé : l'annuaire se lit comme avant.
-const loginDialog = document.getElementById('loginDialog');
-const loginButton = document.getElementById('loginLink');
-const loginPrompt = loginDialog && loginButton ? createLoginPrompt(loginDialog, loginButton) : null;
+// La fenêtre de connexion d'un visiteur sans compte (1.44.0, refaite à l'identique de celle de l'agenda partagé en 1.45.1, login-ui.js) : le lien
+// de l'en-tête, son repli et la fenêtre sont cachés tant que l'identité n'a pas dit que la personne est sans compte (applyIdentity). Avec un
+// index.html ancien (cache de GitHub Pages) qui n'a pas la fenêtre, rien n'est proposé : l'annuaire se lit comme avant.
+const loginDialog = document.getElementById('acces');
+const loginLink = document.getElementById('loginLink');
+const loginOpen = document.getElementById('loginOpen');
+const loginPrompt = loginDialog && loginLink && loginOpen ? createLoginPrompt(loginDialog, { link: loginLink, openButton: loginOpen }) : null;
 
 async function offerLogin() {
   if (!loginPrompt) return;

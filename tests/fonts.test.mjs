@@ -105,7 +105,8 @@ const assertOnlySiteInter = (fonts, where) => {
 test('dans la page, les quatre graisses sont chargées', { skip }, () =>
   withWidget({}, async ({ page }) => {
     await waitForCards(page, 4);
-    assert.deepEqual(await page.evaluate(() => [...document.fonts].map(face => `${face.family} ${face.weight} ${face.status}`)),
+    // Bitter (login.css, la fenêtre de connexion) se déclare aussi, mais ne se charge que si la fenêtre s'ouvre : ce test ne regarde qu'Inter.
+    assert.deepEqual(await page.evaluate(() => [...document.fonts].filter(face => face.family === 'Inter').map(face => `${face.family} ${face.weight} ${face.status}`)),
       WEIGHTS.map(weight => `Inter ${weight === 700 ? '650 750' : weight} loaded`));
   }));
 

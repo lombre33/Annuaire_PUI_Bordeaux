@@ -178,7 +178,8 @@ test('la politique laisse le widget se charger dans un cadre sandbox sans allow-
     const frame = await (await outer.waitForSelector('iframe')).contentFrame();
     await waitForCards(frame, 4);
     assert.equal(await frame.evaluate(() => window.origin), 'null', 'le cadre est bien sandboxé : son origine est opaque');
-    // La police Inter se demande en CORS : depuis une origine opaque, elle ne se charge que si le serveur répond « access-control-allow-origin ».
-    assert.deepEqual(await frame.evaluate(() => Promise.all([...document.fonts].map(face => face.load().then(() => face.status)))),
-      ['loaded', 'loaded', 'loaded', 'loaded'], 'les quatre graisses d\'Inter se chargent aussi dans ce cadre');
+    // Les polices se demandent en CORS : depuis une origine opaque, elles ne se chargent que si le serveur répond « access-control-allow-origin ».
+    // Inter (style.css, quatre graisses) et Bitter (login.css, la fenêtre de connexion, deux graisses).
+    assert.deepEqual(await frame.evaluate(() => Promise.all([...document.fonts].map(face => face.load().then(() => `${face.family} ${face.status}`)))),
+      ['Inter loaded', 'Inter loaded', 'Inter loaded', 'Inter loaded', 'Bitter loaded', 'Bitter loaded'], 'les graisses d\'Inter et de Bitter se chargent aussi dans ce cadre');
   }));

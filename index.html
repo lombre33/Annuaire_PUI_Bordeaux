@@ -28,6 +28,7 @@
   <title>Annuaire PUI Bordeaux</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="dialogs.css">
+  <link rel="stylesheet" href="login.css">
   <!-- Les quatre fichiers de la police Inter (style.css, @font-face) sont demandés dès l'en-tête, en même temps que les feuilles de
        style : sans cela le navigateur ne les découvrirait qu'une fois le texte mis en page. Le préchargement d'une police est
        toujours en CORS, d'où `crossorigin`, même pour un fichier du dépôt. tests/fonts.test.mjs garde cette liste d'accord avec style.css. -->
@@ -64,6 +65,7 @@
   <link rel="modulepreload" href="identity.js">
   <link rel="modulepreload" href="image-prep.js">
   <link rel="modulepreload" href="login-ui.js">
+  <link rel="modulepreload" href="login-art.js">
   <link rel="modulepreload" href="login.js">
   <link rel="modulepreload" href="logos-report.js">
   <link rel="modulepreload" href="markdown-dom.js">
@@ -99,8 +101,10 @@
              #docDialog plus bas. Il est ici, sous le slogan, et non sur la ligne du titre : c'est la largeur de cette ligne qui règle
              le centrage des financeurs (style.css, « En-tête »). -->
         <button id="docLink" class="doc-link" type="button" aria-haspopup="dialog" hidden>Documentation</button>
-        <!-- « Se connecter » : pour un visiteur sans compte seulement (identity.js, status « anonymous ») ; ouvre la fenêtre #loginDialog plus bas. -->
-        <button id="loginLink" class="doc-link login-link" type="button" aria-haspopup="dialog" hidden>Se connecter</button>
+        <!-- « Se connecter » : pour un visiteur sans compte seulement (identity.js, status « anonymous »). Avec l'adresse de connexion (login.js) c'est
+             un lien vers la page de connexion de Grist, comme dans l'agenda partagé ; sans elle, un bouton qui rouvre la fenêtre #acces plus bas. -->
+        <a id="loginLink" class="doc-link login-link" target="_top" rel="noopener" hidden>Se connecter</a>
+        <button id="loginOpen" class="doc-link login-link" type="button" aria-haspopup="dialog" hidden>Se connecter</button>
       </div>
       <div id="funders" class="funders">
         <p class="funders-label">Projet financé par l'État dans le cadre de France 2030</p>
@@ -228,21 +232,9 @@
     </div>
   </dialog>
 
-  <!-- La fenêtre de connexion d'un visiteur sans compte (login-ui.js) : une explication, « Continuer sans me connecter » et « Se connecter »,
-       le lien vers la page de connexion de Grist (login.js). -->
-  <dialog id="loginDialog" class="dlg login-dlg" aria-labelledby="loginTitle">
-    <div class="dlg-form">
-      <header class="dlg-head">
-        <div>
-          <h2 id="loginTitle" tabindex="-1">Se connecter à Grist</h2>
-          <p class="dlg-sub"></p>
-        </div>
-        <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>
-      </header>
-      <div class="dlg-body"></div>
-      <footer class="dlg-foot"></footer>
-    </div>
-  </dialog>
+  <!-- La fenêtre de connexion d'un visiteur sans compte (login-ui.js), la même que celle de l'agenda partagé : trois étapes dessinées,
+       « Continuer sans me connecter » et « Se connecter » (le lien vers la page de connexion de Grist, login.js). Son contenu est bâti par le code. -->
+  <dialog class="acces" id="acces" aria-labelledby="acces-titre"></dialog>
 
   <!-- Les demandes de fiche à valider (requests-ui.js), pour un administrateur : « Valider » ou « Refuser » (supprime la demande). -->
   <dialog id="requestsDialog" class="dlg requests-dlg" aria-labelledby="requestsTitle">
