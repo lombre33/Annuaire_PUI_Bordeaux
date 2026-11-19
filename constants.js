@@ -61,7 +61,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.45.0';
+export const VERSION = '1.45.1';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -103,10 +103,14 @@ export const ANONYMOUS_EMAIL = 'anon@getgrist.com';
 
 // La fenêtre « Se connecter » d'un visiteur sans compte (1.44.0). `LOGIN_RETURN_STYLE` : le style de page de Grist (`?style=…`) où la
 // personne est ramenée une fois connectée, « singlePage » pour une page qui montre le seul annuaire, sans le cadre de Grist ; vide, Grist la
-// ramène à la page sans style. `LOGIN_AUTO_OPEN` : la fenêtre s'ouvre d'elle-même, une fois, à l'arrivée d'un visiteur sans compte (le
-// bouton « Se connecter » de l'en-tête la rouvre) ; faux, seul ce bouton la propose.
+// ramène à la page sans style. `LOGIN_AUTO_OPEN` : la fenêtre s'ouvre d'elle-même, une fois, à l'arrivée d'un visiteur sans compte ; faux, elle ne
+// s'ouvre jamais seule (le bouton « Se connecter » de l'en-tête mène à la connexion). Depuis la 1.45.1 la fenêtre est celle de l'agenda partagé
+// (login-ui.js) : `LOGIN_SERVICE` est le service de connexion que la page de Grist propose, `LOGIN_REFERENCE` le service que les gens connaissent
+// déjà et dont le compte est le même (le texte de la fenêtre et le dessin de la deuxième étape les nomment).
 export const LOGIN_RETURN_STYLE = 'singlePage';
 export const LOGIN_AUTO_OPEN = true;
+export const LOGIN_SERVICE = 'ProConnect';
+export const LOGIN_REFERENCE = 'Resana';
 
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.

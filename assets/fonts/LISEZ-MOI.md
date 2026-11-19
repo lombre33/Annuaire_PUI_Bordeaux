@@ -23,3 +23,11 @@ pyftsubset Inter-Regular.otf --output-file=inter-400.woff2 --flavor=woff2 --no-h
 
 Pour ajouter un signe, l'ajouter à `--unicodes`, refaire les quatre fichiers et vérifier qu'aucun ne dépasse 30 Ko
 (`tests/fonts.test.mjs`).
+
+## Bitter : la police de la fenêtre de connexion
+
+`bitter-latin-400-normal.woff2` et `bitter-latin-700-normal.woff2` (18 Ko le fichier) sont les graisses normale et grasse de **Bitter**, de The
+Bitter Project Authors, sous licence **SIL Open Font License 1.1** (le texte est dans `OFL-Bitter.txt`, à garder à côté des fichiers). Ce sont les
+sous-ensembles latins que le widget « agenda partagé » embarque pour sa fenêtre de connexion ; l'annuaire les reprend avec cette fenêtre (1.45.1,
+`login.css`) : elle doit se reconnaître d'un widget à l'autre. Ils ne servent qu'à elle : `login.css` ne les demande que lorsque la fenêtre s'ouvre,
+d'où l'absence de préchargement dans `index.html` (`tests/fonts.test.mjs` ne garde que le préchargement d'Inter).

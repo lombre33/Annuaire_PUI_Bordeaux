@@ -1,0 +1,91 @@
+/* La fenêtre de connexion d'un visiteur sans compte (1.45.1, login-ui.js) : celle du widget « agenda partagé », à l'identique. Antoine l'avait
+   demandée ainsi dès la 1.44.0 (« reprendre l'autre projet ») ; la 1.44.0 n'en avait repris que la logique. Les règles `.acces…` plus bas sont
+   celles du style.css de l'agenda, mot pour mot (tests/fixtures/agenda-acces.css, que tests/login-window.test.mjs compare à ce fichier) : sa
+   charte (magenta, jaune, brun, Bitter) n'est pas celle de l'annuaire (violet, Inter), et c'est voulu : la fenêtre doit se reconnaître d'un
+   widget à l'autre. Elle ne déborde donc pas : les couleurs et la police sont posées sur `.acces` seul, jamais sur la page. */
+
+/* Bitter (licence SIL OFL : assets/fonts/OFL-Bitter.txt, assets/fonts/LISEZ-MOI.md) : la police à empattements de l'agenda, un sous-ensemble
+   latin de deux graisses (18 Ko le fichier). Elle ne se charge que si la fenêtre s'ouvre, d'où l'absence de préchargement dans index.html. */
+@font-face {
+  font-family: Bitter;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("assets/fonts/bitter-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: Bitter;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("assets/fonts/bitter-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Ce que l'agenda tient de sa page (ses jetons de couleur, sa police, ses réglages d'éléments) : ici posé sur la fenêtre seule. `:where()`
+   garde aux réglages d'éléments la force qu'ils ont dans l'agenda (celle d'un sélecteur d'élément), pour que les règles `.acces…` les
+   emportent comme là-bas. */
+.acces {
+  --magenta: #b9348b;
+  --jaune: #ffcc00;
+  --brun: #3b1c13;
+  --texte: #292322;
+  --gris: #615961;
+  --rose: #faf4f8;
+  --serif: "Bitter", "Rockwell", "Roboto Slab", Georgia, "Times New Roman", serif;
+  --rayon: 8px;
+  font: 16px/1.4 var(--serif);
+}
+:where(.acces) *,
+:where(.acces) ::before,
+:where(.acces) ::after {
+  box-sizing: border-box;
+}
+:where(.acces) :is(h2, h3, p) {
+  margin: 0;
+}
+:where(.acces) button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+:where(.acces) a {
+  color: var(--magenta);
+  -webkit-tap-highlight-color: transparent;
+}
+:where(.acces) :focus-visible {
+  outline: 3px solid var(--brun);
+  outline-offset: 2px;
+}
+
+.acces { width: min(640px, calc(100% - 24px)); max-height: calc(100% - 24px); margin: auto; padding: 0; border: 0; border-radius: 16px; background: #fff; color: var(--texte); box-shadow: 0 12px 48px rgba(59, 28, 19, .35); overflow: auto; }
+.acces::backdrop { background: rgba(59, 28, 19, .55); }
+.acces__corps:focus { outline: none; }
+.acces__corps { padding: 22px 22px 20px; border-top: 6px solid var(--magenta); }
+.acces__sur { margin-bottom: 4px; font-size: 0.78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--magenta); overflow-wrap: anywhere; }
+.acces h2 { font-size: clamp(1.3rem, 5vw, 1.7rem); line-height: 1.15; color: var(--brun); }
+.acces__intro { margin-top: 8px; color: var(--gris); }
+.acces__etapes { display: grid; gap: 16px; margin: 18px 0 0; padding: 0; list-style: none; }
+.acces__etapes li { display: grid; grid-template-columns: 32px 1fr; gap: 6px 12px; align-items: start; }
+.acces__num { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--jaune); color: var(--brun); font-weight: 700; }
+.acces__texte h3 { font-size: 1rem; line-height: 1.25; color: var(--brun); }
+.acces__texte p { margin-top: 2px; font-size: 0.9rem; color: var(--gris); }
+.acces__etapes figure { grid-column: 2; margin: 4px 0 0; }
+.acces__etapes svg { display: block; width: 100%; max-width: 320px; height: auto; }
+.acces__note { margin-top: 18px; padding: 10px 12px; border-radius: var(--rayon); background: var(--rose); font-size: 0.85rem; color: var(--brun); }
+.acces__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 12px; margin-top: 20px; }
+.acces__bouton { min-height: 44px; padding: 8px 22px; border: 0; border-radius: 999px; background: var(--magenta); color: #fff; font-weight: 700; }
+a.acces__bouton { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+a.acces__bouton:hover { text-decoration: underline; text-underline-offset: 3px; }
+.acces__lien { min-height: 44px; padding: 8px 12px; border: 0; background: none; color: var(--gris); text-decoration: underline; }
+@media (max-width: 480px) { .acces__corps { padding: 18px 16px 16px; } }
+@media (min-width: 640px) {
+  .acces__etapes li { grid-template-columns: 32px 1fr 270px; align-items: center; }
+  .acces__etapes figure { grid-column: 3; grid-row: 1; margin: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .acces[open] { animation: acces-entree .2s ease-out; }
+  @keyframes acces-entree { from { opacity: 0; transform: translateY(8px); } }
+}

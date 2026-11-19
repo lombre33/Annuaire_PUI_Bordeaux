@@ -911,7 +911,9 @@ test('les pages décrivent tous les préfixes de la console, et leur nombre', ()
 
 test('la page de sécurité nomme chaque adresse web écrite en dur dans le code du widget', () => {
   const literal = /(['"`])(https?:\/\/[^'"`\s]+)\1/g;
-  const found = WIDGET_SOURCES().flatMap(({ name, code }) => [...code.matchAll(literal)].map(match => ({ name, url: match[2] })));
+  // L'espace de noms SVG (login-art.js) est un identifiant que le navigateur lit, pas une adresse qu'il joint : aucune requête.
+  const found = WIDGET_SOURCES().flatMap(({ name, code }) => [...code.matchAll(literal)].map(match => ({ name, url: match[2] })))
+    .filter(({ url }) => url !== 'http://www.w3.org/2000/svg');
   // Deux adresses, toutes deux dans constants.js : PUI_URL (le bandeau du bas) et DOCS_URL (la page de GitHub que propose la fenêtre « Documentation »).
   assert.deepEqual(found.map(({ name }) => name), ['constants.js', 'constants.js'],
     'Une adresse web a été ajoutée au code (ou retirée de constants.js) : décrivez-la dans docs/securite.md (puce « Réseau »), puis ce test.');
