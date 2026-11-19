@@ -105,6 +105,21 @@ export function describePending(person) {
   };
 }
 
+// Ce que le bandeau dit à la personne dont la seule fiche est désactivée (1.46.0) : le responsable de son établissement l'a retirée de l'annuaire
+// (elle a quitté l'établissement). Seul un administrateur ou un responsable d'établissement arrive jusqu'ici : les autres personnes ont l'écran fermé de
+// gate.js. Ni interrupteur ni fiche à modifier : une fiche désactivée ne se modifie plus.
+export function describeDeactivated(person) {
+  return {
+    name: person?.name || 'Ma fiche',
+    initials: person?.initials ?? '?',
+    photo: person?.photo ?? 0,
+    accepted: false,
+    switchable: false,
+    tone: 'info',
+    message: 'Votre fiche est désactivée : elle n\u2019apparaît plus dans l\u2019annuaire. Pour la réactiver, contactez le responsable de votre établissement ou un administrateur.'
+  };
+}
+
 // Ce que la relecture d'une modification dit d'une fiche absente de l'annuaire : la
 // carte « Après » montre une carte que personne ne verra dans la grille tant que la
 // cause demeure. `status` vient de describeVisibility() ; `own` dit si la fiche est celle
@@ -122,6 +137,9 @@ export function describeHiddenFiche(status, { own, etablissement = '', creating 
   if (status.pending) {
     if (creating) return 'Votre fiche sera envoyée à un administrateur, qui doit la valider avant qu\u2019elle apparaisse dans l\u2019annuaire.';
     return own ? 'Votre fiche est en attente de validation par un administrateur.' : 'Cette fiche est une demande en attente de validation.';
+  }
+  if (status.deactivated) {
+    return own ? 'Votre fiche est désactivée : elle n\u2019apparaît plus dans l\u2019annuaire.' : 'Cette fiche est désactivée : la personne a quitté l\u2019établissement.';
   }
   if (status.etablissement === 'not_validated' && status.named) {
     return own

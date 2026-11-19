@@ -47,6 +47,9 @@
   <link rel="modulepreload" href="branding.js">
   <link rel="modulepreload" href="changes-ui.js">
   <link rel="modulepreload" href="constants.js">
+  <link rel="modulepreload" href="departure-save.js">
+  <link rel="modulepreload" href="departure-ui.js">
+  <link rel="modulepreload" href="departure.js">
   <link rel="modulepreload" href="dialog-shell.js">
   <link rel="modulepreload" href="doc-refs.js">
   <link rel="modulepreload" href="docs-source.js">
@@ -242,6 +245,22 @@
       <header class="dlg-head">
         <div>
           <h2 id="requestsTitle" tabindex="-1">Demandes à valider</h2>
+          <p class="dlg-sub"></p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>
+      </header>
+      <div class="dlg-body"></div>
+      <footer class="dlg-foot"></footer>
+    </div>
+  </dialog>
+
+  <!-- Le départ d'un·e collègue (departure-ui.js), ouvert depuis la fiche de l'établissement : la fiche d'une personne qui part est DÉSACTIVÉE (elle reste
+       dans Grist, elle n'apparaît plus dans l'annuaire), après le transfert éventuel de ses valeurs à une autre personne. -->
+  <dialog id="departDialog" class="dlg depart-dlg" aria-labelledby="departTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="departTitle" tabindex="-1">Départ d’un·e collègue</h2>
           <p class="dlg-sub"></p>
         </div>
         <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>

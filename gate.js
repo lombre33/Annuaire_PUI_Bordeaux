@@ -4,6 +4,7 @@
 //   checking       l'identité (ou l'annuaire) n'est pas encore lue : rien ne se montre d'ici là (fermé par défaut, 1.45.2)
 //   pending        leur demande de fiche attend la validation d'un administrateur
 //   create         pas de fiche, mais le domaine de leur adresse est celui d'un établissement : elles peuvent la demander
+//   deactivated    leur fiche a été désactivée par le responsable de leur établissement : elles l'ont quitté (1.46.0)
 //   denied         pas de fiche, et le domaine de leur adresse n'est celui d'aucun établissement
 //   unverifiable   le widget ne lit pas les domaines des établissements : il ne peut pas trancher (fermé par défaut)
 //   noemail        BDD n'a pas de colonne « email » lisible pour ce compte : le widget ne retrouve la fiche de personne
@@ -27,6 +28,12 @@ const SCREENS = {
     title: 'Votre demande est en attente',
     text: 'Un administrateur doit valider votre fiche avant que vous puissiez consulter l’annuaire. Revenez plus tard et rechargez la page : l’annuaire s’ouvrira dès qu’elle sera validée.',
     count: 'Demande en attente'
+  }),
+  deactivated: () => ({
+    title: 'Votre fiche est désactivée',
+    text: 'Le responsable de votre établissement a désactivé votre fiche : l’annuaire n’est plus ouvert à votre compte. '
+      + 'Si vous pensez que c’est une erreur, contactez le responsable de votre établissement ou un administrateur de l’annuaire.',
+    count: 'Fiche désactivée'
   }),
   create: ({ domain }) => ({
     title: 'Vous n’êtes pas encore dans l’annuaire',
@@ -110,7 +117,8 @@ export function describeGate({ identity, people, etablissementRows, directoryFai
   if (!people) return closed(directoryFailed ? (directoryRefused ? 'unreadable' : 'loadfailed') : 'checking');
   if (!people.hasEmailColumn) return closed('noemail');
   const mine = people.findByEmail(identity.email);
-  if (mine.some(person => !person.status.pending)) return OPEN;
+  if (mine.some(person => !person.status.pending && !person.status.deactivated)) return OPEN;
+  if (mine.some(person => person.status.deactivated)) return closed('deactivated');
   if (mine.length > 0) return closed('pending');
   const { readable, ids, domain } = etablissementsForEmail(identity.email, etablissementRows);
   if (!readable) return closed('unverifiable');

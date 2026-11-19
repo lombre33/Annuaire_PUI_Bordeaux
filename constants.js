@@ -61,7 +61,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.45.6';
+export const VERSION = '1.46.0';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -262,6 +262,13 @@ export const RESPONSIBLE_LABEL = 'Responsable de';
 // validation d'un administrateur (fausse), et le refus d'un administrateur supprime la ligne.
 export const PENDING_COLUMN = 'En_attente_validation';
 
+// La fiche DÉSACTIVÉE (1.46.0, Antoine, 19 novembre 2026 : « le départ désactive la fiche, il ne la supprime pas de la BDD, juste plus visible dans le
+// widget »). Une case à cocher de BDD : vraie, la fiche reste dans Grist mais n'apparaît plus nulle part dans le widget ; vide ou fausse, la fiche est
+// active, donc rien à migrer. Elle est distincte d'`Accepte_apparaitre`, qui est le choix de la PERSONNE : le responsable d'un établissement qui
+// désactive la fiche d'un·e collègue qui part n'écrit pas son choix, et ne le réécrit pas en la réactivant. Le widget la crée quand elle manque
+// (schema.js, createDeactivatedColumn) ; seul un responsable de l'établissement ou un administrateur l'écrit (GRIST_SETUP.md).
+export const DEACTIVATED_COLUMN = 'Fiche_desactivee';
+
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
 // groupes du menu Compétences, les actions (les intitulés de la table `Actions`) ceux du menu Actions. Rôle dans
 // le PUI en a un depuis la 1.24.0 (demande d'Antoine du 13 octobre 2026). Il n'y a plus de bouton « Actions » à part
@@ -354,3 +361,13 @@ export const PROFILE_FIELDS = [
 export const fieldsFor = (admin, creating = false) =>
   PROFILE_FIELDS.filter(field => (admin === true || !field.admin || (creating === true && field.atCreation === true))
     && !(creating === true && field.afterCreation === true));
+
+// Ce qu'un responsable peut transférer à une autre personne en désactivant la fiche d'un·e collègue (1.46.0) : un groupe par rubrique de la
+// fiche (la catégorie de CATEGORIES qui nomme la rubrique), les colonnes de liste de PROFILE_FIELDS qui en font partie (« Responsable de » suit les
+// actions). `on` : coché d'office ; le rôle dans le PUI est personnel (une fonction, pas un savoir-faire), il se coche à la main.
+export const DEPARTURE_GROUPS = ['instances', 'gt', 'competences', 'communautes', 'taches', 'role'].map(key => ({
+  key,
+  label: CATEGORIES[key].label,
+  on: key !== 'role',
+  fields: PROFILE_FIELDS.filter(field => field.kind === 'list' && field.category === key)
+}));

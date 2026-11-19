@@ -53,8 +53,8 @@ test('describeVisibility reports the pending state and never shows a pending fic
   const maps = { etablissement: { 1: 'CHU' } };
   const flags = { byId: { 1: { fondateur: true, partenaire: false, ok_pour_apparaitre: true } } };
   const row = { id: 1, prenom: 'Zoé', nom: 'N', Etablissement: 1, Accepte_apparaitre: true };
-  assert.deepEqual(describeVisibility(row, maps, flags), { accepted: true, named: true, etablissement: 'ok', partnerOnly: false, pending: false, visible: true });
-  assert.deepEqual(describeVisibility({ ...row, [PENDING_COLUMN]: true }, maps, flags), { accepted: true, named: true, etablissement: 'ok', partnerOnly: false, pending: true, visible: false });
+  assert.deepEqual(describeVisibility(row, maps, flags), { accepted: true, named: true, etablissement: 'ok', partnerOnly: false, pending: false, deactivated: false, visible: true });
+  assert.deepEqual(describeVisibility({ ...row, [PENDING_COLUMN]: true }, maps, flags), { accepted: true, named: true, etablissement: 'ok', partnerOnly: false, pending: true, deactivated: false, visible: false });
 });
 
 test('the bar tells a person who waits for validation that their fiche is pending, with nothing to switch or edit', () => {

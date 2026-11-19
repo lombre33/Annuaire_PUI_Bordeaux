@@ -252,8 +252,11 @@ test('la fenêtre montre le logo, le sigle et le statut en lecture seule, le nom
       'Décoché, aucune fiche de cet établissement n’apparaît, même celles des personnes qui ont accepté d’apparaître.');
     assert.equal(await dlg(page).locator('#etabVisibleNote').isHidden(), true);
 
-    assert.equal(await dlg(page).locator('.es-sec-title').textContent(), 'Responsables de l’établissement');
-    assert.equal(await dlg(page).locator('.es-sec-help').textContent(), 'Ils peuvent modifier cette fiche et en nommer d’autres, sans passer par un administrateur.');
+    assert.equal(await dlg(page).locator('#etabRespTitle').textContent(), 'Responsables de l’établissement');
+    assert.equal(await dlg(page).locator('section[aria-labelledby="etabRespTitle"] .es-sec-help').textContent(),
+      'Ils peuvent modifier cette fiche et en nommer d’autres, sans passer par un administrateur.');
+    // Sous les responsables, depuis la 1.46.0 : le départ d'un·e collègue (tests/e2e-departure.test.mjs).
+    assert.equal(await dlg(page).locator('#etabDepartTitle').textContent(), 'Départ d’un·e collègue');
     assert.equal(await rows(page).count(), 1);
     assert.equal(await rows(page).locator('.es-resp-name').textContent(), 'Ana Martinvous');
     assert.equal(await rows(page).locator('.es-resp-mail').textContent(), ANA_EMAIL);

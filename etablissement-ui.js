@@ -10,7 +10,7 @@
 import { button, el, glyph, notice } from './dom.js';
 import { createDialogShell, dialogApi } from './dialog-shell.js';
 import { draftOfEtablissement, rebaseDraft } from './etablissement.js';
-import { buildForm, forgetPreview, paintLogo, paintResponsables, refreshForm } from './etablissement-form.js';
+import { buildForm, forgetPreview, paintDeparture, paintLogo, paintResponsables, refreshForm } from './etablissement-form.js';
 
 const emptyEvaluation = () => ({ champs: {}, labels: [], errors: [], fieldErrors: {} });
 
@@ -28,7 +28,8 @@ function createContext(dialog) {
     evaluation: emptyEvaluation(),
     previewUrl: null, // l'adresse locale de l'image choisie, à libérer
     ui: {},
-    get acronym() { return this.fiche?.etablissement.acronym ?? this.chosen?.acronym ?? ''; }
+    get acronym() { return this.fiche?.etablissement.acronym ?? this.chosen?.acronym ?? ''; },
+    refreshPeople: () => refreshPeople(ctx)
   };
   ctx.shell = createDialogShell(dialog, {
     isSaving: () => ctx.phase === 'saving',
@@ -120,8 +121,22 @@ function renderForm(ctx, message = '') {
   ctx.ui.summary = shell.renderFoot('', ctx.ui.cancel, ctx.ui.save);
   paintLogo(ctx);
   if (fiche.responsables !== null) paintResponsables(ctx);
+  if (ctx.ui.departNote) paintDeparture(ctx);
   refreshForm(ctx);
   shell.announceStep();
+}
+
+// ===== Les personnes de l'établissement =====
+
+// Un départ vient de changer des fiches (departure-ui.js) : les personnes qu'on peut nommer, le nombre de fiches que la visibilité masquerait et celui des
+// fiches désactivées se relisent dans l'annuaire, sans toucher à ce que la personne a saisi.
+function refreshPeople(ctx) {
+  if (ctx.phase !== 'editing' || !ctx.session.people) return;
+  const { candidates, warning, departure } = ctx.session.people(ctx.fiche.etablissement.id);
+  ctx.fiche = { ...ctx.fiche, candidates, warning, departure };
+  if (ctx.fiche.responsables !== null) paintResponsables(ctx);
+  if (ctx.ui.departNote) paintDeparture(ctx);
+  refreshForm(ctx);
 }
 
 // ===== L'enregistrement =====
@@ -252,6 +267,7 @@ function reset(ctx) {
 //                                 peut nommer
 //                 warning         { hidden, includesMe } : combien de fiches l'annuaire montre pour
 //                                 cet établissement, et si la mienne en fait partie
+//                 departure       { departed } : combien de fiches de l'établissement sont désactivées (1.46.0)
 //                 meEmail         l'adresse de la personne connectée
 //               un échec porte dans `message` la phrase à montrer
 //   lookup      adresse → { name, initials, photo } si la personne a une fiche visible dans l'annuaire
@@ -259,6 +275,9 @@ function reset(ctx) {
 //               en a une qui n'y figure pas (son nom ne se dévoile pas), null si aucune fiche ne porte
 //               cette adresse
 //   renderAvatar  { initials, photo } → l'avatar rond d'une personne (avatar-ui.js)
+//   people      (identifiant) → { candidates, warning, departure } relus dans l'annuaire, après un départ (1.46.0)
+//   openDeparture  (facultatif, 1.46.0) (etablissement, { isResponsable, onChanged, onClose }) → ouvre la fenêtre du départ d'un·e collègue ;
+//               sans lui, la fenêtre n'a pas de section « Départ d'un·e collègue »
 //   renderLogo  (fiche) → l'élément qui montre le logo actuel (null : le sigle en pastille)
 //   save        (draft, fiche) → promesse de { status: 'saved', unsaved, reloaded } ou
 //               { status: 'changed', fiche, notice } (la fiche a changé dans Grist pendant que la
