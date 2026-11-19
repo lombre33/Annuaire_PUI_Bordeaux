@@ -2,7 +2,7 @@
 // pour une seule chose : écrire un numéro de téléphone dans la forme de sa colonne
 // (nombre ou texte).
 
-import { CATEGORIES, DEACTIVATED_COLUMN, MAIN_TABLE, PENDING_COLUMN, RESPONSIBLE_COLUMN } from './constants.js';
+import { CATEGORIES, MAIN_TABLE, PENDING_COLUMN, RESPONSIBLE_COLUMN } from './constants.js';
 import { tableToRows } from './grist-data.js';
 
 // { colonne → type } d'une table (« Text », « Numeric », « Ref:Etablissements »…).
@@ -70,27 +70,5 @@ export async function createPendingColumn(docApi, { log = console } = {}) {
   } catch (error) {
     return `la colonne « ${PENDING_COLUMN} » manque dans ${MAIN_TABLE} et Grist n'a pas permis de la créer (${error?.message || error}) : `
       + 'personne ne peut créer sa fiche tant qu\'elle manque. Créez-la à la main, en case à cocher (GRIST_SETUP.md, étape 1).';
-  }
-}
-
-// Crée la colonne `Fiche_desactivee` de BDD quand elle manque (1.46.0, Antoine, 19 novembre 2026 : le départ d'un·e collègue désactive sa fiche, il ne la
-// supprime pas). Une colonne de DONNÉES (`isFormula: false`) de type case à cocher : vraie, la fiche est désactivée (elle reste dans Grist mais le widget
-// ne la montre plus) ; vide ou fausse, la fiche est active, si bien que les lignes existantes n'ont rien à changer. Comme `En_attente_validation`, elle
-// n'est créée qu'à l'ouverture de l'annuaire par un administrateur (main.js, ensureColumns) : Grist la refuse à qui n'a pas le droit de changer la
-// structure. Sans elle, la fenêtre « Départ d'un·e collègue » ne propose rien. Renvoie '' si la colonne existe désormais, sinon la raison de l'échec.
-export async function createDeactivatedColumn(docApi, { log = console } = {}) {
-  try {
-    const created = await docApi.applyUserActions([['AddColumn', MAIN_TABLE, DEACTIVATED_COLUMN, { type: 'Bool', isFormula: false }]]);
-    const made = created?.retValues?.[0]?.colId;
-    if (typeof made === 'string' && made !== DEACTIVATED_COLUMN) {
-      await Promise.resolve(docApi.applyUserActions([['RemoveColumn', MAIN_TABLE, made]])).catch(() => {});
-      log.info(`[SCHEMA] colonne « ${DEACTIVATED_COLUMN} » déjà créée par une autre personne.`);
-    } else {
-      log.info(`[SCHEMA] colonne « ${DEACTIVATED_COLUMN} » absente de ${MAIN_TABLE} : créée, une case à cocher (GRIST_SETUP.md, étape 1).`);
-    }
-    return '';
-  } catch (error) {
-    return `la colonne « ${DEACTIVATED_COLUMN} » manque dans ${MAIN_TABLE} et Grist n'a pas permis de la créer (${error?.message || error}) : `
-      + 'le départ d\'un·e collègue n\'est pas proposé tant qu\'elle manque. Créez-la à la main, en case à cocher (GRIST_SETUP.md, étape 1).';
   }
 }

@@ -4,7 +4,7 @@ import { describeGate } from '../gate.js';
 import { loadDirectory } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { quiet } from './support/logs.mjs';
-import { ADMIN_EMAIL, ANA_EMAIL, NEW_EMAIL, sampleTables, withDeactivation, withIdentity, withRequest, withValidation } from './fixtures.mjs';
+import { ADMIN_EMAIL, ANA_EMAIL, NEW_EMAIL, sampleTables, withIdentity, withRequest, withValidation } from './fixtures.mjs';
 
 // ===== gate : qui voit l'annuaire (1.45.0) =====
 
@@ -77,30 +77,6 @@ test('a person whose only fiche is a pending request waits, and sees the directo
   assert.equal(waiting.title, 'Votre demande est en attente');
   assert.equal(waiting.count, 'Demande en attente');
   assert.deepEqual(await gateFor(ready(ANA_EMAIL), withValidation(withIdentity(), { pending: { 1: false } })), { open: true });
-});
-
-test('a person whose only fiche was deactivated is told so, whatever her domain, and cannot ask for a new fiche', async () => {
-  const tables = withDeactivation(withValidation(withIdentity()), { deactivated: { 1: true } });
-  const gate = await gateFor(ready(ANA_EMAIL), tables);
-  assert.equal(gate.open, false);
-  assert.equal(gate.kind, 'deactivated');
-  assert.equal(gate.title, 'Votre fiche est désactivée');
-  assert.equal(gate.count, 'Fiche désactivée');
-  assert.doesNotMatch(gate.text, /\.md/);
-  assert.match(gate.text, /responsable de votre établissement/);
-  // Un administrateur et le responsable d'un établissement gardent l'annuaire ouvert : leurs règles d'accès sont celles de leur rôle, pas de leur fiche.
-  assert.deepEqual(await gateFor(ready(ANA_EMAIL, { admin: true }), tables), { open: true });
-  assert.deepEqual(await gateFor(ready(ANA_EMAIL, { etablissements: [1] }), tables), { open: true });
-});
-
-test('a person with a deactivated fiche and an active one sees the directory, and a request waiting next to a deactivated fiche keeps waiting', async () => {
-  const active = withDeactivation(withValidation(withIdentity()), { deactivated: { 1: true } });
-  const doubled = withRequest(active, { email: ANA_EMAIL, prenom: 'Ana', nom: 'Retour', Etablissement: 1 });
-  doubled.BDD.En_attente_validation[doubled.BDD.id.length - 1] = false;
-  doubled.BDD.Fiche_desactivee[doubled.BDD.id.length - 1] = false;
-  assert.deepEqual(await gateFor(ready(ANA_EMAIL), doubled), { open: true });
-  const waiting = withRequest(active, { email: ANA_EMAIL, prenom: 'Ana', nom: 'Retour', Etablissement: 1 });
-  assert.equal((await gateFor(ready(ANA_EMAIL), waiting)).kind, 'deactivated');
 });
 
 test('a person with a validated fiche and a pending one sees the directory', async () => {

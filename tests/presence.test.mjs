@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
-import { describeCreated, describeDeactivated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, explainWriteError, PresenceError } from '../presence.js';
+import { describeCreated, describeHiddenFiche, describePresence, describeUnknownAccount, setPresence, explainWriteError, PresenceError } from '../presence.js';
 import { loadDirectory } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { quiet } from './support/logs.mjs';
-import { sampleTables, withDeactivation, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
+import { sampleTables, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL } from './fixtures.mjs';
 
 // ===== presence : ce qu'on dit à la personne, et l'écriture de son choix =====
 
@@ -121,23 +121,6 @@ test('describeHiddenFiche tells a person who has not accepted where the switch i
     'Cette fiche est masquée de l’annuaire : la personne n’a pas accepté d’apparaître.');
   const [jules] = find('jules@chu-bordeaux.example');
   assert.match(describeHiddenFiche(jules.status, { own: false }), /n’a pas accepté d’apparaître/, 'une case vide n\'est pas un accord');
-});
-
-test('describeHiddenFiche tells a deactivated fiche apart from one hidden by its owner, for the person and for the one who reads it', async () => {
-  const { find } = await setup(withDeactivation(sampleTables(), { deactivated: { 1: true } }));
-  const [ana] = find(ANA_EMAIL);
-  assert.equal(describeHiddenFiche(ana.status, { own: true }), 'Votre fiche est désactivée : elle n’apparaît plus dans l’annuaire.');
-  assert.equal(describeHiddenFiche(ana.status, { own: false }), 'Cette fiche est désactivée : la personne a quitté l’établissement.');
-  assert.doesNotMatch(describeHiddenFiche(ana.status, { own: false, withdrawn: true }), /interrupteur/, 'ce n\'est pas son choix : aucun interrupteur à lui montrer');
-});
-
-test('describeDeactivated gives the account bar of a person who left: no switch, her name, and who to ask', () => {
-  const said = describeDeactivated({ name: 'Ana Martin', initials: 'AM', photo: 0 });
-  assert.deepEqual({ name: said.name, initials: said.initials, accepted: said.accepted, switchable: said.switchable, tone: said.tone }, { name: 'Ana Martin', initials: 'AM', accepted: false, switchable: false, tone: 'info' });
-  assert.match(said.message, /^Votre fiche est désactivée/);
-  assert.match(said.message, /responsable de votre établissement ou un administrateur/);
-  assert.doesNotMatch(said.message, /\.md/);
-  assert.equal(describeDeactivated(null).name, 'Ma fiche');
 });
 
 test('describeHiddenFiche tells an administrator who unticks « Accepte d’apparaître » that the fiche leaves the directory and that she cannot open it there any more', async () => {

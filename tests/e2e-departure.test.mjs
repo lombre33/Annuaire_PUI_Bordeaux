@@ -1,6 +1,7 @@
-// Le départ d'un·e collègue (1.46.0 : departure.js, departure-save.js, departure-ui.js, etablissement-form.js, gate.js) dans Chromium (optionnel :
-// voir TESTING.md), sur une API Grist simulée : le responsable d'un établissement ouvre la fenêtre depuis « Mon établissement », choisit qui part et qui
-// reprend ses valeurs, relit l'avant / après, confirme ; la fiche est DÉSACTIVÉE (la case `Fiche_desactivee`), jamais supprimée ; il peut la réactiver.
+// Le départ d'un·e collègue (1.46.0, simplifié en 1.46.1 : departure.js, departure-save.js, departure-ui.js, etablissement-form.js) dans Chromium
+// (optionnel : voir TESTING.md), sur une API Grist simulée : le responsable d'un établissement ouvre la fenêtre depuis « Mon établissement », choisit qui part
+// et qui reprend ses valeurs, relit l'avant / après, confirme ; la fiche est DÉSACTIVÉE (sa case `Accepte_apparaitre` est décochée, aucune colonne de plus),
+// jamais supprimée ; il peut la réactiver (la case est recochée).
 // Ce que Grist refuse vraiment, ce sont ses règles d'accès (GRIST_SETUP.md) : rien de cela n'a été essayé dans le Grist d'Antoine (TESTING.md, section 33).
 
 import { test } from 'node:test';
@@ -37,12 +38,13 @@ async function openDeparture(page, cards = 4) {
   await dlg(page).locator('#departPeopleTitle').waitFor();
 }
 
-const reactivate = page => dlg(page).getByRole('button', { name: /^Réactiver la fiche de / });
+const reactivate = (page, name = 'Hugo Bernard') => dlg(page).getByRole('button', { name: `Réactiver la fiche de ${name}` });
 const departButton = (page, name) => depart.press(page, `Départ de ${name}`);
 const recipient = page => page.locator('#departRecipient');
 const recipientOptions = page => page.locator('#departRecipient-list .dd-option').allTextContents();
 const checkbox = (page, key) => dlg(page).locator(`input[data-group="${key}"]`);
-// Les personnes de l'établissement (la section « Personnes de l'établissement »), pas les fiches désactivées plus bas.
+// Les personnes de l'établissement (la section « Personnes de l'établissement »), pas les fiches qui n'apparaissent pas plus bas.
+const goneNames = page => dlg(page).locator('[data-state="removed"] .es-resp-name').allTextContents();
 const rowsOf = page => dlg(page).locator('section[aria-labelledby="departPeopleTitle"] .dp-person');
 const group = (page, key) => dlg(page).locator(`.dp-group[data-group="${key}"]`);
 const groupLines = async (page, key) => ({
@@ -70,8 +72,10 @@ test('un responsable trouve le départ dans « Mon établissement » ; la fenêt
     assert.deepEqual(await rowsOf(page).locator('.es-resp-name').allTextContents(), [`${HOSTILE_FIRST_NAME} Hostile`, 'Ana Martinvous', 'Hugo Bernard']);
     assert.equal(await rowsOf(page).filter({ hasText: 'Ana Martin' }).getByRole('button').count(), 0, 'on ne désactive pas sa propre fiche');
     assert.equal(await departButton(page, 'Hugo Bernard').textContent(), 'Départ…');
-    assert.equal(await dlg(page).locator('#departGoneTitle').count(), 0, 'aucune fiche désactivée pour l’instant');
-    assert.equal(await dlg(page).locator('.notice').count(), 0, 'la colonne existe : rien à signaler');
+    // Iris a refusé d'apparaître et Jules n'a pas répondu : leurs fiches n'apparaissent pas, la case ne dit pas pourquoi.
+    assert.equal(await dlg(page).locator('#departGoneTitle').textContent(), 'Fiches qui n’apparaissent pas (2)');
+    assert.deepEqual(await goneNames(page), ['Iris Refus', 'Jules Sansreponse']);
+    assert.equal(await dlg(page).locator('.notice').count(), 0, 'rien à signaler');
     assert.deepEqual(await updates(page), [], 'ouvrir n’écrit rien');
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
@@ -111,7 +115,7 @@ test('départ de Hugo, ses valeurs reprises par Ana : avant / après relus, une 
 
     // L'écran de confirmation dit ce que Ana avait AVANT et aura APRÈS, rubrique par rubrique.
     await headingIs(page, 'Désactiver la fiche de Hugo Bernard ?');
-    assert.match(await dlg(page).locator('.notice').first().innerText(), /n’apparaîtra plus dans l’annuaire\. Elle reste dans Grist : rien n’est supprimé, et vous pouvez la réactiver\./);
+    assert.match(await dlg(page).locator('.notice').first().innerText(), /n’apparaîtra plus dans l’annuaire\s: sa case «\sApparaître dans l’annuaire\s» sera décochée\. Elle reste dans Grist\s: rien n’est supprimé, et vous pouvez la réactiver\./);
     assert.equal(await dlg(page).locator('#departTransferTitle').textContent(), 'Valeurs recopiées sur la fiche de Ana Martin');
     assert.deepEqual(await groupLines(page, 'instances'), { count: 'Avant 1 valeur → après 1 valeur', lines: ['Rien à transférer : la fiche n’en a aucune.'] });
     assert.deepEqual(await groupLines(page, 'gt'), { count: 'Avant 0 valeur → après 1 valeur', lines: ['Ajoutées : GT qualité'] });
@@ -130,19 +134,22 @@ test('départ de Hugo, ses valeurs reprises par Ana : avant / après relus, une 
     const calls = await bddCalls(page);
     assert.deepEqual(calls.map(call => [call.action, call.rowId, call.values, call.ok]), [
       ['UpdateRecord', 1, { GT: ['L', 1], Communautes: ['L', 2, 1], Taches: ['L', 1, 3, 4] }, true],
-      ['UpdateRecord', 10, { Fiche_desactivee: true }, true]
+      ['UpdateRecord', 10, { Accepte_apparaitre: false }, true]
     ]);
-    assert.deepEqual(await structureCalls(page), [], 'la colonne existait : rien n’est ajouté au document');
+    assert.deepEqual(await structureCalls(page), [], 'aucune colonne n’est ajoutée au document');
     const tablesAfter = await page.evaluate(() => structuredClone(window.__tables.BDD));
+    assert.equal('Fiche_desactivee' in tablesAfter, false, 'et il n’existe pas de colonne de plus pour le départ');
     assert.equal(tablesAfter.id.length, tablesBefore.id.length, 'la fiche reste dans BDD');
     assert.deepEqual(tablesAfter.Etablissement, tablesBefore.Etablissement, 'les établissements des fiches n’ont pas bougé');
+    assert.equal(await values(page, 'Accepte_apparaitre', 10), false);
+    Object.keys(tablesBefore).filter(key => key !== 'Accepte_apparaitre').forEach(key => assert.deepEqual(tablesAfter[key][tablesAfter.id.indexOf(10)], tablesBefore[key][tablesBefore.id.indexOf(10)], `Hugo : ${key}`));
     assert.deepEqual(await values(page, 'Competences', 10), ['L', 2], 'Hugo garde ses propres valeurs : la fiche désactivée reste telle qu’elle était');
     assert.deepEqual(await values(page, 'GT', 10), ['L', 1]);
 
-    // La liste se redessine : Hugo n'est plus une personne de l'établissement, il est dans les fiches désactivées.
+    // La liste se redessine : Hugo n'est plus une personne de l'établissement, il est avec les fiches qui n'apparaissent pas.
     assert.deepEqual(await rowsOf(page).locator('.es-resp-name').allTextContents(), [`${HOSTILE_FIRST_NAME} Hostile`, 'Ana Martinvous']);
-    assert.equal(await dlg(page).locator('#departGoneTitle').textContent(), 'Fiches désactivées (1)');
-    assert.equal(await dlg(page).locator('[data-state="removed"] .es-resp-name').textContent(), 'Hugo Bernard');
+    assert.equal(await dlg(page).locator('#departGoneTitle').textContent(), 'Fiches qui n’apparaissent pas (3)');
+    assert.deepEqual(await goneNames(page), ['Hugo Bernard', 'Iris Refus', 'Jules Sansreponse']);
     assert.equal(await reactivate(page).count(), 1);
 
     // L'annuaire derrière : un contact de moins, les autres inchangés.
@@ -155,7 +162,7 @@ test('départ de Hugo, ses valeurs reprises par Ana : avant / après relus, une 
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
-test('départ sans transfert : « Ne rien transférer » désactive la fiche et rien d’autre', { skip }, () =>
+test('départ sans transfert : « Ne rien transférer » décoche la case de la fiche et rien d’autre', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await openDeparture(page);
     await departButton(page, 'Hugo Bernard').click();
@@ -165,7 +172,7 @@ test('départ sans transfert : « Ne rien transférer » désactive la fiche et 
     await depart.press(page, 'Désactiver la fiche').click();
     await dlg(page).locator('.rq-done').waitFor();
     assert.equal(await dlg(page).locator('.rq-done').textContent(), 'La fiche de Hugo Bernard est désactivée.');
-    assert.deepEqual((await bddCalls(page)).map(call => [call.action, call.rowId, call.values]), [['UpdateRecord', 10, { Fiche_desactivee: true }]]);
+    assert.deepEqual((await bddCalls(page)).map(call => [call.action, call.rowId, call.values]), [['UpdateRecord', 10, { Accepte_apparaitre: false }]]);
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
@@ -191,7 +198,7 @@ test('le rôle se coche à la main, « Retour » garde le choix, et « Annuler �
 
 // ===== La réactivation =====
 
-test('une fiche désactivée se réactive après confirmation : elle revient dans l’annuaire, et ce qui a été transféré y reste', { skip }, () =>
+test('une fiche désactivée se réactive après confirmation : la case est recochée, la personne revient dans l’annuaire, et ce qui a été transféré y reste', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await openDeparture(page);
     await departButton(page, 'Hugo Bernard').click();
@@ -202,34 +209,46 @@ test('une fiche désactivée se réactive après confirmation : elle revient dan
 
     await reactivate(page).click();
     assert.equal(await depart.press(page, 'Confirmer la réactivation').count(), 1, 'une confirmation avant d’écrire');
-    assert.equal(await values(page, 'Fiche_desactivee', 10), true);
+    assert.match(await dlg(page).locator('.dp-consent').innerText(), /^Cela coche «\sApparaître dans l’annuaire\s» sur sa fiche\s: ne le faites que si la personne vous a donné son accord\.$/);
+    assert.equal(await values(page, 'Accepte_apparaitre', 10), false);
     await depart.press(page, 'Annuler').click();
-    assert.equal(await values(page, 'Fiche_desactivee', 10), true, 'annuler ne réactive rien');
+    assert.equal(await values(page, 'Accepte_apparaitre', 10), false, 'annuler ne réactive rien');
+    assert.equal(await dlg(page).locator('.dp-consent').count(), 0);
 
     await reactivate(page).click();
     await depart.press(page, 'Confirmer la réactivation').click();
     await dlg(page).locator('.rq-done').waitFor();
     assert.equal(await dlg(page).locator('.rq-done').textContent(), 'La fiche de Hugo Bernard est réactivée.');
-    assert.equal(await dlg(page).locator('#departGoneTitle').count(), 0);
-    assert.equal(await values(page, 'Fiche_desactivee', 10), false);
+    assert.equal(await dlg(page).locator('#departGoneTitle').textContent(), 'Fiches qui n’apparaissent pas (2)');
+    assert.equal(await values(page, 'Accepte_apparaitre', 10), true);
     assert.deepEqual(await values(page, 'Taches', 1), ['L', 1, 3, 4], 'les valeurs recopiées sur Ana restent');
     assert.equal(await rowsOf(page).count(), 3);
-    assert.equal(await values(page, 'Accepte_apparaitre', 10), true, 'son choix d’apparaître n’a jamais été touché');
     await depart.press(page, 'Fermer').click();
     await etab.press(page, 'Annuler').click();
     await waitForCards(page, 4);
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
-test('une fiche désactivée depuis Grist ou par un autre responsable est proposée à la réactivation dès que l’annuaire est relu', { skip }, () =>
+test('Grist refuse la réactivation : le message se lit sous la personne, et rien n’est recoché', { skip }, () =>
+  withWidget({ tables: world(tables => { tables.BDD.Accepte_apparaitre[tables.BDD.id.indexOf(10)] = false; }), user: ANA_EMAIL }, async ({ page }) => {
+    await openDeparture(page, 3);
+    await reactivate(page).click();
+    await page.evaluate(() => { window.__denyRows = { BDD: [10] }; });
+    await depart.press(page, 'Confirmer la réactivation').click();
+    const item = dlg(page).locator('[data-state="removed"]', { hasText: 'Hugo Bernard' });
+    await item.locator('.notice').waitFor();
+    assert.match(await item.locator('.notice').innerText(), /Grist a refusé la modification/);
+    assert.equal(await values(page, 'Accepte_apparaitre', 10), false);
+  }));
+
+test('une fiche masquée depuis Grist ou par un autre responsable est proposée à la réactivation dès que l’annuaire est relu', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await openDeparture(page);
     assert.equal(await rowsOf(page).count(), 3);
-    await page.evaluate(() => { window.__tables.BDD.Fiche_desactivee[window.__tables.BDD.id.indexOf(6)] = true; window.__triggerRecords(); });
-    await dlg(page).locator('#departGoneTitle').waitFor();
-    assert.equal(await dlg(page).locator('#departGoneTitle').textContent(), 'Fiches désactivées (1)');
-    assert.equal(await rowsOf(page).count(), 2, 'deux personnes actives');
-    assert.equal(await dlg(page).locator('[data-state="removed"]').count(), 1, 'et la désactivée plus bas');
+    await page.evaluate(() => { window.__tables.BDD.Accepte_apparaitre[window.__tables.BDD.id.indexOf(6)] = false; window.__triggerRecords(); });
+    await until(async () => (await dlg(page).locator('#departGoneTitle').textContent()) === 'Fiches qui n’apparaissent pas (3)', 'la liste n’a pas été relue');
+    assert.equal(await rowsOf(page).count(), 2, 'deux personnes qui apparaissent');
+    assert.equal(await dlg(page).locator('[data-state="removed"]').count(), 3, 'et les trois autres plus bas');
   }));
 
 // ===== Ce que Grist refuse, ce qui a changé, ce qui manque =====
@@ -245,7 +264,7 @@ test('Grist refuse l’écriture : le message le dit, rien n’est changé, et l
     await depart.press(page, 'Désactiver la fiche').click();
     await headingIs(page, 'Départ de Hugo Bernard');
     assert.match(await dlg(page).locator('.notice').innerText(), /Grist a refusé la modification : vos droits ne permettent pas de désactiver cette fiche/);
-    assert.equal(await values(page, 'Fiche_desactivee', 10), false);
+    assert.equal(await values(page, 'Accepte_apparaitre', 10), true);
     assert.deepEqual(await values(page, 'Taches', 1), ['L', 1, 3], 'ni les valeurs d’Ana n’ont été écrites : tout ou rien');
     assert.equal(await recipient(page).textContent(), 'Ana Martin', 'le choix est gardé pour recommencer');
     assert.ok((await Promise.all(logs.errors)).some(line => /\[DEPART\] écriture impossible/.test(line)), 'la console dit pourquoi');
@@ -254,7 +273,7 @@ test('Grist refuse l’écriture : le message le dit, rien n’est changé, et l
     await depart.press(page, 'Continuer').click();
     await depart.press(page, 'Désactiver la fiche').click();
     await dlg(page).locator('.rq-done').waitFor();
-    assert.equal(await values(page, 'Fiche_desactivee', 10), true);
+    assert.equal(await values(page, 'Accepte_apparaitre', 10), false);
   }));
 
 test('si l’une des deux fiches a changé dans Grist pendant la relecture, rien n’est écrit et le responsable relit', { skip }, () =>
@@ -284,42 +303,31 @@ test('un responsable qui est aussi sur la liste des responsables de l’établis
     assert.match(await dlg(page).locator('.notice').innerText(), /Cette personne est aussi responsable de l’établissement : pensez à la retirer de la liste des responsables/);
   }));
 
-test('sans la colonne « Fiche_desactivee » (un compte qui ne peut pas la créer), la fenêtre le dit et ne propose aucun départ', { skip }, () =>
-  withWidget({ tables: world(tables => { delete tables.BDD.Fiche_desactivee; tables.ACL.admin[0] = false; }), user: ANA_EMAIL }, async ({ page, logs }) => {
-    await openDeparture(page);
-    assert.match(await dlg(page).locator('.notice').innerText(), /La colonne « Fiche_desactivee » n’existe pas dans BDD : le départ d’un·e collègue n’est pas proposé/);
-    assert.doesNotMatch(await dlg(page).locator('.notice').innerText(), /\.md/, 'un message ne nomme pas de fichier : il renvoie à la documentation');
-    assert.equal(await dlg(page).locator('.dp-person').count(), 0);
-    assert.equal(await dlg(page).getByRole('button', { name: /^Départ/ }).count(), 0);
-    assert.deepEqual(await structureCalls(page), [], 'un responsable qui n’administre pas ne tente pas d’ajouter une colonne');
-    assert.deepEqual(await Promise.all(logs.errors), []);
-  }));
-
-test('un administrateur qui ouvre l’annuaire fait ajouter la colonne « Fiche_desactivee » au document, une seule fois, et le départ se propose', { skip }, () =>
-  withWidget({ tables: world(tables => { delete tables.BDD.Fiche_desactivee; }), user: ANA_EMAIL }, async ({ page }) => {
+test('un administrateur qui ouvre l’annuaire n’ajoute aucune colonne pour le départ : la 1.46.0 en créait une, la 1.46.1 non', { skip }, () =>
+  withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
-    await until(async () => (await structureCalls(page)).some(call => call.action === 'AddColumn' && call.rowId === 'Fiche_desactivee'), 'la colonne n’a pas été ajoutée');
-    assert.deepEqual((await structureCalls(page)).filter(call => call.rowId === 'Fiche_desactivee').map(call => [call.table, call.values]), [['BDD', { type: 'Bool', isFormula: false }]]);
+    await page.waitForTimeout(400); // les colonnes se tentent après le chargement de l'annuaire
+    assert.deepEqual(await structureCalls(page), []);
+    assert.equal(await page.evaluate(() => 'Fiche_desactivee' in window.__tables.BDD), false);
     await openDeparture(page);
-    assert.equal(await departButton(page, 'Hugo Bernard').count(), 1);
+    assert.equal(await departButton(page, 'Hugo Bernard').count(), 1, 'le départ se propose sans rien de plus que les colonnes de la fiche');
+    assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
 // ===== La personne qui est partie =====
 
-test('une personne dont la fiche est désactivée ne voit plus l’annuaire : un écran lui dit pourquoi', { skip }, () =>
-  withWidget({ tables: world(tables => { tables.BDD.Fiche_desactivee[tables.BDD.id.indexOf(6)] = true; }), user: 'hostile@chu-bordeaux.example' }, async ({ page, logs }) => {
-    await page.locator('#gatePanel[data-kind="deactivated"]').waitFor();
-    assert.equal(await page.locator('#gatePanel h2').textContent(), 'Votre fiche est désactivée');
-    assert.match(await page.locator('#gatePanel .gate-text').innerText(), /Le responsable de votre établissement a désactivé votre fiche/);
-    assert.equal(await page.locator('#resultCount').textContent(), 'Fiche désactivée');
-    assert.equal(await page.locator('#cardsGrid .contact-card').count(), 0);
-    assert.equal(await page.locator('#gatePanel .gate-action').isHidden(), true, 'elle ne peut pas créer une autre fiche');
-    assert.equal(await page.locator('#toolbar').isHidden(), true);
+test('une personne partie qui se connecte encore est une personne qui n’a pas accepté d’apparaître : aucun écran à part, et elle ne figure plus dans les cartes', { skip }, () =>
+  withWidget({ tables: world(tables => { tables.BDD.Accepte_apparaitre[tables.BDD.id.indexOf(6)] = false; }), user: 'hostile@chu-bordeaux.example' }, async ({ page, logs }) => {
+    await waitForCards(page, 3);
+    assert.equal(await page.locator('#gatePanel[data-kind="deactivated"]').count(), 0, 'plus d’écran « fiche désactivée » : la case suffit');
+    assert.equal(await page.locator('#gatePanel').isHidden(), true);
+    assert.equal((await cardNames(page)).some(name => /Hostile/.test(name)), false);
+    assert.equal(await page.locator('#accountBar .presence-switch').getAttribute('aria-checked'), 'false', 'son interrupteur est éteint');
     assert.deepEqual(await Promise.all(logs.pageErrors), []);
   }));
 
-test('le responsable d’un autre établissement ne voit ni les collègues ni les fiches désactivées du CHU', { skip }, () =>
-  withWidget({ tables: world(tables => { tables.BDD.Fiche_desactivee[tables.BDD.id.indexOf(6)] = true; }), user: BOB_EMAIL }, async ({ page }) => {
+test('le responsable d’un autre établissement ne voit ni les collègues ni les fiches masquées du CHU', { skip }, () =>
+  withWidget({ tables: world(tables => { tables.BDD.Accepte_apparaitre[tables.BDD.id.indexOf(6)] = false; }), user: BOB_EMAIL }, async ({ page }) => {
     await waitForCards(page, 3);
     await page.locator('#accountBar .account-etab').click();
     await page.locator('#etabName').waitFor();
@@ -327,6 +335,6 @@ test('le responsable d’un autre établissement ne voit ni les collègues ni le
     await etab.press(page, 'Un·e collègue quitte l’établissement…').click();
     await dlg(page).locator('#departPeopleTitle').waitFor();
     assert.deepEqual(await rowsOf(page).locator('.es-resp-name').allTextContents(), ['Bob Durandvous'], 'seulement les personnes de l’UBM');
-    assert.equal(await dlg(page).locator('#departGoneTitle').count(), 0, 'la fiche désactivée du CHU n’est pas la sienne à réactiver');
+    assert.equal(await dlg(page).locator('#departGoneTitle').count(), 0, 'les fiches masquées du CHU ne sont pas les siennes à réactiver');
     assert.equal(await toast(page).isHidden(), true);
   }));

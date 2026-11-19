@@ -1,7 +1,7 @@
 // Lecture et enrichissement des données Grist. Rien ici ne touche le DOM ; seule
 // loadDirectory() lit Grist, via le `docApi` qu'on lui passe (voir tests/).
 
-import { ACTIONS_COLUMN, CATEGORIES, CONSENT_COLUMN, DEACTIVATED_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, PENDING_COLUMN, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, ROLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
+import { ACTIONS_COLUMN, CATEGORIES, CONSENT_COLUMN, ETABLISSEMENT_NAMES, LIST_CATEGORIES, MAIN_TABLE, PENDING_COLUMN, REFERENCE_SOURCES, REFERENCE_TABLES, RESPONSIBLE_COLUMN, ROLE_COLUMN, TASK_ROLES, TASK_ROLE_COLUMN } from './constants.js';
 
 export function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
@@ -691,18 +691,11 @@ export function isPendingRow(record) {
   return record?.[PENDING_COLUMN] === true;
 }
 
-// Une fiche DÉSACTIVÉE (1.46.0, BDD.Fiche_desactivee) : une personne qui a quitté l'établissement, dont le responsable a retiré la fiche de l'annuaire
-// sans la supprimer. Seul `true` vaut désactivation : vide, faux ou colonne absente, la fiche est active, comme toutes celles d'avant la colonne.
-export function isDeactivatedRow(record) {
-  return record?.[DEACTIVATED_COLUMN] === true;
-}
-
-// `rows` : les lignes de BDD. Une personne apparaît si sa fiche est validée (pas une demande en attente) et active (pas désactivée), si elle a accepté
-// (Accepte_apparaitre), si elle a un nom ou un prénom et si son établissement est éligible : rien d'autre ne compte, pas même `perimetre`.
+// `rows` : les lignes de BDD. Une personne apparaît si sa fiche est validée (pas une demande en attente), si elle a accepté (Accepte_apparaitre),
+// si elle a un nom ou un prénom et si son établissement est éligible : rien d'autre ne compte, pas même `perimetre`.
 export function buildContacts(rows, referenceMaps, etabFlags) {
   return rows
     .filter(row => !isPendingRow(row))
-    .filter(row => !isDeactivatedRow(row))
     .filter(hasAccepted)
     .map(row => enrich(row, referenceMaps, etabFlags))
     .filter(contact => contact.nom || contact.prenom)
@@ -719,7 +712,6 @@ export function buildContacts(rows, referenceMaps, etabFlags) {
 //                              ni partenaire)
 //   partnerOnly                affichée seulement avec l'interrupteur Partenaires
 //   pending                    la fiche est une demande qui attend la validation d'un administrateur (1.45.0)
-//   deactivated                la fiche est désactivée : la personne a quitté l'établissement (1.46.0)
 //   visible                    tous les critères sont réunis
 export function describeVisibility(row, referenceMaps, etabFlags) {
   const contact = enrich(row, referenceMaps, etabFlags);
@@ -735,15 +727,13 @@ export function describeVisibility(row, referenceMaps, etabFlags) {
   const accepted = hasAccepted(row);
   const named = Boolean(contact.nom || contact.prenom);
   const pending = isPendingRow(row);
-  const deactivated = isDeactivatedRow(row);
   return {
     accepted,
     named,
     etablissement,
     partnerOnly: eligible && !contact.etablissement_fondateur,
     pending,
-    deactivated,
-    visible: !pending && !deactivated && accepted && named && eligible
+    visible: !pending && accepted && named && eligible
   };
 }
 
@@ -794,12 +784,12 @@ export function createPeopleIndex(rows, referenceMaps, etabFlags, columns = rows
       return rows.filter(isPendingRow).map(entry);
     },
     hasPendingColumn: columns.includes(PENDING_COLUMN),
-    // Les fiches désactivées d'un établissement (1.46.0), dans l'ordre des lignes de BDD : le responsable les relit pour en réactiver une. Une
-    // fiche en attente de validation n'en fait pas partie (elle n'est pas encore une fiche).
-    deactivatedOf(etablissementId) {
-      return rows.filter(row => isDeactivatedRow(row) && !isPendingRow(row) && refId(row.Etablissement) === etablissementId).map(entry);
+    // Les fiches validées d'un établissement que l'annuaire ne montre pas faute d'accord (1.46.0 ; depuis la 1.46.1, c'est aussi ce que devient la fiche d'une
+    // personne qui part : le départ décoche `Accepte_apparaitre`), dans l'ordre des lignes de BDD : le responsable les relit pour en réactiver une. Une fiche
+    // en attente de validation n'en fait pas partie (elle n'est pas encore une fiche).
+    withoutConsentOf(etablissementId) {
+      return rows.filter(row => !isPendingRow(row) && !hasAccepted(row) && refId(row.Etablissement) === etablissementId).map(entry);
     },
-    hasDeactivatedColumn: columns.includes(DEACTIVATED_COLUMN),
     // `ids` : les lignes de BDD dont Grist a enregistré le choix `accepted`.
     rememberConsent(ids, accepted) {
       ids.forEach(id => written.set(id, accepted));
@@ -1151,12 +1141,10 @@ export async function loadDirectory(docApi, { previousMaps = {}, log = console }
   referenceMaps[ETABLISSEMENT_NAMES] = labelMapFromRows(etablissementRows, ['nom_complet', 'acronyme']);
   const etabFlags = etablissementFlagsFromRows(etablissementRows);
   const contacts = buildContacts(rows, referenceMaps, etabFlags);
-  // Les demandes en attente (1.45.0) et les fiches désactivées (1.46.0) ne sont ni des contacts ni une anomalie : les avertissements ne parlent
-  // que des fiches validées et actives.
-  const waiting = rows.filter(isPendingRow).length;
-  const retired = rows.filter(row => !isPendingRow(row) && isDeactivatedRow(row)).length;
-  const validated = rows.filter(row => !isPendingRow(row) && !isDeactivatedRow(row));
-  log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length}${waiting ? `, demandes en attente : ${waiting}` : ''}${retired ? `, fiches désactivées : ${retired}` : ''})`);
+  // Les demandes en attente (1.45.0) ne sont ni des contacts ni une anomalie : les avertissements ne parlent que des fiches validées.
+  const validated = rows.filter(row => !isPendingRow(row));
+  const waiting = rows.length - validated.length;
+  log.info(`[GRIST] Enregistrements reçus: ${rows.length} (contacts affichables : ${contacts.length}${waiting ? `, demandes en attente : ${waiting}` : ''})`);
   reportHeldActions(contacts, log);
   warnAboutTextInLists(rows, log);
   warnAboutMissingEtablissement(validated, log);

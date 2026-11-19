@@ -1026,12 +1026,12 @@ test('l\'identification laisse le document propre : la ligne de la sonde est ret
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForAccountBar(page);
     await probeRemoved(page);
-    // Ana est administratrice : en ouvrant l'annuaire, elle fait ajouter les colonnes Taches_responsable (1.40.0), En_attente_validation (1.45.0) et Fiche_desactivee
-    // (1.46.0), la seule structure que le widget touche ; l'identification, elle, n'écrit que la ligne de la sonde.
+    // Ana est administratrice : en ouvrant l'annuaire, elle fait ajouter les colonnes Taches_responsable (1.40.0) et En_attente_validation (1.45.0), la
+    // seule structure que le widget touche ; l'identification, elle, n'écrit que la ligne de la sonde.
     assert.deepEqual((await grist(page)).filter(call => !/Column$/.test(call.action)).map(call => [call.action, call.table]),
       [['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
     assert.deepEqual((await grist(page)).filter(call => /Column$/.test(call.action)).map(call => [call.action, call.table, call.rowId]),
-      [['AddColumn', 'BDD', 'Taches_responsable'], ['AddColumn', 'BDD', 'En_attente_validation'], ['AddColumn', 'BDD', 'Fiche_desactivee']]);
+      [['AddColumn', 'BDD', 'Taches_responsable'], ['AddColumn', 'BDD', 'En_attente_validation']]);
     assert.deepEqual(await page.evaluate(() => window.__tables.Annuaire_Sonde.id), []);
   }));
 

@@ -6,7 +6,7 @@ la faire et comment vérifier qu'elle a marché.
 
 | Étape | Quoi | Sans elle |
 |---|---|---|
-| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** ; la colonne `Taches_responsable` (« Responsable de l'action x.y », 1.40.0, facultative) la case `En_attente_validation` (1.45.0, **obligatoire** pour créer une fiche) et la case `Fiche_desactivee` (1.46.0, nécessaire au départ d'un·e collègue) : **le widget les crée lui-même** quand un administrateur ouvre l'annuaire | l'interrupteur « Ma présence » échoue (la console dit la colonne et renvoie ici), de même que l'enregistrement ou la création d'une fiche, avec un message qui renvoie ici ; sans `Taches_responsable`, seule la case « Responsable de » manque dans « Modifier mon profil » |
+| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** ; la colonne `Taches_responsable` (« Responsable de l'action x.y », 1.40.0, facultative) la case `En_attente_validation` (1.45.0, **obligatoire** pour créer une fiche) : **le widget les crée lui-même** quand un administrateur ouvre l'annuaire | l'interrupteur « Ma présence » échoue (la console dit la colonne et renvoie ici), de même que l'enregistrement ou la création d'une fiche, avec un message qui renvoie ici ; sans `Taches_responsable`, seule la case « Responsable de » manque dans « Modifier mon profil » |
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement : **le widget la crée lui-même** au premier chargement, ouvert par un compte qui peut modifier la structure du document | si le widget n'a pas pu la créer, personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, depuis la 1.17.0 une fiche d'établissement aussi, depuis la 1.18.0 une personne crée elle-même sa fiche, et depuis la 1.46.0 un responsable désactive la fiche d'un·e collègue |
@@ -15,8 +15,8 @@ la faire et comment vérifier qu'elle a marché.
 | 7 | La fenêtre de connexion des visiteurs sans compte (facultatif, 1.44.0) : le numéro de la page dans l'adresse du widget (`index.html?page=4`) ; elle suppose les règles de l'étape 4 | le visiteur voit toujours la fenêtre, mais, une fois connecté, il revient à la **première** page du document au lieu de celle de l'annuaire |
 
 Le widget ne modifie jamais la structure du document (règle d'accès, colonne existante) et ne crée
-qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2), et que trois colonnes de
-`BDD`, `Taches_responsable` (1.40.0), `En_attente_validation` (1.45.0) et `Fiche_desactivee` (1.46.0), quand elles manquent et qu'un administrateur ouvre l'annuaire (étape 1) :
+qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2), et que deux colonnes de
+`BDD`, `Taches_responsable` (1.40.0) et `En_attente_validation` (1.45.0), quand elles manquent et qu'un administrateur ouvre l'annuaire (étape 1) :
 tout le reste de ce qui est ci-dessous se fait à la main, une fois. Hors ces créations, il n'écrit que
 des lignes et des cellules : celle de la personne connectée dans `BDD` (son choix de présence, sa
 fiche, ou la fiche qu'elle crée quand elle n'en a pas) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
@@ -43,9 +43,10 @@ Le widget écrit dans `BDD` dans cinq cas :
   la case « Apparaître dans l’annuaire », cochée d'avance) et les colonnes qu'elle a
   remplies parmi celles du cas précédent, sauf `Avatar` : la photo s'ajoute ensuite ;
 - quand un **responsable d'établissement** signale le départ d'un·e collègue (1.46.0) : la case
-  `Fiche_desactivee` de la fiche de la personne qui part (elle est **désactivée**, jamais supprimée) et, si le
-  responsable le demande, les listes de la fiche d'une autre personne de l'établissement (celles du cas précédent, sans
-  `Avatar`) ; il peut aussi la réactiver ;
+  `Accepte_apparaitre` de la fiche de la personne qui part, **décochée** (la fiche est **désactivée**, jamais
+  supprimée ; depuis la 1.46.1, aucune colonne de plus) et, si le responsable le demande, les listes de la fiche d'une
+  autre personne de l'établissement (celles du cas précédent, sans `Avatar`) ; il peut aussi la réactiver (la case
+  est recochée) ;
 - quand un administrateur, mode admin allumé, enregistre la fiche d'une autre
   personne : les mêmes colonnes que pour la modification d'une fiche, plus `email`,
   `Etablissement` et, depuis la 1.38.0, `Accepte_apparaitre` (la case « Accepte
@@ -101,24 +102,6 @@ peut créer sa fiche** : le widget refuse plutôt que d'ajouter une fiche sans v
 « En_attente_validation » … Rien n'a été créé. »). À la main : ajoutez à `BDD` une colonne `En_attente_validation`,
 type **Case à cocher**, comportement **Colonne de données**, sans rien y écrire. Cette création n'a pas été
 essayée dans un vrai Grist.
-
-**`Fiche_desactivee` (1.46.0).** Depuis la 1.46.0, un responsable d'établissement signale, depuis « Mon établissement »
-puis « Départ d'un·e collègue », qu'une personne a quitté son établissement : sa fiche est **désactivée**, jamais
-supprimée. La colonne qui le dit est une case à cocher de `BDD` nommée `Fiche_desactivee`, une colonne de **données**.
-Vraie, la fiche n'apparaît plus dans l'annuaire, et la personne lit « Votre fiche est désactivée » à la place de
-l'annuaire ; **vide ou fausse, c'est une fiche active** : les lignes d'avant n'ont rien à changer. Le responsable peut
-la réactiver (la case est décochée), et la personne retrouve alors son choix d'apparaître, que le départ n'a jamais
-touché : c'est pourquoi la désactivation a sa propre colonne et n'utilise pas `Accepte_apparaitre`.
-
-*Le widget la crée lui-même quand elle manque*, comme `En_attente_validation` : seulement quand un administrateur
-ouvre l'annuaire, une fois par chargement, en une action (`AddColumn`, type **Case à cocher**, colonne de données).
-Grist ne l'accepte que d'un compte qui peut modifier la structure (étape 4, point A : si la structure est verrouillée,
-seul un propriétaire qui est aussi administrateur d'`ACL` la crée). **Sans cette colonne**, la fenêtre « Départ
-d'un·e collègue » le dit et ne propose aucun départ : rien d'autre ne change. **À la main** : ajoutez à `BDD` une
-colonne dont l'**ID est exactement `Fiche_desactivee`** (vérifiez-le dans les options de la colonne : Grist le tire du
-nom), type **Case à cocher**, comportement **Colonne de données**, sans rien y écrire. **Créez-la avant les règles
-d'accès du départ** (étape 4) : Grist refuse une règle de colonne sur une colonne qui n'existe pas encore. Cette
-création n'a pas été essayée dans un vrai Grist.
 
 **La liste blanche des domaines (1.45.0).** Pour créer sa fiche, une personne doit avoir une adresse dont le
 **domaine** est celui d'un établissement : le widget lit pour cela, **en lecture seule**, la colonne des noms de
@@ -623,86 +606,72 @@ widget, ignore la casse). Une fiche créée à la main en `Carol@Univ.Example` p
 lit mais ne se modifie pas. (2) Une personne qui aurait deux lignes (une validée, une en attente) est dans un
 état imprévisible : cherchez les doublons.
 
-### Le départ d'un·e collègue (1.46.0 : fiche désactivée)
+### Le départ d'un·e collègue (1.46.0, simplifié en 1.46.1)
 
 Antoine, 19 novembre 2026 : un responsable d'établissement désactive la fiche d'un·e collègue qui part (elle reste dans
 `BDD`, le widget ne la montre plus) et peut recopier ses listes sur la fiche d'une autre personne de l'établissement.
-Le widget fait sa part (la fenêtre « Départ d'un·e collègue », le contrôle des deux fiches, la copie sans doublon,
-une seule action Grist) ; **les règles d'accès sont la seule vraie barrière** : sans elles, n'importe quel Éditeur
-peut cocher `Fiche_desactivee` sur n'importe quelle fiche depuis la console. Ces règles ont été **établies avec le
-fil des permissions et essayées dans un Grist local (1.7.22), avec un compte par profil** (huit profils, dix-huit essais
-chacun, les sept listes une à une), et **pas** dans le vrai document d'Antoine ni avec le widget 1.46.0 : saisissez-les
-d'abord sur une copie complète. Elles s'ajoutent à celles de « Annuaire fermé et fiches à valider » ci-dessus.
+**Depuis la 1.46.1, désactiver, c'est décocher `Accepte_apparaitre`** (« Réactiver » la recoche) : il n'y a **aucune
+colonne à créer**, et **une seule règle à ajouter**. La 1.46.0 cochait une colonne `Fiche_desactivee` et demandait quatre
+règles : si vous les avez saisies, supprimez-les (le bloc de colonne `Fiche_desactivee`, et remettez les règles 3, 5 et 6
+du groupe « Toutes » ainsi que le bloc `Avatar` dans l'état d'avant) ; la colonne elle-même, si elle existe dans votre
+document, est inutile et peut être supprimée. Le widget fait sa part (la fenêtre « Départ d'un·e collègue », le contrôle
+des deux fiches, la copie sans doublon, une seule action Grist) ; **les règles d'accès sont la seule vraie barrière** :
+sans elles, n'importe quel Éditeur peut décocher `Accepte_apparaitre` sur n'importe quelle fiche, ou en réécrire les
+listes, depuis la console. Cette règle a été **établie avec le fil des permissions et essayée dans un Grist local
+(1.7.22), avec un compte par profil** (huit profils, dix-neuf essais chacun, les sept listes une à une), et **pas** dans
+le vrai document d'Antoine ni avec le widget 1.46.1 : saisissez-la d'abord sur une copie complète. Elle s'ajoute à
+celles de « Annuaire fermé et fiches à valider » ci-dessus.
 
-**Avant les règles, créez la colonne** `Fiche_desactivee` (étape 1) : Grist refuse une règle de colonne sur une colonne
-qui n'existe pas encore. (Dans l'étude, l'attribut d'utilisateur `Acl` s'appelle `myUser` : gardez le nom que votre
-document a déjà.)
+**Ce que le widget écrit.** Une seule action du responsable de l'établissement A, tout ou rien : (1) sur la fiche qui
+part, `{ Accepte_apparaitre: false }` (réactivation : `true`) ; (2) facultatif, sur la fiche qui reprend, les sept listes
+`Instances`, `GT`, `Competences`, `Communautes`, `Taches`, `Taches_responsable` et `Role_dans_le_PUI`. Les deux fiches
+sont de A et validées (pas `En_attente_validation`). **Aucune lecture en plus** : un membre (le responsable compris) lit
+déjà les fiches validées de `BDD` ; c'est le widget qui cache celles dont `Accepte_apparaitre` n'est pas coché.
 
 **Ce que chaque profil peut faire.**
 
 | Profil | Peut | Ne peut pas |
 |---|---|---|
-| Administrateur (case `admin` d'`ACL`) | tout : désactiver, réactiver, copier des listes, lire les fiches désactivées | |
-| Responsable de l'établissement A (ligne d'`ACL`) | désactiver et réactiver les fiches **validées** de A ; copier les listes (instances, groupes de travail, compétences, communautés, actions, rôles, responsable d'action) vers une autre fiche de A ; lire les fiches désactivées de A | toucher à une fiche d'un autre établissement ; changer le nom, l'e-mail, l'établissement, la photo ou la validation de quelqu'un ; écrire dans une fiche désactivée (sauf la réactiver) ; valider une demande |
-| Membre de A (fiche validée, active) | tout ce qu'il fait aujourd'hui sur sa fiche | cocher « désactivée » sur sa propre fiche ; lire une fiche désactivée |
-| Personne dont la fiche est désactivée | lire sa propre ligne (c'est ce qui affiche « Votre fiche est désactivée ») | lire les autres fiches ; modifier sa fiche ; redéposer une demande |
+| Administrateur (case `admin` d'`ACL`) | tout, comme avant | |
+| Responsable de l'établissement A (ligne d'`ACL`) | décocher et recocher `Accepte_apparaitre` des fiches **validées** de A ; copier les sept listes vers une autre fiche de A | toucher à une fiche d'un autre établissement ; changer le nom, l'e-mail, l'établissement, la fonction ou la validation de quelqu'un ; agir sur une demande en attente |
+| Membre de A (fiche validée) | tout ce qu'il fait aujourd'hui sur sa fiche, sa case comprise | décocher la case d'une autre personne ; copier des listes |
 | Demande en attente, connecté sans fiche, visiteur | rien ne change pour eux | |
 
-**Règle 1 · un nouveau bloc de colonne `Fiche_desactivee`** (menu « ⋯ » du bloc de la table `BDD`, « Ajouter une règle
-de colonne », la colonne seule). Trois lignes, qui décident qui coche ou décoche la case ; seul **Modifier** est donné
-ou refusé :
+**La règle : un nouveau bloc de colonnes sur `BDD`** (menu « ⋯ » du bloc de la table `BDD`, « Ajouter une règle de
+colonne »), avec ces **huit colonnes ensemble** : `Accepte_apparaitre`, `Instances`, `GT`, `Competences`, `Communautes`,
+`Taches`, `Taches_responsable` et `Role_dans_le_PUI`. **Une seule ligne, et pas de ligne « Tous les autres »** (sans quoi
+une personne ne modifierait plus sa propre fiche : elle passe par les règles de la table). Seul **Modifier** est donné :
 
-| # | Condition | Modifier |
-|---|---|---|
-| 1 | `user.Acl.admin or user.Access in [OWNER]` | ✓ |
-| 2 | `user.Acl.Responsable_de_l_Etablissement and rec.Etablissement == user.Acl.Responsable_de_l_Etablissement and not rec.En_attente_validation` | ✓ |
-| 3 | « Tous les autres » (y compris la personne elle-même) | ✗ |
+`user.Acl.Responsable_de_l_Etablissement and rec.Etablissement == user.Acl.Responsable_de_l_Etablissement and not rec.En_attente_validation`
 
-**Règle 2 · un deuxième nouveau bloc de colonnes**, avec ces sept colonnes **ensemble** : `Instances`, `GT`,
-`Competences`, `Communautes`, `Taches`, `Taches_responsable`, `Role_dans_le_PUI`. Une seule ligne (et pas de « Tous les
-autres » : la personne qui modifie sa propre fiche passe par les règles de la table). Seul **Modifier** est donné :
+(Dans l'étude, l'attribut d'utilisateur `Acl` s'appelle `myUser` : gardez le nom que votre document a déjà.) Si
+`Role_dans_le_PUI` a déjà un bloc de colonne chez vous, regardez-le avant d'ajouter cette colonne à ce bloc : l'ordre des
+règles compte. Les règles de la table et le bloc `Avatar` restent ce qu'ils sont.
 
-`user.Acl.Responsable_de_l_Etablissement and rec.Etablissement == user.Acl.Responsable_de_l_Etablissement and not rec.En_attente_validation and not rec.Fiche_desactivee`
-
-Si `Role_dans_le_PUI` a déjà un bloc de colonne chez vous, regardez-le avant de continuer : l'ordre des règles compte.
-Le responsable copie ainsi les listes d'une fiche vers une autre de son établissement, tant que la fiche cible n'est
-pas désactivée.
-
-**Règle 3 · le bloc de colonne `Avatar` existant : deux petits ajouts.** Sans cette modification, **une fiche
-désactivée reste lisible** : les autres cellules sont masquées, mais la ligne (et la photo) apparaît. La condition de
-**Lire** devient (les ajouts sont les deux `Fiche_desactivee`) :
-
-`user.IsLoggedIn and user.Access in [VIEWER, EDITOR] and (user.Acl.admin or rec.email == user.Email or ((user.Acl.email or (user.maFiche.email and not user.maFiche.En_attente_validation and not user.maFiche.Fiche_desactivee)) and not rec.En_attente_validation and not rec.Fiche_desactivee))`
-
-**Règle 4 · le groupe « Toutes » de `BDD` : trois conditions à modifier, une ligne à ajouter.** Le reste du groupe ne
-bouge pas, dans cet ordre (ces règles remplacent les lignes correspondantes du tableau « `BDD`, règles de la table » ci-dessus) :
-
-| # | Condition | Lire | Modifier | Créer | Supprimer |
-|---|---|---|---|---|---|
-| 3 | `user.IsLoggedIn and newRec.email == user.Email and newRec.En_attente_validation and not newRec.Fiche_desactivee and not user.maFiche.email` *(modifiée : on ne se crée pas une fiche déjà désactivée)* | — | — | ✓ | — |
-| 4 | `rec.email == user.Email` *(ne bouge pas : une personne lit toujours sa propre ligne, désactivée ou non)* | ✓ | — | — | — |
-| 5 | `user.IsLoggedIn and rec.email == user.Email and not rec.En_attente_validation and not rec.Fiche_desactivee` *(modifiée : une fiche désactivée ne se modifie plus par la personne)* | — | ✓ | — | — |
-| 6 | `user.IsLoggedIn and (user.Acl.email or (user.maFiche.email and not user.maFiche.En_attente_validation and not user.maFiche.Fiche_desactivee)) and not rec.En_attente_validation and not rec.Fiche_desactivee and user.Access in [EDITOR]` *(modifiée : les membres ne lisent plus les fiches désactivées, et une personne désactivée ne lit plus les autres)* | ✓ | ✗ | ✗ | ✗ |
-| 6 bis | `user.IsLoggedIn and user.Acl.Responsable_de_l_Etablissement and rec.Etablissement == user.Acl.Responsable_de_l_Etablissement and not rec.En_attente_validation` *(**nouvelle**, juste sous la 6 : le responsable lit les fiches de son établissement, désactivées comprises, pour les lister et les réactiver)* | ✓ | — | — | — |
-
-**Pas à pas.** (1) Créez la colonne `Fiche_desactivee` (étape 1). (2) Ouvrez les droits d'accès du document. Faites les
-règles 1 et 2 (nouvelles règles de colonne), puis modifiez le bloc `Avatar` (règle 3), puis le groupe « Toutes » (règle 4),
-dans l'ordre affiché. (3) Enregistrez **une seule fois**, en haut de la page. (4) Contrôlez avec le compte d'un
-responsable : « Mon établissement », « Départ d'un·e collègue », désactivez une fiche de test, vérifiez qu'elle
-disparaît de l'annuaire pour un membre, puis réactivez-la ([`TESTING.md`](TESTING.md), section 33).
+**Pas à pas.** (1) Ouvrez les droits d'accès du document. (2) Ajoutez le bloc de colonnes ci-dessus. (3) Enregistrez
+**une seule fois**, en haut de la page. (4) Contrôlez avec le compte d'un responsable : « Mon établissement », « Départ
+d'un·e collègue », désactivez une fiche de test, vérifiez qu'elle disparaît de l'annuaire pour un membre, puis réactivez-la
+([`TESTING.md`](TESTING.md), section 33).
 
 **Ce qui a été vérifié** (Grist local, un compte par profil). Comparer deux références
 (`rec.Etablissement == user.Acl.Responsable_de_l_Etablissement`, sans `.id`) fonctionne : le responsable de A agit sur les
-fiches de A, pas sur celles de B ; un compte d'`ACL` sans établissement de responsabilité ne peut rien sur une fiche sans
-établissement. Un **lot d'écritures est accepté ou refusé en entier** : désactiver une fiche de A et écrire une liste
-dans une fiche de B n'écrit rien (même essai avec trois écritures dont la dernière est refusée) : c'est ce qui garantit
-le « tout ou rien » du départ côté Grist. Les autres profils ne voient rien de plus (batterie de non-régression rejouée
-avec ces règles : mêmes résultats qu'avant).
+fiches de A, pas sur celles de B ; sur une demande en attente, il ne peut rien. Un **lot d'écritures est accepté ou refusé
+en entier** : désactiver une fiche de A et copier des listes vers une autre fiche de A est accepté ; avec une fiche de B, ou
+avec trois écritures dont la dernière est refusée, rien n'est écrit : c'est ce qui garantit le « tout ou rien » du départ
+côté Grist. Un membre ne décoche pas la case d'une autre personne, et modifie la sienne comme avant. Les lectures et les
+autres profils ne changent pas (batterie de non-régression rejouée avec cette règle : mêmes résultats qu'avant).
 
-**Limites connues.** Un responsable de **deux établissements** n'a ces droits que pour le premier (un attribut
-d'utilisateur ne donne qu'une ligne d'`ACL`). Un responsable peut aussi **désactiver sa propre fiche** depuis la console
-(le widget ne le propose pas). La désactivation **n'est pas une protection de confidentialité** : un administrateur et
-le propriétaire lisent tout, et l'historique de Grist garde les valeurs.
+**Limites connues.**
+- La personne dont la fiche est masquée peut **recocher elle-même** `Accepte_apparaitre` (« Ma présence ») tant qu'elle a
+  accès au document : c'est sa case. Une personne partie n'a plus son adresse professionnelle, donc ne peut plus se connecter
+  avec la bonne adresse ; si elle garde un accès au document, retirez-le (voir « Quand quelqu'un part », `docs/maintenance.md`).
+- Une fiche masquée reste **lisible dans Grist** par les membres du document : le widget la cache, la règle ne le fait pas.
+  La désactivation **n'est donc pas une protection de confidentialité** (un administrateur et le propriétaire lisent tout,
+  et l'historique de Grist garde les valeurs).
+- « Réactiver » **recoche** la case même si la personne l'avait décochée elle-même : le widget ne peut pas faire la
+  différence (la fenêtre le rappelle avant de confirmer).
+- Un responsable de **deux établissements** n'a ces droits que pour le premier (un attribut d'utilisateur ne donne qu'une
+  ligne d'`ACL`). Un responsable peut aussi masquer **sa propre** fiche, depuis la console (le widget ne le propose pas).
 
 ## 5. Les logos des établissements (facultatif)
 

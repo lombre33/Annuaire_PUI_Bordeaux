@@ -1,11 +1,11 @@
 // La fenêtre « Départ d'un·e collègue » (index.html : #departDialog, 1.46.0) : le responsable d'un établissement y désactive la fiche d'un·e collègue qui part,
 // après avoir, s'il veut, transféré ses valeurs (compétences, GT, instances, actions…) à une autre personne de l'établissement. Rien n'est supprimé : la
-// fiche reste dans Grist et n'apparaît plus dans l'annuaire, et le responsable peut la réactiver. Trois écrans : la liste (les collègues et les fiches
-// désactivées), le choix de ce qui est transféré, puis la confirmation, qui montre ce que chaque rubrique contenait AVANT et aura APRÈS.
+// fiche reste dans Grist et n'apparaît plus dans l'annuaire (depuis la 1.46.1, sa case « Accepte_apparaitre » est décochée, aucune colonne de plus), et le
+// responsable peut la réactiver en recochant la case. Trois écrans : la liste (les collègues et les fiches qui n'apparaissent pas), le choix de ce qui est
+// transféré, puis la confirmation, qui montre ce que chaque rubrique contenait AVANT et aura APRÈS.
 // DOM seulement : departure.js calcule, departure-save.js lit et écrit, main.js relit l'annuaire après chaque écriture.
 
 import { DEPARTURE_GROUPS } from './constants.js';
-import { DOC_REFS } from './doc-refs.js';
 import { button, dropdown, el, foundText, matchesTerm, notice, searchField } from './dom.js';
 import { createDialogShell } from './dialog-shell.js';
 
@@ -65,8 +65,7 @@ function groupBlock(group) {
 // `dialog` : le <dialog> de index.html. open(session), session :
 //   etablissement      { id, acronym }
 //   colleagues()       les personnes que l'annuaire montre pour l'établissement (departure.js, colleaguesOf), lues à chaque dessin
-//   departed()         les fiches désactivées de l'établissement (departure.js, departedOf)
-//   canWrite           le bouton « Départ » et la réactivation n'existent que quand BDD a la colonne des fiches désactivées
+//   departed()         les fiches de l'établissement qui n'apparaissent pas faute d'accord (departure.js, departedOf)
 //   isResponsable      adresse → vrai si la personne est aussi responsable de l'établissement
 //   prepare(request)   → promesse de la relecture (departure-save.js, prepareDeparture) ; { departingId, recipientId, groups } ; un échec porte son message
 //   apply(review)      → promesse de { status: 'saved', total } ou { status: 'changed' } (departure-save.js, applyDeparture, puis main.js relit l'annuaire)
@@ -95,25 +94,17 @@ export function createDepartureDialog(dialog) {
 
   // ----- La liste -----
 
-  function colleagueList() {
+  // Une liste de personnes (`items` : les lignes, chacune avec son `dataset.name`), avec sa recherche à partir de SEARCH_FROM personnes.
+  function searchableList(items, { label, placeholder }) {
     const list = el('ul', 'es-resp-list dp-list');
-    const people = session.colleagues();
-    if (people.length === 0) return [el('p', 'es-sec-help', 'Aucune fiche de cet établissement n’apparaît dans l’annuaire.')];
-    const items = people.map(person => {
-      const depart = person.me ? [] : [button('Départ…', 'btn', () => renderPlan(person))];
-      depart.forEach(node => node.setAttribute('aria-label', `Départ de ${person.name}`));
-      const item = personRow(session, person, { actions: depart, tag: person.me ? 'vous' : '' });
-      item.dataset.name = person.name;
-      return item;
-    });
     list.append(...items);
     const status = el('p', 'sr-only');
     status.setAttribute('role', 'status');
     const parts = [];
-    if (people.length >= SEARCH_FROM) {
+    if (items.length >= SEARCH_FROM) {
       parts.push(searchField({
-        label: 'Rechercher un·e collègue',
-        placeholder: 'Rechercher un·e collègue…',
+        label,
+        placeholder,
         onTerm: found => {
           let shown = 0;
           items.forEach(item => {
@@ -129,6 +120,19 @@ export function createDepartureDialog(dialog) {
     return parts;
   }
 
+  function colleagueList() {
+    const people = session.colleagues();
+    if (people.length === 0) return [el('p', 'es-sec-help', 'Aucune fiche de cet établissement n’apparaît dans l’annuaire.')];
+    const items = people.map(person => {
+      const depart = person.me ? [] : [button('Départ…', 'btn', () => renderPlan(person))];
+      depart.forEach(node => node.setAttribute('aria-label', `Départ de ${person.name}`));
+      const item = personRow(session, person, { actions: depart, tag: person.me ? 'vous' : '' });
+      item.dataset.name = person.name;
+      return item;
+    });
+    return searchableList(items, { label: 'Rechercher un·e collègue', placeholder: 'Rechercher un·e collègue…' });
+  }
+
   function departedItem(person, { confirming, error }) {
     const confirm = confirming === person.id;
     const actions = confirm
@@ -137,7 +141,10 @@ export function createDepartureDialog(dialog) {
     if (!confirm) actions[0].setAttribute('aria-label', `Réactiver la fiche de ${person.name}`);
     const item = personRow(session, person, { actions, tag: '' });
     item.dataset.state = 'removed';
-    if (error?.id === person.id) item.after(notice('ko', error.message, 'alert'));
+    item.dataset.name = person.name;
+    // Recocher la case est un geste que seule la personne a le droit de décider : la fenêtre le rappelle avant de confirmer.
+    if (confirm) item.querySelector('.es-resp-main').append(el('p', 'es-sec-help dp-consent', 'Cela coche « Apparaître dans l’annuaire » sur sa fiche : ne le faites que si la personne vous a donné son accord.'));
+    if (error?.id === person.id) item.querySelector('.es-resp-main').append(notice('ko', error.message, 'alert'));
     return item;
   }
 
@@ -150,29 +157,24 @@ export function createDepartureDialog(dialog) {
       done.setAttribute('role', 'status');
       parts.push(done);
     }
-    if (!session.canWrite) {
-      parts.push(notice('pending', `La colonne « Fiche_desactivee » n’existe pas dans BDD : le départ d’un·e collègue n’est pas proposé. Un administrateur la crée en ouvrant l’annuaire, ou à la main (voir le ${DOC_REFS.columns.text}).`, 'status'));
-    }
-    parts.push(el('p', 'rq-lead', 'Quand une personne quitte l’établissement, sa fiche est désactivée : elle reste dans Grist, rien n’est supprimé, mais elle n’apparaît plus dans l’annuaire. '
+    parts.push(el('p', 'rq-lead', 'Quand une personne quitte l’établissement, sa fiche est désactivée : elle reste dans Grist, rien n’est supprimé, mais elle n’apparaît plus dans l’annuaire (sa case « Apparaître dans l’annuaire » est décochée). '
       + 'Vous pouvez d’abord transférer ses compétences, GT, instances, actions… à une autre personne de l’établissement.'));
     const people = el('section', 'es-sec');
     people.setAttribute('aria-labelledby', 'departPeopleTitle');
     const title = el('h3', 'es-sec-title', 'Personnes de l’établissement');
     title.id = 'departPeopleTitle';
-    people.append(title, ...(session.canWrite ? colleagueList() : []));
+    people.append(title, ...colleagueList());
     parts.push(people);
 
     const gone = session.departed();
     if (gone.length > 0) {
       const section = el('section', 'es-sec');
       section.setAttribute('aria-labelledby', 'departGoneTitle');
-      const goneTitle = el('h3', 'es-sec-title', `Fiches désactivées (${gone.length})`);
+      const goneTitle = el('h3', 'es-sec-title', `Fiches qui n’apparaissent pas (${gone.length})`);
       goneTitle.id = 'departGoneTitle';
-      const help = el('p', 'es-sec-help', 'Ces fiches restent dans Grist. Réactivée, une fiche réapparaît dans l’annuaire si la personne avait accepté d’apparaître ; '
-        + 'les valeurs déjà transférées à une autre personne y restent.');
-      const list = el('ul', 'es-resp-list dp-list');
-      list.append(...gone.map(person => departedItem(person, { confirming, error })));
-      section.append(goneTitle, help, list);
+      const help = el('p', 'es-sec-help', 'Ces personnes n’apparaissent pas dans l’annuaire : elles ont quitté l’établissement, ou n’ont pas accepté d’apparaître. Leurs fiches restent dans Grist. '
+        + 'Réactiver une fiche recoche son accord d’apparaître ; les valeurs déjà transférées à une autre personne y restent.');
+      section.append(goneTitle, help, ...searchableList(gone.map(person => departedItem(person, { confirming, error })), { label: 'Rechercher une fiche', placeholder: 'Rechercher une fiche…' }));
       parts.push(section);
     }
     shell.body.replaceChildren(...parts);
@@ -272,7 +274,7 @@ export function createDepartureDialog(dialog) {
     generation += 1;
     heading(`Désactiver la fiche de ${result.departing.name} ?`);
     const parts = [
-      notice('pending', `La fiche de ${result.departing.name} n’apparaîtra plus dans l’annuaire. Elle reste dans Grist : rien n’est supprimé, et vous pouvez la réactiver.`, 'status')
+      notice('pending', `La fiche de ${result.departing.name} n’apparaîtra plus dans l’annuaire : sa case « Apparaître dans l’annuaire » sera décochée. Elle reste dans Grist : rien n’est supprimé, et vous pouvez la réactiver.`, 'status')
     ];
     if (result.recipient && result.groups.length > 0) {
       const section = el('section', 'es-sec');

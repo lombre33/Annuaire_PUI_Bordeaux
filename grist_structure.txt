@@ -28,7 +28,7 @@
 # _grist_Tables_column pour écrire le téléphone dans la forme de sa
 # colonne. Il ne modifie jamais une colonne existante. Il ne crée qu'une seule table,
 # Annuaire_Sonde, quand elle manque (depuis la 1.20.0), et que deux colonnes de BDD, Taches_responsable
-# (depuis la 1.40.0), En_attente_validation (depuis la 1.45.0) et Fiche_desactivee (depuis la 1.46.0), quand elles manquent et qu'un
+# (depuis la 1.40.0) et En_attente_validation (depuis la 1.45.0), quand elles manquent et qu'un
 # administrateur ouvre l'annuaire : voir GRIST_SETUP.md pour les créer à la main.
 #
 # Les logos des établissements (1.14.0) sont des pièces jointes du document : le widget lit les
@@ -68,8 +68,11 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
     d'écrire dans une colonne à formule, et l'interrupteur « Ma présence » en
     dépend. Seule la valeur vraie compte : vide, décochée ou autre valeur masque
     la personne. Sans cette colonne, le widget affiche une erreur au lieu
-    d'afficher tout le monde. Voir hasAccepted() dans grist-data.js et
-    setPresence() dans presence.js.
+    d'afficher tout le monde. Depuis la 1.46.0, le responsable d'un établissement
+    la DÉCOCHE aussi sur la fiche d'un·e collègue qui part (« Départ d'un·e
+    collègue », departure-save.js ; la fiche n'est jamais supprimée) et la
+    recoche pour la réactiver : GRIST_SETUP.md, étape 4. Voir hasAccepted() dans
+    grist-data.js et setPresence() dans presence.js.
   Actions           : ReferenceList(Actions)   LUE POUR LA CARTE SEULEMENT
     Les actions d'une personne sont ses tâches (la colonne Taches ci-dessous, que filtre le bouton
     « Actions »). Cette colonne ne filtre rien et ne s'écrit pas ; depuis la 1.41.0 le widget la lit
@@ -125,17 +128,6 @@ Table BDD (table principale : une ligne par personne, lue par son nom via fetchT
                                      administrateur ouvre l'annuaire (AddColumn, schema.js) ;
                                      sans elle, personne ne peut créer sa fiche. Voir
                                      isPendingRow() dans grist-data.js)
-  Fiche_desactivee : Bool (case à cocher)   (depuis la 1.46.0 : VRAIE, la fiche d'une personne
-                                     qui a quitté l'établissement est désactivée ; elle reste
-                                     dans BDD mais n'apparaît dans aucune carte ni aucun menu, et
-                                     sa personne lit « Votre fiche est désactivée ». VIDE ou FAUSSE :
-                                     une fiche active, donc rien à migrer. Indépendante de
-                                     Accepte_apparaitre (le consentement ne change pas). Colonne de
-                                     DONNÉES, que seuls un propriétaire, un administrateur ou le
-                                     responsable de l'établissement écrivent (règles d'accès,
-                                     GRIST_SETUP.md, étape 4). Le widget la crée quand elle manque
-                                     et qu'un administrateur ouvre l'annuaire (AddColumn,
-                                     schema.js). Voir isDeactivatedRow() dans grist-data.js)
 
 Tables de référence (id -> libellé, chargées via fetchTable)
   Chaque table porte un libellé brut (issu de l'import) et un libellé corrigé :
