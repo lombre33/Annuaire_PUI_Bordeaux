@@ -354,6 +354,52 @@ function responsablesSection(ctx) {
   return box;
 }
 
+// ===== Le départ d'un·e collègue =====
+
+// Combien de fiches de l'établissement sont désactivées, sous le bouton qui ouvre la fenêtre du départ (1.46.0).
+export function departureNote({ departed }) {
+  if (departed === 0) return '';
+  return `${departed} fiche${departed > 1 ? 's' : ''} désactivée${departed > 1 ? 's' : ''} : vous pouvez les réactiver depuis cette fenêtre.`;
+}
+
+export function paintDeparture(ctx) {
+  const { ui, fiche } = ctx;
+  const note = departureNote(fiche.departure);
+  ui.departNote.textContent = note;
+  ui.departNote.hidden = note === '';
+}
+
+// Ouvre la fenêtre du départ au-dessus de celle-ci ; quand elle a écrit quelque chose, les personnes à nommer et le nombre de fiches masquées se relisent.
+function openDeparture(ctx) {
+  const { ui } = ctx;
+  ctx.session.openDeparture(ctx.fiche.etablissement, {
+    isResponsable: email => email !== '' && (ctx.fiche.responsables ?? []).some(item => item.email === email),
+    onChanged: () => ctx.refreshPeople(),
+    onClose: () => ui.departOpen.focus()
+  });
+}
+
+function departureSection(ctx) {
+  const { ui } = ctx;
+  const box = el('section', 'es-sec');
+  box.setAttribute('aria-labelledby', 'etabDepartTitle');
+  const heading = el('h3', 'es-sec-title', 'Départ d’un·e collègue');
+  heading.id = 'etabDepartTitle';
+  ui.departNote = el('p', 'es-sec-help');
+  ui.departOpen = button('Un·e collègue quitte l’établissement…', 'btn', () => openDeparture(ctx));
+  ui.departOpen.setAttribute('aria-haspopup', 'dialog');
+  const actions = el('div', 'es-depart-actions');
+  actions.append(ui.departOpen);
+  box.append(
+    heading,
+    el('p', 'es-sec-help', 'Sa fiche est désactivée : elle reste dans Grist, rien n’est supprimé, mais elle n’apparaît plus dans l’annuaire. '
+      + 'Vous pouvez d’abord transférer ses compétences, GT, instances, actions… à une autre personne de l’établissement.'),
+    ui.departNote,
+    actions
+  );
+  return box;
+}
+
 // ===== Le formulaire =====
 
 // Les éléments du corps de la fenêtre à cette étape, dans leur ordre. Repart d'un `ctx.ui` neuf, où ils se rangent.
@@ -372,7 +418,7 @@ export function buildForm(ctx, message = '') {
     nameField(ctx)
   );
   const [visible, visibleNote] = visibilityField(ctx);
-  return [ui.alert, logoSection(ctx), fields, visible, visibleNote, responsablesSection(ctx)];
+  return [ui.alert, logoSection(ctx), fields, visible, visibleNote, responsablesSection(ctx), ...(ctx.session.openDeparture ? [departureSection(ctx)] : [])];
 }
 
 // Remet à jour tout ce qui dépend du brouillon, sans reconstruire les champs (ils garderaient leur curseur).

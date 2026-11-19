@@ -1,4 +1,4 @@
-# Version 1.45.6 — La page sécurité décrit les six écritures de la 1.45 : demande de fiche en attente, validation ou refus par un administrateur (voir CHANGELOG.md)
+# Version 1.46.0 — Le départ d'un·e collègue : un responsable d'établissement désactive la fiche d'une personne qui part (elle reste dans Grist) et lui transfère ses valeurs (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en

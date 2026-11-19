@@ -1706,3 +1706,86 @@ a.btn {
     width: auto;
   }
 }
+
+/* Le départ d'un·e collègue (1.46.0, departure-ui.js) : une fenêtre comme les autres, ouverte au-dessus de la fiche de l'établissement. Elle reprend les
+   lignes de personnes (.es-resp) et les titres de section (.es-sec) de cette fiche ; seuls le choix des rubriques et la confirmation ont leurs classes. */
+.dlg.depart-dlg {
+  width: min(680px, calc(100vw - 32px));
+}
+.dp-list {
+  margin-top: 8px;
+}
+.dp-person[hidden] {
+  display: none;
+}
+.pick-search + .dp-list {
+  margin-top: 8px;
+}
+.dp-groups {
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+}
+.dp-groups legend {
+  padding: 0;
+}
+.dp-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.dp-check input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  --check-color: var(--teal-deep);
+}
+.dp-check input:disabled + span {
+  color: var(--muted);
+}
+.dp-groups-list {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dp-group {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.dp-group-title {
+  font-size: 13px;
+  font-weight: 800;
+}
+.dp-group-count {
+  margin-top: 2px;
+  color: var(--teal-deep);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.dp-group-line {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.dp-more {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.dp-more summary {
+  cursor: pointer;
+}
+.es-depart-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}

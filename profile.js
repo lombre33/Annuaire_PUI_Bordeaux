@@ -197,6 +197,14 @@ function knownIds(cell, options) {
   return [...new Set(listItems(cell).filter(item => typeof item === 'number' && entryOf.has(item)).map(item => entryOf.get(item)))];
 }
 
+// Les valeurs d'une liste de la fiche `row`, comme le formulaire les montre : une entrée par libellé { id, label, ids? } (listEntry), celles que
+// le formulaire ne peut pas nommer (une ligne sans libellé) en moins. De quoi comparer deux fiches sans se soucier des lignes brutes qui se lisent
+// pareil (voir mergeSameLabels), par exemple pour transférer les valeurs d'une fiche à une autre (departure.js, 1.46.0).
+export function listEntriesOf(field, row, referenceMaps) {
+  const options = optionsOf(labelsKey(field, referenceMaps), referenceMaps, { merge: true });
+  return knownIds(row[field.key], options).map(id => listEntry(options, id));
+}
+
 // Les établissements qu'une fiche peut choisir : ceux que la table Etablissements marque fondateur ou partenaire,
 // jamais une structure « autres » (ni l'un ni l'autre), et celui que la fiche porte déjà, pour que la liste le
 // montre même s'il n'en est pas. Sans les indicateurs des établissements (`etabFlags`), rien n'est écarté.
