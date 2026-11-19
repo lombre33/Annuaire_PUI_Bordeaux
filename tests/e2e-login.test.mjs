@@ -1,7 +1,8 @@
 // La fenêtre « Se connecter à Grist » d'un visiteur sans compte (1.44.0 : login.js, login-ui.js, identity.js) dans Chromium (optionnel :
-// voir TESTING.md), sur une API Grist simulée. L'annuaire reste public : les cartes s'affichent pour tout le monde ; seule une personne
-// que Grist dit sans compte (l'adresse anonyme de tous les visiteurs d'un lien public, ou la ligne de la sonde refusée par une règle
-// d'accès) voit la fenêtre, une fois, et le bouton « Se connecter » de l'en-tête. Le lien de la fenêtre mène à la page de connexion
+// voir TESTING.md), sur une API Grist simulée. Depuis la 1.45.0 l'annuaire n'est plus public : un visiteur sans compte lit l'écran
+// « Annuaire réservé » (gate.js) et aucune carte ; seule une personne que Grist dit sans compte (l'adresse anonyme de tous les visiteurs
+// d'un lien public, ou la ligne de la sonde refusée par une règle d'accès) voit la fenêtre, une fois, et le bouton « Se connecter » de
+// l'en-tête. Le lien de la fenêtre mène à la page de connexion
 // de Grist et revient sur la page de l'annuaire en style singlePage ; ce que fait vraiment le Grist de l'instance n'est pas essayé ici
 // (TESTING.md, section 28).
 
@@ -18,10 +19,12 @@ const LOGIN_TO_PAGE_7 = 'https://docs.getgrist.com/login?next=%2Ffake-doc%2Fx%2F
 const DIALOG = '#loginDialog';
 const isOpen = page => page.locator(DIALOG).evaluate(dialog => dialog.open);
 const anonymous = (options = {}) => ({ tables: withIdentity(), user: ANONYMOUS_EMAIL, ...options });
+// L'écran « Annuaire réservé » du visiteur sans compte : l'annuaire lui-même n'est pas dessiné.
+const waitForClosedDirectory = page => page.locator('#gatePanel[data-kind="anonymous"]').waitFor();
 
-test('un visiteur sans compte voit l\'annuaire, puis une fenêtre qui mène à la connexion de Grist, retour sur le document en singlePage', { skip }, () =>
+test('un visiteur sans compte lit « Annuaire réservé », puis une fenêtre qui mène à la connexion de Grist, retour sur le document en singlePage', { skip }, () =>
   withWidget(anonymous(), async ({ page, logs }) => {
-    await waitForCards(page, 4);
+    await waitForClosedDirectory(page);
     await page.locator(`${DIALOG}[open]`).waitFor();
     assert.equal(await page.locator('#loginTitle').textContent(), 'Se connecter à Grist');
     assert.equal(await page.locator(`${DIALOG} .dlg-sub`).textContent(), 'Un compte Grist est nécessaire pour modifier une fiche.');
@@ -33,7 +36,9 @@ test('un visiteur sans compte voit l\'annuaire, puis une fenêtre qui mène à l
     assert.match(await link.getAttribute('rel'), /noopener/);
     assert.match(await page.locator(`${DIALOG} .dlg-body`).innerText(), /connectez-vous à Grist[\s\S]*une fois connecté\(e\), vous revenez ici/);
     assert.deepEqual(await page.locator(`${DIALOG} .dlg-foot .btn`).allTextContents(), ['Continuer sans me connecter', 'Se connecter']);
-    // L'annuaire, lui, n'a rien perdu : pas de bandeau « Ma présence », pas de bouton de modification, la place du bandeau est rendue.
+    // L'annuaire est fermé (1.45.0) : aucune carte, pas de bandeau « Ma présence », pas de bouton de modification, la place du bandeau est rendue.
+    assert.equal(await page.locator('.contact-card').count(), 0);
+    assert.equal(await page.locator('#resultCount').textContent(), 'Connexion requise');
     assert.equal(await page.locator('#accountBar').isHidden(), true);
     assert.equal(await page.locator('.card-edit:visible').count(), 0);
     assert.equal(await page.locator('.account-bar[data-pending]').evaluate(room => room.hidden), true);
@@ -81,14 +86,15 @@ test('la fenêtre ne s\'impose qu\'une fois : « Continuer sans me connecter » 
     await until(() => page.locator('#loginLink').evaluate(link => document.activeElement === link), 'le focus revient au bouton de l\'en-tête');
   }));
 
-test('la croix ferme la fenêtre, et l\'annuaire se lit derrière sans rien de caché', { skip }, () =>
+test('la croix ferme la fenêtre, et l\'écran « Annuaire réservé » se lit derrière, sans rien de caché', { skip }, () =>
   withWidget(anonymous(), async ({ page }) => {
-    await waitForCards(page, 4);
+    await waitForClosedDirectory(page);
     await page.locator(`${DIALOG}[open]`).waitFor();
     await page.getByRole('button', { name: 'Fermer la fenêtre' }).click();
     assert.equal(await isOpen(page), false);
-    assert.equal(await page.locator('.contact-card').count(), 4);
-    assert.equal(await page.locator('#resultCount').textContent(), '4 contacts');
+    assert.equal(await page.locator('.contact-card').count(), 0, 'le visiteur n\'a aucune carte');
+    assert.equal(await page.locator('#gatePanel h2').textContent(), 'Annuaire réservé');
+    assert.equal(await page.locator('#resultCount').textContent(), 'Connexion requise');
   }));
 
 test('si Grist refuse la ligne de la sonde (règle `user.IsLoggedIn`), la personne est prise pour un visiteur sans compte', { skip }, () =>
@@ -147,7 +153,7 @@ test('si Grist ne donne pas l\'adresse de l\'API, la fenêtre explique la connex
 
 test('le bouton de l\'en-tête ne s\'imprime pas', { skip }, () =>
   withWidget(anonymous(), async ({ page }) => {
-    await waitForCards(page, 4);
+    await waitForClosedDirectory(page);
     await page.locator(`${DIALOG}[open]`).waitFor();
     await page.getByRole('button', { name: 'Continuer sans me connecter' }).click();
     assert.equal(await page.locator('#loginLink').isVisible(), true, 'à l\'écran');
@@ -163,10 +169,10 @@ test('un index.html ancien, sans la fenêtre (cache de GitHub Pages : dix minute
       document.getElementById('loginLink')?.remove();
     }).observe(document, { childList: true, subtree: true })
   }), async ({ page, logs }) => {
-    await waitForCards(page, 4);
+    await waitForClosedDirectory(page);
     await page.waitForTimeout(400);
     assert.equal(await page.locator(DIALOG).count(), 0);
-    assert.deepEqual(logs.pageErrors, [], 'l\'annuaire se lit comme avant');
+    assert.deepEqual(logs.pageErrors, [], 'l\'écran réservé se lit comme sans la fenêtre');
   }));
 
 test('LOGIN_AUTO_OPEN faux : la fenêtre n\'est proposée que par le bouton de l\'en-tête', { skip }, () =>
@@ -177,7 +183,7 @@ test('LOGIN_AUTO_OPEN faux : la fenêtre n\'est proposée que par le bouton de l
       await route.fulfill({ response, body: (await response.text()).replace('export const LOGIN_AUTO_OPEN = true;', 'export const LOGIN_AUTO_OPEN = false;') });
     });
     await page.reload();
-    await waitForCards(page, 4);
+    await waitForClosedDirectory(page);
     await page.locator('#loginLink:not([hidden])').waitFor();
     assert.equal(await isOpen(page), false, 'rien ne s\'impose');
     await page.locator('#loginLink').click();

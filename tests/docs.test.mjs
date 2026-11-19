@@ -599,7 +599,9 @@ test('les messages cités dans « Modifier ma fiche » et « Créer ma fiche » 
   const composed = [describeHiddenFiche(hidden({}), { own: true }), describeHiddenFiche(hidden({}), { own: false }),
     describeHiddenFiche(hidden({ etablissement: 'not_eligible' }), { own: false }), ...photoRefusals,
     // ce que la personne lit une fois sa fiche créée (la raison d'une fiche masquée varie : le guide la remplace par …)
-    describeCreated({ visible: true }, true), describeCreated({ visible: false }, false), describeCreated(null, true)].map(plain);
+    describeCreated({ visible: true }, true), describeCreated({ visible: false }, false), describeCreated(null, true, { pending: false }),
+    // depuis la 1.45.0, la fiche créée par la personne est d'abord une demande que valide un administrateur
+    describeCreated(null, true)].map(plain);
   composed.forEach(message => assert.ok(section.includes(message), `Le guide doit citer : ${message}`));
 
   const code = withUploadHint(widgetCode(), PHOTO_UPLOAD_HINT);

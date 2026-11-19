@@ -18,7 +18,7 @@ Pages liées : [README](../README.md), [sécurité et confidentialité](securite
 - [Réinitialiser](#réinitialiser)
 - [Ma présence : apparaître ou non](#ma-présence--apparaître-ou-non)
 - [Modifier ma fiche](#modifier-ma-fiche), dont [Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable), [L'adresse e-mail affichée](#ladresse-e-mail-affichée), [Ma photo de profil](#ma-photo-de-profil), [Quand l'enregistrement échoue](#quand-lenregistrement-échoue), [Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique) et [Pour les administrateurs](#pour-les-administrateurs)
-- [Créer ma fiche](#créer-ma-fiche), dont [Si la création échoue](#si-la-création-échoue)
+- [Créer ma fiche](#créer-ma-fiche), dont [Si la création échoue](#si-la-création-échoue), puis [Valider les demandes de fiche](#valider-les-demandes-de-fiche)
 - [La fiche de mon établissement](#la-fiche-de-mon-établissement), dont [Les responsables](#les-responsables) et [Si l'enregistrement de la fiche échoue](#si-lenregistrement-de-la-fiche-échoue)
 - [Pourquoi une personne n'apparaît-elle pas ?](#pourquoi-une-personne-napparaît-elle-pas-)
 - [Messages du bandeau rouge](#messages-du-bandeau-rouge)
@@ -105,7 +105,7 @@ Quand vous ouvrez l'annuaire par un **lien public**, sans être connecté(e) à 
 
 - **« Se connecter »** ouvre la page de connexion de Grist (dans le même onglet, pas dans le petit cadre de l'annuaire). Une fois connecté(e), vous **revenez sur la page de l'annuaire**, sans le cadre de Grist : l'annuaire apparaît en pleine page, et reconnaît votre compte.
 - **« Continuer sans me connecter »**, la touche Échap ou la croix referment la fenêtre. Le bouton **« Se connecter »**, à droite de « Documentation » dans l'en-tête, la rouvre quand vous le voulez.
-- **Ce que vous voyez sans compte** dépend des réglages de l'annuaire : selon eux, les fiches qui ont accepté d'apparaître sont lisibles, ou rien ne l'est avant connexion. Dans les deux cas, aucun bouton « ✎ Modifier » n'est proposé.
+- **Ce que vous voyez sans compte :** rien. Depuis la 1.45.0 l'annuaire est réservé aux personnes qui y figurent : un écran « Annuaire réservé » remplace les cartes, le compteur dit « Connexion requise », et seule la connexion mène plus loin ([Créer ma fiche](#créer-ma-fiche)). Aucun bouton « ✎ Modifier » n'est proposé.
 - **Si vous êtes déjà connecté(e) à Grist et que la fenêtre s'ouvre quand même**, Grist refuse à votre compte l'accès que l'annuaire lui demande pour vous reconnaître : prévenez la personne qui gère l'annuaire.
 - **Si l'annuaire vous a été envoyé en lecture seule** (lien « Lecteur »), il ne vous propose pas de vous connecter : il n'a aucun moyen de savoir que vous n'êtes pas connecté(e). Ouvrez le document depuis Grist avec votre compte.
 
@@ -523,7 +523,7 @@ Un échec n'est jamais muet : un message apparaît en haut de la fenêtre. Les �
 
 ### Pas de validation, pas d'historique
 
-- **Aucune validation.** Personne ne relit ni n'approuve vos modifications : elles s'appliquent dès que vous cliquez sur « Valider ». Il n'y a pas d'attente.
+- **Aucune validation.** Personne ne relit ni n'approuve vos modifications : elles s'appliquent dès que vous cliquez sur « Valider ». Il n'y a pas d'attente. (Seule la **création** d'une fiche est validée par un administrateur : [Créer ma fiche](#créer-ma-fiche).)
 - **Aucun historique tenu par l'annuaire.** L'annuaire ne garde ni l'ancienne valeur, ni la date, ni l'auteur d'une modification, et il ne crée aucune table dans le document Grist, hormis la table de service `Annuaire_Sonde` qui lui sert à vous reconnaître, une seule fois, quand elle manque ([sécurité](securite.md#écritures-et-règles-daccès)). On ne peut donc pas lui demander qui a changé quoi.
 - **Ce que Grist garde de son côté.** Le document Grist garde sans doute une trace de la modification dans son propre journal ; l'annuaire ne l'a pas vérifié, ne la lit pas et ne la montre pas. Selon [`GRIST_SETUP.md`](../GRIST_SETUP.md), le bouton « Annuler » de Grist défait la dernière modification faite par l'annuaire, ce qui n'a pas été constaté.
 - **Pour revenir en arrière,** rouvrez la fiche et remettez l'ancienne valeur : le « Détail des changements » de la relecture l'a rappelée avant que vous validiez. Le mieux reste de bien relire avant de valider.
@@ -563,24 +563,34 @@ Ce que cela implique, et pourquoi rester prudent :
 
 ## Créer ma fiche
 
-Si l'annuaire vous reconnaît (vous êtes connecté à Grist) mais qu'**aucune fiche ne porte l'adresse e-mail de votre compte**, le bandeau [Ma présence](#ma-présence--apparaître-ou-non) s'intitule « Compte absent de l'annuaire » (« Administrateur », pour un administrateur) et propose un bouton **Créer ma fiche**. Une personne qui a déjà une fiche ne le voit jamais, ni un compte que l'annuaire ne reconnaît pas (voir **Pas de bandeau ?** dans [Ma présence](#ma-présence--apparaître-ou-non)). Il n'existe pas non plus quand la table `BDD` n'a pas de colonne `email` : la fiche ne pourrait pas être reliée à votre compte.
+Depuis la 1.45.0, **l'annuaire n'est ouvert qu'aux personnes qui y figurent** : le lien du document est public, mais le widget ne montre ni cartes, ni recherche, ni filtres à une personne qui n'a pas de fiche validée (un administrateur, ou un responsable d'établissement désigné dans `ACL`, voit toujours l'annuaire). À la place, un écran lui dit où elle en est.
+
+| Titre de l'écran | Pour qui | Ce qu'on y fait |
+|---|---|---|
+| « Vous n’êtes pas encore dans l’annuaire » | Personne connectée dont aucune fiche ne porte l'adresse du compte, **et dont le domaine d'adresse (ce qui suit le @) est celui d'un établissement** du PUI | Le bouton **Créer ma fiche** demande une fiche (voir plus bas) |
+| « Votre demande est en attente » | Personne dont la fiche a été demandée mais **pas encore validée** par un administrateur | Rien : revenir plus tard et recharger la page, l'annuaire s'ouvre dès que la fiche est validée |
+| « Annuaire réservé » | Personne connectée dont le domaine d'adresse n'est celui d'aucun établissement, ou visiteur sans compte (le compteur dit alors « Connexion requise » et la fenêtre de connexion de Grist s'ouvre : [Se connecter quand on n'a pas de compte](#se-connecter-quand-on-na-pas-de-compte)) | Rien, sauf contacter un administrateur de l'annuaire si c'est une erreur |
+| « Vérification impossible » | Le widget ne peut pas lire la liste des établissements et de leurs domaines : il ne peut pas vérifier l'adresse | Contacter un administrateur de l'annuaire |
+
+C'est un contrôle de l'**affichage** : ce que Grist donne réellement au widget, ce sont les règles d'accès du document qui le décident ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 4). Un administrateur ou un responsable d'établissement, lui, **ne passe pas par cet écran** : si aucune fiche ne porte l'adresse de son compte, le bandeau [Ma présence](#ma-présence--apparaître-ou-non) s'intitule « Administrateur » et propose le bouton **Créer ma fiche**. Ce bouton n'existe pas non plus quand la table `BDD` n'a pas de colonne `email` : la fiche ne pourrait pas être reliée à votre compte.
 
 Le bouton ouvre la **même fenêtre** que « Modifier mon profil » ([Modifier ma fiche](#modifier-ma-fiche)) : mêmes champs, mêmes règles de saisie, même relecture, avec ces différences.
 
-- **Le titre et la phrase d'introduction.** La fenêtre s'intitule « Créer ma fiche » et dit : « Vous relisez votre fiche avant de la publier : elle est ajoutée tout de suite, sans validation. »
+- **Le titre et la phrase d'introduction.** La fenêtre s'intitule « Créer ma fiche » et dit : « Vous relisez votre fiche avant de l’envoyer : un administrateur la valide, et elle n’apparaît dans l’annuaire qu’ensuite. » Pour un administrateur, qui crée sa propre fiche sans validation, elle dit : « Vous relisez votre fiche avant de la publier : elle est ajoutée tout de suite, sans validation. »
 - **L'adresse e-mail est celle de votre compte.** Elle se lit dans le bloc d'identité, en haut de la fenêtre, et ne se saisit pas. Le bloc dit : « L’adresse e-mail est celle de votre compte. Une fois la fiche créée, seul un administrateur peut changer l’établissement. »
-- **Vous choisissez votre établissement.** C'est obligatoire : sans lui, la fiche ne pourrait jamais s'afficher, et seul un administrateur peut le changer ensuite. La liste déroulante propose les établissements fondateurs et partenaires, par leur sigle, avec la zone de recherche habituelle ; « Choisir… » s'y lit tant que rien n'est choisi, et le pied de la fenêtre dit « Choisissez votre établissement ».
+- **Vous choisissez votre établissement parmi ceux de votre domaine.** C'est obligatoire : sans lui, la fiche ne pourrait jamais s'afficher, et seul un administrateur peut le changer ensuite. La liste déroulante ne propose que les établissements fondateurs et partenaires **dont le domaine est celui de votre adresse** (le CHU pour une adresse du CHU, par exemple), par leur sigle, avec la zone de recherche habituelle ; « Choisir… » s'y lit tant que rien n'est choisi, et le pied de la fenêtre dit « Choisissez votre établissement ». Un administrateur choisit parmi tous les établissements.
 - **Pas de carte « Photo de profil ».** La photo s'ajoute ensuite, depuis « Modifier mon profil » ([Ma photo de profil](#ma-photo-de-profil)).
-- **Une case « Apparaître dans l'annuaire »**, en bas du formulaire, **cochée d'avance**, avec sa phrase : « Décochée, votre fiche est créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page. » Cochée, votre fiche est publiée dès sa création ; décochée, elle est créée sans apparaître, et vous la montrerez plus tard avec l'interrupteur de [Ma présence](#ma-présence--apparaître-ou-non).
+- **Une case « Apparaître dans l'annuaire »**, en bas du formulaire, **cochée d'avance**, avec sa phrase : « Décochée, votre fiche reste masquée, même validée, jusqu’à ce que vous activiez l’interrupteur en haut de page. » Cochée, votre fiche apparaîtra dès qu'un administrateur l'aura validée ; décochée, elle sera validée sans apparaître, et vous la montrerez plus tard avec l'interrupteur de [Ma présence](#ma-présence--apparaître-ou-non).
 
-**La relecture.** Le bouton **Relire ma fiche** ouvre « Relire avant de publier » (« Relire avant de créer » quand la case est décochée). Il n'y a pas de carte « Avant » : une seule carte, **Ma fiche**, telle qu'elle apparaîtra, puis la liste « Ce qui sera enregistré », sans légende ni repères. Quand la fiche ne figurera pas dans l'annuaire, un avis le dit en haut de la fenêtre :
+**La relecture.** Le bouton **Relire ma fiche** ouvre « Relire avant d’envoyer ». Il n'y a pas de carte « Avant » : une seule carte, **Ma fiche**, telle qu'elle apparaîtra, puis la liste « Ce qui sera enregistré », sans légende ni repères. La relecture dit : « Voici votre carte telle qu’elle apparaîtra une fois votre demande validée par un administrateur. Elle n’est visible de personne d’ici là. »
 
-| Avis | Pourquoi |
-|---|---|
-| « Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page). » | La case « Apparaître dans l'annuaire » est décochée |
-| « Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire. » | L'établissement choisi n'a pas encore validé sa présence : la fiche apparaîtra quand il l'aura fait |
+**Envoyer la demande.** Le bouton **Envoyer ma demande** écrit la fiche. L'annuaire relit d'abord `BDD` : si une fiche porte déjà votre adresse (créée entre-temps, dans un autre onglet ou par un administrateur, **demande en attente comprise**), **rien n'est écrit**. Il relit aussi la liste des établissements et vérifie **une seconde fois** que le domaine de votre adresse est celui de l'établissement choisi. Sinon il **ajoute une ligne** à `BDD`, en une seule action : votre adresse (avec la casse de votre compte Grist), ce que vous avez rempli, votre choix d'apparaître (`Accepte_apparaitre`) et le drapeau `En_attente_validation`, jamais une table ni le périmètre. Cette ligne est une **demande** : elle ne figure dans aucune carte, y compris la vôtre, et vous ne pouvez plus la modifier tant qu'elle attend. Un message dit où vous en êtes :
 
-**Publier.** Le bouton **Publier ma fiche** (**Créer ma fiche** quand la case est décochée) écrit la fiche. L'annuaire relit d'abord `BDD` : si une fiche porte déjà votre adresse (créée entre-temps, dans un autre onglet ou par un administrateur), **rien n'est écrit**. Sinon il **ajoute une ligne** à `BDD`, en une seule action : votre adresse (en minuscules), ce que vous avez rempli et votre choix d'apparaître (`Accepte_apparaitre`), jamais une table ni le périmètre. Il relit ensuite l'annuaire : la fenêtre se ferme, le bandeau montre l'interrupteur et **Modifier mon profil**, la carte apparaît dans la grille quand rien ne la masque, et un message dit où vous en êtes :
+> « Votre demande est envoyée : un administrateur doit valider votre fiche, qui apparaîtra ensuite dans l’annuaire. Revenez plus tard. »
+
+(Quand la case « Apparaître dans l'annuaire » était décochée, la phrase le dit aussi : l'interrupteur reste à activer une fois la fiche validée.) L'écran « Votre demande est en attente » remplace alors le formulaire ; quand un administrateur la valide, rechargez la page : l'annuaire s'ouvre et la fiche se modifie comme toute autre, avec « Modifier mon profil » ; votre établissement, lui, ne se change plus que par un administrateur. Si l'administrateur **refuse** la demande, la ligne est supprimée : vous retrouvez l'écran « Vous n’êtes pas encore dans l’annuaire » et pouvez la refaire.
+
+**Pour un administrateur**, qui crée sa propre fiche, il n'y a ni domaine à vérifier ni validation : le bouton s'appelle **Publier ma fiche** (**Créer ma fiche** quand la case est décochée), la relecture « Relire avant de publier » dit la carte telle qu'elle apparaîtra, et la fiche est ajoutée tout de suite. Un message dit où il en est :
 
 | Message | Ce que cela veut dire |
 |---|---|
@@ -589,7 +599,14 @@ Le bouton ouvre la **même fenêtre** que « Modifier mon profil » ([Modifier m
 | « Votre fiche est publiée, mais elle reste masquée de l’annuaire … Contactez un administrateur. » | La fiche est créée, mais quelque chose la retient, dit après les deux-points : par exemple l'établissement n'a pas validé sa présence |
 | « Votre fiche est publiée. Rechargez la page pour vérifier qu’elle apparaît dans l’annuaire. » | La fiche est créée, mais l'annuaire n'a pas pu se relire |
 
-Aucun administrateur ne valide votre fiche et l'annuaire n'en garde aucun historique, comme pour une modification ([Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique)). Ensuite, votre fiche se modifie comme toute autre, avec « Modifier mon profil » ; votre établissement, lui, ne se change plus que par un administrateur. Pour que la création marche, l'administrateur des données doit avoir réglé une règle d'accès qui laisse chaque personne ajouter la ligne qui porte son adresse ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 4).
+Quand la fiche d'un administrateur ne figurera pas dans l'annuaire, un avis le dit en haut de la relecture :
+
+| Avis | Pourquoi |
+|---|---|
+| « Votre fiche est masquée de l’annuaire : vous n’avez pas accepté d’apparaître (interrupteur en haut de page). » | La case « Apparaître dans l'annuaire » est décochée |
+| « Votre établissement n’a pas validé sa présence : votre fiche reste masquée dans l’annuaire. » | L'établissement choisi n'a pas encore validé sa présence : la fiche apparaîtra quand il l'aura fait |
+
+L'annuaire n'en garde aucun historique, comme pour une modification ([Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique)) : la **validation d'un administrateur ne concerne que la création d'une fiche**, pas ses modifications. Pour que la création marche, l'administrateur des données doit avoir réglé les règles d'accès du document (une personne sans fiche peut ajouter la seule ligne qui porte son adresse, marquée « en attente », et rien d'autre) et la colonne `En_attente_validation` doit exister ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étapes 1 et 4).
 
 ### Si la création échoue
 
@@ -601,8 +618,25 @@ Un échec n'est jamais muet : un message apparaît en haut de la fenêtre, qui r
 | « Grist a refusé la création : vos droits ne permettent pas d'ajouter une fiche. Contactez un administrateur. » | Une règle d'accès de Grist ne vous laisse pas ajouter une ligne à `BDD` | Contactez l'administrateur des données ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 4) |
 | « La fiche n'a pas pu être créée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur. » | Une panne passagère, ou un réglage à revoir | Réessayez ; si cela persiste, prévenez l'administrateur des données |
 | « BDD n'a pas de colonne « email » : la fiche ne pourrait pas être reliée à votre compte. Rien n'a été créé. Contactez un administrateur. » | La table `BDD` n'a pas de colonne `email` | Prévenez l'administrateur des données : c'est un réglage du document Grist |
+| « BDD n'a pas de colonne … » (elle nomme `En_attente_validation`) | La colonne de validation manque : sans elle, la demande ne pourrait pas être mise en attente, et le widget refuse plutôt que de publier une fiche sans validation | Un administrateur qui ouvre l'annuaire la crée ; sinon, créez-la à la main (case à cocher) |
+| « Le domaine de votre adresse ne correspond à aucun établissement : vous ne pouvez pas créer de fiche. Rien n'a été créé. Contactez un administrateur. » | La liste des établissements a changé depuis l'ouverture de la fenêtre | Contactez un administrateur |
+| « L'établissement choisi ne correspond pas au domaine de votre adresse : choisissez-en un autre. Rien n'a été créé. » | Le domaine de l'établissement choisi n'est pas celui de votre adresse | Choisissez-en un autre dans la liste |
+| « Le widget ne peut pas lire la liste des établissements et de leurs domaines : il ne peut pas vérifier votre adresse. Rien n'a été créé. Contactez un administrateur. » | Grist ne donne pas au widget la liste des établissements ou la colonne de leurs domaines | Prévenez l'administrateur des données ([`GRIST_SETUP.md`](../GRIST_SETUP.md), étape 4) |
 
 Deux autres messages, ceux de la fin du tableau de [Quand l'enregistrement échoue](#quand-lenregistrement-échoue), concernent une fiche qui **a bien été créée** : Grist n'en a pas retenu tous les champs, ou l'annuaire n'a pas pu se recharger. La fenêtre reste alors ouverte sur l'écran **Fiche créée** (« Votre fiche est dans l’annuaire Grist. »), avec la liste **Ce qui a été enregistré**, jusqu'à ce que vous cliquiez sur « Fermer ».
+
+## Valider les demandes de fiche
+
+*(Pour les administrateurs.)* Une fiche créée par la personne elle-même est une **demande** : elle attend ici qu'un administrateur la valide.
+
+- **La pastille.** Dès qu'une demande attend, le bouton **Mode admin** du bandeau porte une **pastille** avec leur nombre, **même en mode classique**. Son nom dit alors, par exemple, « Mode admin, 2 demandes de fiche à valider ». Sans demande, il n'y a pas de pastille.
+- **Le bouton.** Quand vous allumez le mode admin, un bouton **Demandes à valider (2)** apparaît à côté. Il ouvre la fenêtre « Demandes à valider ».
+- **La fenêtre.** Elle compte les demandes (« 2 demandes en attente ») et en montre une ligne par personne : son nom, son adresse, son établissement et sa fonction, avec un avis sur le domaine. « Le domaine de l’adresse est celui de l’établissement choisi. » est le cas normal ; « Attention : le domaine de l’adresse n’est pas celui de l’établissement choisi. Vérifiez avant de valider. » demande un regard : la personne a choisi un autre établissement que celui de son adresse (ce que le formulaire ne permet pas, mais qu'une écriture directe dans Grist peut produire).
+- **Valider.** **Valider** retire seulement le drapeau « en attente » de la ligne : l'annuaire se relit, la personne n'a plus qu'à recharger la page pour y entrer, et sa fiche apparaît dans les cartes si elle a accepté d'apparaître et si son établissement est validé. La pastille et la liste se mettent à jour.
+- **Refuser.** **Refuser** demande une confirmation (« Refuser supprime la demande de BDD. La personne pourra en refaire une. »), puis **supprime la ligne** : rien n'est gardé, et la personne peut redemander. Le bouton « Annuler » referme la confirmation sans rien écrire.
+- **Si une autre personne a déjà traité la demande**, la fenêtre le dit (« … n'était plus à traiter : un autre administrateur s'en est occupé. ») et rien n'est écrit. Si Grist refuse l'écriture, la ligne affiche « Grist a refusé : vos droits ne permettent pas de traiter cette demande. » et rien ne change.
+
+Le widget ne **crée** que la colonne `En_attente_validation` de `BDD` (une case à cocher), quand un administrateur ouvre l'annuaire et qu'elle manque ; il ne modifie jamais une autre structure.
 
 ## La fiche de mon établissement
 
@@ -712,6 +746,7 @@ Dans tous ces cas, le logo se change aussi directement dans Grist (colonne `logo
 - elle est rattachée à un établissement (colonne `Etablissement`, qui renvoie à une ligne de la table `Etablissements`) ;
 - cet établissement a **validé** son apparition (`ok_pour_apparaitre` coché) ;
 - cet établissement est **fondateur ou partenaire** (une structure « autres », extérieure au PUI, n'apparaît jamais).
+- sa fiche n'est **pas une demande en attente** : la colonne `En_attente_validation` est vide ou décochée (une fiche que la personne a créée elle-même attend d'abord la validation d'un administrateur : [Valider les demandes de fiche](#valider-les-demandes-de-fiche)).
 
 Quelques cas, avec des personnes fictives du jeu de démonstration :
 

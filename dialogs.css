@@ -1406,6 +1406,85 @@ a.btn {
   font-size: 12.5px;
 }
 
+/* La fenêtre « Demandes à valider » (1.45.0, requests-ui.js) : une ligne par demande, avec ses deux boutons. */
+.dlg.requests-dlg {
+  width: min(680px, calc(100vw - 32px));
+}
+.rq-lead,
+.rq-empty {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.rq-done {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  color: var(--teal-deep);
+  background: #e8f6f3;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.rq-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rq-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  align-items: center;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.rq-name {
+  font-size: 14px;
+  font-weight: 800;
+}
+.rq-mail,
+.rq-meta,
+.rq-domain {
+  margin-top: 2px;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.rq-mail,
+.rq-meta {
+  color: var(--muted);
+}
+.rq-domain[data-tone="ok"] {
+  color: var(--teal-deep);
+}
+.rq-domain[data-tone="warn"] {
+  color: #8f4519;
+  font-weight: 700;
+}
+.rq-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rq-confirm {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.rq-item .notice {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+@media (max-width: 599px) {
+  .rq-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .md {
   max-width: 80ch;
   margin: 0 auto;

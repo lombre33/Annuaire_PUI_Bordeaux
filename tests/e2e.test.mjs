@@ -986,10 +986,12 @@ test('sans table-sonde (Annuaire_Sonde) le widget la crée au chargement et iden
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
-// Grist refuse de la créer (compte sans droit sur la structure) : personne n'est identifié, l'annuaire s'affiche comme avant.
-test('Grist refuse de créer la table-sonde : personne n\'est identifié, pas de bandeau, annuaire intact, rien d\'écrit', { skip }, () =>
+// Grist refuse de la créer (« Blocked by … access rules ») : personne n'est identifié, pas de bandeau ; depuis la 1.45.0 le widget prend cette personne pour
+// un visiteur sans compte et l'annuaire reste fermé (écran « Annuaire réservé »).
+test('Grist refuse de créer la table-sonde : personne n\'est identifié, pas de bandeau, annuaire fermé, rien d\'écrit', { skip }, () =>
   withWidget({ user: ANA_EMAIL, denyWrites: ['Annuaire_Sonde'] }, async ({ page, logs }) => {
-    await waitForCards(page, 4);
+    await page.locator('#gatePanel[data-kind="anonymous"]').waitFor();
+    assert.equal(await page.locator('.contact-card').count(), 0);
     await page.waitForFunction(() => window.__fake.calls.length > 0);
     assert.equal(await accountBar(page).isHidden(), true);
     assert.deepEqual((await grist(page)).map(call => [call.action, call.table, call.ok]), [['AddTable', 'Annuaire_Sonde', false]]);
@@ -1023,11 +1025,12 @@ test('l\'identification laisse le document propre : la ligne de la sonde est ret
   withWidget({ tables: withIdentity(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForAccountBar(page);
     await probeRemoved(page);
-    // Ana est administratrice : en ouvrant l'annuaire, elle fait ajouter la colonne Taches_responsable (1.40.0), la seule structure que le
-    // widget touche ; l'identification, elle, n'écrit que la ligne de la sonde.
+    // Ana est administratrice : en ouvrant l'annuaire, elle fait ajouter les colonnes Taches_responsable (1.40.0) et En_attente_validation (1.45.0), la
+    // seule structure que le widget touche ; l'identification, elle, n'écrit que la ligne de la sonde.
     assert.deepEqual((await grist(page)).filter(call => !/Column$/.test(call.action)).map(call => [call.action, call.table]),
       [['AddRecord', 'Annuaire_Sonde'], ['RemoveRecord', 'Annuaire_Sonde']]);
-    assert.deepEqual((await grist(page)).filter(call => /Column$/.test(call.action)).map(call => [call.action, call.table, call.rowId]), [['AddColumn', 'BDD', 'Taches_responsable']]);
+    assert.deepEqual((await grist(page)).filter(call => /Column$/.test(call.action)).map(call => [call.action, call.table, call.rowId]),
+      [['AddColumn', 'BDD', 'Taches_responsable'], ['AddColumn', 'BDD', 'En_attente_validation']]);
     assert.deepEqual(await page.evaluate(() => window.__tables.Annuaire_Sonde.id), []);
   }));
 
@@ -1222,8 +1225,15 @@ test('le message « l\'annuaire n\'a pas pu être rechargé » s\'efface dès qu
     assert.equal(await isSwitchOn(page), true);
   }));
 
-test('une personne identifiée sans fiche dans BDD voit une mention sans interrupteur, et la console dit pourquoi sans citer d\'adresse', { skip }, () =>
-  withWidget({ tables: withIdentity(), user: 'inconnu@example.example' }, async ({ page, logs }) => {
+// Depuis la 1.45.0, une personne que ni BDD ni ACL ne connaissent ne voit pas l'annuaire (tests/e2e-validation.test.mjs) : ce bandeau est celui d'une personne
+// que les règles d'accès laissent lire sans fiche, ici un responsable d'établissement désigné dans ACL.
+test('une personne identifiée sans fiche dans BDD voit une mention sans interrupteur, et la console dit pourquoi sans citer d\'adresse', { skip }, () => {
+  const tables = withIdentity();
+  tables.ACL.id.push(4);
+  tables.ACL.email.push('inconnu@example.example');
+  tables.ACL.Responsable_de_l_Etablissement.push(1);
+  tables.ACL.admin.push(false);
+  return withWidget({ tables, user: 'inconnu@example.example' }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     await probeRemoved(page);
     await accountBar(page).waitFor();
@@ -1237,7 +1247,8 @@ test('une personne identifiée sans fiche dans BDD voit une mention sans interru
     const warning = (await identityLogs(logs)).find(line => line.includes('Aucune ligne de BDD'));
     assert.ok(warning, 'avertissement présent');
     assert.ok(!warning.includes('@'));
-  }));
+  });
+});
 
 test('BDD sans colonne email : le bandeau accuse la configuration, la console l\'explique, annuaire intact', { skip }, () => {
   const tables = withIdentity();

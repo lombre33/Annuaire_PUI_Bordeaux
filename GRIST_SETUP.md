@@ -6,7 +6,7 @@ la faire et comment vérifier qu'elle a marché.
 
 | Étape | Quoi | Sans elle |
 |---|---|---|
-| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** ; la colonne `Taches_responsable` (« Responsable de l'action x.y », 1.40.0, facultative) : **le widget la crée lui-même** quand un administrateur ouvre l'annuaire | l'interrupteur « Ma présence » échoue (la console dit la colonne et renvoie ici), de même que l'enregistrement ou la création d'une fiche, avec un message qui renvoie ici ; sans `Taches_responsable`, seule la case « Responsable de » manque dans « Modifier mon profil » |
+| 1 | Les colonnes que le widget écrit dans `BDD` sont des colonnes de **données** ; la colonne `Taches_responsable` (« Responsable de l'action x.y », 1.40.0, facultative) et la case `En_attente_validation` (1.45.0, **obligatoire** pour créer une fiche) : **le widget les crée lui-même** quand un administrateur ouvre l'annuaire | l'interrupteur « Ma présence » échoue (la console dit la colonne et renvoie ici), de même que l'enregistrement ou la création d'une fiche, avec un message qui renvoie ici ; sans `Taches_responsable`, seule la case « Responsable de » manque dans « Modifier mon profil » |
 | 2 | Table `Annuaire_Sonde` (qui est connecté ?), avec sa colonne `Responsable_de` pour les responsables d'établissement : **le widget la crée lui-même** au premier chargement, ouvert par un compte qui peut modifier la structure du document | si le widget n'a pas pu la créer, personne n'est identifié : ni bandeau ni bouton « Modifier », rien d'autre ne change ; sans la seule colonne `Responsable_de`, personne ne peut modifier la fiche de son établissement |
 | 3 | `ACL` : case `admin` cochée pour les administrateurs, une ligne par responsable d'établissement | personne n'est administrateur ni responsable d'établissement |
 | 4 | Règles d'accès (à vous) | l'interface est un verrou de confort, pas une sécurité : depuis la 1.12.0, une fiche se modifie sans validation, depuis la 1.17.0 une fiche d'établissement aussi, et depuis la 1.18.0 une personne crée elle-même sa fiche |
@@ -15,8 +15,8 @@ la faire et comment vérifier qu'elle a marché.
 | 7 | La fenêtre de connexion des visiteurs sans compte (facultatif, 1.44.0) : le numéro de la page dans l'adresse du widget (`index.html?page=4`) ; elle suppose les règles de l'étape 4 | le visiteur voit toujours la fenêtre, mais, une fois connecté, il revient à la **première** page du document au lieu de celle de l'annuaire |
 
 Le widget ne modifie jamais la structure du document (règle d'accès, colonne existante) et ne crée
-qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2), et qu'une seule colonne,
-`BDD.Taches_responsable`, quand elle manque et qu'un administrateur ouvre l'annuaire (étape 1, 1.40.0) :
+qu'une seule table, `Annuaire_Sonde`, quand elle manque (étape 2), et que deux colonnes de
+`BDD`, `Taches_responsable` (1.40.0) et `En_attente_validation` (1.45.0), quand elles manquent et qu'un administrateur ouvre l'annuaire (étape 1) :
 tout le reste de ce qui est ci-dessous se fait à la main, une fois. Hors ces créations, il n'écrit que
 des lignes et des cellules : celle de la personne connectée dans `BDD` (son choix de présence, sa
 fiche, ou la fiche qu'elle crée quand elle n'en a pas) ou, pour un administrateur en mode admin, celle d'une autre personne (sa fiche), la ligne
@@ -81,6 +81,33 @@ et Grist n'a pas permis de la créer…`), la case « Responsable de » n'est pa
 **À la main**, dans les données brutes de `BDD` : ajoutez une colonne `Taches_responsable`, type **Liste de
 références** vers `Taches` (colonne affichée au choix), comportement **Colonne de données**, et ne la remplissez pas.
 Cette création n'a pas été essayée dans un vrai Grist.
+
+**`En_attente_validation` (1.45.0).** Depuis la 1.45.0, une fiche que la personne crée elle-même est une
+**demande** : un administrateur la valide ensuite, depuis le widget (mode admin). La colonne qui le dit est une
+case à cocher de `BDD` nommée `En_attente_validation`, une colonne de **données**. Vraie, la ligne est une demande :
+elle n'apparaît dans aucune carte, pas même celle de son auteur, qui lit « Votre demande est en attente »
+à la place de l'annuaire. **Vide ou fausse, c'est une fiche validée** : les lignes d'avant n'ont donc rien à
+changer. « Valider » décoche la case ; « Refuser » supprime la ligne.
+
+*Le widget la crée lui-même quand elle manque*, comme `Taches_responsable` : seulement quand un administrateur
+ouvre l'annuaire, une fois par chargement, en une action (`AddColumn`, type **Case à cocher**, colonne de
+données). Grist ne l'accepte que d'un compte qui peut modifier la structure (étape 4, point A : si la structure est
+verrouillée, seul un propriétaire qui est aussi administrateur d'`ACL` la crée). **Sans cette colonne, personne ne
+peut créer sa fiche** : le widget refuse plutôt que d'ajouter une fiche sans validation (« BDD n'a pas de colonne
+« En_attente_validation » … Rien n'a été créé. »). À la main : ajoutez à `BDD` une colonne `En_attente_validation`,
+type **Case à cocher**, comportement **Colonne de données**, sans rien y écrire. Cette création n'a pas été
+essayée dans un vrai Grist.
+
+**La liste blanche des domaines (1.45.0).** Pour créer sa fiche, une personne doit avoir une adresse dont le
+**domaine** est celui d'un établissement : le widget lit pour cela, **en lecture seule**, la colonne des noms de
+domaine de la table `Etablissements` (`ETABLISSEMENT_DOMAIN_COLUMN` dans `constants.js`, décision d'Antoine du
+19 novembre 2026 : c'est la seule exception à la règle « ne jamais utiliser la colonne `nom_de_domaine` », qui
+reste vraie pour celle de `BDD` et pour l'établissement d'un contact). Une cellule peut porter un domaine
+(`u-bordeaux.fr`), plusieurs séparés par des espaces, des virgules, des points-virgules ou des barres, ou une liste ;
+`@`, `www.`, `https://` et les majuscules sont ignorés ; une adresse en `etu.u-bordeaux.fr` correspond à
+`u-bordeaux.fr`, mais pas l'inverse. Une cellule vide, ou qui n'est pas un domaine (« n/a »), n'en donne aucun.
+Sans la colonne, ou si Grist ne la donne pas au widget, **personne ne peut créer sa fiche** (écran « Vérification
+impossible »).
 
 Grist refuse d'écrire dans une colonne **à formule** : chacune doit être une colonne
 de **données**. `Accepte_apparaitre` est de type **Case à cocher** (Bascule) ;
@@ -293,7 +320,9 @@ une fiche et les autres utilisateurs du document.
 Les tableaux qui suivent disent ce dont le widget a besoin ; « Le jeu complet » (à la fin de
 cette étape) dit comment le saisir : refus par défaut, structure verrouillée, cas d'un lien
 public. Ces règles n'ont pas pu être essayées dans un vrai Grist : à tester sur une copie du
-document (`TESTING.md`, section 27).
+document (`TESTING.md`, section 27). **Depuis la 1.45.0**, quand le lien du document est public en Éditeur, l'annuaire
+est fermé à qui n'y figure pas et une fiche créée attend la validation d'un administrateur : la ligne « ajouter une ligne
+à `BDD` » ci-dessous change, et « Annuaire fermé et fiches à valider », à la fin de cette étape, donne les règles à saisir.
 
 | Où | Qui peut | Pourquoi |
 |---|---|---|
@@ -485,6 +514,80 @@ touche pas à la structure.
 
 **Le mode de partage** (invitations ou lien public en Éditeur) ne change pas ces règles, mais change qui
 profite d'une règle oubliée : voir [`docs/securite.md`](docs/securite.md#le-partage-du-document-lien-public-ou-invitations).
+
+### Annuaire fermé et fiches à valider (1.45.0 : lien public en Éditeur)
+
+Antoine, 19 novembre 2026 : le lien du document est **public avec accès Éditeur**, mais personne ne voit
+l'annuaire tant qu'il n'y figure pas ; une personne qui n'y est pas peut demander sa fiche si le domaine de son
+adresse est celui d'un établissement, et un administrateur la valide. Le widget fait sa part (l'écran réservé, la
+liste blanche des domaines, la demande « en attente », la pastille et la fenêtre « Demandes à valider ») ; **les
+règles d'accès sont la seule vraie barrière** : un écran se contourne depuis la console du navigateur. Ce qui suit
+remplace, pour `BDD`, `Annuaire_Sonde` et le défaut, les lignes correspondantes du jeu complet ci-dessus. Ces
+règles ont été **essayées dans un Grist local (1.7.22), avec un compte par profil** (étude du 19 novembre 2026), et
+**pas** dans le vrai document d'Antoine : saisissez-les d'abord sur une copie complète et passez le protocole de
+[`TESTING.md`](TESTING.md), section 31.
+
+**Ce que chaque profil peut faire.**
+
+| Profil | Lit | Écrit |
+|---|---|---|
+| Sans compte | rien | rien : le widget lui montre la fenêtre de connexion |
+| Connecté, sans fiche | les établissements (avec leur domaine) et les sept listes de référence, que le formulaire de création lit ; **aucune fiche** | crée **une seule** fiche, avec **son** adresse, « en attente » |
+| Demande en attente | sa propre ligne (le widget affiche « Votre demande est en attente ») | rien : pas de modification, pas de seconde demande |
+| Dans l'annuaire (fiche validée, ou présent dans `ACL`) | les fiches validées, jamais les demandes des autres | sa fiche, sauf `email`, `Etablissement` et `En_attente_validation` |
+| Administrateur | toutes les lignes, demandes comprises (c'est ce qui permet la pastille) | tout ; refuse une demande en supprimant sa ligne ; ne supprime jamais une fiche validée |
+
+**Ajouter l'attribut d'utilisateur `maFiche`** (en plus d'`Acl`, point B) : nom `maFiche`, attribut de la personne
+`Email`, table `BDD`, colonne `email`. Il retrouve la fiche de la personne, et dit si elle est validée. Si deux
+lignes de `BDD` portent la même adresse, il ne retient que la première : cherchez les doublons avant.
+
+**`BDD`, règles de la table, dans cet ordre :**
+
+| # | Condition | Lire | Modifier | Créer | Supprimer |
+|---|---|---|---|---|---|
+| 1 | `user.Acl.admin` | ✓ | ✓ | — | — |
+| 2 | `user.Acl.admin and rec.En_attente_validation` | — | — | — | ✓ |
+| 3 | `user.IsLoggedIn and newRec.email == user.Email and newRec.En_attente_validation and not user.maFiche.email` | — | — | ✓ | — |
+| 4 | `user.IsLoggedIn and rec.email == user.Email` | ✓ | — | — | — |
+| 5 | `user.IsLoggedIn and rec.email == user.Email and not rec.En_attente_validation` | — | ✓ | — | — |
+| 6 | `user.IsLoggedIn and (user.Acl.email or (user.maFiche.email and not user.maFiche.En_attente_validation)) and not rec.En_attente_validation and user.Access in [EDITOR]` | ✓ | — | — | — |
+
+(Dans l'étude, l'attribut `Acl` s'appelle `myUser` : gardez le nom que votre document a déjà.) La règle 3 est celle
+qui permet « Créer ma fiche » : **seulement avec sa propre adresse, seulement « en attente », une seule fois**.
+Elle n'a aucune liste de colonnes : tout ce que le formulaire écrit à la création (prénom, nom, établissement,
+fonction, téléphone, `email_affiche`, listes, `Accepte_apparaitre`, la photo ensuite) passe avec elle, ce qui a été
+essayé. La règle 5 ne laisse modifier qu'une fiche **validée** : une demande en attente ne se modifie plus.
+
+**Colonnes réservées.** Une règle de **colonne** sur `email`, `Etablissement` et `En_attente_validation` passe
+avant celles de la table : `user.Access in [OWNER]` Modifier ✓, `user.Acl.admin` Modifier ✓, puis « Tous les
+autres » Modifier ✗. Seuls un propriétaire ou un administrateur changent l'adresse, l'établissement ou l'état de
+validation d'une fiche : c'est ce qui empêche une personne de valider sa propre demande.
+
+**La colonne `Avatar`** (étape 6) : le widget lit les photos avec un jeton « Lecteur », qu'aucune règle de table
+ne laisse passer. Une règle de colonne sur `Avatar` laisse lire à `user.IsLoggedIn and user.Access in [VIEWER,
+EDITOR]` les photos des fiches validées, et celles de sa propre demande ou des demandes pour un administrateur.
+
+**Les autres tables.** `Etablissements` : lecture pour `user.IsLoggedIn` (le formulaire de création a besoin des
+établissements **et de leurs domaines**), écriture comme au jeu complet. Les sept listes de référence :
+`user.IsLoggedIn`, Lire ✓. `Annuaire_Sonde` : chacun crée, lit et supprime seulement sa ligne
+(`user.IsLoggedIn and newRec.Email == user.Email` pour créer ; `user.IsLoggedIn and rec.Email == user.Email` pour
+lire et supprimer). `ACL` : inchangée.
+
+**Le défaut, en dernier.** `user.Access != OWNER` : tout refusé, de sorte qu'une table sans règle, ou ajoutée plus
+tard, ne se lit pas.
+
+**Ce que les règles ne savent pas faire.** Comparer le **domaine** de l'adresse : une condition ne sait pas
+découper une adresse (aucun appel de fonction, et `in` teste seulement qu'un texte en contient un autre ; une
+règle « le domaine est contenu dans l'adresse » accepterait aussi `@domaine.fr.autre.example`). Le test de la
+liste blanche reste donc dans le widget, qui le refait à la relecture **et** juste avant d'écrire. Une personne
+qui contourne le widget peut déposer **une** demande en attente avec n'importe quelle adresse de son compte : vous
+la voyez dans la pastille et vous la refusez ; elle ne lit rien d'autre qu'elle-même.
+
+**Deux pièges.** (1) L'adresse de la fiche est comparée **à l'identique** à celle du compte, majuscules comprises :
+le widget écrit donc l'adresse du compte telle que Grist la donne (alors que la recherche de la fiche, côté
+widget, ignore la casse). Une fiche créée à la main en `Carol@Univ.Example` pour le compte `carol@univ.example` se
+lit mais ne se modifie pas. (2) Une personne qui aurait deux lignes (une validée, une en attente) est dans un
+état imprévisible : cherchez les doublons.
 
 ## 5. Les logos des établissements (facultatif)
 

@@ -116,11 +116,13 @@ test('personne d’autre n’a de bouton d’établissement : ni une personne sa
     ['un administrateur sans établissement, même en mode admin', { user: ADMIN_EMAIL, adminMode: true }],
     ['un compte anonyme', { user: null }],
     ['un compte Lecteur', { user: ANA_EMAIL, readOnly: true }],
-    ['une adresse inconnue de l’annuaire et d’ACL', { user: 'inconnu@exemple.example' }]
+    // Depuis la 1.45.0, une adresse inconnue ne voit pas l'annuaire : l'écran réservé remplace les cartes (gate.js).
+    ['une adresse inconnue de l’annuaire et d’ACL', { user: 'inconnu@exemple.example', closed: true }]
   ];
-  for (const [who, { adminMode, ...options }] of cases) {
+  for (const [who, { adminMode, closed, ...options }] of cases) {
     await withWidget({ tables: world(), ...options }, async ({ page, logs }) => {
-      await waitForCards(page, 4);
+      if (closed) await page.locator('#gatePanel:not([hidden])').waitFor();
+      else await waitForCards(page, 4);
       if (adminMode) {
         await page.locator('#accountBar .account-admin').click();
         await waitForEditButtons(page, 4);

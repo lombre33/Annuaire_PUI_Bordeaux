@@ -8,7 +8,7 @@ import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { logged, quiet } from './support/logs.mjs';
 import { UploadError } from '../upload.js';
-import { withAvatars, withIdentity, withSchema, withShownEmail, ANA_EMAIL, NEW_EMAIL } from './fixtures.mjs';
+import { withAvatars, withIdentity, withSchema, withShownEmail, withValidation, ADMIN_EMAIL, ANA_EMAIL, DOMAIN_COLUMN, NEW_EMAIL } from './fixtures.mjs';
 
 // ===== profile-save : relire, vérifier, écrire une fiche modifiée =====
 
@@ -928,7 +928,7 @@ async function creation(w, changes) {
   const draft = draftOf(profileFormModel(blank, w.referenceMaps, { creating: true }));
   return prepareCreation(w.docApi, blank, { ...draft, ...changes }, { email: NEW_EMAIL, ...w.context });
 }
-const newcomer = () => world({ tables: withSchema(withIdentity(withShownEmail())), user: { email: NEW_EMAIL } });
+const newcomer = () => world({ tables: withValidation(withSchema(withIdentity(withShownEmail()))), user: { email: NEW_EMAIL } });
 
 test('createProfile adds one row to BDD with the address of the account and what was filled in, and nothing else', async () => {
   const w = await newcomer();
@@ -936,14 +936,16 @@ test('createProfile adds one row to BDD with the address of the account and what
   assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien');
   assert.equal(next.after.prenom, 'Zoé');
   assert.equal(next.after.etablissement_label, 'CHU');
-  assert.equal(next.visibility.visible, false, 'ni accord, ni périmètre : la fiche créée n\'apparaît pas');
+  assert.equal(next.visibility.visible, false, 'ni accord, ni validation : la fiche créée n\'apparaît pas');
   assert.equal(next.visibility.accepted, false);
+  assert.equal(next.visibility.pending, true, 'la fiche créée est une demande');
+  assert.equal(next.pending, true);
 
   const result = await createProfile(w.docApi, next, { log: quiet });
   assert.deepEqual(result, { status: 'created', rowId: 13 });
   assert.deepEqual(writes(w), [{
     action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
-    values: { email: NEW_EMAIL, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission', email_affiche: 'zoe@chu-bordeaux.example', Competences: ['L', 3] }
+    values: { email: NEW_EMAIL, En_attente_validation: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission', email_affiche: 'zoe@chu-bordeaux.example', Competences: ['L', 3] }
   }]);
   assert.equal(w.tables.BDD.id.length, 13, 'une ligne de plus');
   assert.deepEqual(unsavedLabels(next, tableToRows(w.tables.BDD).find(row => row.id === 13), w.referenceMaps), []);
@@ -957,14 +959,15 @@ test('a fiche created with « Apparaître dans l\'annuaire » ticked is written 
   const published = await creation(w, { ...fill, Accepte_apparaitre: true });
   assert.equal(published.accepted, true);
   assert.equal(published.visibility.accepted, true, 'la relecture compte la fiche comme acceptée');
-  assert.equal(published.visibility.visible, true, 'sans périmètre (le widget n\'en écrit jamais), la fiche apparaît quand même : le périmètre ne décide plus de rien');
+  assert.equal(published.visibility.visible, false, 'même acceptée, la fiche attend la validation d\'un administrateur');
+  assert.equal(published.visibility.pending, true);
   assert.deepEqual(Object.keys(published.champs), ['prenom', 'nom', 'Etablissement'], 'le choix n\'est pas un champ de la fiche');
   assert.deepEqual(published.lines.map(line => line.key), ['prenom', 'nom', 'Etablissement']);
   assert.deepEqual(writes(w), [], 'la relecture n\'écrit rien');
   await createProfile(w.docApi, published, { log: quiet });
   assert.deepEqual(writes(w), [{
     action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
-    values: { email: NEW_EMAIL, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 }
+    values: { email: NEW_EMAIL, En_attente_validation: true, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 }
   }]);
   assert.equal(w.tables.BDD.Accepte_apparaitre[12], true);
   assert.equal('perimetre' in writes(w)[0].values, false, 'aucun périmètre écrit : il reste l\'affaire des administrateurs');
@@ -1005,8 +1008,101 @@ test('createProfile writes nothing when a fiche already carries the address, whe
   assert.equal(writes(w).length, 1, 'seul l\'ajout simulé ci-dessus est passé');
   await assert.rejects(createProfile(w.docApi, { ...next, creating: false }, { log: quiet }), /Aucune fiche à créer/);
 
-  const refused = await world({ tables: withSchema(withIdentity(withShownEmail())), user: { email: NEW_EMAIL }, denyWrites: ['BDD'] });
+  const refused = await world({ tables: withValidation(withSchema(withIdentity(withShownEmail()))), user: { email: NEW_EMAIL }, denyWrites: ['BDD'] });
   const denied = await creation(refused, { prenom: 'Zoé', Etablissement: 1 });
   await assert.rejects(createProfile(refused.docApi, denied, { log: quiet }), error => error instanceof ProfileSaveError && /Grist a refusé la création/.test(error.message));
   assert.equal(refused.tables.BDD.id.length, 12, 'rien n\'a été ajouté');
+});
+
+// ===== La fiche créée est une demande (1.45.0) =====
+
+test('createProfile writes the row as a request waiting for validation, and nothing in the review or the row says otherwise', async () => {
+  const w = await newcomer();
+  const next = await creation(w, { prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Accepte_apparaitre: true });
+  assert.equal(next.pending, true);
+  assert.equal(next.values.En_attente_validation, true);
+  assert.equal('En_attente_validation' in next.champs, false, 'la case de validation n\'est pas un champ que la personne remplit');
+  assert.deepEqual(next.lines.map(line => line.key), ['prenom', 'nom', 'Etablissement']);
+  await createProfile(w.docApi, next, { log: quiet });
+  assert.equal(w.tables.BDD.En_attente_validation[12], true);
+  const { people, contacts } = await loadDirectory(w.docApi, { log: quiet });
+  assert.equal(contacts.some(contact => contact.email === NEW_EMAIL), false, 'la demande n\'est dans aucune carte de l\'annuaire');
+  assert.equal(people.findByEmail(NEW_EMAIL)[0].status.pending, true, 'mais la personne retrouve sa demande par son adresse');
+  assert.deepEqual(people.pendingRequests().map(person => person.name), ['Zoé Nouvelle']);
+});
+
+test('createProfile refuses to publish a fiche without the validation column, unless an administrator creates it', async () => {
+  const w = await world({ tables: withSchema(withIdentity(withShownEmail())), user: { email: NEW_EMAIL } });
+  await assert.rejects(creation(w, { prenom: 'Zoé', Etablissement: 1 }), error => error instanceof ProfileSaveError
+    && /BDD n'a pas de colonne\s«\sEn_attente_validation\s»/.test(error.message) && /Rien n'a été créé/.test(error.message));
+  assert.deepEqual(writes(w), []);
+});
+
+test('createProfile refuses a review that does not carry the pending flag (closed by default), even if the domain is right', async () => {
+  const w = await newcomer();
+  const next = await creation(w, { prenom: 'Zoé', Etablissement: 1 });
+  const { En_attente_validation: _, ...without } = next.values;
+  await assert.rejects(createProfile(w.docApi, { ...next, values: without }, { log: quiet }), error => error instanceof ProfileSaveError);
+  await assert.rejects(createProfile(w.docApi, { ...next, values: { ...next.values, En_attente_validation: false } }, { log: quiet }), error => error instanceof ProfileSaveError);
+  assert.deepEqual(writes(w), []);
+});
+
+test('the domain of the address decides which établissements a newcomer can ask for, in the review and again when writing', async () => {
+  const w = await newcomer();
+  // Zoé écrit depuis chu-bordeaux.example : le CHU (1), pas l'UBM (2).
+  await assert.rejects(creation(w, { prenom: 'Zoé', Etablissement: 2 }), error => error instanceof ProfileSaveError
+    && /ne correspond pas au domaine de votre adresse/.test(error.message));
+  const next = await creation(w, { prenom: 'Zoé', Etablissement: 1 });
+  // Entre la relecture et l'écriture, le domaine du CHU change dans Etablissements : la demande n'est plus écrite.
+  w.tables.Etablissements[DOMAIN_COLUMN][0] = 'autre-chose.example';
+  await assert.rejects(createProfile(w.docApi, next, { log: quiet }), error => error instanceof ProfileSaveError
+    && /ne correspond à aucun établissement/.test(error.message));
+  assert.deepEqual(writes(w), []);
+});
+
+test('a subdomain of an établissement domain counts, and the comparison ignores the case of the address', async () => {
+  const w = await world({ tables: withValidation(withSchema(withIdentity())), user: { email: 'Zoe@Etu.CHU-Bordeaux.example' } });
+  const blank = blankFiche(w.people.columns, 'zoe@etu.chu-bordeaux.example');
+  const draft = draftOf(profileFormModel(blank, w.referenceMaps, { creating: true }));
+  const next = await prepareCreation(w.docApi, blank, { ...draft, prenom: 'Zoé', Etablissement: 1 }, { email: 'Zoe@Etu.CHU-Bordeaux.example', ...w.context });
+  assert.equal(next.email, 'Zoe@Etu.CHU-Bordeaux.example', 'l\'adresse du compte, casse comprise : les règles d\'accès la comparent à l\'identique');
+  await createProfile(w.docApi, next, { log: quiet });
+  assert.equal(w.tables.BDD.email[12], 'Zoe@Etu.CHU-Bordeaux.example');
+  assert.equal(w.people.findByEmail('zoe@etu.chu-bordeaux.example').length, 0, 'l\'index d\'avant l\'écriture ne la connaît pas');
+  assert.equal((await loadDirectory(w.docApi, { log: quiet })).people.findByEmail('ZOE@etu.chu-bordeaux.example').length, 1, 'la recherche par adresse ignore la casse');
+});
+
+test('without the domain column, or with Etablissements unreadable, no one can create a fiche (closed by default)', async () => {
+  const bare = await world({ tables: withValidation(withSchema(withIdentity())), user: { email: NEW_EMAIL } });
+  delete bare.tables.Etablissements[DOMAIN_COLUMN];
+  await assert.rejects(creation(bare, { prenom: 'Zoé', Etablissement: 1 }), error => error instanceof ProfileSaveError && /ne peut pas lire la liste des établissements et de leurs domaines/.test(error.message));
+  const unreadable = await world({ tables: withValidation(withSchema(withIdentity())), user: { email: NEW_EMAIL } });
+  const blank = blankFiche(unreadable.people.columns, NEW_EMAIL);
+  const draft = draftOf(profileFormModel(blank, unreadable.referenceMaps, { creating: true }));
+  unreadable.fail(['Etablissements']);
+  await assert.rejects(prepareCreation(unreadable.docApi, blank, { ...draft, prenom: 'Zoé', Etablissement: 1 }, { email: NEW_EMAIL, ...unreadable.context }),
+    error => error instanceof ProfileSaveError && /ne peut pas lire la liste des établissements/.test(error.message));
+  assert.deepEqual([...writes(bare), ...writes(unreadable)], []);
+});
+
+test('an administrator creating their own fiche needs neither the domain nor the validation: the row is written already validated', async () => {
+  const w = await world({ tables: withValidation(withSchema(withIdentity())), user: { email: ADMIN_EMAIL } });
+  const blank = blankFiche(w.people.columns, 'direction@exemple.example');
+  const draft = draftOf(profileFormModel(blank, w.referenceMaps, { creating: true }));
+  const next = await prepareCreation(w.docApi, blank, { ...draft, prenom: 'Dir', Etablissement: 4, Accepte_apparaitre: true },
+    { email: 'direction@exemple.example', admin: true, ...w.context });
+  assert.equal(next.pending, false);
+  assert.equal('En_attente_validation' in next.values, false);
+  await createProfile(w.docApi, next, { log: quiet });
+  assert.notEqual(w.tables.BDD.En_attente_validation[12], true, 'une fiche validée : la colonne n\'est pas vraie');
+  assert.deepEqual(writes(w).map(call => call.action), ['AddRecord']);
+});
+
+test('an administrator creating their own fiche still works in a document that has no validation column yet', async () => {
+  const w = await world({ tables: withSchema(withIdentity()), user: { email: ADMIN_EMAIL } });
+  const blank = blankFiche(w.people.columns, 'direction@exemple.example');
+  const draft = draftOf(profileFormModel(blank, w.referenceMaps, { creating: true }));
+  const next = await prepareCreation(w.docApi, blank, { ...draft, prenom: 'Dir', Etablissement: 4 }, { email: 'direction@exemple.example', admin: true, ...w.context });
+  await createProfile(w.docApi, next, { log: quiet });
+  assert.equal(w.tables.BDD.id.length, 13);
 });

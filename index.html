@@ -51,12 +51,15 @@
   <link rel="modulepreload" href="docs-source.js">
   <link rel="modulepreload" href="docs-ui.js">
   <link rel="modulepreload" href="dom.js">
+  <link rel="modulepreload" href="domains.js">
   <link rel="modulepreload" href="etablissement-form.js">
   <link rel="modulepreload" href="etablissement-save.js">
   <link rel="modulepreload" href="etablissement-ui.js">
   <link rel="modulepreload" href="etablissement.js">
   <link rel="modulepreload" href="filter-menus.js">
   <link rel="modulepreload" href="filters.js">
+  <link rel="modulepreload" href="gate-ui.js">
+  <link rel="modulepreload" href="gate.js">
   <link rel="modulepreload" href="grist-data.js">
   <link rel="modulepreload" href="identity.js">
   <link rel="modulepreload" href="image-prep.js">
@@ -73,6 +76,8 @@
   <link rel="modulepreload" href="profile-ui.js">
   <link rel="modulepreload" href="profile.js">
   <link rel="modulepreload" href="render.js">
+  <link rel="modulepreload" href="requests-ui.js">
+  <link rel="modulepreload" href="requests.js">
   <link rel="modulepreload" href="save-upload.js">
   <link rel="modulepreload" href="scroll-tools.js">
   <link rel="modulepreload" href="schema.js">
@@ -116,6 +121,7 @@
           <button type="button" class="account-edit" aria-haspopup="dialog" hidden>Modifier mon profil</button>
           <button type="button" class="account-etab" aria-haspopup="dialog" hidden>Mon établissement</button>
           <button type="button" class="account-admin" aria-pressed="false" hidden>Mode admin</button>
+          <button type="button" class="account-requests" aria-haspopup="dialog" hidden>Demandes à valider</button>
         </div>
         <p class="account-status" role="status" data-tone="info"></p>
         <p class="account-error" role="alert"></p>
@@ -147,6 +153,14 @@
       <div class="empty-mark" aria-hidden="true">✦</div>
       <h2 class="empty-title">Aucun contact trouvé</h2>
       <p class="empty-text">Modifiez votre recherche ou réinitialisez les filtres.</p>
+    </section>
+    <!-- L'écran d'une personne qui n'est pas (encore) dans l'annuaire (gate-ui.js, gate.js) : il remplace la recherche, les filtres et les cartes,
+         que la classe `gated` du corps de page cache. -->
+    <section id="gatePanel" class="gate-panel" aria-labelledby="gateTitle" hidden>
+      <div class="empty-mark" aria-hidden="true">✦</div>
+      <h2 id="gateTitle" class="gate-title"></h2>
+      <p class="gate-text"></p>
+      <button type="button" class="btn btn-primary gate-action" aria-haspopup="dialog" hidden>Créer ma fiche</button>
     </section>
 
     <div id="scrollTools" class="scroll-tools" hidden>
@@ -221,6 +235,21 @@
       <header class="dlg-head">
         <div>
           <h2 id="loginTitle" tabindex="-1">Se connecter à Grist</h2>
+          <p class="dlg-sub"></p>
+        </div>
+        <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>
+      </header>
+      <div class="dlg-body"></div>
+      <footer class="dlg-foot"></footer>
+    </div>
+  </dialog>
+
+  <!-- Les demandes de fiche à valider (requests-ui.js), pour un administrateur : « Valider » ou « Refuser » (supprime la demande). -->
+  <dialog id="requestsDialog" class="dlg requests-dlg" aria-labelledby="requestsTitle">
+    <div class="dlg-form">
+      <header class="dlg-head">
+        <div>
+          <h2 id="requestsTitle" tabindex="-1">Demandes à valider</h2>
           <p class="dlg-sub"></p>
         </div>
         <button type="button" class="dlg-x" data-close aria-label="Fermer la fenêtre">✕</button>

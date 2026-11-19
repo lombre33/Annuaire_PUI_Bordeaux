@@ -25,7 +25,12 @@ const PHOTO_HELP = 'Elle remplace les initiales sur la carte et s’agrandit au 
 
 // La case de la fiche qu'on crée (CONSENT_LABEL) : elle décide de publier la fiche tout de suite (cochée d'avance) ou
 // de la créer masquée, et elle écrit Accepte_apparaitre avec la fiche.
-const PUBLISH_HELP = 'Décochée, votre fiche est créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page.';
+const PUBLISH_HELP = 'Décochée, votre fiche reste masquée, même validée, jusqu’à ce que vous activiez l’interrupteur en haut de page.';
+const PUBLISH_HELP_DIRECT = 'Décochée, votre fiche est créée mais reste masquée jusqu’à ce que vous activiez l’interrupteur en haut de page.';
+
+// Une fiche qu'on crée est une demande que la validation d'un administrateur fait apparaître (1.45.0) ; `session.validation` vaut faux pour un
+// administrateur qui crée la sienne (main.js, openCreation).
+export const needsValidation = ctx => ctx.creating && ctx.session.validation !== false;
 
 // La même case sur la fiche d'une autre personne, pour un administrateur (1.38.0) : elle règle la colonne que la personne règle elle-même
 // avec l'interrupteur de son bandeau.
@@ -41,7 +46,9 @@ const recapTitle = ctx => (ctx.creating ? 'Ce qui sera enregistré' : 'Ce qui va
 
 export function editingHeading(ctx) {
   if (ctx.creating) {
-    return ['Créer ma fiche', 'Vous relisez votre fiche avant de la publier : elle est ajoutée tout de suite, sans validation.'];
+    return ['Créer ma fiche', needsValidation(ctx)
+      ? 'Vous relisez votre fiche avant de l’envoyer : un administrateur la valide, et elle n’apparaît dans l’annuaire qu’ensuite.'
+      : 'Vous relisez votre fiche avant de la publier : elle est ajoutée tout de suite, sans validation.'];
   }
   return [
     ctx.admin ? `Modifier la fiche de ${ctx.session.person.name}` : 'Modifier mon profil',
@@ -461,7 +468,7 @@ function consentBox(ctx, label, helpText) {
   return box;
 }
 
-const publishField = ctx => consentBox(ctx, CONSENT_LABEL, PUBLISH_HELP);
+const publishField = ctx => consentBox(ctx, CONSENT_LABEL, needsValidation(ctx) ? PUBLISH_HELP : PUBLISH_HELP_DIRECT);
 const consentField = (ctx, field) => {
   const box = consentBox(ctx, field.label, ADMIN_CONSENT_HELP);
   box.classList.add('es-chk-lead');

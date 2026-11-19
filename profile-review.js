@@ -3,11 +3,11 @@
 // DOM seulement : profile-ui.js enchaîne les étapes (`ctx`, l'état de la fenêtre : voir profile-form.js).
 
 import { el, glyph, notice } from './dom.js';
-import { changeList } from './profile-form.js';
+import { changeList, needsValidation } from './profile-form.js';
 
 // Ce que la personne voit une fois sa fiche créée : la fenêtre se ferme et ce message le dit. main.js le
 // compose d'après ce que Grist a gardé (`result.notice`) ; celui-ci sert à défaut.
-const CREATED_NOTICE = 'Votre fiche est créée. Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire ».';
+const CREATED_NOTICE = 'Votre demande est envoyée : un administrateur doit valider votre fiche, qui apparaîtra ensuite dans l’annuaire. Revenez plus tard.';
 export const createdNotice = result => result?.notice || CREATED_NOTICE;
 
 // Ce que l'administrateur doit savoir quand il change l'adresse e-mail d'une fiche :
@@ -15,15 +15,21 @@ export const createdNotice = result => result?.notice || CREATED_NOTICE;
 const EMAIL_NOTICE = 'L’adresse change dans BDD, pas dans la table ACL : si cette personne est administratrice ou '
   + 'responsable d’un établissement, ses droits restent attachés à son ancienne adresse.';
 
-export const validateLabel = ctx => (ctx.creating ? (ctx.publishes ? 'Publier ma fiche' : 'Créer ma fiche') : 'Valider');
+export const validateLabel = ctx => (ctx.creating
+  ? (needsValidation(ctx) ? 'Envoyer ma demande' : ctx.publishes ? 'Publier ma fiche' : 'Créer ma fiche')
+  : 'Valider');
 
 // ===== La relecture =====
 
 export function reviewHeading(ctx) {
   return [
-    ctx.creating ? (ctx.publishes ? 'Relire avant de publier' : 'Relire avant de créer') : 'Relire avant de valider',
     ctx.creating
-      ? 'Voici votre carte telle qu’elle apparaîtra dans l’annuaire. La fiche est créée tout de suite, sans validation.'
+      ? (needsValidation(ctx) ? 'Relire avant d’envoyer' : ctx.publishes ? 'Relire avant de publier' : 'Relire avant de créer')
+      : 'Relire avant de valider',
+    ctx.creating
+      ? (needsValidation(ctx)
+        ? 'Voici votre carte telle qu’elle apparaîtra une fois votre demande validée par un administrateur. Elle n’est visible de personne d’ici là.'
+        : 'Voici votre carte telle qu’elle apparaîtra dans l’annuaire. La fiche est créée tout de suite, sans validation.')
       : `Voici ${ctx.admin ? `la carte de ${ctx.session.person.name}` : 'votre carte'} telle qu’elle est aujourd’hui et telle qu’elle apparaîtra. `
         + 'Les changements sont repérés sur la carte « Après ».'
   ];
@@ -104,8 +110,8 @@ export function reviewParts(ctx, message) {
 export function savedHeading(ctx) {
   const { person } = ctx.session;
   return [
-    ctx.creating ? 'Fiche créée' : 'Fiche enregistrée',
-    ctx.creating ? 'Votre fiche est dans l’annuaire Grist.' : ctx.admin ? `La fiche de ${person.name} est à jour.` : 'Votre fiche est à jour.'
+    ctx.creating ? (needsValidation(ctx) ? 'Demande envoyée' : 'Fiche créée') : 'Fiche enregistrée',
+    ctx.creating ? (needsValidation(ctx) ? 'Votre demande attend la validation d’un administrateur.' : 'Votre fiche est dans l’annuaire Grist.') : ctx.admin ? `La fiche de ${person.name} est à jour.` : 'Votre fiche est à jour.'
   ];
 }
 
@@ -115,9 +121,9 @@ export function savedParts(ctx, result) {
   const done = el('div', 'sent');
   done.append(
     glyph('✓', 'div', 'sent-mark'),
-    el('h3', '', ctx.creating ? 'Votre fiche est créée' : ctx.admin ? `La fiche de ${person.name} est enregistrée` : 'Vos modifications sont enregistrées'),
+    el('h3', '', ctx.creating ? (needsValidation(ctx) ? 'Votre demande est envoyée' : 'Votre fiche est créée') : ctx.admin ? `La fiche de ${person.name} est enregistrée` : 'Vos modifications sont enregistrées'),
     el('p', '', ctx.creating
-      ? (ctx.publishes ? createdNotice(result) : 'Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire » en haut de page.')
+      ? (needsValidation(ctx) || ctx.publishes ? createdNotice(result) : 'Pour apparaître dans l’annuaire, activez l’interrupteur « Apparaître dans l\'annuaire » en haut de page.')
       : 'Elles s\'appliquent tout de suite dans Grist, sans validation.')
   );
   const recap = el('div', 'recap');

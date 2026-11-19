@@ -27,8 +27,9 @@ const boxOf = (page, label) => rowOf(page, label).locator('input');
 const picker = (page, label) => dialog(page).locator('.grp').filter({ has: page.locator('.grp-title', { hasText: new RegExp(`^${label}$`) }) });
 const chip = (page, group, label) => picker(page, group).locator('.pick', { hasText: new RegExp(`^${label}$`) });
 const rolePills = (scope) => scope.locator('.tag-group').filter({ has: scope.page().locator('.tag-group-title', { hasText: /^Rôle dans le PUI$/ }) }).locator('.tag');
-// Les demandes de colonne que Grist a reçues, acceptées ou refusées (`ok`).
-const addColumnCalls = structureCalls;
+// Les demandes de colonne `Taches_responsable` que Grist a reçues, acceptées ou refusées (`ok`). Depuis la 1.45.0, un administrateur fait aussi ajouter
+// `En_attente_validation` quand elle manque : ce fichier ne s'occupe que de la première (tests/e2e-validation.test.mjs, de l'autre).
+const addColumnCalls = async page => (await structureCalls(page)).filter(call => call.rowId === 'Taches_responsable');
 const consoleLines = async logs => plain((await Promise.all([...logs.warnings, ...logs.infos])).join('\n'));
 
 // ===== La carte : le rôle écrit avec les actions =====

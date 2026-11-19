@@ -12,8 +12,9 @@
 //   - l'écriture est une seule action Grist, donc atomique.
 
 import { avatarIdOf } from './attachments.js';
-import { CONSENT_COLUMN, CONSENT_LABEL, MAIN_TABLE, PROFILE_FIELDS } from './constants.js';
+import { CONSENT_COLUMN, CONSENT_LABEL, ETABLISSEMENT_TABLE, MAIN_TABLE, PENDING_COLUMN, PROFILE_FIELDS } from './constants.js';
 import { DOC_REFS } from './doc-refs.js';
+import { etablissementsForEmail } from './domains.js';
 import { describeVisibility, formatPhone, hasAccepted, normalizeEmail, safeValues, tableToRows, text } from './grist-data.js';
 import { classifyWriteError } from './presence.js';
 import { describeChanges, diffProfile, rebaseChanges } from './profile.js';
@@ -280,19 +281,45 @@ export async function saveProfile(docApi, review, { upload, log = console } = {}
 
 // ===== Créer la fiche de la personne connectée =====
 
+// Depuis la 1.45.0 (Antoine, 19 novembre 2026), la fiche qu'une personne crée est une DEMANDE : la ligne porte `En_attente_validation` vraie
+// (constants.js, PENDING_COLUMN) et reste invisible, pour son auteur comme pour les autres, jusqu'à ce qu'un administrateur la valide (requests.js).
+// Seule une personne dont l'adresse a le domaine d'un établissement (domains.js) peut en faire la demande, et seulement pour cet établissement.
+// Ces contrôles guident la personne, rien de plus : ce que Grist refuse vraiment, ce sont ses règles d'accès (GRIST_SETUP.md). Un administrateur
+// qui crée sa propre fiche n'est soumis ni au domaine ni à la validation : il pourrait valider sa demande lui-même.
+
 // Les phrases dites à la personne quand sa fiche ne peut pas être créée.
 const CREATION_FAILURES = {
   ...FAILURES,
   denied: 'Grist a refusé la création : vos droits ne permettent pas d\'ajouter une fiche. Contactez un administrateur.',
   other: 'La fiche n\'a pas pu être créée. Réessayez ; si le problème persiste, le détail est dans la console du navigateur.',
   exists: 'Une fiche porte déjà votre adresse : rien n\'a été créé. Rechargez la page pour la retrouver.',
-  noEmailColumn: 'BDD n\'a pas de colonne « email » : la fiche ne pourrait pas être reliée à votre compte. Rien n\'a été créé. Contactez un administrateur.'
+  noEmailColumn: 'BDD n\'a pas de colonne « email » : la fiche ne pourrait pas être reliée à votre compte. Rien n\'a été créé. Contactez un administrateur.',
+  noPendingColumn: `BDD n'a pas de colonne « ${PENDING_COLUMN} » : la demande ne pourrait pas être mise en attente de validation. Rien n'a été créé. Contactez un administrateur.`,
+  domainUnreadable: 'Le widget ne peut pas lire la liste des établissements et de leurs domaines : il ne peut pas vérifier votre adresse. Rien n\'a été créé. Contactez un administrateur.',
+  domainDenied: 'Le domaine de votre adresse ne correspond à aucun établissement : vous ne pouvez pas créer de fiche. Rien n\'a été créé. Contactez un administrateur.',
+  wrongEtablissement: 'L\'établissement choisi ne correspond pas au domaine de votre adresse : choisissez-en un autre. Rien n\'a été créé.'
 };
 
-// Relit BDD et vérifie que la fiche peut y être créée : la table a une colonne « email » et aucune ligne
-// ne porte déjà cette adresse (créée entre-temps, dans un autre onglet ou par un administrateur).
-// Lève une ProfileSaveError.
-async function checkCanCreate(docApi, email, log) {
+// Relit Etablissements et vérifie que le domaine de l'adresse est celui de l'établissement choisi (`etablissement`, un identifiant de ligne ; null : pas
+// encore choisi, seul le domaine compte). Lève une ProfileSaveError.
+async function checkDomain(docApi, email, etablissement, log) {
+  let rows;
+  try {
+    rows = tableToRows(await docApi.fetchTable(ETABLISSEMENT_TABLE));
+  } catch (error) {
+    log.error('[PROFIL] lecture d\'Etablissements impossible :', error);
+    throw new ProfileSaveError(CREATION_FAILURES.domainUnreadable, error);
+  }
+  const { readable, ids } = etablissementsForEmail(email, rows);
+  if (!readable) throw new ProfileSaveError(CREATION_FAILURES.domainUnreadable);
+  if (ids.length === 0) throw new ProfileSaveError(CREATION_FAILURES.domainDenied);
+  if (etablissement !== null && !ids.includes(etablissement)) throw new ProfileSaveError(CREATION_FAILURES.wrongEtablissement);
+}
+
+// Relit BDD et vérifie que la fiche peut y être créée : la table a une colonne « email » (et la colonne de validation, sauf pour un administrateur),
+// aucune ligne ne porte déjà cette adresse (créée entre-temps, dans un autre onglet ou par un administrateur : une demande en attente compte) et,
+// sauf pour un administrateur, le domaine de l'adresse est celui de l'établissement choisi. Lève une ProfileSaveError.
+async function checkCanCreate(docApi, email, { admin = false, etablissement = null, log }) {
   let table;
   try {
     table = await docApi.fetchTable(MAIN_TABLE);
@@ -301,36 +328,43 @@ async function checkCanCreate(docApi, email, log) {
     throw new ProfileSaveError(FAILURES.read, error);
   }
   if (!('email' in table)) throw new ProfileSaveError(CREATION_FAILURES.noEmailColumn);
+  if (!admin && !(PENDING_COLUMN in table)) throw new ProfileSaveError(CREATION_FAILURES.noPendingColumn);
   const mine = normalizeEmail(email);
   if (!mine) throw new ProfileSaveError(CREATION_FAILURES.other);
   if (tableToRows(table).some(row => normalizeEmail(row.email) === mine)) throw new ProfileSaveError(CREATION_FAILURES.exists);
+  if (!admin) await checkDomain(docApi, email, etablissement, log);
 }
 
-// Prépare la relecture de la fiche qu'une personne veut créer : vérifie qu'elle n'existe pas déjà, ramène
+// Prépare la relecture de la fiche qu'une personne veut créer : vérifie qu'elle n'existe pas déjà et que son adresse y donne droit, ramène
 // le brouillon à ce qui sera écrit et en tire la carte « après ». Rien n'est écrit. `blank` : la fiche
-// vide (blankFiche, avec l'adresse du compte), `email` : l'adresse du compte, jamais celle du brouillon.
+// vide (blankFiche, avec l'adresse du compte), `email` : l'adresse du compte, jamais celle du brouillon. `admin` : un administrateur crée sa fiche
+// (ni domaine ni validation).
 // Le brouillon dit aussi si la personne veut apparaître (sa case Accepte_apparaitre, un booléen) : la fiche est
 // créée avec ce choix, écrit tel quel, vrai ou faux. Ce n'est pas un champ de la fiche (il ne compte pas dans
 // `champs` ni dans `lines`) ; sans lui, rien n'est écrit et la colonne garde la valeur de Grist.
-// Renvoie la relecture : { creating, email, accepted, champs, values, lines, after, visibility, notice }.
-// Lève une ProfileSaveError.
-export async function prepareCreation(docApi, blank, draft, { email, referenceMaps, etabFlags, log = console }) {
-  await checkCanCreate(docApi, email, log);
+// Renvoie la relecture : { creating, pending, email, accepted, champs, values, lines, after, visibility, notice }. `pending` : la fiche est une demande
+// (`values` porte alors la case de validation, vraie). Lève une ProfileSaveError.
+export async function prepareCreation(docApi, blank, draft, { email, referenceMaps, etabFlags, admin = false, log = console }) {
   const { champs, errors } = diffProfile(blank, draft, referenceMaps, { creating: true });
   if (errors.length > 0 || Object.keys(champs).length === 0) {
     throw new ProfileSaveError('Il n\'y a rien à relire : corrigez les champs signalés ou remplissez la fiche.');
   }
+  await checkCanCreate(docApi, email, { admin, etablissement: champs.Etablissement?.apres?.id ?? null, log });
   const columnTypes = await readColumnTypes(docApi, MAIN_TABLE, { log });
   const built = buildRowUpdate(champs, blank, columnTypes);
   if (built.error) throw new ProfileSaveError(`Cette fiche ne peut pas être créée : ${built.error}.`);
   const choice = typeof draft?.[CONSENT_COLUMN] === 'boolean' ? { [CONSENT_COLUMN]: draft[CONSENT_COLUMN] } : {};
-  const row = { ...blank, email: normalizeEmail(email), ...choice };
+  const pending = admin !== true;
+  // L'adresse s'écrit telle que le compte la porte, casse comprise : les règles d'accès de Grist la comparent à l'identique (`rec.email == user.Email`,
+  // GRIST_SETUP.md), et une fiche écrite en minuscules ne serait plus lisible par son auteur quand son adresse a des majuscules.
+  const row = { ...blank, email: text(email), ...choice, ...(pending && { [PENDING_COLUMN]: true }) };
   return {
     creating: true,
+    pending,
     email: row.email,
     accepted: choice[CONSENT_COLUMN] === true,
     champs,
-    values: { email: row.email, ...choice, ...built.values },
+    values: { email: row.email, ...choice, ...(pending && { [PENDING_COLUMN]: true }), ...built.values },
     lines: describeChanges(champs),
     after: previewOf(row, built.values, referenceMaps, etabFlags).after,
     visibility: describeVisibility({ ...row, ...built.values }, referenceMaps, etabFlags),
@@ -339,14 +373,18 @@ export async function prepareCreation(docApi, blank, draft, { email, referenceMa
 }
 
 // Ajoute la ligne de la relecture (prepareCreation) à BDD, en une seule action Grist. Elle porte l'adresse
-// du compte, ce que la personne a rempli et son choix d'apparaître (la case Accepte_apparaitre) ; jamais le
+// du compte, ce que la personne a rempli, son choix d'apparaître (la case Accepte_apparaitre) et, sauf pour un administrateur, la case
+// « en attente de validation » vraie ; jamais le
 // périmètre, qui reste l'affaire des administrateurs. Renvoie { status: 'created', rowId } ; lève une
-// ProfileSaveError, sans rien écrire, si une fiche porte déjà l'adresse.
+// ProfileSaveError, sans rien écrire, si une fiche porte déjà l'adresse ou si l'adresse n'a plus droit à l'établissement choisi.
 export async function createProfile(docApi, review, { log = console } = {}) {
   if (review?.creating !== true || !review.email || Object.keys(review.champs).length === 0) {
     throw new ProfileSaveError('Aucune fiche à créer.');
   }
-  await checkCanCreate(docApi, review.email, log);
+  // Fermé par défaut : une demande sans la case de validation serait publiée sans qu'un administrateur l'ait vue.
+  const admin = review.pending === false;
+  if (!admin && review.values?.[PENDING_COLUMN] !== true) throw new ProfileSaveError(CREATION_FAILURES.other);
+  await checkCanCreate(docApi, review.email, { admin, etablissement: Number.isInteger(review.values?.Etablissement) ? review.values.Etablissement : null, log });
   let added;
   try {
     added = await docApi.applyUserActions([['AddRecord', MAIN_TABLE, null, review.values]]);

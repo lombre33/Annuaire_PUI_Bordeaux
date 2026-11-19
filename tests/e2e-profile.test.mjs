@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
-import { sampleTables, withIdentity, withSchema, withShownEmail, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL, NEW_EMAIL } from './fixtures.mjs';
+import { sampleTables, withIdentity, withSchema, withShownEmail, HOSTILE_FIRST_NAME, ANA_EMAIL, IRIS_EMAIL, ADMIN_EMAIL } from './fixtures.mjs';
 import {
   assertFooterWraps, bddCalls, bddCell, changeFonction, focusReturnsTo, gridCard, openOwn, probeRemoved, reload, skip, toast, until, waitForCards,
   waitForEditButtons, withWidget
@@ -272,9 +272,9 @@ test('le bandeau « Ma présence » tient dans son cadre à toute largeur : le t
 // pour un écart de 14 px. La base est de 200 px : l'interrupteur passe sous le texte dès que celui-ci
 // n'aurait plus 200 px (pas 15rem, que l'audit proposait : à 320 px l'avatar resterait seul sur sa ligne).
 // Sept comptes : le plus chargé (administratrice et responsable : trois boutons),
-// un nom de 47 caractères, le message de deux raisons, un nom et une adresse sans aucune coupure
-// possible, un compte sans fiche (aucun bouton : le bloc des boutons est vide), un administrateur sans
-// fiche et un responsable sans fiche (un seul bouton chacun).
+// un nom de 47 caractères, le message de deux raisons, un nom sans aucune coupure possible, une table
+// sans colonne « email » (aucun bouton : le bloc des boutons est vide), un administrateur sans fiche et
+// un responsable sans fiche (deux boutons chacun).
 test('le bandeau « Ma présence » de 320 à 840 px : le texte garde 200 px au moins, rien ne le recouvre ni ne le coupe, et le bloc des boutons vide ne prend aucune place (audit U46)', { skip }, async () => {
   const unbreakableAddress = `${'a'.repeat(60)}@example.test`;
   const accounts = [
@@ -294,8 +294,7 @@ test('le bandeau « Ma présence » de 320 à 840 px : le texte garde 200 px au 
       tables.BDD.nom[4] = '';
       tables.BDD.Etablissement[4] = 0;
     } },
-    // Un compte sans fiche a « Créer ma fiche », son seul bouton.
-    { label: 'compte sans fiche, adresse sans coupure possible', user: unbreakableAddress, ready: '.account-create', buttons: 1, patch: () => {} },
+    // Depuis la 1.45.0, un compte sans fiche qui n'administre pas ne voit pas l'annuaire : son « Créer ma fiche » est celui de l'écran réservé (tests/e2e-validation.test.mjs).
     // Sans colonne « email » dans BDD, la fiche ne pourrait pas être reliée à la personne : aucun bouton, le bloc vide ne prend aucune place.
     { label: 'BDD sans colonne email', user: unbreakableAddress, ready: '.account-name', buttons: 0, patch: tables => { delete tables.BDD.email; } },
     // Administrateur sans fiche : ni interrupteur ni « Modifier mon profil », mais « Créer ma fiche » et « Mode admin ».
@@ -405,16 +404,25 @@ test('un administrateur qui n\'a pas de fiche a un bandeau sans interrupteur de 
     assert.ok(!JSON.stringify(await Promise.all([...logs.warnings, ...logs.infos])).includes('@'), 'aucune adresse dans la console');
   }));
 
-for (const [who, options] of [
-  ['un membre', { tables: memberTables(), user: ANA_EMAIL }],
-  ['une personne dont la fiche est masquée', { tables: withIdentity(), user: IRIS_EMAIL }],
-  ['une personne que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.example' }]
+// Depuis la 1.45.0, une adresse que ni BDD ni ACL ne connaissent ne voit pas l'annuaire : l'écran réservé (gate.js) remplace les cartes et le bandeau.
+const waitForGate = page => page.locator('#gatePanel:not([hidden])').waitFor();
+
+for (const [who, options, closed] of [
+  ['un membre', { tables: memberTables(), user: ANA_EMAIL }, false],
+  ['une personne dont la fiche est masquée', { tables: withIdentity(), user: IRIS_EMAIL }, false],
+  ['une personne que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.example' }, true]
 ]) {
   test(`${who} ne voit jamais « Mode admin », et ne peut pas l'allumer en forçant le bouton`, { skip }, () =>
     withWidget(options, async ({ page }) => {
-      await waitForCards(page, 4);
-      await probeRemoved(page);
-      await page.locator('#accountBar:not([hidden])').waitFor();
+      if (closed) {
+        await waitForGate(page);
+        await probeRemoved(page);
+        assert.equal(await page.locator('#accountBar').isHidden(), true, 'l\'annuaire est fermé : ni bandeau ni bouton');
+      } else {
+        await waitForCards(page, 4);
+        await probeRemoved(page);
+        await page.locator('#accountBar:not([hidden])').waitFor();
+      }
       assert.equal(await adminToggle(page).isHidden(), true);
       await page.evaluate(() => {
         const button = document.querySelector('#accountBar .account-admin');
@@ -441,15 +449,17 @@ const settled = {
   immediately: async () => {}
 };
 
-for (const [who, options, wait] of [
-  ['un compte anonyme', { tables: withIdentity(), user: null }, settled.probeRemoved],
-  ['une adresse que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.example' }, settled.probeRemoved],
-  ['un compte Lecteur', { tables: withIdentity(), user: ANA_EMAIL, readOnly: true }, settled.immediately],
-  ['un document sans table-sonde que Grist refuse de créer', { tables: sampleTables(), user: ANA_EMAIL, denyWrites: ['Annuaire_Sonde'] }, settled.warned]
+// `closed` : depuis la 1.45.0 l'annuaire n'est pas montré à cette personne (une adresse inconnue, ou une sonde que les règles d'accès bloquent, que le
+// widget prend pour un visiteur sans compte) : l'écran réservé remplace les cartes.
+for (const [who, options, wait, closed] of [
+  ['un compte anonyme', { tables: withIdentity(), user: null }, settled.probeRemoved, false],
+  ['une adresse que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.example' }, settled.probeRemoved, true],
+  ['un compte Lecteur', { tables: withIdentity(), user: ANA_EMAIL, readOnly: true }, settled.immediately, false],
+  ['un document sans table-sonde que Grist refuse de créer', { tables: sampleTables(), user: ANA_EMAIL, denyWrites: ['Annuaire_Sonde'] }, settled.warned, true]
 ]) {
   test(`${who} : aucun bouton « Modifier », nulle part`, { skip }, () =>
     withWidget(options, async ({ page, logs }) => {
-      await waitForCards(page, 4);
+      await (closed ? waitForGate(page) : waitForCards(page, 4));
       await wait(page, logs);
       assert.equal(await page.locator('#cardsGrid .card-actions:not([hidden])').count(), 0);
       assert.equal(await page.locator('#accountBar .account-edit').isHidden(), true);
@@ -1524,7 +1534,7 @@ for (const width of [280, 320, 360]) {
 // ===== Créer sa fiche =====
 
 test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit une seule carte, et une ligne publiée est ajoutée à BDD', { skip }, () =>
-  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL }, async ({ page, logs }) => {
+  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: ADMIN_EMAIL }, async ({ page, logs }) => {
     await waitForCards(page, 4);
     const create = page.locator('#accountBar .account-create');
     await create.waitFor();
@@ -1535,7 +1545,7 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     await create.click();
     await dialog(page).waitFor();
     assert.equal(await heading(page).textContent(), 'Créer ma fiche');
-    assert.equal(await dialog(page).locator('.ident-mail').textContent(), NEW_EMAIL, 'l\'adresse du compte, qui ne se saisit pas');
+    assert.equal(await dialog(page).locator('.ident-mail').textContent(), ADMIN_EMAIL, 'l\'adresse du compte, qui ne se saisit pas');
     assert.equal(await dialog(page).locator('#profile-email').count(), 0);
     assert.equal(await summary(page), 'Aucun champ rempli', 'la case « Apparaître dans l’annuaire » n\'est pas un champ à remplir');
     assert.equal(await press(page, 'Relire ma fiche').isDisabled(), true);
@@ -1579,7 +1589,7 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     await headingIs(page, 'Relire avant de publier');
     assert.equal(await dialog(page).locator('.rv-col-before').count(), 0, 'pas de carte « avant » pour une fiche qui n\'existe pas');
     assert.equal(await column(page, 'after').locator('.name').textContent(), 'Zoé Nouvelle');
-    assert.equal(await column(page, 'after').locator('.email').textContent(), NEW_EMAIL);
+    assert.equal(await column(page, 'after').locator('.email').textContent(), ADMIN_EMAIL);
     assert.equal(await dialog(page).locator('.notice').count(), 0, 'rien ne retient la fiche : aucun avis de fiche masquée, ni de périmètre');
     assert.deepEqual(await bddCalls(page), [], 'la relecture n\'écrit rien');
     await press(page, 'Publier ma fiche').click();
@@ -1589,7 +1599,7 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
     // périmètre (il n'en a plus besoin), aucune autre table touchée.
     assert.deepEqual(await bddCalls(page), [{
       action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
-      values: { email: NEW_EMAIL, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission' }
+      values: { email: ADMIN_EMAIL, Accepte_apparaitre: true, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1, Fonction: 'Chargée de mission' }
     }]);
     assert.deepEqual(await page.evaluate(() => window.__fake.calls.filter(call => !['BDD', 'Annuaire_Sonde'].includes(call.table))), []);
     await waitForCards(page, 5); // la fiche, sans aucun périmètre, apparaît tout de suite, sans recharger la page
@@ -1615,7 +1625,7 @@ test('« Créer ma fiche » : une personne sans fiche remplit la fenêtre, relit
 // La liste déroulante à recherche (dropdown(), dom.js), au clavier et à la souris : la recherche trie en direct, les flèches et
 // Entrée choisissent, Échap ne referme que le panneau, un clic ailleurs aussi.
 test('la liste déroulante des établissements : recherche en direct, flèches et Entrée, Échap ne ferme que le panneau, un clic ailleurs le referme', { skip }, () =>
-  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL }, async ({ page }) => {
+  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: ADMIN_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
     await page.locator('#accountBar .account-create').click();
     await dialog(page).waitFor();
@@ -1675,7 +1685,7 @@ test('la liste déroulante des établissements : recherche en direct, flèches e
 
 test('la liste déroulante sur un écran tactile : le panneau s\'ouvre sans prendre le focus, et un appui sur une valeur la choisit', { skip }, () =>
   withWidget({
-    tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL, contextOptions: { hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } }
+    tables: withSchema(withShownEmail(withIdentity())), user: ADMIN_EMAIL, contextOptions: { hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } }
   }, async ({ page }) => {
     await waitForCards(page, 4);
     await page.locator('#accountBar .account-create').tap();
@@ -1694,7 +1704,7 @@ test('la liste déroulante sur un écran tactile : le panneau s\'ouvre sans pren
   }));
 
 test('« Créer ma fiche » avec la case « Apparaître dans l’annuaire » décochée : la fiche est créée sans accord, le bouton reste « Créer ma fiche »', { skip }, () =>
-  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: NEW_EMAIL }, async ({ page }) => {
+  withWidget({ tables: withSchema(withShownEmail(withIdentity())), user: ADMIN_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);
     await page.locator('#accountBar .account-create').click();
     await dialog(page).waitFor();
@@ -1715,7 +1725,7 @@ test('« Créer ma fiche » avec la case « Apparaître dans l’annuaire » dé
 
     assert.deepEqual(await bddCalls(page), [{
       action: 'AddRecord', table: 'BDD', rowId: 13, ok: true,
-      values: { email: NEW_EMAIL, Accepte_apparaitre: false, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 }
+      values: { email: ADMIN_EMAIL, Accepte_apparaitre: false, prenom: 'Zoé', nom: 'Nouvelle', Etablissement: 1 }
     }]);
     await page.locator('#accountBar .presence-switch').waitFor();
     assert.equal(await page.locator('#accountBar .presence-switch').getAttribute('aria-checked'), 'false', 'l\'interrupteur reste éteint');
