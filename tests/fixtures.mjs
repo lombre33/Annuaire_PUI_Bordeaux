@@ -325,20 +325,12 @@ export function withValidation(tables = sampleTables(), { pending = {} } = {}) {
   return copy;
 }
 
-// Le document complété de la colonne `Fiche_desactivee` de BDD (1.46.0, le départ d'un·e collègue) : une case à cocher, fausse pour toutes les fiches
-// existantes. `deactivated` : { identifiant de ligne de BDD → vrai } pour les fiches désactivées.
-export function withDeactivation(tables = sampleTables(), { deactivated = {} } = {}) {
-  const copy = structuredClone(tables);
-  copy.BDD.Fiche_desactivee = copy.BDD.id.map(id => deactivated[id] === true);
-  return copy;
-}
-
 // Le document de départ : Ana (CHU) part, Hugo (CHU) reprend ses valeurs.
 //   Ana  : Instances CME ; Communautés « Réseau douleur » ; Compétences Oncologie et Hématologie ; actions 1.1 et 2.1 dont elle est responsable de la 1.1 ;
 //          rôle « Référent qualité »
 //   Hugo : une instance inconnue (999), la compétence Hématologie (qu'Ana a aussi), l'action « Veille », aucun rôle
 export function departureTables() {
-  const tables = withIdentity(withDeactivation(withResponsibleColumn(withTaskActions())));
+  const tables = withIdentity(withResponsibleColumn(withTaskActions()));
   const at = id => tables.BDD.id.indexOf(id);
   tables.BDD.Competences[at(10)] = ['L', 2];
   return tables;

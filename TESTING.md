@@ -360,16 +360,16 @@ demande de fiche, la pastille et la fenêtre des administrateurs). `tests/profil
 (domaine relu deux fois, colonne de validation absente, adresse du compte à la lettre) et `tests/rules.test.mjs` la règle du nom de
 colonne.
 
-Le départ d'un·e collègue (1.46.0) a deux fichiers sans navigateur et un dans Chromium : `tests/departure.test.mjs` (19 tests : une fiche
-désactivée n'est jamais un contact et `describeVisibility()` le dit, seul `true` désactive, `deactivatedOf()`, `colleaguesOf()` et
-`departedOf()`, `transferOf()` : fusion sans doublon même quand deux lignes de la table de référence se lisent pareil, la
-responsabilité des actions, les rôles que le widget déduit jamais recopiés, une colonne manquante ; `createDeactivatedColumn()`),
-`tests/departure-save.test.mjs` (25 tests avec le faux Grist : chaque refus de `prepareDeparture()`, **une seule action atomique**
-(recopie puis désactivation), rien de supprimé ni de créé, aucune autre fiche touchée, le conflit, le tout ou rien dans les deux sens,
-une colonne à formule, ce que Grist n'a pas gardé, `reactivateFiche()`) et `tests/e2e-departure.test.mjs` (14 scénarios : le parcours
-complet avec l'avant et l'après, un départ sans transfert, le rôle coché à la main, la réactivation, une fiche désactivée depuis Grist,
-un refus de Grist, un conflit, la colonne manquante ou créée par l'administrateur, l'écran de la personne désactivée, le responsable
-d'un autre établissement, **le nombre de contacts après le départ** et **la colonne `Etablissement` de chaque fiche, inchangée**).
+Le départ d'un·e collègue (1.46.0, simplifié en 1.46.1) a deux fichiers sans navigateur et un dans Chromium : `tests/departure.test.mjs` (15 tests :
+décocher `Accepte_apparaitre` est tout ce que le départ change dans l'annuaire, un contact de moins et les établissements inchangés, `withoutConsentOf()`,
+`colleaguesOf()` et `departedOf()`, `transferOf()` : fusion sans doublon même quand deux lignes de la table de référence se lisent pareil, la
+responsabilité des actions, les rôles que le widget déduit jamais recopiés, la console qui ne dit rien de plus qu'avant),
+`tests/departure-save.test.mjs` (24 tests avec le faux Grist : chaque refus de `prepareDeparture()`, **une seule action atomique**
+(recopie puis case décochée), rien de supprimé ni de créé, aucune autre fiche touchée, le conflit, le tout ou rien dans les deux sens,
+une colonne à formule, ce que Grist n'a pas gardé, `reactivateFiche()`, une demande en attente jamais touchée) et `tests/e2e-departure.test.mjs` (14 scénarios :
+le parcours complet avec l'avant et l'après, un départ sans transfert, le rôle coché à la main, la réactivation et son rappel d'accord, un refus de Grist au
+départ et à la réactivation, un conflit, **aucune colonne ajoutée au document**, la personne partie qui se connecte encore, le responsable d'un autre
+établissement, **le nombre de contacts après le départ** et **la colonne `Etablissement` de chaque fiche, inchangée**).
 `tests/gate.test.mjs` et `tests/presence.test.mjs` y ajoutent l'écran et la phrase de la personne désactivée.
 
 `tests/e2e-task-roles.test.mjs` y ajoute 5 scénarios sur le rôle dans une tâche (`withTaskRoles` dans
@@ -2188,31 +2188,30 @@ le fil des permissions a seulement joué le widget 1.45.0 dans un Grist local. �
       (GRIST_SETUP.md, étape 4, 1.45.2).
 - [ ] **Console.** Aucune adresse e-mail, aucune erreur rouge hors celles que ces cas annoncent.
 
-## 33. Le départ d'un·e collègue (1.46.0)
+## 33. Le départ d'un·e collègue (1.46.0, simplifié en 1.46.1)
 
 Antoine, 19 novembre 2026 : un responsable d'établissement désactive la fiche d'un·e collègue qui part (elle reste dans `BDD`, le widget ne la montre
-plus) et transfère ses valeurs à une autre personne. **Rien de cela n'a été essayé dans le vrai Grist d'Antoine** : les règles ont été essayées dans un
-Grist local (1.7.22) avec un compte par profil, **sans** le widget 1.46.0. À passer sur une **copie** du document, avec la colonne `Fiche_desactivee`
-et les règles de [`GRIST_SETUP.md`](GRIST_SETUP.md) (étape 4, « Départ d'un·e collègue ») saisies, avec un compte par profil :
+plus) et transfère ses valeurs à une autre personne. Depuis la 1.46.1, **désactiver, c'est décocher `Accepte_apparaitre`** : aucune colonne de plus.
+**Rien de cela n'a été essayé dans le vrai Grist d'Antoine** : les règles ont été essayées dans un Grist local (1.7.22) avec un compte par profil,
+**sans** le widget. À passer sur une **copie** du document, avec les règles de [`GRIST_SETUP.md`](GRIST_SETUP.md) (étape 4, « Départ d'un·e
+collègue ») saisies, avec un compte par profil :
 
-- [ ] **La colonne.** Ouverte par un administrateur, l'annuaire crée `BDD.Fiche_desactivee` (case à cocher) si elle manque ; la console dit
-      `[SCHEMA] colonne « Fiche_desactivee » absente de BDD : créée…`. Ouverte par un responsable qui n'administre pas, la fenêtre du départ dit
-      que la colonne n'existe pas, et ne propose aucun « Départ… ».
+- [ ] **Aucune colonne ajoutée.** Ouverte par un administrateur, l'annuaire n'ajoute aucune colonne pour le départ (la 1.46.0 créait `Fiche_desactivee`) ;
+      si le document en a gardé une, elle est inutile et peut être supprimée.
 - [ ] **Le responsable, « Mon établissement ».** La section « Départ d'un·e collègue » est là ; le bouton ouvre la fenêtre : ses collègues
-      (ceux que l'annuaire montre), « vous » sans bouton sur sa propre ligne.
+      (ceux que l'annuaire montre), « vous » sans bouton sur sa propre ligne, et, plus bas, « Fiches qui n'apparaissent pas » (les personnes parties
+      ou qui n'ont pas répondu).
 - [ ] **Un départ avec transfert.** « Départ… » d'une personne, une autre personne choisie, les rubriques cochées (le rôle ne l'est pas d'avance).
       « Continuer » montre, rubrique par rubrique, **avant** et **après**, ce qui s'ajoute et ce qui est déjà là. « Désactiver la fiche » :
-      la fiche part de l'annuaire (un membre ne la voit plus), **reste dans `BDD`**, et la personne qui reprend a les valeurs en plus, **sans
-      doublon**. La fiche désactivée **garde** ses valeurs.
-- [ ] **Les écritures.** Dans l'historique de Grist, **une seule action** : les listes de la personne qui reprend, puis `Fiche_desactivee` de
+      la fiche part de l'annuaire (un membre ne la voit plus), **reste dans `BDD`** avec sa case `Accepte_apparaitre` décochée, et la personne qui
+      reprend a les valeurs en plus, **sans doublon**. La fiche qui part **garde** ses valeurs.
+- [ ] **Les écritures.** Dans l'historique de Grist, **une seule action** : les listes de la personne qui reprend, puis `Accepte_apparaitre` de
       celle qui part. Aucune autre cellule, aucune ligne supprimée.
-- [ ] **Un départ sans transfert** (« Ne rien transférer ») : seule `Fiche_desactivee` change.
-- [ ] **La réactivation.** « Réactiver » puis « Confirmer la réactivation » : la fiche revient dans l'annuaire (si la personne avait accepté
-      d'apparaître), avec les valeurs qu'elle avait ; ce qui a été transféré à l'autre personne y reste.
-- [ ] **La personne désactivée** (son compte) : « Votre fiche est désactivée », aucune carte, pas de « Créer ma fiche » ; elle ne modifie plus sa fiche.
-- [ ] **Les refus de Grist** : un responsable d'un **autre** établissement ne désactive pas cette fiche (« Grist a refusé la modification… », rien
-      de changé) ; un membre ne peut pas cocher la case depuis la console ; la fiche d'une personne désactivée ne se modifie pas.
-- [ ] **Tout ou rien** : une copie vers une fiche d'un autre établissement avec une désactivation dans le même lot n'écrit rien.
-- [ ] **Le bloc `Avatar`** : un membre ne lit pas la photo d'une fiche désactivée.
+- [ ] **Un départ sans transfert** (« Ne rien transférer ») : seule `Accepte_apparaitre` change.
+- [ ] **La réactivation.** « Réactiver » rappelle que cela coche « Apparaître dans l'annuaire » et qu'il faut l'accord de la personne ;
+      « Confirmer la réactivation » : la fiche revient dans l'annuaire avec les valeurs qu'elle avait ; ce qui a été transféré à l'autre personne y reste.
+- [ ] **Les refus de Grist** : un responsable d'un **autre** établissement ne peut pas décocher la case de cette fiche (« Grist a refusé la
+      modification… », rien de changé) ; un membre (ni responsable ni administrateur) ne peut pas décocher la case d'une autre fiche depuis la console.
+- [ ] **Tout ou rien** : une copie vers une fiche d'un autre établissement avec une case décochée dans le même lot n'écrit rien.
 - [ ] **Le nombre de contacts** : après un départ, l'annuaire montre **un contact de moins** et la colonne `Etablissement` de chaque fiche est inchangée.
 - [ ] **Console.** Aucune adresse ni aucun nom ; `[DEPART]` seulement en cas d'échec.

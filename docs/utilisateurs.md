@@ -905,7 +905,7 @@ Ce que votre navigateur fait de l'image : il ne l'envoie **jamais telle quelle**
 
 Une personne quitte votre établissement ? Vous pouvez **désactiver sa fiche** et **transférer ses valeurs** à quelqu'un d'autre, sans passer par un administrateur.
 
-- **Ce que « désactiver » veut dire.** La fiche **n'apparaît plus** dans l'annuaire, mais **rien n'est supprimé** : elle reste dans Grist, avec toutes ses valeurs. Vous pouvez la **réactiver** quand vous voulez.
+- **Ce que « désactiver » veut dire.** La fiche **n'apparaît plus** dans l'annuaire (sa case « Apparaître dans l'annuaire » est décochée), mais **rien n'est supprimé** : elle reste dans Grist, avec toutes ses valeurs. Vous pouvez la **réactiver** quand vous voulez.
 - **Où cliquer.** Dans la fenêtre de votre établissement, section **Départ d'un·e collègue**, le bouton **Un·e collègue quitte l'établissement…** ouvre une fenêtre.
   - Elle liste les personnes de l'établissement qui apparaissent dans l'annuaire. Vous ne voyez pas de bouton sur **votre** fiche (« vous ») : on ne désactive pas sa propre fiche.
   - Cliquez sur **Départ…** à côté de la personne qui part.
@@ -916,10 +916,10 @@ Une personne quitte votre établissement ? Vous pouvez **désactiver sa fiche** 
   - Les valeurs sont **ajoutées** à celles de la personne qui reprend, **sans doublon** : elle garde les siennes. Ce n'est pas un remplacement.
   - La fiche qui part **garde** les siennes : rien ne se perd.
   - Tout s'écrit **en une fois** : si Grist refuse une des deux fiches, aucune n'est changée.
-- **Réactiver une fiche.** Dans la même fenêtre, **Fiches désactivées** liste les fiches de l'établissement : **Réactiver**, puis **Confirmer la réactivation**. La fiche revient dans l'annuaire si la personne avait accepté d'apparaître ; ce qui a été transféré à une autre personne y reste.
+- **Réactiver une fiche.** Dans la même fenêtre, **Fiches qui n'apparaissent pas** liste les fiches de l'établissement qui ne figurent pas dans l'annuaire : celles des personnes parties, mais aussi celles des personnes qui n'ont pas répondu ou qui ont refusé d'apparaître. **Réactiver**, puis **Confirmer la réactivation**, **recoche** la case « Apparaître dans l'annuaire » de la fiche : ne le faites que si la personne vous a donné son accord. Ce qui a été transféré à une autre personne y reste.
 - **Si la personne qui part est aussi responsable de l'établissement**, la fenêtre vous le rappelle : retirez-la de la liste des **Responsables** de la fiche de l'établissement. Le départ n'y touche pas.
-- **Ce que voit la personne désactivée.** Un écran « Votre fiche est désactivée » à la place de l'annuaire, qui lui dit de contacter le responsable de son établissement ou un administrateur.
-- **Si quelque chose bloque.** Un message dit pourquoi, et rien n'est modifié : « Grist a refusé la modification : vos droits ne permettent pas de désactiver cette fiche ou de modifier celle de la personne qui reprend. Contactez un administrateur. », ou « L’une des deux fiches a changé dans Grist pendant que vous relisiez : rien n’a été écrit. Relisez, puis confirmez à nouveau. » (relisez, puis confirmez de nouveau). Si la fenêtre dit que la colonne « Fiche_desactivee » n'existe pas, un administrateur doit la créer (ouvrir l'annuaire suffit).
+- **Ce que devient la personne qui part.** Sa fiche n'apparaît plus ; elle n'a pas d'écran à part. Elle n'a plus son adresse professionnelle : elle ne peut donc pas se reconnecter pour réafficher elle-même sa fiche.
+- **Si quelque chose bloque.** Un message dit pourquoi, et rien n'est modifié : « Grist a refusé la modification : vos droits ne permettent pas de désactiver cette fiche ou de modifier celle de la personne qui reprend. Contactez un administrateur. », ou « L’une des deux fiches a changé dans Grist pendant que vous relisiez : rien n’a été écrit. Relisez, puis confirmez à nouveau. » (relisez, puis confirmez de nouveau).
 
 ### Enregistrer
 
@@ -1004,11 +1004,10 @@ Si l'envoi d'un logo échoue chez vous, le logo se change dans Grist, comme avan
 **Ensuite, côté données** (informations à transmettre à l'administrateur des données). Une personne n'est affichée que si **toutes** ces conditions sont réunies :
 
 - elle a un **nom ou un prénom** ;
-- elle a **accepté d'apparaître** (case `Accepte_apparaitre` cochée : par elle-même avec « Ma présence », ou dans Grist avec son accord) ;
+- elle a **accepté d'apparaître** (case `Accepte_apparaitre` cochée : par elle-même avec « Ma présence », ou dans Grist avec son accord ; le responsable de son établissement la décoche quand elle le quitte : [Quand un·e collègue quitte l'établissement](#quand-une-collègue-quitte-létablissement)) ;
 - elle est rattachée à un établissement (colonne `Etablissement`, qui renvoie à une ligne de la table `Etablissements`) ;
 - cet établissement a **validé** son apparition (`ok_pour_apparaitre` coché) ;
 - cet établissement est **fondateur ou partenaire** (une structure « autres », extérieure au PUI, n'apparaît jamais).
-- sa fiche n'est **pas désactivée** : la colonne `Fiche_desactivee` est vide ou décochée (le responsable de son établissement la coche quand la personne le quitte : [Quand un·e collègue quitte l'établissement](#quand-une-collègue-quitte-létablissement)) ;
 - sa fiche n'est **pas une demande en attente** : la colonne `En_attente_validation` est vide ou décochée (une fiche que la personne a créée elle-même attend d'abord la validation d'un administrateur : [Valider les demandes de fiche](#valider-les-demandes-de-fiche)).
 
 Quelques cas, avec des personnes fictives du jeu de démonstration :

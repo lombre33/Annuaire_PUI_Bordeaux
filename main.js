@@ -21,8 +21,8 @@ import { createScrollTools } from './scroll-tools.js';
 import { readIdentity, isReadOnlyAddress, isAccessRefused } from './identity.js';
 import { findLoginUrl } from './login.js';
 import { createLoginPrompt } from './login-ui.js';
-import { createDeactivatedColumn, createPendingColumn, createResponsibleColumn } from './schema.js';
-import { describeCreated, describeDeactivated, describeHiddenFiche, describePending, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
+import { createPendingColumn, createResponsibleColumn } from './schema.js';
+import { describeCreated, describeHiddenFiche, describePending, describePresence, describeUnknownAccount, setPresence, PresenceError } from './presence.js';
 import { describeGate } from './gate.js';
 import { createGatePanel } from './gate-ui.js';
 import { RequestError, approveRequest, describeRequests, refuseRequest } from './requests.js';
@@ -510,22 +510,9 @@ async function ensurePendingColumn() {
   else await reloadDirectory();
 }
 
-// La colonne `Fiche_desactivee` de BDD (1.46.0) : sans elle, le départ d'un·e collègue n'est pas proposé (departure-ui.js). Créée comme les deux autres,
-// par un administrateur qui ouvre l'annuaire, une fois par chargement.
-let deactivatedColumnTried = false;
-async function ensureDeactivatedColumn() {
-  if (deactivatedColumnTried || !isAdmin() || !state.people) return;
-  if (state.people.hasDeactivatedColumn || !state.people.hasEmailColumn) return;
-  deactivatedColumnTried = true;
-  const failure = await createDeactivatedColumn(window.grist.docApi);
-  if (failure) console.info(`[SCHEMA] ${failure}`);
-  else await reloadDirectory();
-}
-
 function ensureColumns() {
   ensureResponsibleColumn();
   ensurePendingColumn();
-  ensureDeactivatedColumn();
 }
 
 // Qui voit l'annuaire (gate.js). Fermé, l'écran de la personne prend la place de la recherche, des filtres et des cartes (gate-ui.js) et le
@@ -592,10 +579,8 @@ function refreshAccount() {
   }
   // La seule fiche de la personne est une demande en attente : ni interrupteur ni fiche à modifier tant qu'un administrateur ne l'a pas validée
   // (seul un administrateur arrive jusqu'ici : les autres personnes ont l'écran de refreshGate).
-  // Une fiche désactivée (1.46.0) ne se modifie pas non plus : le bandeau le dit, sans interrupteur.
-  if (persons.every(person => person.status.pending || person.status.deactivated)) {
-    const describe = persons[0].status.deactivated ? describeDeactivated : describePending;
-    accountBar.show(describe({ name: persons[0].name, initials: initials(persons[0].row), photo: avatarIdOf(persons[0].row.Avatar) }));
+  if (persons.every(person => person.status.pending)) {
+    accountBar.show(describePending({ name: persons[0].name, initials: initials(persons[0].row), photo: avatarIdOf(persons[0].row.Avatar) }));
     accountBar.setActions({ etab: myEtablissements().length > 0, ...adminActions });
     return;
   }
@@ -979,14 +964,14 @@ function ficheOf({ row, etablissement, responsables }) {
 const myEmail = () => (state.identity?.status === 'ready' ? normalizeEmail(state.identity.email) : '');
 
 // Ce que l'annuaire dit des personnes de l'établissement `etablissementId` : celles qu'on peut nommer, ce que cacherait un établissement décoché et,
-// depuis la 1.46.0, combien de fiches y sont désactivées. Relu à chaque appel : la fenêtre du départ le redemande après chaque écriture.
+// depuis la 1.46.0, combien de fiches y sont masquées faute d'accord (celles des personnes parties, par exemple). Relu à chaque appel : la fenêtre du départ le redemande après chaque écriture.
 function peopleInfo(etablissementId) {
   const meEmail = myEmail();
   const { candidates, hidden, includesMe } = peopleOfEtablissement(state.allContacts, etablissementId, meEmail, initials);
   return {
     candidates,
     warning: { hidden, includesMe },
-    departure: { departed: state.people?.deactivatedOf(etablissementId).length ?? 0 },
+    departure: { departed: state.people?.withoutConsentOf(etablissementId).length ?? 0 },
     meEmail
   };
 }
@@ -1085,7 +1070,7 @@ const photoOf = row => avatarIdOf(row.Avatar);
 // Les personnes que la fenêtre du départ montre pour l'établissement `etablissementId` (departure.js).
 const departureLists = etablissementId => ({
   colleagues: colleaguesOf(state.allContacts, etablissementId, myEmail(), { initialsOf: initials, photoOf }),
-  departed: departedOf(state.people?.deactivatedOf(etablissementId) ?? [], { initialsOf: initials, photoOf })
+  departed: departedOf(state.people?.withoutConsentOf(etablissementId) ?? [], { initialsOf: initials, photoOf })
 });
 
 // Ouvre la fenêtre du départ d'un·e collègue pour `etablissement` ({ id, acronym }). Fermé par défaut : seulement pour un établissement dont la personne
@@ -1098,7 +1083,6 @@ function openDeparture(etablissement, { isResponsable, onChanged, onClose }) {
     etablissement,
     colleagues: () => departureLists(id).colleagues,
     departed: () => departureLists(id).departed,
-    get canWrite() { return state.people?.hasDeactivatedColumn === true; },
     isResponsable,
     prepare: request => speaking(userFacingDeparture, () => prepareDeparture(window.grist.docApi,
       { ...request, etablissementId: id, responsable: responsable(), meEmail: myEmail() }, { referenceMaps: state.referenceMaps })),

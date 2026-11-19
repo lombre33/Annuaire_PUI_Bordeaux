@@ -1,11 +1,12 @@
 // Le départ d'un·e collègue (1.46.0, Antoine, 19 novembre 2026 : « une personne qui est gestionnaire d'un établissement peut supprimer la fiche d'un·e
 // collègue de cet établissement (le départ d'une personne), et migrer ses valeurs vers une autre personne », puis « ça désactive la fiche mais ça ne la
-// supprime pas de la BDD, juste plus visible dans le widget »). Ici, ce que le responsable lit (ses collègues, les fiches désactivées de son
-// établissement), ce qu'il choisit (qui reprend quelles rubriques) et ce que ce choix changerait : le calcul seul, sans DOM ni Grist. L'écriture est dans
-// departure-save.js, la fenêtre dans departure-ui.js.
+// supprime pas de la BDD, juste plus visible dans le widget »). Depuis la 1.46.1 (« il y avait déjà un booléen pour apparaître, il suffit de le
+// désactiver »), le départ DÉCOCHE `Accepte_apparaitre` : aucune colonne de plus. Ici, ce que le responsable lit (ses collègues, les fiches de son
+// établissement qui n'apparaissent pas), ce qu'il choisit (qui reprend quelles rubriques) et ce que ce choix changerait : le calcul seul, sans DOM ni
+// Grist. L'écriture est dans departure-save.js, la fenêtre dans departure-ui.js.
 //
 // Le transfert est une COPIE sans doublon : la personne qui reprend reçoit les valeurs qu'elle n'a pas déjà (comparées par libellé, comme le formulaire de
-// profil), les siennes restent, et la fiche désactivée garde les siennes, de sorte que rien ne se perd et qu'une réactivation la rend telle qu'elle était.
+// profil), les siennes restent, et la fiche qui part garde les siennes, de sorte que rien ne se perd et qu'une réactivation la rend telle qu'elle était.
 
 import { DEPARTURE_GROUPS } from './constants.js';
 import { automaticRoles, compareLabels, displayName, normalize, normalizeEmail, refId } from './grist-data.js';
@@ -32,8 +33,9 @@ export function colleaguesOf(contacts, etablissementId, meEmail, { initialsOf, p
     .sort((a, b) => compareLabels(a.name, b.name) || a.id - b.id);
 }
 
-// Les fiches désactivées de l'établissement, d'après `people.deactivatedOf` (grist-data.js) : [{ id, name, email, initials, photo }], par ordre alphabétique.
-// Leur nom se montre : c'est le responsable de l'établissement qui les a désactivées, et seul lui (ou un administrateur) les lit.
+// Les fiches de l'établissement qui n'apparaissent pas faute d'accord, d'après `people.withoutConsentOf` (grist-data.js) : [{ id, name, email, initials, photo }],
+// par ordre alphabétique. Ce sont celles des personnes parties, mais aussi de celles qui n'ont pas (encore) accepté d'apparaître : la case ne dit pas
+// pourquoi. Leur nom se montre : seul le responsable de l'établissement (ou un administrateur) les lit, pour en réactiver une.
 export function departedOf(entries, { initialsOf, photoOf }) {
   return entries
     .map(({ row, name }) => ({ id: row.id, name: name || 'Sans nom', email: normalizeEmail(row.email), initials: initialsOf(row), photo: photoOf(row) }))

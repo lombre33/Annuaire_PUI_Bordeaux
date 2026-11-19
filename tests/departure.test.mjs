@@ -1,12 +1,11 @@
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
-import { DEACTIVATED_COLUMN, DEPARTURE_GROUPS, PROFILE_FIELDS } from '../constants.js';
-import { buildContacts, describeVisibility, isDeactivatedRow, loadDirectory } from '../grist-data.js';
+import { DEPARTURE_GROUPS, PROFILE_FIELDS } from '../constants.js';
+import { loadDirectory } from '../grist-data.js';
 import { colleaguesOf, departedOf, transferOf } from '../departure.js';
-import { createDeactivatedColumn } from '../schema.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { logged, quiet } from './support/logs.mjs';
-import { ADMIN_EMAIL, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL, departureTables, sampleTables, withDeactivation, withIdentity, withSchema, withTaskActions } from './fixtures.mjs';
+import { ADMIN_EMAIL, ANA_EMAIL, BOB_EMAIL, IRIS_EMAIL, departureTables, withIdentity, withTaskActions } from './fixtures.mjs';
 
 // ===== departure : ce que le départ d'un·e collègue lit et ce que le transfert changerait (1.46.0) =====
 
@@ -20,77 +19,48 @@ const rowOf = (tables, id) => Object.fromEntries(Object.keys(tables.BDD).map(col
 const initialsOf = row => (String(row.prenom ?? '')[0] ?? '?');
 const photoOf = () => 0;
 
-// ===== Les fiches désactivées =====
+// ===== Les fiches qui n'apparaissent pas (le départ décoche Accepte_apparaitre, 1.46.1) =====
 
-test('a deactivated fiche is never a contact, and says why in describeVisibility, whatever the person agreed to', async () => {
-  const tables = withDeactivation(sampleTables(), { deactivated: { 1: true } });
-  const { contacts, people } = await directoryOf(tables);
-  assert.equal(contacts.some(contact => contact.email === ANA_EMAIL), false);
-  assert.equal(contacts.some(contact => contact.email === 'hostile@chu-bordeaux.example'), true);
-  const status = people.findByEmail(ANA_EMAIL)[0].status;
-  assert.deepEqual({ accepted: status.accepted, deactivated: status.deactivated, visible: status.visible }, { accepted: true, deactivated: true, visible: false });
+const untick = (tables, ...ids) => {
+  ids.forEach(id => { tables.BDD.Accepte_apparaitre[tables.BDD.id.indexOf(id)] = false; });
+  return tables;
+};
+
+test('unticking « Accepte_apparaitre » is all a departure does to the directory: the fiche leaves the cards, ticking it brings it back', async () => {
+  const before = await directoryOf(departureTables());
+  assert.equal(before.contacts.some(contact => contact.email === ANA_EMAIL), true);
+  const after = await directoryOf(untick(departureTables(), 1));
+  assert.equal(after.contacts.some(contact => contact.email === ANA_EMAIL), false);
+  assert.equal(after.contacts.length, before.contacts.length - 1, 'un contact de moins, exactement');
+  const status = after.people.findByEmail(ANA_EMAIL)[0].status;
+  assert.deepEqual({ accepted: status.accepted, pending: status.pending, visible: status.visible }, { accepted: false, pending: false, visible: false });
+  assert.equal('deactivated' in status, false, 'aucune colonne de plus : le départ ne dit rien que la case ne dise déjà');
+  // L'établissement de chaque fiche ne bouge pas : seule la case change.
+  assert.deepEqual(after.tables.BDD.Etablissement, before.tables.BDD.Etablissement);
+  const ticked = untick(departureTables(), 1);
+  ticked.BDD.Accepte_apparaitre[ticked.BDD.id.indexOf(1)] = true;
+  const back = await directoryOf(ticked);
+  assert.equal(back.contacts.some(contact => contact.email === ANA_EMAIL), true);
+  assert.equal(back.contacts.length, before.contacts.length);
 });
 
-test('only the value true deactivates a fiche: empty, false, text or a missing column leave it active (nothing to migrate)', () => {
-  assert.equal(isDeactivatedRow({ [DEACTIVATED_COLUMN]: true }), true);
-  [false, null, undefined, 0, 1, 'true', 'Oui', ['L']].forEach(value => assert.equal(isDeactivatedRow({ [DEACTIVATED_COLUMN]: value }), false, String(value)));
-  assert.equal(isDeactivatedRow({}), false);
-  assert.equal(isDeactivatedRow(null), false);
-});
-
-test('a deactivated fiche is kept out of the directory but stays a normal row for the person who left: her choice to appear is untouched', async () => {
-  const tables = withDeactivation(sampleTables(), { deactivated: { 1: true } });
-  const rows = tables.BDD;
-  assert.equal(rows.Accepte_apparaitre[0], true);
-  const { referenceMaps, etabFlags } = await directoryOf(tables);
-  const row = rowOf(tables, 1);
-  assert.deepEqual(buildContacts([row], referenceMaps, etabFlags), []);
-  assert.deepEqual(buildContacts([{ ...row, [DEACTIVATED_COLUMN]: false }], referenceMaps, etabFlags).map(contact => contact.prenom), ['Ana']);
-  assert.equal(describeVisibility({ ...row, [DEACTIVATED_COLUMN]: false }, referenceMaps, etabFlags).visible, true);
-});
-
-test('deactivatedOf lists the deactivated fiches of one establishment, in table order, and leaves out pending requests', async () => {
-  const tables = withDeactivation(sampleTables(), { deactivated: { 1: true, 6: true, 2: true } });
-  tables.BDD.En_attente_validation = tables.BDD.id.map(id => id === 6);
+test('withoutConsentOf lists the fiches of one establishment the directory does not show for lack of consent, in table order, and leaves out pending requests', async () => {
+  const tables = untick(departureTables(), 1, 2);
+  tables.BDD.En_attente_validation = tables.BDD.id.map(id => id === 12);
   const { people } = await directoryOf(tables);
-  assert.deepEqual(people.deactivatedOf(1).map(entry => entry.row.id), [1]);
-  assert.deepEqual(people.deactivatedOf(2).map(entry => entry.row.id), [2]);
-  assert.deepEqual(people.deactivatedOf(3), []);
-  assert.equal(people.hasDeactivatedColumn, true);
+  assert.deepEqual(people.withoutConsentOf(1).map(entry => entry.row.id), [1, 11], 'Ana (partie) et Iris (a refusé) ; Jules est une demande en attente');
+  assert.deepEqual(people.withoutConsentOf(2).map(entry => entry.row.id), [2]);
+  assert.deepEqual(people.withoutConsentOf(3), []);
+  const everyone = (await directoryOf(departureTables())).people;
+  assert.deepEqual(everyone.withoutConsentOf(1).map(entry => entry.row.id), [11, 12], 'sans la colonne des demandes : Iris a refusé, Jules n’a pas répondu');
 });
 
-test('without the column, nothing is deactivated and the index says the column is missing', async () => {
-  const { people, contacts } = await directoryOf(sampleTables());
-  assert.equal(people.hasDeactivatedColumn, false);
-  assert.deepEqual(people.deactivatedOf(1), []);
-  assert.equal(contacts.length, 5, 'les cinq contacts de l\'exemple, comme avant la 1.46.0');
-});
-
-test('the console counts the deactivated fiches apart, and warns about none of them', async () => {
-  const tables = withDeactivation(sampleTables(), { deactivated: { 1: true, 11: true } });
-  tables.BDD.Etablissement[10] = 0; // Iris (désactivée) n'a plus d'établissement : son départ n'est pas une anomalie
+test('the console says nothing more than before the departure existed: no count of departed fiches, no new warning', async () => {
   const { lines, log } = logged();
-  const fake = createFakeGrist({ user: { email: ADMIN_EMAIL }, tables });
+  const fake = createFakeGrist({ user: { email: ADMIN_EMAIL }, tables: untick(departureTables(), 1) });
   await loadDirectory(fake.docApi, { log });
-  assert.ok(lines.info.some(line => /fiches désactivées\s: 2/.test(line)), lines.info.join('\n'));
-  assert.equal(lines.warn.some(line => /Iris|sans établissement|Etablissement vide|consentement/i.test(line) && /désactiv/i.test(line)), false);
-});
-
-test('createDeactivatedColumn adds a data column of check boxes to BDD, once, and says why when Grist refuses', async () => {
-  const tables = withSchema(withIdentity());
-  const fake = createFakeGrist({ tables });
-  const first = logged();
-  assert.equal(await createDeactivatedColumn(fake.docApi, { log: first.log }), '');
-  assert.deepEqual(fake.calls.filter(call => call.action === 'AddColumn').map(call => [call.table, call.rowId, call.values]), [['BDD', DEACTIVATED_COLUMN, { type: 'Bool', isFormula: false }]]);
-  assert.ok(DEACTIVATED_COLUMN in tables.BDD);
-  assert.equal(tables.BDD[DEACTIVATED_COLUMN].length, tables.BDD.id.length);
-  assert.match(first.lines.info.join('\n'), /colonne\s«\sFiche_desactivee\s»\sabsente de BDD\s: créée, une case à cocher/);
-
-  const refusedTables = withSchema(withIdentity());
-  const failure = await createDeactivatedColumn(createFakeGrist({ tables: refusedTables, denyStructure: true }).docApi, { log: quiet });
-  assert.match(failure, /manque dans BDD et Grist n'a pas permis de la créer/);
-  assert.match(failure, /le départ d'un·e collègue n'est pas proposé tant qu'elle manque/);
-  assert.equal(DEACTIVATED_COLUMN in refusedTables.BDD, false);
+  assert.equal(lines.info.some(line => /désactiv/.test(line)), false, lines.info.join('\n'));
+  assert.equal(lines.warn.some(line => /désactiv/.test(line)), false);
 });
 
 // ===== Les personnes =====
@@ -113,11 +83,11 @@ test('colleaguesOf keeps a fiche without an address: it is found by its row, not
   assert.deepEqual({ id: hugo.id, email: hugo.email, me: hugo.me }, { id: 10, email: '', me: false });
 });
 
-test('departedOf names the deactivated people by their row, sorted, with a name even when they have none', async () => {
-  const tables = withDeactivation(departureTables(), { deactivated: { 1: true, 10: true, 8: true } });
-  const { people } = await directoryOf(tables);
-  const gone = departedOf(people.deactivatedOf(1), { initialsOf, photoOf });
-  assert.deepEqual(gone.map(person => [person.id, person.name]).sort((a, b) => a[0] - b[0]), [[1, 'Ana Martin'], [8, 'Sans nom'], [10, 'Hugo Bernard']]);
+test('departedOf names the people whose fiche does not appear by their row, sorted, with a name even when they have none', async () => {
+  const { people } = await directoryOf(untick(departureTables(), 1, 10, 8));
+  const gone = departedOf(people.withoutConsentOf(1), { initialsOf, photoOf });
+  assert.deepEqual(gone.map(person => [person.id, person.name]).sort((a, b) => a[0] - b[0]),
+    [[1, 'Ana Martin'], [8, 'Sans nom'], [10, 'Hugo Bernard'], [11, 'Iris Refus'], [12, 'Jules Sansreponse']]);
   assert.deepEqual(gone.map(person => person.name), [...gone.map(person => person.name)].sort((a, b) => a.localeCompare(b, 'fr')));
 });
 
@@ -183,7 +153,7 @@ test('transferOf hands the responsibility over with the action, and only for an 
 });
 
 test('transferOf without the « Responsable de » column still moves the actions', async () => {
-  const tables = withIdentity(withDeactivation(withTaskActions()));
+  const tables = withIdentity(withTaskActions());
   const { referenceMaps } = await directoryOf(tables);
   const result = transferOf(rowOf(tables, 1), rowOf(tables, 10), ['taches'], referenceMaps);
   assert.deepEqual(result.groups[0].add, ['1.1 Relecture', '2.1 Inspection']);

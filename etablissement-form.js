@@ -356,10 +356,12 @@ function responsablesSection(ctx) {
 
 // ===== Le départ d'un·e collègue =====
 
-// Combien de fiches de l'établissement sont désactivées, sous le bouton qui ouvre la fenêtre du départ (1.46.0).
+// Combien de fiches de l'établissement n'apparaissent pas faute d'accord (celles des personnes parties, par exemple), sous le bouton qui ouvre la fenêtre du départ.
 export function departureNote({ departed }) {
   if (departed === 0) return '';
-  return `${departed} fiche${departed > 1 ? 's' : ''} désactivée${departed > 1 ? 's' : ''} : vous pouvez les réactiver depuis cette fenêtre.`;
+  return departed > 1
+    ? `${departed} fiches de l’établissement n’apparaissent pas : vous pouvez les réactiver depuis cette fenêtre.`
+    : `1 fiche de l’établissement n’apparaît pas : vous pouvez la réactiver depuis cette fenêtre.`;
 }
 
 export function paintDeparture(ctx) {

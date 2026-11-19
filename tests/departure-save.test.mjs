@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from './support/assert.mjs';
-import { DEACTIVATED_COLUMN, DEPARTURE_GROUPS, PENDING_COLUMN } from '../constants.js';
+import { CONSENT_COLUMN, DEPARTURE_GROUPS, PENDING_COLUMN } from '../constants.js';
 import { DepartureError, applyDeparture, prepareDeparture, reactivateFiche } from '../departure-save.js';
 import { loadDirectory, tableToRows } from '../grist-data.js';
 import { createFakeGrist } from './support/fake-grist.js';
 import { logged, quiet } from './support/logs.mjs';
-import { ADMIN_EMAIL, ANA_EMAIL, BOB_EMAIL, departureTables, withSchema, withValidation } from './fixtures.mjs';
+import { ADMIN_EMAIL, ANA_EMAIL, departureTables, withSchema, withValidation } from './fixtures.mjs';
 
-// ===== departure-save : relire, vérifier, écrire le départ d'un·e collègue (1.46.0) =====
+// ===== departure-save : relire, vérifier, écrire le départ d'un·e collègue (1.46.0, 1.46.1) =====
 
 // Le document de départ de tests/fixtures.mjs, vu par un administrateur : Ana (id 1, CHU) part, Hugo (id 10, CHU) reprend ses valeurs ; Bob (id 2) est à l'UBM.
 // `fail(['BDD'])` rend ensuite illisibles les tables nommées : l'annuaire est déjà chargé, c'est la relecture qui échoue.
@@ -22,7 +22,7 @@ async function world(options = {}) {
 
 const ALL = DEPARTURE_GROUPS.filter(group => group.on).map(group => group.key);
 
-// La demande du responsable du CHU qui désactive Ana et laisse ses valeurs à Hugo ; `changes` la modifie.
+// La demande du responsable du CHU qui désactive Ana (décoche sa case « Accepte_apparaitre ») et laisse ses valeurs à Hugo ; `changes` la modifie.
 const request = (changes = {}) => ({ etablissementId: 1, responsable: true, meEmail: ADMIN_EMAIL, departingId: 1, recipientId: 10, groups: ALL, ...changes });
 const prepare = (w, changes) => prepareDeparture(w.docApi, request(changes), w.context);
 const writes = w => w.calls.filter(call => call.action === 'UpdateRecord' && call.ok);
@@ -50,14 +50,14 @@ test('prepareDeparture reads the two fiches as they are now and says what the de
   assert.deepEqual(writes(w), [], 'préparer n\'écrit rien');
 });
 
-test('prepareDeparture without any rubric chosen is a plain deactivation: no recipient needed, nothing to copy', async () => {
+test('prepareDeparture without any rubric chosen is a plain departure: no recipient needed, nothing to copy', async () => {
   const w = await world();
   const review = await prepare(w, { groups: [], recipientId: 0 });
   assert.deepEqual({ recipient: review.recipient, groups: review.groups, total: review.total, values: review.values }, { recipient: null, groups: [], total: 0, values: {} });
   assert.equal(review.signatures.recipient, null);
 });
 
-test('prepareDeparture with a recipient but no rubric checked copies nothing and still deactivates', async () => {
+test('prepareDeparture with a recipient but no rubric checked copies nothing and still lets the fiche leave', async () => {
   const w = await world();
   const review = await prepare(w, { groups: [] });
   assert.equal(review.recipient, null, 'sans rubrique, la personne qui reprend ne compte pas');
@@ -79,7 +79,7 @@ test('prepareDeparture is closed by default: without being responsible of the é
   await refused(prepare(w, { responsable: 'true' }), /pas responsable de cet établissement/);
 });
 
-test('prepareDeparture refuses a fiche of another établissement, a missing one, a request, an already deactivated one and one\'s own', async () => {
+test('prepareDeparture refuses a fiche of another établissement, a missing one, a request, one that already does not appear and one\'s own', async () => {
   const w = await world();
   await refused(prepare(w, { departingId: 2 }), /pas celle d’une personne de cet établissement/);
   await refused(prepare(w, { departingId: 999 }), /n’existe plus/);
@@ -89,8 +89,11 @@ test('prepareDeparture refuses a fiche of another établissement, a missing one,
   await refused(prepare(pending), /demande en attente de validation/);
 
   const gone = departureTables();
-  gone.BDD[DEACTIVATED_COLUMN][0] = true;
-  await refused(prepare(await world({ tables: withSchema(gone) })), /déjà désactivée/);
+  gone.BDD[CONSENT_COLUMN][0] = false;
+  await refused(prepare(await world({ tables: withSchema(gone) })), /n’apparaît déjà plus dans l’annuaire/);
+  const unanswered = departureTables();
+  unanswered.BDD[CONSENT_COLUMN][0] = null;
+  await refused(prepare(await world({ tables: withSchema(unanswered) })), /n’apparaît déjà plus dans l’annuaire/);
 });
 
 test('prepareDeparture refuses a recipient that cannot take the values over, and says what is wrong', async () => {
@@ -101,20 +104,12 @@ test('prepareDeparture refuses a recipient that cannot take the values over, and
   await refused(prepare(w, { recipientId: 999 }), /n’a plus de fiche/);
   await refused(prepare(w, { recipientId: 2 }), /n’est pas de cet établissement/);
 
-  const deactivated = departureTables();
-  deactivated.BDD[DEACTIVATED_COLUMN][deactivated.BDD.id.indexOf(10)] = true;
-  await refused(prepare(await world({ tables: withSchema(deactivated) })), /n’est pas active/);
+  const hidden = departureTables();
+  hidden.BDD[CONSENT_COLUMN][hidden.BDD.id.indexOf(10)] = false;
+  await refused(prepare(await world({ tables: withSchema(hidden) })), /n’apparaît pas dans l’annuaire/);
 
   const pending = await world({ tables: withSchema(withValidation(departureTables(), { pending: { 10: true } })) });
-  await refused(prepare(pending), /n’est pas active/);
-});
-
-test('prepareDeparture says so when BDD has no « Fiche_desactivee » column, and what to do about it', async () => {
-  const tables = departureTables();
-  delete tables.BDD[DEACTIVATED_COLUMN];
-  const w = await world({ tables: withSchema(tables) });
-  await refused(prepare(w), /Fiche_desactivee/);
-  await assert.rejects(prepare(w), error => /GRIST_SETUP\.md/.test(error.message) === false, 'le message ne nomme pas de fichier : il renvoie à la documentation');
+  await refused(prepare(pending), /n’apparaît pas dans l’annuaire/);
 });
 
 test('prepareDeparture reports a read failure as such, and nothing is written', async () => {
@@ -136,7 +131,7 @@ test('prepareDeparture refuses to copy into a list the widget cannot rewrite (a 
 
 // ===== applyDeparture =====
 
-test('applyDeparture writes the transfer and the deactivation in ONE Grist action, the recipient first, and deletes nothing', async () => {
+test('applyDeparture writes the transfer and the unticked box in ONE Grist action, the recipient first, and deletes nothing', async () => {
   const w = await world();
   const before = structuredClone(w.tables.BDD);
   const review = await prepare(w);
@@ -144,18 +139,18 @@ test('applyDeparture writes the transfer and the deactivation in ONE Grist actio
 
   assert.deepEqual(writes(w).map(call => [call.table, call.rowId, Object.keys(call.values)]), [
     ['BDD', 10, ['Instances', 'Competences', 'Communautes', 'Taches', 'Taches_responsable']],
-    ['BDD', 1, [DEACTIVATED_COLUMN]]
+    ['BDD', 1, [CONSENT_COLUMN]]
   ]);
   assert.deepEqual(w.calls.filter(call => ['RemoveRecord', 'BulkRemoveRecord', 'AddRecord', 'AddColumn'].includes(call.action)), [], 'rien ne se supprime ni ne se crée');
 
   const after = w.tables.BDD;
   const at = id => after.id.indexOf(id);
   assert.equal(after.id.length, before.id.length, 'la fiche reste dans BDD');
-  assert.equal(after[DEACTIVATED_COLUMN][at(1)], true);
+  assert.equal(after[CONSENT_COLUMN][at(1)], false, 'la case est décochée : c’est tout ce que le départ change sur la fiche qui part');
   assert.deepEqual(after.Etablissement, before.Etablissement, 'les établissements des fiches ne bougent pas');
   assert.deepEqual(after.Competences[at(10)], ['L', 2, 1]);
-  // La fiche qui part garde toutes ses valeurs (copie, pas déplacement) : réactivée, elle redevient ce qu'elle était.
-  ['Instances', 'Competences', 'Communautes', 'Taches', 'Taches_responsable', 'Role_dans_le_PUI', 'Accepte_apparaitre', 'email'].forEach(key => {
+  // La fiche qui part garde toutes ses valeurs (copie, pas déplacement) : réactivée, elle redevient ce qu'elle était. Seule sa case a changé.
+  Object.keys(before).filter(key => key !== CONSENT_COLUMN).forEach(key => {
     assert.deepEqual(after[key][at(1)], before[key][at(1)], key);
   });
   // Aucune autre fiche n'est touchée.
@@ -172,15 +167,15 @@ test('after the departure the directory shows one contact fewer, the others and 
   assert.deepEqual(next.contacts.map(contact => contact.prenom).sort(), w.contacts.map(contact => contact.prenom).filter(name => name !== 'Ana').sort());
   assert.deepEqual(next.contacts.map(contact => [contact.id, contact.Etablissement]).sort(), w.contacts.filter(contact => contact.prenom !== 'Ana').map(contact => [contact.id, contact.Etablissement]).sort());
   const hugo = next.contacts.find(contact => contact.id === 10);
-  assert.deepEqual(next.people.deactivatedOf(1).map(entry => entry.row.id), [1]);
+  assert.deepEqual(next.people.withoutConsentOf(1).map(entry => entry.row.id), [1, 11, 12], 'Ana, qui part, avec Iris (a refusé) et Jules (n’a pas répondu)');
   assert.ok(hugo.Competences, 'Hugo a ses compétences');
 });
 
-test('applyDeparture without a recipient only deactivates, in one UpdateRecord', async () => {
+test('applyDeparture without a recipient only unticks the box, in one UpdateRecord', async () => {
   const w = await world();
   const review = await prepare(w, { groups: [] });
   assert.deepEqual(await applyDeparture(w.docApi, review, { log: quiet }), { status: 'saved', total: 0 });
-  assert.deepEqual(writes(w).map(call => [call.rowId, call.values]), [[1, { [DEACTIVATED_COLUMN]: true }]]);
+  assert.deepEqual(writes(w).map(call => [call.rowId, call.values]), [[1, { [CONSENT_COLUMN]: false }]]);
 });
 
 test('applyDeparture writes nothing when one of the two fiches changed in Grist since the review: the responsable reads again', async () => {
@@ -197,7 +192,7 @@ test('applyDeparture writes nothing when one of the two fiches changed in Grist 
   assert.deepEqual(writes(w), []);
 
   const third = await prepare(w);
-  w.tables.BDD[DEACTIVATED_COLUMN][w.tables.BDD.id.indexOf(1)] = true; // un autre responsable l'a désactivée entre-temps
+  w.tables.BDD[CONSENT_COLUMN][w.tables.BDD.id.indexOf(1)] = false; // un autre responsable l'a masquée entre-temps
   assert.deepEqual(await applyDeparture(w.docApi, third, { log: quiet }), { status: 'changed' });
   assert.deepEqual(writes(w), []);
 });
@@ -220,7 +215,7 @@ test('applyDeparture is all or nothing: a refusal on the departing fiche leaves 
   assert.equal(writes(w).length, 0);
 });
 
-test('applyDeparture is all or nothing the other way round: a refusal on the recipient does not deactivate the departing fiche', async () => {
+test('applyDeparture is all or nothing the other way round: a refusal on the recipient does not hide the departing fiche', async () => {
   const w = await world({ denyRows: { BDD: [10] } });
   const before = structuredClone(w.tables);
   await assert.rejects(applyDeparture(w.docApi, await prepare(w), { log: quiet }), error => error instanceof DepartureError && /Grist a refusé la modification/.test(error.message));
@@ -238,7 +233,7 @@ test('applyDeparture tells a formula column from a refusal, and any other failur
 test('applyDeparture fails loudly when Grist did not keep what was asked, and still succeeds when the check read cannot be done', async () => {
   const w = await world();
   const review = await prepare(w);
-  const forgetful = { ...w.docApi, applyUserActions: async actions => { await w.docApi.applyUserActions(actions); w.tables.BDD[DEACTIVATED_COLUMN][0] = false; } };
+  const forgetful = { ...w.docApi, applyUserActions: async actions => { await w.docApi.applyUserActions(actions); w.tables.BDD[CONSENT_COLUMN][0] = true; } };
   await assert.rejects(applyDeparture(forgetful, review, { log: quiet }), error => /n’a pas gardé tout ce qui était demandé/.test(error.message));
 
   const fresh = await world();
@@ -248,28 +243,22 @@ test('applyDeparture fails loudly when Grist did not keep what was asked, and st
   assert.deepEqual(await applyDeparture(blind, second, { log: quiet }), { status: 'saved', total: 6 });
 });
 
-test('applyDeparture says the column is missing if it vanished since the review', async () => {
-  const w = await world();
-  const review = await prepare(w);
-  delete w.tables.BDD[DEACTIVATED_COLUMN];
-  await refused(applyDeparture(w.docApi, review, { log: quiet }), /Fiche_desactivee/);
-});
-
 // ===== reactivateFiche =====
 
+// Ana est partie : sa case est décochée.
 const deactivatedWorld = async (options = {}) => {
   const tables = departureTables();
-  tables.BDD[DEACTIVATED_COLUMN][0] = true;
+  tables.BDD[CONSENT_COLUMN][0] = false;
   return world({ ...options, tables: withSchema(tables) });
 };
 
-test('reactivateFiche clears the deactivation and nothing else: the person comes back as she was, her choice to appear untouched', async () => {
+test('reactivateFiche ticks the box again and nothing else: the person comes back as she was', async () => {
   const w = await deactivatedWorld();
   const before = structuredClone(w.tables.BDD);
   assert.deepEqual(await reactivateFiche(w.docApi, { id: 1, etablissementId: 1, responsable: true }, { log: quiet }), { status: 'reactivated' });
-  assert.deepEqual(writes(w).map(call => [call.rowId, call.values]), [[1, { [DEACTIVATED_COLUMN]: false }]]);
-  assert.equal(w.tables.BDD[DEACTIVATED_COLUMN][0], false);
-  assert.equal(w.tables.BDD.Accepte_apparaitre[0], before.Accepte_apparaitre[0]);
+  assert.deepEqual(writes(w).map(call => [call.rowId, call.values]), [[1, { [CONSENT_COLUMN]: true }]]);
+  assert.equal(w.tables.BDD[CONSENT_COLUMN][0], true);
+  Object.keys(before).filter(key => key !== CONSENT_COLUMN).forEach(key => assert.deepEqual(w.tables.BDD[key], before[key], key));
   const next = await loadDirectory(w.docApi, { log: quiet });
   assert.equal(next.contacts.some(contact => contact.id === 1), true, 'Ana réapparaît dans l\'annuaire');
 });
@@ -281,18 +270,20 @@ test('reactivateFiche is closed by default and stays inside the établissement',
   assert.deepEqual(writes(w), []);
 });
 
-test('reactivateFiche writes nothing for a fiche that is gone, or that someone else already reactivated', async () => {
+test('reactivateFiche writes nothing for a fiche that is gone, or whose box someone else already ticked', async () => {
   const w = await deactivatedWorld();
   assert.deepEqual(await reactivateFiche(w.docApi, { id: 999, etablissementId: 1, responsable: true }, { log: quiet }), { status: 'gone' });
   assert.deepEqual(await reactivateFiche(w.docApi, { id: 6, etablissementId: 1, responsable: true }, { log: quiet }), { status: 'done' });
   assert.deepEqual(writes(w), []);
 });
 
-test('reactivateFiche reports the missing column, a refusal of Grist and a failed read', async () => {
-  const tables = departureTables();
-  delete tables.BDD[DEACTIVATED_COLUMN];
-  await refused(reactivateFiche((await world({ tables: withSchema(tables) })).docApi, { id: 1, etablissementId: 1, responsable: true }, { log: quiet }), /Fiche_desactivee/);
+test('reactivateFiche ticks the box of any fiche of the établissement that does not appear, the person who never answered included (the dialog warns first)', async () => {
+  const w = await deactivatedWorld();
+  assert.deepEqual(await reactivateFiche(w.docApi, { id: 12, etablissementId: 1, responsable: true }, { log: quiet }), { status: 'reactivated' });
+  assert.deepEqual(writes(w).map(call => [call.rowId, call.values]), [[12, { [CONSENT_COLUMN]: true }]]);
+});
 
+test('reactivateFiche reports a refusal of Grist and a failed read', async () => {
   const denied = await deactivatedWorld({ denyWrites: ['BDD'] });
   await refused(reactivateFiche(denied.docApi, { id: 1, etablissementId: 1, responsable: true }, { log: quiet }), /Grist a refusé la modification/);
 
@@ -301,11 +292,11 @@ test('reactivateFiche reports the missing column, a refusal of Grist and a faile
   await refused(reactivateFiche(broken.docApi, { id: 1, etablissementId: 1, responsable: true }, { log: quiet }), /relues dans Grist/);
 });
 
-test('a pending request is never deactivated or reactivated as if it were a colleague', async () => {
-  const tables = withValidation(departureTables(), { pending: { 6: true } });
+test('a pending request is never hidden or reactivated as if it were a colleague: only an administrator validates it', async () => {
+  const tables = withValidation(departureTables(), { pending: { 6: true, 12: true } });
   const w = await world({ tables: withSchema(tables) });
   await refused(prepare(w, { departingId: 6 }), /demande en attente de validation/);
   assert.equal(PENDING_COLUMN in w.tables.BDD, true);
-  assert.deepEqual(await reactivateFiche(w.docApi, { id: 6, etablissementId: 1, responsable: true }, { log: quiet }), { status: 'done' });
-  assert.equal(BOB_EMAIL.length > 0, true);
+  await refused(reactivateFiche(w.docApi, { id: 12, etablissementId: 1, responsable: true }, { log: quiet }), /demande en attente de validation/);
+  assert.deepEqual(writes(w), []);
 });

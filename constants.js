@@ -61,7 +61,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.46.0';
+export const VERSION = '1.46.1';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -261,13 +261,6 @@ export const RESPONSIBLE_LABEL = 'Responsable de';
 // la crée quand elle manque (schema.js, createPendingColumn) et ne l'écrit que dans trois cas : une fiche qu'une personne crée (vraie), la
 // validation d'un administrateur (fausse), et le refus d'un administrateur supprime la ligne.
 export const PENDING_COLUMN = 'En_attente_validation';
-
-// La fiche DÉSACTIVÉE (1.46.0, Antoine, 19 novembre 2026 : « le départ désactive la fiche, il ne la supprime pas de la BDD, juste plus visible dans le
-// widget »). Une case à cocher de BDD : vraie, la fiche reste dans Grist mais n'apparaît plus nulle part dans le widget ; vide ou fausse, la fiche est
-// active, donc rien à migrer. Elle est distincte d'`Accepte_apparaitre`, qui est le choix de la PERSONNE : le responsable d'un établissement qui
-// désactive la fiche d'un·e collègue qui part n'écrit pas son choix, et ne le réécrit pas en la réactivant. Le widget la crée quand elle manque
-// (schema.js, createDeactivatedColumn) ; seul un responsable de l'établissement ou un administrateur l'écrit (GRIST_SETUP.md).
-export const DEACTIVATED_COLUMN = 'Fiche_desactivee';
 
 // Ordre des boutons de filtre. Les regroupements n'ont pas de bouton : les domaines sont les
 // groupes du menu Compétences, les actions (les intitulés de la table `Actions`) ceux du menu Actions. Rôle dans

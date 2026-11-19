@@ -1,4 +1,4 @@
-# Version 1.46.0 — Le départ d'un·e collègue : un responsable d'établissement désactive la fiche d'une personne qui part (elle reste dans Grist) et lui transfère ses valeurs (voir CHANGELOG.md)
+# Version 1.46.1 — Le départ d'un·e collègue décoche « Accepte_apparaitre » (plus de colonne `Fiche_desactivee`), la fiche reste dans Grist (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en

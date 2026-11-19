@@ -53,15 +53,15 @@ test('findByEmail returns every row that carries the address (a duplicate is rep
 test('describeVisibility says what keeps each person out of the directory', async () => {
   const { people } = await directory();
   const expected = {
-    [ANA_EMAIL]: { accepted: true, named: true, etablissement: 'ok', partnerOnly: false, pending: false, deactivated: false, visible: true },
-    [BOB_EMAIL]: { accepted: true, named: true, etablissement: 'ok', partnerOnly: true, pending: false, deactivated: false, visible: true },
-    'carla@clinique.example': { accepted: true, named: true, etablissement: 'not_eligible', partnerOnly: false, pending: false, deactivated: false, visible: false },
-    'dan@inserm.example': { accepted: true, named: true, etablissement: 'not_validated', partnerOnly: false, pending: false, deactivated: false, visible: false },
-    'eve@example.example': { accepted: true, named: true, etablissement: 'missing', partnerOnly: false, pending: false, deactivated: false, visible: false },
-    'fred@chu-bordeaux.example': { accepted: true, named: true, etablissement: 'unknown', partnerOnly: false, pending: false, deactivated: false, visible: false },
-    [IRIS_EMAIL]: { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, pending: false, deactivated: false, visible: false },
-    'jules@chu-bordeaux.example': { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, pending: false, deactivated: false, visible: false },
-    'x@chu-bordeaux.example': { accepted: true, named: false, etablissement: 'ok', partnerOnly: false, pending: false, deactivated: false, visible: false }
+    [ANA_EMAIL]: { accepted: true, named: true, etablissement: 'ok', partnerOnly: false, pending: false, visible: true },
+    [BOB_EMAIL]: { accepted: true, named: true, etablissement: 'ok', partnerOnly: true, pending: false, visible: true },
+    'carla@clinique.example': { accepted: true, named: true, etablissement: 'not_eligible', partnerOnly: false, pending: false, visible: false },
+    'dan@inserm.example': { accepted: true, named: true, etablissement: 'not_validated', partnerOnly: false, pending: false, visible: false },
+    'eve@example.example': { accepted: true, named: true, etablissement: 'missing', partnerOnly: false, pending: false, visible: false },
+    'fred@chu-bordeaux.example': { accepted: true, named: true, etablissement: 'unknown', partnerOnly: false, pending: false, visible: false },
+    [IRIS_EMAIL]: { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, pending: false, visible: false },
+    'jules@chu-bordeaux.example': { accepted: false, named: true, etablissement: 'ok', partnerOnly: false, pending: false, visible: false },
+    'x@chu-bordeaux.example': { accepted: true, named: false, etablissement: 'ok', partnerOnly: false, pending: false, visible: false }
   };
   for (const [email, status] of Object.entries(expected)) {
     assert.deepEqual(await statusOf(people, email), status, email);
