@@ -1,7 +1,7 @@
 // Le départ d'un·e collègue (1.46.0 : departure.js, departure-save.js, departure-ui.js, etablissement-form.js, gate.js) dans Chromium (optionnel :
 // voir TESTING.md), sur une API Grist simulée : le responsable d'un établissement ouvre la fenêtre depuis « Mon établissement », choisit qui part et qui
 // reprend ses valeurs, relit l'avant / après, confirme ; la fiche est DÉSACTIVÉE (la case `Fiche_desactivee`), jamais supprimée ; il peut la réactiver.
-// Ce que Grist refuse vraiment, ce sont ses règles d'accès (GRIST_SETUP.md) : rien de cela n'a été essayé dans le Grist d'Antoine (TESTING.md, section 32).
+// Ce que Grist refuse vraiment, ce sont ses règles d'accès (GRIST_SETUP.md) : rien de cela n'a été essayé dans le Grist d'Antoine (TESTING.md, section 33).
 
 import { test } from 'node:test';
 import assert from './support/assert.mjs';

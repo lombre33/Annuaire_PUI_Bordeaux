@@ -19,7 +19,7 @@ Les autres documents (présentation, installation, sécurité, maintenance, docu
 - [Ma présence : apparaître ou non](#ma-présence--apparaître-ou-non)
 - [Modifier ma fiche](#modifier-ma-fiche), dont [Dire de quelles actions on est responsable](#dire-de-quelles-actions-on-est-responsable), [L'adresse e-mail affichée](#ladresse-e-mail-affichée), [Ma photo de profil](#ma-photo-de-profil), [Quand l'enregistrement échoue](#quand-lenregistrement-échoue), [Pas de validation, pas d'historique](#pas-de-validation-pas-dhistorique) et [Pour les administrateurs](#pour-les-administrateurs)
 - [Créer ma fiche](#créer-ma-fiche), dont [Si la création échoue](#si-la-création-échoue), puis [Valider les demandes de fiche](#valider-les-demandes-de-fiche)
-- [La fiche de mon établissement](#la-fiche-de-mon-établissement), dont [Les responsables](#les-responsables) et [Si l'enregistrement de la fiche échoue](#si-lenregistrement-de-la-fiche-échoue)
+- [La fiche de mon établissement](#la-fiche-de-mon-établissement), dont [Les responsables](#les-responsables), [Quand un·e collègue quitte l'établissement](#quand-une-collègue-quitte-létablissement) et [Si l'enregistrement de la fiche échoue](#si-lenregistrement-de-la-fiche-échoue)
 - [Pourquoi une personne n'apparaît-elle pas ?](#pourquoi-une-personne-napparaît-elle-pas-)
 - [Messages du bandeau rouge](#messages-du-bandeau-rouge)
 - [Questions fréquentes](#questions-fréquentes)
@@ -901,6 +901,26 @@ Ce que votre navigateur fait de l'image : il ne l'envoie **jamais telle quelle**
   - Si aucune fiche ne porte l'adresse, elle écrit « Adresse sans fiche dans l’annuaire ».
   - L'annuaire ne dévoile pas le nom d'une personne qu'il n'affiche pas.
 
+### Quand un·e collègue quitte l'établissement
+
+Une personne quitte votre établissement ? Vous pouvez **désactiver sa fiche** et **transférer ses valeurs** à quelqu'un d'autre, sans passer par un administrateur.
+
+- **Ce que « désactiver » veut dire.** La fiche **n'apparaît plus** dans l'annuaire, mais **rien n'est supprimé** : elle reste dans Grist, avec toutes ses valeurs. Vous pouvez la **réactiver** quand vous voulez.
+- **Où cliquer.** Dans la fenêtre de votre établissement, section **Départ d'un·e collègue**, le bouton **Un·e collègue quitte l'établissement…** ouvre une fenêtre.
+  - Elle liste les personnes de l'établissement qui apparaissent dans l'annuaire. Vous ne voyez pas de bouton sur **votre** fiche (« vous ») : on ne désactive pas sa propre fiche.
+  - Cliquez sur **Départ…** à côté de la personne qui part.
+- **Choisir qui reprend.** Le menu **Personne qui reprend ses valeurs** propose les autres personnes de l'établissement ; « Ne rien transférer » désactive seulement la fiche.
+  - Cochez ce qui est transféré : **Instances**, **GT**, **Compétences**, **Communautés**, **Actions** (avec la responsabilité de ces actions) et, si vous le voulez, **Rôle dans le PUI** (non coché d'avance, parce qu'il est personnel).
+- **Relire avant de confirmer.** L'écran suivant dit, pour chaque rubrique, combien de valeurs la personne qui reprend a **avant** et aura **après**, ce qui est **ajouté** et ce qu'elle a **déjà**. **Désactiver la fiche** écrit ; **Retour** garde votre choix.
+- **Ce que le transfert fait, et ne fait pas.**
+  - Les valeurs sont **ajoutées** à celles de la personne qui reprend, **sans doublon** : elle garde les siennes. Ce n'est pas un remplacement.
+  - La fiche qui part **garde** les siennes : rien ne se perd.
+  - Tout s'écrit **en une fois** : si Grist refuse une des deux fiches, aucune n'est changée.
+- **Réactiver une fiche.** Dans la même fenêtre, **Fiches désactivées** liste les fiches de l'établissement : **Réactiver**, puis **Confirmer la réactivation**. La fiche revient dans l'annuaire si la personne avait accepté d'apparaître ; ce qui a été transféré à une autre personne y reste.
+- **Si la personne qui part est aussi responsable de l'établissement**, la fenêtre vous le rappelle : retirez-la de la liste des **Responsables** de la fiche de l'établissement. Le départ n'y touche pas.
+- **Ce que voit la personne désactivée.** Un écran « Votre fiche est désactivée » à la place de l'annuaire, qui lui dit de contacter le responsable de son établissement ou un administrateur.
+- **Si quelque chose bloque.** Un message dit pourquoi, et rien n'est modifié : « Grist a refusé la modification : vos droits ne permettent pas de désactiver cette fiche ou de modifier celle de la personne qui reprend. Contactez un administrateur. », ou « L’une des deux fiches a changé dans Grist pendant que vous relisiez : rien n’a été écrit. Relisez, puis confirmez à nouveau. » (relisez, puis confirmez de nouveau). Si la fenêtre dit que la colonne « Fiche_desactivee » n'existe pas, un administrateur doit la créer (ouvrir l'annuaire suffit).
+
 ### Enregistrer
 
 En bas de la fenêtre, un résumé dit où vous en êtes : « Aucune modification », « 2 modifications : nom, visibilité », « Indiquez le nom complet de l’établissement » (nom vide), « Corrigez le nom » (nom trop long, ou qui commence par = + - ou @) ou « Gardez au moins un responsable ». Le bouton **Enregistrer** reste grisé tant qu'il n'y a rien à enregistrer ou qu'un champ est refusé.
@@ -988,6 +1008,7 @@ Si l'envoi d'un logo échoue chez vous, le logo se change dans Grist, comme avan
 - elle est rattachée à un établissement (colonne `Etablissement`, qui renvoie à une ligne de la table `Etablissements`) ;
 - cet établissement a **validé** son apparition (`ok_pour_apparaitre` coché) ;
 - cet établissement est **fondateur ou partenaire** (une structure « autres », extérieure au PUI, n'apparaît jamais).
+- sa fiche n'est **pas désactivée** : la colonne `Fiche_desactivee` est vide ou décochée (le responsable de son établissement la coche quand la personne le quitte : [Quand un·e collègue quitte l'établissement](#quand-une-collègue-quitte-létablissement)) ;
 - sa fiche n'est **pas une demande en attente** : la colonne `En_attente_validation` est vide ou décochée (une fiche que la personne a créée elle-même attend d'abord la validation d'un administrateur : [Valider les demandes de fiche](#valider-les-demandes-de-fiche)).
 
 Quelques cas, avec des personnes fictives du jeu de démonstration :
