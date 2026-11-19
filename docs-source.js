@@ -5,22 +5,24 @@
 // page du widget (document.baseURI) suivie du chemin du fichier, tel que DOC_PAGES le liste. C'est la SEULE requête réseau du widget
 // avec l'envoi d'un fichier (upload.js) ; elle ne part qu'à l'ouverture de la fenêtre, jamais au chargement de l'annuaire, et rien
 // d'autre qu'un fichier de DOC_PAGES ne peut être demandé (docs/securite.md, « Les documents de la fenêtre Documentation »).
-// Le dépôt qui publie le widget doit donc publier aussi ces fichiers ; sinon la fenêtre dit qu'elle ne les a pas, et propose la page
-// de DOCS_URL (constants.js), la seule adresse à changer quand le dépôt déménage.
+// Le dépôt qui publie le widget doit donc publier aussi ces fichiers ; sinon la fenêtre dit qu'elle ne les a pas, et propose à un
+// administrateur la page de DOCS_URL (constants.js), la seule adresse à changer quand le dépôt déménage.
 
 // Les documents montrés, dans l'ordre de leur barre (le premier est celui qui s'ouvre). `path` : le chemin du fichier depuis la
-// racine du dépôt ; `label` : son nom dans la fenêtre. Un lien d'un document vers un fichier qui n'est pas dans cette liste n'est pas
-// un lien (du texte) ; un fichier qui n'existe plus doit être retiré d'ici : tests/docs-source.test.mjs le vérifie.
+// racine du dépôt ; `label` : son nom dans la fenêtre ; `adminOnly` : réservé aux administrateurs (1.45.3) : la personne qui n'en est
+// pas voit seulement le guide utilisateur (pagesFor). Un lien d'un document vers un fichier qui n'est pas dans cette liste, ou que la
+// personne ne voit pas, n'est pas un lien (du texte) ; un fichier qui n'existe plus doit être retiré d'ici :
+// tests/docs-source.test.mjs le vérifie.
 export const DOC_PAGES = [
-  { path: 'README.md', label: 'Présentation' },
-  { path: 'docs/utilisateurs.md', label: 'Guide utilisateur' },
-  { path: 'GRIST_SETUP.md', label: 'Installation' },
-  { path: 'docs/securite.md', label: 'Sécurité' },
-  { path: 'docs/maintenance.md', label: 'Maintenance' },
-  { path: 'docs/developpeurs.md', label: 'Développeurs' },
-  { path: 'TESTING.md', label: 'Essais' },
-  { path: 'specs.md', label: 'Cahier des charges' },
-  { path: 'CHANGELOG.md', label: 'Historique' }
+  { path: 'README.md', label: 'Présentation', adminOnly: true },
+  { path: 'docs/utilisateurs.md', label: 'Guide utilisateur', adminOnly: false },
+  { path: 'GRIST_SETUP.md', label: 'Installation', adminOnly: true },
+  { path: 'docs/securite.md', label: 'Sécurité', adminOnly: true },
+  { path: 'docs/maintenance.md', label: 'Maintenance', adminOnly: true },
+  { path: 'docs/developpeurs.md', label: 'Développeurs', adminOnly: true },
+  { path: 'TESTING.md', label: 'Essais', adminOnly: true },
+  { path: 'specs.md', label: 'Cahier des charges', adminOnly: true },
+  { path: 'CHANGELOG.md', label: 'Historique', adminOnly: true }
 ];
 
 // Un document plus gros que cela (en caractères) n'est pas lu : le plus grand en fait aujourd'hui trois cent mille.
@@ -30,6 +32,12 @@ const DOC_TIMEOUT_MS = 20_000;
 const IMAGE_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 
 export const pageOf = path => DOC_PAGES.find(page => page.path === path) ?? null;
+
+// Les documents que la personne voit : tous pour un administrateur (`admin` vrai : identity.js, la même notion que le mode admin),
+// le guide utilisateur seulement pour toute autre personne, y compris tant que l'identité n'est pas lue (fermé par défaut). C'est un
+// choix d'affichage, pas une protection : les fichiers restent publiés avec le widget (docs/securite.md).
+export const pagesFor = admin => DOC_PAGES.filter(page => admin === true || !page.adminOnly);
+export const canRead = (path, admin) => pagesFor(admin).some(page => page.path === path);
 
 // Pourquoi un document n'a pas pu être lu : `reason` 'unknown' (pas dans DOC_PAGES), 'http' (le serveur ne l'a pas : `status`),
 // 'size' (trop gros), 'network' (pas de réponse ou délai dépassé), 'unreadable' (reçu, mais docs-ui.js n'a pas pu le lire).
@@ -67,9 +75,9 @@ function resolveRelative(from, target) {
 }
 
 // Où mène un lien du document `from` : voir markdown-dom.js. Une page web : en https seulement ; un document de DOC_PAGES : ouvert
-// dans la fenêtre ; une ancre : un titre du document ; tout le reste (un fichier du dépôt qui n'est pas un document, un lien mailto:,
-// javascript:, data:, http:) n'est pas un lien.
-export function resolveLink(from, href) {
+// dans la fenêtre ; une ancre : un titre du document ; tout le reste (un fichier du dépôt qui n'est pas un document ou que la personne
+// ne voit pas, un lien mailto:, javascript:, data:, http:) n'est pas un lien. `admin` : voir pagesFor.
+export function resolveLink(from, href, { admin = false } = {}) {
   const target = href.trim();
   if (target.startsWith('#')) return { kind: 'anchor', anchor: decode(target.slice(1)) };
   if (/^https:\/\//i.test(target)) {
@@ -82,7 +90,7 @@ export function resolveLink(from, href) {
   }
   const [file, ...rest] = target.split('#');
   const path = resolveRelative(from, file);
-  const page = path === null ? null : pageOf(path);
+  const page = path === null || !canRead(path, admin) ? null : pageOf(path);
   return page ? { kind: 'doc', page: page.path, anchor: decode(rest.join('#')) } : { kind: 'none' };
 }
 
@@ -101,9 +109,9 @@ export function resolveImage(from, src, base = document.baseURI) {
 }
 
 // Le texte d'un document. La requête : un GET, sans cookie, sans l'adresse de la page, vers un fichier de DOC_PAGES de la même
-// origine que le widget ; elle est coupée au bout de DOC_TIMEOUT_MS.
-export async function fetchDocument(path, { base = document.baseURI, fetchImpl = fetch } = {}) {
-  if (!pageOf(path)) throw new DocError('unknown');
+// origine que le widget que la personne a le droit de voir (`admin` : voir pagesFor) ; elle est coupée au bout de DOC_TIMEOUT_MS.
+export async function fetchDocument(path, { base = document.baseURI, fetchImpl = fetch, admin = false } = {}) {
+  if (!canRead(path, admin)) throw new DocError('unknown');
   const url = fileUrl(path, base);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DOC_TIMEOUT_MS);

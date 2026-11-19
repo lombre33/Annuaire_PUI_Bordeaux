@@ -1,4 +1,4 @@
-# Version 1.45.2 — L'annuaire est fermé par défaut : un compte que le widget n'a pas reconnu ne le voit plus, et chaque cause a son écran (voir CHANGELOG.md)
+# Version 1.45.3 — La fenêtre « Documentation » : tous les documents pour un administrateur, le guide utilisateur seul pour les autres (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en

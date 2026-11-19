@@ -6,7 +6,7 @@ import assert from './support/assert.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DOC_PAGES, DocError, fetchDocument, fileUrl, pageOf, resolveImage, resolveLink } from '../docs-source.js';
+import { DOC_PAGES, DocError, canRead, fetchDocument, fileUrl, pageOf, pagesFor, resolveImage, resolveLink } from '../docs-source.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = 'https://exemple.test/Widget/index.html';
@@ -43,17 +43,58 @@ test('pageOf ne connaît que les documents de la liste, au chemin exact', () => 
   }
 });
 
+// ===== Qui voit quoi (1.45.3) =====
+
+const ADMIN = { admin: true };
+
+test('un administrateur lit tous les documents ; toute autre personne, le guide utilisateur seulement', () => {
+  assert.deepEqual(pagesFor(true).map(page => page.path), DOC_PAGES.map(page => page.path), 'un administrateur : la liste entière, dans son ordre');
+  for (const other of [false, undefined, null, 0, 1, '', 'true', 'oui', {}, []]) {
+    assert.deepEqual(pagesFor(other).map(page => page.path), ['docs/utilisateurs.md'], `${JSON.stringify(other)} : le guide utilisateur, pas un autre document`);
+  }
+  assert.deepEqual(DOC_PAGES.filter(page => !page.adminOnly).map(page => page.path), ['docs/utilisateurs.md'], 'un nouveau document est réservé aux administrateurs tant qu\'on n\'en a pas décidé autrement');
+  assert.ok(DOC_PAGES.every(page => typeof page.adminOnly === 'boolean'), 'chaque document dit s\'il est réservé');
+  assert.equal(canRead('docs/utilisateurs.md', false), true);
+  for (const { path: file } of DOC_PAGES.filter(page => page.adminOnly)) {
+    assert.equal(canRead(file, false), false, `${file} : réservé aux administrateurs`);
+    assert.equal(canRead(file, true), true, `${file} : un administrateur le lit`);
+  }
+  assert.equal(canRead('constants.js', true), false, 'un fichier qui n\'est pas un document ne se lit pour personne');
+});
+
+test('une personne qui n\'administre pas ne suit aucun lien vers un document réservé, et fetchDocument ne le demande pas', async () => {
+  for (const [from, href] of [['docs/utilisateurs.md', '../README.md'], ['docs/utilisateurs.md', 'securite.md'], ['docs/utilisateurs.md', '../GRIST_SETUP.md#4-règles-daccès'],
+    ['docs/utilisateurs.md', '../TESTING.md'], ['docs/utilisateurs.md', '../CHANGELOG.md'], ['docs/utilisateurs.md', '../specs.md'], ['README.md', 'docs/maintenance.md']]) {
+    assert.equal(resolveLink(from, href).kind, 'none', `${href} : du texte`);
+    assert.equal(resolveLink(from, href, { admin: false }).kind, 'none', `${href} : du texte`);
+    assert.equal(resolveLink(from, href, { admin: 'true' }).kind, 'none', `${href} : seul « true » est un administrateur`);
+    assert.equal(resolveLink(from, href, ADMIN).kind, 'doc', `${href} : un administrateur le suit`);
+  }
+  assert.deepEqual(resolveLink('docs/utilisateurs.md', 'utilisateurs.md#lire-une-carte'), { kind: 'doc', page: 'docs/utilisateurs.md', anchor: 'lire-une-carte' }, 'le guide se lit');
+  assert.deepEqual(resolveLink('docs/utilisateurs.md', '#lire-une-carte'), { kind: 'anchor', anchor: 'lire-une-carte' }, 'une ancre du guide reste une ancre');
+  let calls = 0;
+  const fetchImpl = async () => { calls++; return reply('# Guide'); };
+  for (const { path: file } of DOC_PAGES.filter(page => page.adminOnly)) {
+    for (const admin of [undefined, false, 'true']) {
+      await assert.rejects(() => fetchDocument(file, { base: BASE, fetchImpl, ...(admin === undefined ? {} : { admin }) }), error => error instanceof DocError && error.reason === 'unknown', `${file} (${admin})`);
+    }
+  }
+  assert.equal(calls, 0, 'aucune requête n\'est partie pour un document réservé');
+  assert.equal(await fetchDocument('docs/utilisateurs.md', { base: BASE, fetchImpl }), '# Guide', 'le guide se demande sans être administrateur');
+  assert.equal(calls, 1);
+});
+
 // ===== Les liens =====
 
 test('un lien du document : ancre, autre document (avec son ancre), page https ; tout le reste n\'est pas un lien', () => {
   assert.deepEqual(resolveLink('README.md', '#ce-que-fait-le-widget'), { kind: 'anchor', anchor: 'ce-que-fait-le-widget' });
   assert.deepEqual(resolveLink('README.md', '#ma-pr%C3%A9sence'), { kind: 'anchor', anchor: 'ma-présence' }, 'une ancre encodée est décodée');
-  assert.deepEqual(resolveLink('README.md', 'docs/utilisateurs.md#lire-une-carte'), { kind: 'doc', page: 'docs/utilisateurs.md', anchor: 'lire-une-carte' });
-  assert.deepEqual(resolveLink('README.md', 'docs/securite.md'), { kind: 'doc', page: 'docs/securite.md', anchor: '' });
-  assert.deepEqual(resolveLink('docs/utilisateurs.md', '../README.md#installer-dans-grist'), { kind: 'doc', page: 'README.md', anchor: 'installer-dans-grist' });
-  assert.deepEqual(resolveLink('docs/utilisateurs.md', 'securite.md'), { kind: 'doc', page: 'docs/securite.md', anchor: '' });
-  assert.deepEqual(resolveLink('docs/utilisateurs.md', './securite.md#a'), { kind: 'doc', page: 'docs/securite.md', anchor: 'a' });
-  assert.deepEqual(resolveLink('docs/maintenance.md', '../GRIST_SETUP.md'), { kind: 'doc', page: 'GRIST_SETUP.md', anchor: '' });
+  assert.deepEqual(resolveLink('README.md', 'docs/utilisateurs.md#lire-une-carte', ADMIN), { kind: 'doc', page: 'docs/utilisateurs.md', anchor: 'lire-une-carte' });
+  assert.deepEqual(resolveLink('README.md', 'docs/securite.md', ADMIN), { kind: 'doc', page: 'docs/securite.md', anchor: '' });
+  assert.deepEqual(resolveLink('docs/utilisateurs.md', '../README.md#installer-dans-grist', ADMIN), { kind: 'doc', page: 'README.md', anchor: 'installer-dans-grist' });
+  assert.deepEqual(resolveLink('docs/utilisateurs.md', 'securite.md', ADMIN), { kind: 'doc', page: 'docs/securite.md', anchor: '' });
+  assert.deepEqual(resolveLink('docs/utilisateurs.md', './securite.md#a', ADMIN), { kind: 'doc', page: 'docs/securite.md', anchor: 'a' });
+  assert.deepEqual(resolveLink('docs/maintenance.md', '../GRIST_SETUP.md', ADMIN), { kind: 'doc', page: 'GRIST_SETUP.md', anchor: '' });
   assert.deepEqual(resolveLink('README.md', ' https://example.org/a b '.trim().replace(' ', '%20')), { kind: 'external', href: 'https://example.org/a%20b' });
   assert.deepEqual(resolveLink('README.md', 'HTTPS://Example.org/x'), { kind: 'external', href: 'https://example.org/x' });
 });
@@ -100,7 +141,7 @@ const reply = (body, init = {}) => ({ ok: init.ok ?? true, status: init.status ?
 test('fetchDocument : un GET du fichier, sans cookie, sans l\'adresse de la page, vers l\'origine du widget', async () => {
   for (const { path: file } of DOC_PAGES) {
     const calls = [];
-    const text = await fetchDocument(file, { base: BASE, fetchImpl: async (...args) => { calls.push(args); return reply('# Titre'); } });
+    const text = await fetchDocument(file, { admin: true, base: BASE, fetchImpl: async (...args) => { calls.push(args); return reply('# Titre'); } });
     assert.equal(text, '# Titre');
     assert.equal(calls.length, 1, 'une seule requête par document');
     const [url, options] = calls[0];
@@ -121,27 +162,28 @@ test('fetchDocument ne demande que les documents de la liste : tout autre chemin
   const fetchImpl = async () => { calls++; return reply('x'); };
   for (const bad of ['', 'constants.js', '../README.md', 'docs/../README.md', '/README.md', '//example.org/x.md', 'https://example.org/README.md', 'README.md?x=1', 'README.md#a',
     'docs/inconnu.md', 'readme.md', null, undefined, 5, {}, ['README.md']]) {
-    await assert.rejects(() => fetchDocument(bad, { base: BASE, fetchImpl }), error => error instanceof DocError && error.reason === 'unknown', String(bad));
+    await assert.rejects(() => fetchDocument(bad, { admin: true, base: BASE, fetchImpl }), error => error instanceof DocError && error.reason === 'unknown', String(bad));
   }
   assert.equal(calls, 0, 'aucune requête n\'est partie');
 });
 
 test('fetchDocument dit pourquoi un document manque : le serveur ne l\'a pas, le réseau a coupé, il est trop gros', async () => {
-  await assert.rejects(() => fetchDocument('README.md', { base: BASE, fetchImpl: async () => reply('', { ok: false, status: 404 }) }),
+  await assert.rejects(() => fetchDocument('README.md', { admin: true, base: BASE, fetchImpl: async () => reply('', { ok: false, status: 404 }) }),
     error => error instanceof DocError && error.reason === 'http' && error.status === 404);
-  await assert.rejects(() => fetchDocument('README.md', { base: BASE, fetchImpl: async () => { throw new TypeError('Failed to fetch'); } }),
+  await assert.rejects(() => fetchDocument('README.md', { admin: true, base: BASE, fetchImpl: async () => { throw new TypeError('Failed to fetch'); } }),
     error => error instanceof DocError && error.reason === 'network');
-  await assert.rejects(() => fetchDocument('README.md', { base: BASE, fetchImpl: async () => ({ ok: true, status: 200, text: async () => { throw new Error('flux coupé'); } }) }),
+  await assert.rejects(() => fetchDocument('README.md', { admin: true, base: BASE, fetchImpl: async () => ({ ok: true, status: 200, text: async () => { throw new Error('flux coupé'); } }) }),
     error => error instanceof DocError && error.reason === 'network');
-  await assert.rejects(() => fetchDocument('README.md', { base: BASE, fetchImpl: async () => reply('x'.repeat(2_000_001)) }),
+  await assert.rejects(() => fetchDocument('README.md', { admin: true, base: BASE, fetchImpl: async () => reply('x'.repeat(2_000_001)) }),
     error => error instanceof DocError && error.reason === 'size');
-  assert.equal((await fetchDocument('README.md', { base: BASE, fetchImpl: async () => reply('x'.repeat(2_000_000)) })).length, 2_000_000, 'la limite est de deux millions de caractères');
+  assert.equal((await fetchDocument('README.md', { admin: true, base: BASE, fetchImpl: async () => reply('x'.repeat(2_000_000)) })).length, 2_000_000, 'la limite est de deux millions de caractères');
 });
 
 test('fetchDocument abandonne au bout de vingt secondes', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const waiting = fetchDocument('README.md', {
+      admin: true,
       base: BASE,
       fetchImpl: (_url, { signal }) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new DOMException('abandon', 'AbortError'))))
     });

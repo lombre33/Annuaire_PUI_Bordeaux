@@ -91,12 +91,12 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 
 ### Lire la documentation
 
-Le bouton **Documentation** ouvre une fenêtre **dans l'annuaire** : on y lit les guides sans quitter la page et sans passer par GitHub.
+Le bouton **Documentation** ouvre une fenêtre **dans l'annuaire** : on y lit ce guide sans quitter la page et sans passer par GitHub.
 
-- **Passer d'un document à un autre.** La barre du haut propose la présentation, ce guide, l'installation de Grist, la sécurité, la maintenance, la documentation technique, les essais, le cahier des charges et l'historique des versions. Un lien d'un document vers un autre s'ouvre dans la même fenêtre ; **← Retour** revient au document d'avant, à l'endroit où vous l'aviez laissé.
-- **Les messages qui renvoient à l'installation de Grist sont des liens.** Quand l'annuaire dit « voir le guide d'installation Grist, étape 4 « Règles d'accès » », un clic ouvre la fenêtre à cette étape, par-dessus ce que vous faisiez. **Échap** ou **Fermer** la referme et vous rend votre fenêtre telle que vous l'aviez laissée : rien n'est perdu.
-- **Ouvrir sur GitHub** ouvre la page du dépôt dans un autre onglet. Elle sert surtout pour les schémas : la fenêtre en montre le texte source sous « Schéma », GitHub les dessine.
-- **Si la documentation ne s'affiche pas** (réseau coupé, documents absents du site qui publie le widget), la fenêtre le dit, propose **Réessayer** et la page de GitHub.
+- **Ce qu'on y trouve.** Ce guide, pour tout le monde. La présentation, l'installation de Grist, la sécurité, la maintenance, la documentation technique, les essais, le cahier des charges et l'historique des versions sont **réservés aux administrateurs** : une personne qui n'administre pas ne voit ni la barre des documents ni leurs liens, seulement ce guide.
+- **Passer d'un document à un autre** (administrateurs). Un lien d'un document vers un autre s'ouvre dans la même fenêtre ; **← Retour** revient au document d'avant, à l'endroit où vous l'aviez laissé.
+- **Les messages qui renvoient à l'installation de Grist** (« voir le guide d'installation Grist, étape 4 « Règles d'accès » ») sont des liens **pour un administrateur** : un clic ouvre la fenêtre à cette étape, par-dessus ce que vous faisiez ; **Échap** ou **Fermer** la referme et vous rend votre fenêtre telle que vous l'aviez laissée. Pour une autre personne, c'est une indication à transmettre à un administrateur : le message reste du texte.
+- **Si la documentation ne s'affiche pas** (réseau coupé, documents absents du site qui publie le widget), la fenêtre le dit et propose **Réessayer**. Un administrateur peut aussi ouvrir la page du dépôt sur GitHub : elle sert surtout pour les schémas, dont la fenêtre montre le texte source sous « Schéma » et que GitHub dessine.
 - **Ce que la fenêtre ne fait pas.** Elle n'affiche que les images du dépôt (les pastilles d'un site extérieur sont remplacées par leur texte), n'ouvre un lien vers un autre site que dans un nouvel onglet, et ne montre rien d'un document qui n'est pas dans sa liste.
 
 ### Se connecter quand on n'a pas de compte

@@ -107,7 +107,7 @@ Le widget est une page statique : pas de compilation, pas de dépendance npm à 
 
 ## Documentation
 
-Le bouton « Documentation » de l'en-tête du widget ouvre, dans une fenêtre du widget, ces documents (la page du dépôt sur GitHub reste proposée au bas de la fenêtre).
+Le bouton « Documentation » de l'en-tête du widget ouvre, dans une fenêtre du widget, ces documents : un administrateur les lit tous, toute autre personne le guide utilisateur seulement (1.45.3). La page du dépôt sur GitHub n'est proposée qu'à un administrateur, quand un document ne se charge pas.
 
 | Pour… | Lire |
 |---|---|
