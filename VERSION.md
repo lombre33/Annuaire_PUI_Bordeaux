@@ -1,4 +1,4 @@
-# Version 1.45.4 — Le guide utilisateur est plus digeste : phrases courtes et listes, captures et messages gardés (voir CHANGELOG.md)
+# Version 1.45.5 — Les questions fréquentes du guide décrivent le parcours de la 1.45 : demande de fiche, validation par un administrateur, annuaire fermé (voir CHANGELOG.md)
 
 Le widget lit la table `BDD` (1.8.0), range les compétences par domaine dans un seul
 menu « Compétences » (un filtre « Domaines » séparé en 1.9.0, intégré à ce menu en
