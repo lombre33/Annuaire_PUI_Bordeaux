@@ -39,7 +39,9 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
   - L'enregistrement est direct : aucun administrateur ne valide et l'annuaire ne tient aucun historique.
   - L'adresse e-mail de votre compte, l'établissement et le périmètre ne se changent pas sur sa propre fiche : adressez-vous à l'administrateur des données, c'est-à-dire la personne qui gère le contenu du document Grist.
   - Les administrateurs allument un **mode admin** pour modifier la fiche des autres, e-mail et établissement compris.
-- **Pas encore de fiche ? Créez-la.** Quand l'annuaire vous reconnaît mais qu'aucune fiche ne porte l'adresse de votre compte, le bandeau propose **Créer ma fiche** : vous remplissez la même fenêtre, vous choisissez votre établissement, vous relisez votre carte, et votre fiche apparaît tout de suite dans l'annuaire quand rien ne la masque ([Créer ma fiche](#créer-ma-fiche)).
+- **Pas encore de fiche ? Demandez-la.** L'annuaire n'est ouvert qu'aux personnes qui y figurent. Si l'adresse de votre compte est celle d'un établissement du PUI, un écran vous propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)).
+  - Vous remplissez la même fenêtre, vous choisissez votre établissement et vous relisez votre carte.
+  - Vous envoyez votre demande : un administrateur la valide, puis l'annuaire s'ouvre pour vous.
 - **Chaque établissement tient sa fiche.** Si vous êtes **responsable** de votre établissement (c'est l'administrateur des données qui nomme le premier), deux boutons apparaissent : **✎ Modifier** sous le logo de l'établissement sur ses cartes, et **Mon établissement** dans le bandeau.
   - Vous changez son logo, son nom complet, sa visibilité dans l'annuaire et la liste de ses responsables ([La fiche de mon établissement](#la-fiche-de-mon-établissement)).
   - Là aussi, l'enregistrement est direct.
@@ -79,7 +81,7 @@ L'annuaire rassemble les accompagnateurs de l'innovation du PUI de Bordeaux. Sa 
 | **Documentation** (sous le slogan, à gauche de l'en-tête) | Ouvre, dans une fenêtre du widget, la documentation de l'annuaire : ce guide, l'installation de Grist, la sécurité, la maintenance et la documentation technique ([Lire la documentation](#lire-la-documentation)). Le bouton est absent quand le widget n'a pas d'adresse à proposer |
 | **Se connecter** (à droite de « Documentation », seulement si Grist ne vous connaît pas) | Mène à la page de connexion de Grist, dans le même onglet ([Se connecter quand on n'a pas de compte](#se-connecter-quand-on-na-pas-de-compte)) |
 | **Financeurs** (au centre de l'en-tête) | La phrase de financement et les logos des financeurs ([Les logos](#les-logos-et-le-bandeau-du-bas)) |
-| **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)). Les responsables d'un établissement y trouvent aussi le bouton **Mon établissement** ([La fiche de mon établissement](#la-fiche-de-mon-établissement)), les administrateurs le bouton **Mode admin** ([Pour les administrateurs](#pour-les-administrateurs)). Si aucune fiche ne porte l'adresse de votre compte, il le dit, n'a ni interrupteur ni bouton « Modifier mon profil » et propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)) |
+| **Bandeau « Ma présence »** (à droite de l'en-tête, seulement si l'annuaire vous reconnaît) | Dit si vous apparaissez et vous laisse changer d'avis ([Ma présence](#ma-présence--apparaître-ou-non)). Son bouton **Modifier mon profil** ouvre le formulaire de votre fiche ([Modifier ma fiche](#modifier-ma-fiche)). Les responsables d'un établissement y trouvent aussi le bouton **Mon établissement** ([La fiche de mon établissement](#la-fiche-de-mon-établissement)), les administrateurs le bouton **Mode admin** ([Pour les administrateurs](#pour-les-administrateurs)). Un administrateur ou un responsable d'établissement dont l'adresse ne figure sur aucune fiche y lit que son compte est absent de l'annuaire, sans interrupteur, et y trouve **Créer ma fiche**. Toute autre personne sans fiche ne voit pas l'annuaire : un écran lui propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)) |
 | **Rechercher par nom ou prénom** | Cherche une personne par son nom ou son prénom |
 | **Actions, Communautés, GT, Compétences, Instances, Établissement, Rôle dans le PUI** | Sept filtres : chaque bouton ouvre un menu de valeurs à cocher. Le menu **Compétences** range ses valeurs par domaine, et le menu **Actions** par action. Le menu **Rôle dans le PUI** liste les rôles de la table `Role_Dans_le_PUI`, plus « Membre d'une action » et, quand le document Grist a la colonne `Taches_responsable`, « Responsable d'une action » |
 | **Fondateurs / Partenaires** | Choisit les établissements affichés, selon leur statut |
@@ -360,7 +362,8 @@ Il porte votre nom, une phrase qui dit où vous en êtes, un interrupteur et, qu
 
 - Si vous êtes administrateur, le bouton **Mode admin** s'y ajoute ([Pour les administrateurs](#pour-les-administrateurs)).
 - Si vous êtes responsable d'un établissement, le bouton **Mon établissement** s'y ajoute ([La fiche de mon établissement](#la-fiche-de-mon-établissement)).
-- Si aucune fiche ne porte l'adresse de votre compte, le bandeau n'a pas d'interrupteur et propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)).
+- Si vous êtes administrateur ou responsable et qu'aucune fiche ne porte l'adresse de votre compte, le bandeau n'a pas d'interrupteur et propose **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)).
+- Toute autre personne sans fiche ne voit pas l'annuaire, donc pas de bandeau : un écran remplace les cartes et lui dit où elle en est.
 
 ![L'en-tête de l'annuaire, avec à droite le bandeau « Ma présence » de Camille Rousseau : « Vous apparaissez dans l'annuaire. », interrupteur « Apparaître dans l'annuaire » activé et bouton « Modifier mon profil » ; à gauche le titre et le compteur à 14 contacts, au centre les financeurs](images/ma-presence.png)
 
@@ -384,7 +387,7 @@ Il porte votre nom, une phrase qui dit où vous en êtes, un interrupteur et, qu
 | « Vous avez accepté d'apparaître, mais votre fiche reste masquée : … » | Votre accord est donné, mais une autre condition manque. La raison suit les deux-points (voir plus bas) | Transmettez la raison à l'administrateur des données, la personne qui gère le contenu du document Grist : cela se corrige dans Grist |
 | « Vous n'avez accepté d'apparaître que sur une partie de vos fiches. » | Plusieurs fiches portent votre adresse, et seules certaines ont votre accord | Un clic sur l'interrupteur donne votre accord à toutes ; prévenez l'administrateur des données pour qu'il supprime les doublons |
 | « 2 fiches portent votre adresse : votre choix s'applique à toutes. » | Plusieurs fiches portent votre adresse (le chiffre varie). Votre choix, dans un sens comme dans l'autre, vaut pour chacune | Prévenez l'administrateur des données pour qu'il supprime les doublons |
-| « Connecté avec … : cette adresse ne figure pas dans l'annuaire, il n'y a donc pas de fiche à modifier. » (titre « Compte absent de l'annuaire ») | Aucune fiche ne porte l'adresse de votre compte Grist : le bandeau n'a ni interrupteur ni bouton « Modifier mon profil », mais un bouton **Créer ma fiche**. Un administrateur y lit « Administrateur » et garde son bouton **Mode admin** ; un responsable d'établissement garde son bouton **Mon établissement** | Si vous n'avez pas de fiche, **Créer ma fiche** en ouvre une ([Créer ma fiche](#créer-ma-fiche)). Si vous en avez une, prévenez l'administrateur des données : l'adresse de votre fiche n'est pas celle de votre compte |
+| « Connecté avec … : cette adresse ne figure pas dans l'annuaire, il n'y a donc pas de fiche à modifier. » (titre « Compte absent de l'annuaire ») | Aucune fiche ne porte l'adresse de votre compte Grist : le bandeau n'a ni interrupteur ni bouton « Modifier mon profil », mais un bouton **Créer ma fiche**. Seuls un administrateur et un responsable d'établissement le voient (une autre personne sans fiche ne voit pas l'annuaire) : un administrateur y lit « Administrateur » et garde son bouton **Mode admin** ; un responsable garde son bouton **Mon établissement** | Si vous n'avez pas de fiche, **Créer ma fiche** en ouvre une ([Créer ma fiche](#créer-ma-fiche)). Si vous en avez une, prévenez l'administrateur des données : l'adresse de votre fiche n'est pas celle de votre compte |
 | « Le widget ne peut pas retrouver votre fiche : la colonne « email » n'existe pas dans BDD. Contactez un administrateur. » (titre « Fiche introuvable ») | La table `BDD` du document n'a pas de colonne `email` : l'annuaire ne peut relier personne à sa fiche | Prévenez l'administrateur des données : c'est un réglage du document Grist |
 
 ![L'en-tête de Sarah Colin : son bandeau « Ma présence » dit « Vous avez accepté d'apparaître, mais votre fiche reste masquée : votre établissement n'a pas encore été validé. »](images/ma-presence-masquee.png)
@@ -428,9 +431,9 @@ Quand la colonne `Accepte_apparaitre` du document est une colonne à formule (un
 - votre compte ne peut que consulter le document (rôle Lecteur) ;
 - ou l'annuaire n'a pas encore été réglé pour cela.
 
-L'annuaire s'affiche alors comme d'habitude, sans bandeau ni bouton « Modifier mon profil » (voir la question **Pourquoi n'ai-je pas de bouton Modifier ?** des [Questions fréquentes](#questions-fréquentes)). Pour apparaître ou ne plus apparaître, ou pour corriger votre fiche, adressez-vous à l'administrateur des données.
+Depuis la 1.45.0, l'annuaire ne s'ouvre alors pas : un écran remplace les cartes et dit pourquoi ([Créer ma fiche](#créer-ma-fiche) les décrit tous), sans bandeau ni bouton « Modifier mon profil » (voir la question **Pourquoi n'ai-je pas de bouton Modifier ?** des [Questions fréquentes](#questions-fréquentes)). Pour apparaître ou ne plus apparaître, ou pour corriger votre fiche, adressez-vous à l'administrateur des données.
 
-**Un bandeau sans interrupteur ?** C'est le cas quand l'annuaire reconnaît votre compte mais qu'aucune fiche ne porte son adresse.
+**Un bandeau sans interrupteur ?** C'est le cas quand l'annuaire reconnaît votre compte mais qu'aucune fiche ne porte son adresse. Seuls un administrateur ou un responsable d'établissement le voient : une autre personne sans fiche ne voit pas l'annuaire ([Créer ma fiche](#créer-ma-fiche)).
 
 - Le bandeau s'intitule « Compte absent de l'annuaire » et dit « Connecté avec … : cette adresse ne figure pas dans l'annuaire, il n'y a donc pas de fiche à modifier. »
 - Il n'a ni interrupteur ni bouton « Modifier mon profil », mais un bouton **Créer ma fiche** : si vous n'avez pas de fiche, c'est par lui qu'on en crée une ([Créer ma fiche](#créer-ma-fiche)).
@@ -458,7 +461,7 @@ Mais rien n'est écrit avant une **relecture** : une fenêtre vous montre votre 
   - Si plusieurs fiches portent votre adresse, le bandeau ne le propose pas, car il ne saurait pas laquelle ouvrir : chaque carte garde alors son propre bouton.
 - **Pas de bouton ?** C'est normal dans deux cas :
   - l'annuaire ne peut pas vous reconnaître (vous n'êtes pas connecté à Grist, votre compte ne peut que consulter le document, l'annuaire n'a pas été réglé pour cela) ;
-  - l'adresse de votre compte ne figure sur aucune fiche : le bandeau propose alors **Créer ma fiche** (voir [Créer ma fiche](#créer-ma-fiche)).
+  - l'adresse de votre compte ne figure sur aucune fiche : un administrateur ou un responsable lit alors **Créer ma fiche** dans le bandeau, toute autre personne sur l'écran qui remplace l'annuaire (voir [Créer ma fiche](#créer-ma-fiche)).
 
   Voir la question **Pourquoi n'ai-je pas de bouton Modifier ?** des [Questions fréquentes](#questions-fréquentes).
 
@@ -1046,7 +1049,7 @@ Le bouton **✎ Modifier** d'une carte n'apparaît que sur les cartes que vous a
 
 Le bouton **✎ Modifier** sous le logo d'un établissement, lui, n'est proposé qu'aux responsables de cet établissement ([La fiche de mon établissement](#la-fiche-de-mon-établissement)).
 
-Vous n'avez aucun bouton quand l'annuaire ne peut pas vous reconnaître :
+Vous n'avez aucun bouton quand l'annuaire ne peut pas vous reconnaître (il ne s'ouvre alors pas non plus : un écran le dit) :
 
 - vous n'êtes pas connecté à Grist ;
 - votre compte ne peut que consulter le document (rôle Lecteur) ;
@@ -1054,7 +1057,7 @@ Vous n'avez aucun bouton quand l'annuaire ne peut pas vous reconnaître :
 
 Autres cas :
 
-- si l'adresse de votre compte ne figure sur aucune fiche, vous n'avez pas de bouton de fiche personnelle (un responsable garde ceux de son établissement) : le bandeau propose alors **Créer ma fiche** ([Créer ma fiche](#créer-ma-fiche)) ;
+- si l'adresse de votre compte ne figure sur aucune fiche, vous n'avez pas de fiche à modifier : une personne ordinaire ne voit même pas l'annuaire, et l'écran qui le remplace propose **Créer ma fiche** ; un administrateur ou un responsable (qui garde les boutons de son établissement) lit ce bouton dans le bandeau ([Créer ma fiche](#créer-ma-fiche)) ;
 - si plusieurs fiches portent votre adresse, le bandeau ne propose pas **Modifier mon profil**, mais chaque carte garde son bouton ;
 - si votre carte n'apparaît pas dans l'annuaire, le bouton du bandeau reste le seul moyen d'ouvrir votre fiche.
 
@@ -1062,9 +1065,25 @@ Voir [Où cliquer](#où-cliquer) et [Pas de bandeau ?](#ma-présence--apparaîtr
 
 **Je n'ai pas de fiche : puis-je en créer une ?**
 
-Oui, si l'annuaire vous reconnaît (vous êtes connecté à Grist avec une adresse qui ne figure sur aucune fiche) : le bandeau « Compte absent de l'annuaire » (ou « Administrateur ») propose **Créer ma fiche**.
+Oui, si vous êtes connecté(e) à Grist avec une adresse qui est celle d'un établissement du PUI (ce qui suit le @ est le domaine de cet établissement). Elle passe par une demande, qu'un administrateur valide ([Créer ma fiche](#créer-ma-fiche)).
 
-Vous choisissez votre établissement, vous remplissez le reste, vous relisez votre carte, puis vous cliquez sur **Publier ma fiche** : elle apparaît tout de suite dans l'annuaire, sauf si quelque chose la retient (l'établissement n'a pas validé sa présence, par exemple) ([Créer ma fiche](#créer-ma-fiche)).
+1. À l'ouverture, l'écran « Vous n’êtes pas encore dans l’annuaire » remplace les cartes. Il propose **Créer ma fiche**.
+2. Vous choisissez votre établissement, vous remplissez le reste et vous relisez votre carte.
+3. Vous cliquez sur **Envoyer ma demande**. L'écran « Votre demande est en attente » s'affiche d'ici là : votre fiche n'apparaît dans l'annuaire qu'une fois validée.
+4. Quand un administrateur l'a validée, rechargez la page : l'annuaire s'ouvre pour vous.
+
+Si l'adresse de votre compte n'est celle d'aucun établissement, l'écran « Annuaire réservé » ne propose pas de créer de fiche : contactez un administrateur de l'annuaire. Un administrateur, lui, crée sa fiche tout de suite, sans validation (bouton **Publier ma fiche**). Un responsable d'établissement qui n'a pas de fiche la demande comme tout le monde, depuis le bouton **Créer ma fiche** de son bandeau.
+
+**Pourquoi l'annuaire ne m'affiche-t-il aucune carte ?**
+
+Depuis la 1.45.0, l'annuaire n'est ouvert qu'aux personnes qui y figurent. À la place des cartes, un écran vous dit où vous en êtes :
+
+- « Vous n’êtes pas encore dans l’annuaire » : vous pouvez demander votre fiche (question précédente).
+- « Votre demande est en attente » : un administrateur doit encore la valider. Revenez plus tard et rechargez la page.
+- « Annuaire réservé » : l'adresse de votre compte n'est celle d'aucun établissement du PUI, ou vous n'êtes pas connecté(e) à Grist. Connectez-vous, sinon contactez un administrateur.
+- « Vérification impossible », « Compte non reconnu », « Compte en lecture seule » ou « Annuaire illisible » : un réglage empêche le widget de vérifier votre compte. Rechargez la page, sinon contactez un administrateur.
+
+Ces écrans sont décrits un à un dans [Créer ma fiche](#créer-ma-fiche).
 
 **Je suis responsable d'une action : comment le faire figurer sur ma carte ?**
 
@@ -1119,13 +1138,15 @@ D'un document Grist, qui sert de base de données à l'annuaire, logos et photos
 
 L'annuaire n'enregistre rien dans votre navigateur, hormis ce que celui-ci garde de lui-même des images affichées.
 
-Dans le document Grist, il n'écrit que dans cinq cas :
+Dans le document Grist, il n'écrit que dans six cas :
 
-1. **À l'ouverture** (et de nouveau après un changement de responsables), une ligne de service qui sert à vous reconnaître. Elle est ajoutée puis supprimée aussitôt, dans une table de service, `Annuaire_Sonde`, que l'annuaire crée lui-même, une seule fois, quand elle manque. Quand c'est un administrateur qui l'ouvre, la colonne `Taches_responsable` de `BDD`, qui porte vos responsabilités, est ajoutée de la même façon quand elle manque.
+1. **À l'ouverture** (et de nouveau après un changement de responsables), une ligne de service qui sert à vous reconnaître. Elle est ajoutée puis supprimée aussitôt, dans une table de service, `Annuaire_Sonde`, que l'annuaire crée lui-même, une seule fois, quand elle manque.
+   - Quand c'est un administrateur qui l'ouvre, les colonnes `Taches_responsable` de `BDD` (vos responsabilités) et `En_attente_validation` (les demandes de fiche) sont ajoutées de la même façon quand elles manquent.
 2. **Votre choix d'apparaître ou non**, quand vous cliquez sur l'interrupteur.
 3. **Une fiche**, quand vous cliquez sur « Valider » après une relecture : la vôtre, ou celle d'une autre personne si vous êtes administrateur et avez allumé le mode admin (avec, pour une nouvelle photo, un fichier envoyé à Grist, qui devient une pièce jointe du document).
-4. **Votre fiche, quand vous n'en avez pas** et que vous cliquez sur « Publier ma fiche » ou « Créer ma fiche » après une relecture (une ligne ajoutée à `BDD`).
+4. **Votre demande de fiche, quand vous n'en avez pas** et que vous cliquez sur « Envoyer ma demande » après une relecture (une ligne ajoutée à `BDD`, marquée « en attente » jusqu'à ce qu'un administrateur la valide). Un administrateur qui se crée sa fiche clique sur « Publier ma fiche » : la ligne est ajoutée sans attente.
 5. **La fiche de votre établissement**, si vous en êtes responsable et que vous cliquez sur « Enregistrer » (avec, pour un nouveau logo, un fichier envoyé à Grist, qui devient une pièce jointe du document).
+6. **Une demande de fiche**, si vous êtes administrateur, avez allumé le mode admin et cliquez sur « Valider » (la ligne perd son drapeau « en attente ») ou sur « Refuser » (la ligne est supprimée, après confirmation) : [Valider les demandes de fiche](#valider-les-demandes-de-fiche).
 
 **J'ai changé une information dans Grist et je ne la vois pas.**
 
@@ -1210,7 +1231,9 @@ Cette mise en page a été vérifiée dans Chromium (styles calculés en mode im
 
 L'annuaire n'affiche une personne que si elle a accepté d'apparaître, et si son établissement a validé son apparition et est fondateur ou partenaire.
 
-Cette règle ne concerne que l'affichage : les contacts masqués, y compris celles et ceux qui se sont retirés, restent lisibles dans le document Grist par toute personne qui y a accès. L'annuaire lui-même est visible par les personnes qui ont accès à la page Grist qui l'héberge ; les droits d'accès au document se gèrent dans Grist. Voir [sécurité et confidentialité](securite.md).
+Cette règle ne concerne que l'affichage : les contacts masqués, y compris celles et ceux qui se sont retirés, restent lisibles dans le document Grist par toute personne qui y a accès.
+
+Depuis la 1.45.0, l'annuaire n'est ouvert qu'aux personnes qui y figurent : une personne sans fiche validée ne voit aucune carte, même si elle ouvre la page Grist qui l'héberge (les administrateurs et les responsables d'établissement mis à part). C'est un contrôle de l'affichage : les droits d'accès au document se gèrent dans Grist. Voir [Créer ma fiche](#créer-ma-fiche) et [sécurité et confidentialité](securite.md).
 
 **Puis-je retirer mes coordonnées de l'annuaire ?**
 
@@ -1218,7 +1241,9 @@ Oui : désactivez l'interrupteur de [Ma présence](#ma-présence--apparaître-ou
 
 **Pourquoi n'ai-je pas de bandeau « Ma présence » ?**
 
-L'annuaire ne vous propose rien quand il ne peut pas vous reconnaître : compte qui ne peut que consulter (rôle Lecteur), ou réglage manquant dans Grist. Quand l'adresse de votre compte ne figure sur aucune fiche, un bandeau « Compte absent de l'annuaire » le dit, sans interrupteur, et propose **Créer ma fiche**. Voir [Ma présence](#ma-présence--apparaître-ou-non).
+L'annuaire ne vous propose rien quand il ne peut pas vous reconnaître : compte qui ne peut que consulter (rôle Lecteur), ou réglage manquant dans Grist. Il ne s'ouvre alors pas non plus : un écran remplace les cartes et le bandeau, comme pour toute personne qui n'a pas encore de fiche validée ([Créer ma fiche](#créer-ma-fiche)).
+
+Un administrateur ou un responsable d'établissement dont l'adresse ne figure sur aucune fiche, lui, voit l'annuaire et un bandeau « Compte absent de l'annuaire » (« Administrateur » pour un administrateur) : il n'a pas d'interrupteur et propose **Créer ma fiche**. Voir [Ma présence](#ma-présence--apparaître-ou-non).
 
 **L'annuaire utilise-t-il l'intelligence artificielle ?**
 

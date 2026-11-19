@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.45.5 — Le guide utilisateur décrit le parcours de la 1.45 : demande de fiche, validation par un administrateur, annuaire fermé
+
+Demande d'Antoine du 19 novembre 2026, relayée par le coordinateur : les questions fréquentes du guide parlaient encore de « Publier ma fiche » ; les mettre à jour avec le parcours de la 1.45.
+
+- **Ce qui change** (`docs/utilisateurs.md` seulement, aucun code). Les passages qui décrivaient l'annuaire d'avant la 1.45.0 sont corrigés :
+  - la question « Je n'ai pas de fiche : puis-je en créer une ? » (quatre étapes : l'écran « Vous n’êtes pas encore dans l’annuaire », **Créer ma fiche**, **Envoyer ma demande**, la validation d'un administrateur, puis le rechargement de la page) ; un administrateur, lui, publie sa fiche tout de suite ;
+  - une nouvelle question « Pourquoi l'annuaire ne m'affiche-t-il aucune carte ? » qui liste les écrans de l'annuaire fermé ;
+  - « Mes coordonnées sont-elles visibles par tout le monde ? » (l'annuaire n'est plus visible de toute personne qui ouvre la page Grist) ;
+  - « Pourquoi n'ai-je pas de bandeau « Ma présence » ? », « Pourquoi n'ai-je pas de bouton Modifier ? », « Pas de bandeau ? » et « Un bandeau sans interrupteur ? » (une personne sans fiche ne voit plus l'annuaire ; le bandeau « Compte absent de l'annuaire » n'est lu que par un administrateur ou un responsable d'établissement) ;
+  - la présentation du guide (« Pas encore de fiche ? Demandez-la »), le tableau « Où cliquer » et la liste de **Ma présence** ;
+  - « D'où viennent les informations ? » : l'annuaire écrit dans six cas (la demande de fiche, qui attend sa validation, et la validation ou le refus par un administrateur s'ajoutent), et crée aussi la colonne `En_attente_validation` quand elle manque.
+- **Ce qui ne change pas.** Les titres et leurs ancres, les captures, les messages cités (mot pour mot : `tests/docs.test.mjs` les compare au code).
+- **Ce que cette version ne garantit pas.** (1) Rien n'a été essayé dans le Grist d'Antoine : les textes sont relus d'après le code (`gate.js`, `presence.js`, `profile-review.js`, `main.js`). (2) `docs/securite.md`, document réservé aux administrateurs, garde dans un tableau (ligne « Écriture involontaire ou détournée dans le document ») une ancienne formulation des écritures (« cinq cas », « Publier ma fiche ») : non retouchée ici.
+- Fichiers : `constants.js` (`VERSION`), `docs/utilisateurs.md`, `CHANGELOG.md`, `VERSION.md`.
+
 ## 1.45.4 — Le guide utilisateur est plus digeste : paragraphes découpés en phrases courtes et en listes, captures et messages cités gardés
 
 Demande d'Antoine du 19 novembre 2026 : « peut-on faire un guide un peu plus digeste ? Il reste très chargé à lire pour un humain. On garde tout, les captures etc., c'est top, mais des fois les paragraphes sont super longs. »
