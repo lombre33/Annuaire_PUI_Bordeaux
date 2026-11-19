@@ -151,7 +151,7 @@ test('une personne connectée n\'a ni fenêtre ni bouton « Se connecter »', { 
 
 test('un compte Lecteur (cadre en lecture seule) n\'a pas non plus de fenêtre : Grist ne dit pas s\'il est connecté', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANONYMOUS_EMAIL, readOnly: true }, async ({ page }) => {
-    await waitForCards(page, 4);
+    await page.locator('#gatePanel[data-kind="readonly"]').waitFor(); // 1.45.2 : fermé, mais sans fenêtre de connexion
     await page.waitForTimeout(400);
     assert.equal(await isOpen(page), false);
     assert.equal(await page.locator('#loginLink').isHidden(), true);
@@ -159,7 +159,7 @@ test('un compte Lecteur (cadre en lecture seule) n\'a pas non plus de fenêtre :
 
 test('une identité introuvable pour une autre raison (sonde illisible) ne fait pas passer la personne pour un visiteur', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL, failTables: ['Annuaire_Sonde'] }, async ({ page }) => {
-    await waitForCards(page, 4);
+    await page.locator('#gatePanel[data-kind="unidentified"]').waitFor(); // 1.45.2 : fermé (« Compte non reconnu »), mais sans fenêtre de connexion
     await page.waitForTimeout(400);
     assert.equal(await isOpen(page), false);
     assert.equal(await page.locator('#loginLink').isHidden(), true);

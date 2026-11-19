@@ -173,7 +173,7 @@ test('la politique laisse le widget se charger dans un cadre sandbox sans allow-
     const origin = new URL(page.url()).origin;
     const outer = await context.newPage();
     await outer.addInitScript(values => Object.assign(window, values),
-      { __tables: sampleTables(), __failTables: [], __user: null, __denyWrites: [], __denyRows: {}, __delay: 0 });
+      { __tables: sampleTables(), __failTables: [], __user: { email: sampleTables().BDD.email.find(Boolean) }, __denyWrites: [], __denyRows: {}, __delay: 0 });
     await outer.setContent(`<iframe sandbox="allow-scripts allow-forms allow-popups" src="${origin}/index.html"></iframe>`);
     const frame = await (await outer.waitForSelector('iframe')).contentFrame();
     await waitForCards(frame, 4);

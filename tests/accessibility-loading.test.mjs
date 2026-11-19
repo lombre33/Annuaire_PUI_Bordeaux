@@ -44,21 +44,18 @@ test('le compteur de contacts est la seule zone vivante : la grille ne l\'est pl
 
 // ===== U28 : l'état de chargement =====
 
-test('tant que Grist n\'a pas répondu, la page dit « Chargement… » et rien d\'autre, même si l\'on tape ou si l\'on change de périmètre ; la frappe s\'applique à l\'arrivée de l\'annuaire (audit U28)', { skip }, () =>
+test('tant que Grist n\'a pas répondu, la page dit « Vérification… » (écran d\'attente, occupé) et rien d\'autre : ni recherche ni carte ; l\'annuaire s\'ouvre à l\'arrivée de la lecture (audit U28)', { skip }, () =>
   withWidget({ tables: sampleTables(), holdReads: true }, async ({ page }) => {
-    assert.deepEqual(await pageState(page), { counter: 'Chargement…', busy: 'true', cards: 0, emptyShown: false, bannerShown: false });
-
-    await page.getByRole('searchbox').fill('Ana');
-    await page.locator('.scope-btn', { hasText: 'Partenaires' }).click();
-    await page.waitForTimeout(SEARCH_DELAY_MS + 300);
-    assert.deepEqual(await pageState(page), { counter: 'Chargement…', busy: 'true', cards: 0, emptyShown: false, bannerShown: false },
-      'ni « 0 contact » ni « Aucun contact trouvé » : l\'annuaire n\'est pas vide, il n\'est pas arrivé');
+    assert.deepEqual(await pageState(page), { counter: 'Vérification…', busy: null, cards: 0, emptyShown: false, bannerShown: false });
+    // Fermé par défaut (1.45.2) : l'attente est l'écran « Vérification de votre accès », que le navigateur annonce occupé, et la recherche n'est pas proposée.
+    assert.deepEqual(await page.evaluate(() => ({ kind: document.getElementById('gatePanel').dataset.kind, busy: document.getElementById('gatePanel').getAttribute('aria-busy') })),
+      { kind: 'checking', busy: 'true' });
+    assert.equal(await page.getByRole('searchbox').count(), 0, 'la recherche n\'est pas proposée tant que l\'annuaire est fermé');
 
     await page.evaluate(() => window.__releaseReads());
-    await waitForCards(page, 1);
-    assert.deepEqual(await pageState(page), { counter: '1 sur 5 contacts', busy: null, cards: 1, emptyShown: false, bannerShown: false },
-      'la recherche tapée pendant l\'attente s\'applique à l\'arrivée, et le total est celui de l\'interrupteur Partenaires allumé pendant l\'attente (5 contacts)');
-    assert.equal(await page.getByRole('searchbox').inputValue(), 'Ana');
+    await waitForCards(page, 4);
+    assert.deepEqual(await pageState(page), { counter: '4 contacts', busy: null, cards: 4, emptyShown: false, bannerShown: false });
+    assert.equal(await page.getByRole('searchbox').count(), 1);
   }));
 
 test('si la première lecture de Grist échoue, la page le dit au lieu de rester en attente, et ne se fait pas passer pour un annuaire vide (audit U28)', { skip }, () =>
@@ -66,11 +63,9 @@ test('si la première lecture de Grist échoue, la page le dit au lieu de rester
     await waitForBanner(page);
     assert.deepEqual(await pageState(page), { counter: 'Chargement impossible', busy: null, cards: 0, emptyShown: false, bannerShown: true });
     assert.match(await bannerText(page), /Impossible de charger l'annuaire depuis Grist/);
-
-    await page.getByRole('searchbox').fill('Ana');
+    assert.equal(await page.getByRole('searchbox').count(), 0, 'pas de recherche à taper : « Aucun contact trouvé » ne paraît pas sous le message d\'erreur');
     await page.waitForTimeout(SEARCH_DELAY_MS + 300);
-    assert.deepEqual(await pageState(page), { counter: 'Chargement impossible', busy: null, cards: 0, emptyShown: false, bannerShown: true },
-      'une frappe ne fait pas apparaître « Aucun contact trouvé » sous le message d\'erreur');
+    assert.deepEqual(await pageState(page), { counter: 'Chargement impossible', busy: null, cards: 0, emptyShown: false, bannerShown: true });
   }));
 
 // ===== U29 : le script de l'API de Grist ne se charge pas =====

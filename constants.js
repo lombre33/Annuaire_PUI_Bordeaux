@@ -61,7 +61,7 @@ export const IMAGE_RULES = {
 // Le numéro de la version, dit dans la console avec les logos ([LOGOS], main.js) : GitHub Pages fait garder chaque fichier dix
 // minutes, un navigateur peut donc exécuter une version plus ancienne que celle qui vient d'être mise en ligne. Il suit le titre du
 // CHANGELOG (tests/docs.test.mjs le contrôle).
-export const VERSION = '1.45.1';
+export const VERSION = '1.45.2';
 
 // Taille des logos du bandeau des fondateurs (unités : millièmes de la largeur du bloc de
 // logos, 1 014 pour la largeur du bandeau fourni par le PUI) : surface visée et bornes en
@@ -111,6 +111,11 @@ export const LOGIN_RETURN_STYLE = 'singlePage';
 export const LOGIN_AUTO_OPEN = true;
 export const LOGIN_SERVICE = 'ProConnect';
 export const LOGIN_REFERENCE = 'Resana';
+
+// Combien de temps l'écran « Vérification de votre accès » attend l'identité (1.45.2, fermé par défaut), en millisecondes : la lecture de la sonde
+// (écriture, lecture, suppression de sa ligne) dure d'ordinaire une ou deux secondes. Au-delà, le widget prend la personne pour « non reconnue »
+// et l'écran le dit ; si l'identité arrive après, elle remplace l'écran.
+export const IDENTITY_WAIT_MS = 20000;
 
 // Taxonomie : une entrée par catégorie de filtre ou de tag de carte. Source
 // unique des menus, des tags et des tables de référence à lire.

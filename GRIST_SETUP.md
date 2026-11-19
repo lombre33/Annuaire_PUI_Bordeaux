@@ -527,6 +527,18 @@ règles ont été **essayées dans un Grist local (1.7.22), avec un compte par p
 **pas** dans le vrai document d'Antoine : saisissez-les d'abord sur une copie complète et passez le protocole de
 [`TESTING.md`](TESTING.md), section 31.
 
+**Depuis la 1.45.2 le widget ferme l'annuaire à un compte qu'il n'a pas reconnu** (identité illisible, cadre en lecture
+seule, `BDD` sans colonne `email`, annuaire refusé) : un écran dit pourquoi, la console aussi (ligne `[IDENTITE]`).
+Pour qu'un compte **connecté et hors annuaire** soit reconnu et ait « Créer ma fiche », ses droits doivent lui laisser :
+(1) ajouter, lire et supprimer sa ligne de `Annuaire_Sonde` ; (2) lire `Etablissements` en entier, **colonne des domaines
+comprise**, et les listes de référence (sinon « Annuaire illisible » ou « Vérification impossible ») ; (3) lire `BDD` sans
+erreur, au moins sans ligne, **colonne `email` comprise** ; (4) créer sa ligne de `BDD` (règle 3). La liste des tables
+(`_grist_Tables`) n'est plus indispensable à un non-propriétaire : le widget essaie la sonde directement. Un **visiteur
+sans compte** doit voir la page se charger : une règle de lecture de `BDD` qui commence par `user.IsLoggedIn and …` lui
+refuse la table en bloc et Grist n'affiche plus la page du widget (page blanche) ; garder pour `BDD` une règle de lecture
+qui porte sur la ligne (`rec.email == user.Email`, sans `user.IsLoggedIn and`) laisse le widget se charger, la sonde est
+alors refusée et la fenêtre « Se connecter à Grist » s'ouvre.
+
 **Ce que chaque profil peut faire.**
 
 | Profil | Lit | Écrit |

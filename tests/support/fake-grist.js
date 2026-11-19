@@ -20,6 +20,8 @@
 //
 //   tables      les tables du document { nom: { id: [...], colonne: [...] } }
 //   failTables  noms des tables dont la lecture échoue
+//   denyReads       noms des tables que Grist refuse de lire à ce compte (« Blocked by table read access rules », comme une règle d'accès)
+//   denyListTables  vrai : listTables() est refusée (la règle par défaut « tout refusé sauf au propriétaire » cache _grist_Tables)
 //   user        la personne connectée : { email } (null : compte anonyme)
 //   denyWrites  noms des tables où toute écriture est refusée
 //   denyRows    lignes protégées { table: [identifiants] } : toute modification ou
@@ -162,12 +164,14 @@ export function createFakeGrist(options = {}) {
     async fetchTable(name) {
       await read(options.readGate);
       if ((read(options.failTables) || []).includes(name)) throw new Error(`Grist indisponible : ${name}`);
+      if ((read(options.denyReads) || []).includes(name)) throw new Error('[Sandbox] Blocked by table read access rules');
       return structuredClone(requireTable(read(options.tables), name));
     },
 
     // Comme Grist : les tables de métadonnées (_grist_Tables…) se lisent avec
     // fetchTable mais ne sont pas des tables de l'utilisateur.
     async listTables() {
+      if (read(options.denyListTables) === true) throw new Error('Blocked by table read access rules');
       return Object.keys(read(options.tables)).filter(name => !name.startsWith('_grist_'));
     },
 

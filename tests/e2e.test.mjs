@@ -1001,9 +1001,10 @@ test('Grist refuse de créer la table-sonde : personne n\'est identifié, pas de
     assert.deepEqual(await Promise.all(logs.errors), []);
   }));
 
-test('compte Lecteur (?readonly=true) : pas de bandeau et aucune tentative d\'écriture', { skip }, () =>
+test('compte Lecteur (?readonly=true) : l\'annuaire reste fermé (1.45.2), pas de bandeau et aucune tentative d\'écriture', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL, readOnly: true }, async ({ page }) => {
-    await waitForCards(page, 4);
+    await page.locator('#gatePanel[data-kind="readonly"]').waitFor();
+    assert.equal(await page.locator('.contact-card').count(), 0);
     assert.equal(await accountBar(page).isHidden(), true);
     assert.deepEqual(await grist(page), [], 'un Lecteur ne peut rien écrire : le widget n\'essaie pas');
   }));
@@ -1290,10 +1291,11 @@ test('le nom d\'une personne s\'affiche en texte brut dans le bandeau (aucune in
     assert.equal(await page.evaluate(() => window.__xss), undefined);
   }));
 
-test('une panne de la table-sonde n\'empêche jamais l\'annuaire de s\'afficher', { skip }, () =>
+test('une panne de la table-sonde ne casse rien mais ferme l\'annuaire (1.45.2) : « Compte non reconnu », sans bandeau d\'erreur', { skip }, () =>
   withWidget({ tables: withIdentity(), user: ANA_EMAIL, failTables: ['Annuaire_Sonde'] }, async ({ page, logs }) => {
-    await waitForCards(page, 4);
+    await page.locator('#gatePanel[data-kind="unidentified"]').waitFor();
     await probeRemoved(page);
+    assert.equal(await page.locator('.contact-card').count(), 0);
     assert.equal(await accountBar(page).isHidden(), true);
     assert.equal(await page.locator('#statusBanner').isHidden(), true, 'pas de bandeau d\'erreur pour une identité introuvable');
     assert.deepEqual(await Promise.all(logs.errors), []);

@@ -296,7 +296,14 @@ test('le bandeau « Ma présence » de 320 à 840 px : le texte garde 200 px au 
     } },
     // Depuis la 1.45.0, un compte sans fiche qui n'administre pas ne voit pas l'annuaire : son « Créer ma fiche » est celui de l'écran réservé (tests/e2e-validation.test.mjs).
     // Sans colonne « email » dans BDD, la fiche ne pourrait pas être reliée à la personne : aucun bouton, le bloc vide ne prend aucune place.
-    { label: 'BDD sans colonne email', user: unbreakableAddress, ready: '.account-name', buttons: 0, patch: tables => { delete tables.BDD.email; } },
+    // (Depuis la 1.45.2 un compte ordinaire sans colonne « email » lit l'écran « Vérification impossible » : seul un administrateur voit alors l'annuaire.)
+    { label: 'BDD sans colonne email', user: unbreakableAddress, ready: '.account-name', buttons: 1, patch: tables => {
+      delete tables.BDD.email;
+      tables.ACL.id.push(4);
+      tables.ACL.email.push(unbreakableAddress);
+      tables.ACL.Responsable_de_l_Etablissement.push(0);
+      tables.ACL.admin.push(true);
+    } },
     // Administrateur sans fiche : ni interrupteur ni « Modifier mon profil », mais « Créer ma fiche » et « Mode admin ».
     { label: 'administrateur sans fiche', user: ADMIN_EMAIL, ready: '.account-admin', buttons: 2, patch: () => {} },
     // Responsable du CHU, sans fiche ni droit d'administrateur (une ligne de plus dans ACL) : « Créer ma fiche » et « Mon établissement ».
@@ -450,11 +457,11 @@ const settled = {
 };
 
 // `closed` : depuis la 1.45.0 l'annuaire n'est pas montré à cette personne (une adresse inconnue, ou une sonde que les règles d'accès bloquent, que le
-// widget prend pour un visiteur sans compte) : l'écran réservé remplace les cartes.
+// widget prend pour un visiteur sans compte) et, depuis la 1.45.2, ni à un visiteur sans compte ni à un compte Lecteur : l'écran réservé remplace les cartes.
 for (const [who, options, wait, closed] of [
-  ['un compte anonyme', { tables: withIdentity(), user: null }, settled.probeRemoved, false],
+  ['un compte anonyme', { tables: withIdentity(), user: null }, settled.probeRemoved, true],
   ['une adresse que ni BDD ni ACL ne connaissent', { tables: withIdentity(), user: 'inconnu@example.example' }, settled.probeRemoved, true],
-  ['un compte Lecteur', { tables: withIdentity(), user: ANA_EMAIL, readOnly: true }, settled.immediately, false],
+  ['un compte Lecteur', { tables: withIdentity(), user: ANA_EMAIL, readOnly: true }, settled.immediately, true],
   ['un document sans table-sonde que Grist refuse de créer', { tables: sampleTables(), user: ANA_EMAIL, denyWrites: ['Annuaire_Sonde'] }, settled.warned, true]
 ]) {
   test(`${who} : aucun bouton « Modifier », nulle part`, { skip }, () =>
