@@ -30,11 +30,14 @@ export function button(label, className, onClick) {
   return node;
 }
 
-// La fenêtre « Documentation » : main.js dit comment l'ouvrir (`opener({ page, anchor })`) quand elle existe. Tant qu'il n'y en a pas, un
-// message qui cite la documentation n'en fait pas un lien.
+// La fenêtre « Documentation » : main.js dit comment l'ouvrir (`opener({ page, anchor })`) quand elle existe, et `canOpen(page)` si la
+// personne connectée peut y lire ce document (1.45.3 : le guide d'installation n'est lu que par un administrateur). Tant qu'il n'y a
+// pas de fenêtre, ou quand elle ne montre pas le document à cette personne, un message qui le cite n'en fait pas un lien : il reste du texte.
 let docOpener = null;
-export function setDocOpener(opener) {
+let docCanOpen = () => true;
+export function setDocOpener(opener, canOpen = () => true) {
   docOpener = opener;
+  docCanOpen = canOpen;
 }
 
 // Un passage de la documentation (DOC_REFS) en lien : le clic ouvre la fenêtre « Documentation » à la bonne section, sans quitter la page.
@@ -56,7 +59,7 @@ export function messageNodes(text) {
   const nodes = [];
   let rest = text;
   while (rest) {
-    const found = Object.values(DOC_REFS).map(ref => ({ ref, at: rest.indexOf(ref.text) })).filter(hit => hit.at !== -1).sort((a, b) => a.at - b.at)[0];
+    const found = Object.values(DOC_REFS).filter(ref => docCanOpen(ref.page)).map(ref => ({ ref, at: rest.indexOf(ref.text) })).filter(hit => hit.at !== -1).sort((a, b) => a.at - b.at)[0];
     if (!found) {
       nodes.push(document.createTextNode(rest));
       break;

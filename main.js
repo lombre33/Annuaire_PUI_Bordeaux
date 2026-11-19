@@ -50,17 +50,19 @@ const versionNote = document.getElementById('versionNote');
 if (versionNote) versionNote.textContent = `Version ${VERSION}`;
 
 // Le bouton « Documentation » de l'en-tête (DOCS_URL, constants.js) : caché dans index.html, il n'apparaît qu'avec son adresse, et ouvre la
-// fenêtre qui lit les documents du dépôt (docs-ui.js) ; DOCS_URL est la page de GitHub qu'elle propose à côté. Sans adresse il n'y a
-// pas de bouton ; avec un index.html ancien (cache de GitHub Pages) qui n'a pas la fenêtre, c'est le lien d'avant, vers DOCS_URL. Les messages
-// du widget qui citent la documentation (doc-refs.js) en font un lien qui ouvre la même fenêtre à la bonne section (dom.js, setDocOpener).
+// fenêtre qui lit les documents du dépôt (docs-ui.js) ; DOCS_URL est la page de GitHub qu'elle propose à un administrateur quand un document
+// ne se lit pas. Sans adresse il n'y a pas de bouton ; avec un index.html ancien (cache de GitHub Pages) qui n'a pas la fenêtre, c'est le
+// lien d'avant, vers DOCS_URL. Les messages du widget qui citent la documentation (doc-refs.js) en font un lien qui ouvre la même fenêtre
+// à la bonne section (dom.js, setDocOpener), pour un document que la personne peut lire. Un administrateur lit tous les documents, toute
+// autre personne le guide utilisateur seulement (1.45.3) : `isAdmin` est lu à chaque ouverture, l'identité arrivant après le widget.
 const docLink = document.getElementById('docLink');
 const docDialog = document.getElementById('docDialog');
 if (docLink && DOCS_URL) {
   docLink.hidden = false;
   if (docDialog) {
-    const docs = createDocViewer(docDialog, { externalUrl: DOCS_URL });
+    const docs = createDocViewer(docDialog, { externalUrl: DOCS_URL, isAdmin: () => isAdmin() });
     docLink.addEventListener('click', () => docs.open());
-    setDocOpener(target => docs.open(target));
+    setDocOpener(target => docs.open(target), page => docs.canOpen(page));
   } else {
     docLink.href = DOCS_URL;
   }

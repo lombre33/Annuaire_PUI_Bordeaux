@@ -1,6 +1,8 @@
 // La fenêtre « Documentation » (docs-ui.js, markdown-dom.js) dans Chromium, sur le vrai index.html et les vrais documents du dépôt :
 // elle s'ouvre sur la présentation, montre chaque document sans en perdre un titre, suit les liens d'un document à l'autre, dit sa
 // panne et la page de GitHub à la place, et ne laisse rien de ce qu'un document pourrait contenir s'exécuter, se charger ou se saisir.
+// Ces essais sont ceux d'un administrateur, qui lit tous les documents ; ce que voit toute autre personne (le guide utilisateur seulement,
+// 1.45.3) est dans tests/docs-roles.test.mjs.
 // Optionnel (voir TESTING.md) : sans Playwright, ces tests sont ignorés.
 
 import { test } from 'node:test';
@@ -11,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { DOCS_URL } from '../constants.js';
 import { DOC_PAGES } from '../docs-source.js';
 import { parseMarkdown } from '../markdown.js';
-import { sampleTables } from './fixtures.mjs';
+import { ADMIN_EMAIL, sampleTables, withIdentity } from './fixtures.mjs';
 import { focusReturnsTo, skip, until, waitForCards, withWidget } from './support/browser.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -19,8 +21,15 @@ const source = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const MARKDOWN = { contentType: 'text/markdown; charset=utf-8' };
 const DIALOG = '#docDialog';
 
+// Un administrateur : l'identité (ACL) le dit, et son bouton « Mode admin » apparaît quand elle est lue (la fenêtre lit le rôle à l'ouverture).
+const asAdmin = (extra = {}) => ({ tables: withIdentity(), user: ADMIN_EMAIL, ...extra });
+async function adminReady(target) {
+  await waitForCards(target, 4);
+  await target.locator('#accountBar .account-admin').waitFor();
+}
+
 async function openDocs(page) {
-  await waitForCards(page, 4);
+  await adminReady(page);
   await page.locator('#docLink').click();
   await page.locator(`${DIALOG} .md`).waitFor();
 }
@@ -32,9 +41,9 @@ const showsDocument = (page, label) => page.waitForFunction(
 );
 const body = page => page.locator(`${DIALOG} .doc-body`);
 
-test('le bouton « Documentation » ouvre la fenêtre sur la présentation, sans changer d\'onglet ni de page', { skip: skip || !DOCS_URL }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page, context }) => {
-    await waitForCards(page, 4);
+test('le bouton « Documentation » ouvre la fenêtre d\'un administrateur sur la présentation, sans changer d\'onglet ni de page', { skip: skip || !DOCS_URL }, () =>
+  withWidget(asAdmin(), async ({ page, context }) => {
+    await adminReady(page);
     const popups = [];
     context.on('page', popup => popups.push(popup));
     assert.equal(await page.locator(DIALOG).evaluate(dialog => dialog.open), false, 'fermée au départ');
@@ -54,14 +63,12 @@ test('le bouton « Documentation » ouvre la fenêtre sur la présentation, sans
     assert.equal(await page.locator(`${DIALOG} .dlg-foot button`, { hasText: 'Retour' }).isVisible(), false, 'rien où retourner');
     assert.equal(popups.length, 0, 'aucun nouvel onglet');
     assert.equal(page.url().includes('github.com'), false);
-    const github = page.locator(`${DIALOG} .dlg-foot a`);
-    assert.equal(await github.getAttribute('href'), DOCS_URL, 'la page de GitHub reste proposée, à côté');
-    assert.equal(await github.getAttribute('target'), '_blank');
-    assert.equal(await github.getAttribute('rel'), 'noopener noreferrer');
+    assert.equal(await page.locator(`${DIALOG} .dlg-foot a`).count(), 0, 'plus de « Ouvrir sur GitHub » en bas de la fenêtre (1.45.3)');
+    assert.deepEqual(await page.locator(`${DIALOG} .dlg-foot button`).allTextContents(), ['← Retour', 'Fermer']);
   }));
 
 test('chaque document s\'ouvre dans la fenêtre : tous ses titres, rien d\'exécutable, rien qui déborde', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page, logs }) => {
+  withWidget(asAdmin(), async ({ page, logs }) => {
     await openDocs(page);
     for (const { path: file, label } of DOC_PAGES) {
       await tab(page, label).click();
@@ -92,7 +99,7 @@ test('chaque document s\'ouvre dans la fenêtre : tous ses titres, rien d\'exéc
   }));
 
 test('la barre change de document, « Retour » revient au précédent, au même endroit', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     await openDocs(page);
     await body(page).evaluate(element => { element.scrollTop = 600; });
     const before = await body(page).evaluate(element => element.scrollTop);
@@ -112,7 +119,7 @@ test('la barre change de document, « Retour » revient au précédent, au même
   }));
 
 test('un lien d\'un document ouvre l\'autre dans la fenêtre, à son titre, et « Retour » ramène à la page de départ', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     await openDocs(page);
     const link = page.locator(`${DIALOG} a.md-doc-link[data-doc="docs/utilisateurs.md"][data-anchor="lire-une-carte"]`).first();
     await link.scrollIntoViewIfNeeded();
@@ -131,7 +138,7 @@ test('un lien d\'un document ouvre l\'autre dans la fenêtre, à son titre, et �
   }));
 
 test('un lien vers un titre du même document fait défiler jusqu\'à lui, et « Retour » revient où l\'on lisait', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     await openDocs(page);
     await tab(page, 'Guide utilisateur').click();
     await showsDocument(page, 'Guide utilisateur');
@@ -147,7 +154,7 @@ test('un lien vers un titre du même document fait défiler jusqu\'à lui, et «
   }));
 
 test('les liens vers un autre site s\'ouvrent dans un autre onglet sans transmettre la page ; les autres adresses ne sont pas des liens', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     await openDocs(page);
     const external = await page.locator(`${DIALOG} a.md-ext`).evaluateAll(links => links.map(link => ({ href: link.href, target: link.target, rel: link.rel, hidden: link.querySelector('.sr-only')?.textContent })));
     assert.ok(external.length >= 1, 'la présentation renvoie à une page web');
@@ -162,7 +169,7 @@ test('les liens vers un autre site s\'ouvrent dans un autre onglet sans transmet
   }));
 
 test('les images sont celles du dépôt ; une image d\'un autre site n\'est pas chargée : on lit son texte', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     const hosts = new Set();
     page.on('request', request => hosts.add(new URL(request.url()).hostname));
     await openDocs(page);
@@ -176,7 +183,7 @@ test('les images sont celles du dépôt ; une image d\'un autre site n\'est pas 
   }));
 
 test('un document hostile ne s\'exécute pas, ne charge rien et ne perturbe pas le widget', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page, context, logs }) => {
+  withWidget(asAdmin(), async ({ page, context, logs }) => {
     const requested = [];
     page.on('request', request => requested.push(request.url()));
     await context.route('**/README.md', route => route.fulfill({
@@ -228,10 +235,10 @@ test('un document hostile ne s\'exécute pas, ne charge rien et ne perturbe pas 
     assert.deepEqual(logs.pageErrors, []);
   }));
 
-test('un document qui manque : le message dit pourquoi, la page de GitHub est proposée, les autres documents s\'ouvrent toujours', { skip: skip || !DOCS_URL }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page, context }) => {
+test('un document qui manque : le message dit pourquoi, la page de GitHub est proposée à l\'administrateur, les autres documents s\'ouvrent toujours', { skip: skip || !DOCS_URL }, () =>
+  withWidget(asAdmin(), async ({ page, context }) => {
     await context.route('**/README.md', route => route.fulfill({ status: 404, body: 'Not found' }));
-    await waitForCards(page, 4);
+    await adminReady(page);
     await page.locator('#docLink').click();
     const failure = page.locator(`${DIALOG} .doc-fail`);
     await failure.waitFor();
@@ -245,10 +252,10 @@ test('un document qui manque : le message dit pourquoi, la page de GitHub est pr
   }));
 
 test('une coupure du réseau : « Réessayer » relit le document', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page, context }) => {
+  withWidget(asAdmin(), async ({ page, context }) => {
     let reachable = false;
     await context.route('**/README.md', route => (reachable ? route.fulfill({ ...MARKDOWN, body: '# Revenu\n\ntexte' }) : route.abort()));
-    await waitForCards(page, 4);
+    await adminReady(page);
     await page.locator('#docLink').click();
     await page.locator(`${DIALOG} .doc-fail`).waitFor();
     assert.match(await page.locator(`${DIALOG} .notice-ko`).textContent(), /connexion est interrompue ou trop lente/);
@@ -259,7 +266,7 @@ test('une coupure du réseau : « Réessayer » relit le document', { skip }, ()
   }));
 
 test('un document lent : l\'attente est dite, et la réponse qui arrive après un autre choix est ignorée', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page, context }) => {
+  withWidget(asAdmin(), async ({ page, context }) => {
     let release;
     const gate = new Promise(resolve => { release = resolve; });
     await context.route('**/docs/securite.md', async route => {
@@ -279,7 +286,7 @@ test('un document lent : l\'attente est dite, et la réponse qui arrive après u
   }));
 
 test('Échap ferme la fenêtre et rend le focus au bouton ; elle se rouvre sur la présentation, sans rien de l\'ouverture précédente', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     await openDocs(page);
     await tab(page, 'Sécurité').click();
     await showsDocument(page, 'Sécurité');
@@ -298,7 +305,7 @@ test('Échap ferme la fenêtre et rend le focus au bouton ; elle se rouvre sur l
   }));
 
 test('au clavier : Entrée sur un document de la barre l\'ouvre, le focus y reste ; les tableaux et les codes qui défilent se parcourent au clavier', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     await openDocs(page);
     await tab(page, 'Développeurs').focus();
     await page.keyboard.press('Enter');
@@ -313,7 +320,7 @@ test('au clavier : Entrée sur un document de la barre l\'ouvre, le focus y rest
   }));
 
 test('le schéma Mermaid se lit par sa source, repliée, sans rien charger pour le dessiner', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     await openDocs(page);
     await tab(page, 'Développeurs').click();
     await showsDocument(page, 'Développeurs');
@@ -324,7 +331,7 @@ test('le schéma Mermaid se lit par sa source, repliée, sans rien charger pour 
   }));
 
 test('le plus long document s\'affiche vite et sans une page de milliers d\'éléments', { skip }, () =>
-  withWidget({ tables: sampleTables() }, async ({ page }) => {
+  withWidget(asAdmin(), async ({ page }) => {
     await openDocs(page);
     const started = Date.now();
     await tab(page, 'Historique').click();
@@ -340,10 +347,10 @@ test('dans le cadre sandbox de Grist, sans allow-same-origin (origine opaque), l
     const origin = new URL(page.url()).origin;
     const outer = await context.newPage();
     await outer.addInitScript(values => Object.assign(window, values),
-      { __tables: sampleTables(), __failTables: [], __user: { email: sampleTables().BDD.email.find(Boolean) }, __denyWrites: [], __denyRows: {}, __delay: 0 });
+      { __tables: withIdentity(), __failTables: [], __user: { email: ADMIN_EMAIL }, __denyWrites: [], __denyRows: {}, __delay: 0 });
     await outer.setContent(`<iframe sandbox="allow-scripts allow-forms allow-popups" src="${origin}/index.html"></iframe>`);
     const frame = await (await outer.waitForSelector('iframe')).contentFrame();
-    await waitForCards(frame, 4);
+    await adminReady(frame);
     assert.equal(await frame.evaluate(() => window.origin), 'null', 'le cadre est bien sandboxé : son origine est opaque');
     await frame.locator('#docLink').click();
     await frame.locator(`${DIALOG} .md-h1`, { hasText: 'Annuaire PUI Bordeaux' }).waitFor();
@@ -353,7 +360,7 @@ test('dans le cadre sandbox de Grist, sans allow-same-origin (origine opaque), l
   }));
 
 test('sur un téléphone, la fenêtre prend tout l\'écran, la barre des documents défile, le pied reste visible', { skip }, () =>
-  withWidget({ tables: sampleTables(), contextOptions: { viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: true } }, async ({ page }) => {
+  withWidget(asAdmin({ contextOptions: { viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: true } }), async ({ page }) => {
     await openDocs(page);
     const box = await page.locator(DIALOG).boundingBox();
     assert.deepEqual([Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)], [0, 0, 360, 640]);

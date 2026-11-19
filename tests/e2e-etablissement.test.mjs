@@ -352,6 +352,19 @@ test('sans fenêtre « Documentation » (adresse DOCS_URL vide), le message nomm
     assert.equal(await notice.locator('a').count(), 0, 'rien à ouvrir : du texte');
   }));
 
+test('une personne qui n’administre pas lit le message sans lien : le guide d’installation n’est lu que par un administrateur (1.45.3)', { skip }, () =>
+  withWidget({ tables: world(memberAna), user: ANA_EMAIL }, async ({ page }) => {
+    await waitForCards(page, 4);
+    await shortcut(page).waitFor();
+    assert.equal(await page.locator('#accountBar .account-admin').isVisible(), false, 'Ana n\'administre pas');
+    await page.evaluate(() => { window.__failTables = ['ACL']; });
+    await shortcut(page).click();
+    await nameInput(page).waitFor();
+    const notice = dlg(page).locator('.es-sec .notice');
+    assert.match(await notice.textContent(), /guide d’installation Grist, étape 4 « Règles d’accès »/, 'le message nomme toujours le guide');
+    assert.equal(await notice.locator('a').count(), 0, 'sans lien : la fenêtre ne le montrerait pas à cette personne');
+  }));
+
 test('une fiche qui ne peut pas être lue dans Grist s’annonce par une phrase, avec de quoi fermer la fenêtre', { skip }, () =>
   withWidget({ tables: world(), user: ANA_EMAIL }, async ({ page }) => {
     await waitForCards(page, 4);

@@ -331,12 +331,13 @@ dit que « rien » ne donne pas d'onglet. Ces tests échouent sur le comportemen
 `tests/support/menu-checks.mjs`. **Règle : les données d'un test viennent du vrai document, jamais de noms imaginés, et un test de menu
 regarde ce que le menu affiche.**
 
-La fenêtre « Documentation » (1.43.0) a cinq fichiers de tests : `tests/markdown.test.mjs` (25 tests, sans navigateur : le lecteur Markdown,
+La fenêtre « Documentation » (1.43.0) a six fichiers de tests : `tests/markdown.test.mjs` (25 tests, sans navigateur : le lecteur Markdown,
 ses balises admises et refusées, des documents hostiles et démesurés, chaque document du dépôt lu sans balise perdue),
-`tests/docs-source.test.mjs` (11 tests, sans navigateur : la liste des documents, les adresses, la lecture et ses refus),
-`tests/docs-viewer.test.mjs` (17 scénarios dans Chromium : chaque document s'ouvre, la barre, « Retour », les liens et les images, un
+`tests/docs-source.test.mjs` (13 tests, sans navigateur : la liste des documents, les adresses, la lecture et ses refus, et depuis la 1.45.3 qui lit quoi),
+`tests/docs-viewer.test.mjs` (17 scénarios dans Chromium, en administrateur : chaque document s'ouvre, la barre, « Retour », les liens et les images, un
 document hostile, un document qui manque, la coupure et « Réessayer », une réponse tardive, Échap et le focus, le clavier, le schéma
 Mermaid, la durée d'affichage du plus long document, le cadre sandbox de Grist sans `allow-same-origin`, le téléphone),
+`tests/docs-roles.test.mjs` (4 scénarios dans Chromium, 1.45.3 : un membre, un visiteur sans compte et un document en lecture seule ne lisent que le guide utilisateur, sans barre ni lien vers GitHub, et la page ne demande aucun autre document),
 `tests/doc-link.test.mjs` (le bouton de l'en-tête et sa fenêtre dans `index.html`) et `tests/doc-refs.test.mjs` (3 tests : les messages qui
 citent le guide d'installation nomment une étape qui existe encore, et aucun message montré à une personne ne nomme un fichier).
 `tests/e2e-etablissement.test.mjs` essaie le lien d'un message (la liste des responsables illisible) dans une vraie fenêtre : un clic
@@ -2037,27 +2038,33 @@ Grist : les tests automatiques simulent `applyUserActions`.**
 À jouer dans le **vrai Grist** (le widget publié, pas le serveur de démonstration), console ouverte (F12). **Ce protocole est le seul
 contrôle de la fenêtre dans le cadre réel de Grist : les tests automatiques simulent ce cadre (sans `allow-same-origin`) mais pas Grist.**
 
-- [ ] **Le bouton.** « Documentation » est sous le slogan, à gauche de l'en-tête. Un clic ouvre une fenêtre **dans le widget**, sur la
-      présentation (README), sans nouvel onglet. Aucune erreur rouge dans la console, aucune ligne « Refused to … Content Security Policy ».
-- [ ] **Chaque document.** Parcourir la barre : Présentation, Guide utilisateur, Installation, Sécurité, Maintenance, Développeurs, Essais,
+- [ ] **Le bouton.** « Documentation » est sous le slogan, à gauche de l'en-tête. Un clic ouvre une fenêtre **dans le widget**, sans nouvel onglet : sur la
+      présentation (README) pour un **administrateur**, sur le guide utilisateur pour toute autre personne (voir « Qui lit quoi » plus bas). Aucune erreur rouge dans la console, aucune ligne « Refused to … Content Security Policy ».
+- [ ] **Chaque document** (compte administrateur). Parcourir la barre : Présentation, Guide utilisateur, Installation, Sécurité, Maintenance, Développeurs, Essais,
       Cahier des charges, Historique. Chacun s'affiche (titres, tableaux qui défilent sans faire déborder la fenêtre, code, listes).
       Si l'un dit « Ce document n'est pas disponible dans cette fenêtre », le site qui publie le widget ne publie pas ce fichier Markdown
       (les documents doivent être servis avec le widget, par exemple par GitHub Pages sur la branche entière).
 - [ ] **Les liens.** Un lien d'un document vers un autre s'ouvre dans la même fenêtre, à son titre ; « ← Retour » ramène à l'endroit où on
-      lisait. Un lien vers un site extérieur s'ouvre dans un nouvel onglet. « Ouvrir sur GitHub » ouvre la page du dépôt.
+      lisait. Un lien vers un site extérieur s'ouvre dans un nouvel onglet. Il n'y a **plus de bouton « Ouvrir sur GitHub »** au bas de la fenêtre (1.45.3).
 - [ ] **Les messages qui citent le guide.** Réglage d'un compte responsable dont la liste des responsables est illisible (règle d'accès
       d'`ACL`) : dans la fenêtre « Fiche de l'établissement », le message cite le « guide d’installation Grist, étape 4 « Règles d’accès » » ;
       un clic sur ce passage ouvre la documentation à l'étape 4 **par-dessus la fiche**. Échap la referme et laisse la fiche telle qu'elle
       était (rien de saisi n'est perdu).
 - [ ] **Les images.** Les captures du guide utilisateur s'affichent ; les pastilles d'un site extérieur (README) sont remplacées par leur texte.
 - [ ] **Sans réseau.** Couper le réseau puis rouvrir un document jamais lu : « Le document n'a pas pu être chargé… », un bouton
-      « Réessayer » et « Ouvrir la documentation sur GitHub ». Rétablir le réseau, « Réessayer » : le document s'affiche.
+      « Réessayer » et, pour un administrateur seulement, « Ouvrir la documentation sur GitHub ». Rétablir le réseau, « Réessayer » : le document s'affiche.
 - [ ] **Au clavier et au lecteur d'écran.** Tabulation parcourt la barre des documents, les liens et le pied ; Entrée sur un document de la
       barre l'ouvre sans quitter la barre ; Échap ferme la fenêtre et le focus revient au bouton « Documentation ». Le titre de la fenêtre et
       le document affiché sont annoncés.
 - [ ] **Sur un téléphone.** La fenêtre prend tout l'écran, la barre des documents défile, le pied reste visible.
 - [ ] **Après un déménagement du dépôt** (migration vers le GitHub de production) : les documents se lisent toujours dans la fenêtre, à
-      l'adresse du nouveau site, et « Ouvrir sur GitHub » mène au nouveau dépôt (`DOCS_URL`, `constants.js`).
+      l'adresse du nouveau site, et « Ouvrir la documentation sur GitHub » (celle de l'écran d'échec, vue par un administrateur) mène au nouveau dépôt (`DOCS_URL`, `constants.js`).
+- [ ] **Qui lit quoi (1.45.3).** Avec un compte **administrateur** (ligne d'`ACL` avec `admin` coché) : les neuf documents sont dans la barre.
+      Avec un compte **qui n'administre pas** (un membre, un responsable d'établissement) : « Documentation » ouvre le **guide utilisateur** seul,
+      sans barre de documents, et aucun lien du guide ne mène à un autre document. Dans un message qui cite le guide d'installation (liste des
+      responsables illisible, par exemple), le passage « guide d’installation Grist, étape 4… » est du texte, pas un lien. Le bouton « Ouvrir
+      sur GitHub » n'apparaît nulle part. **Ce n'est qu'un choix d'affichage** : le fichier d'un autre document reste lisible à son adresse
+      (voir `docs/securite.md`).
 
 ## 30. La fenêtre de connexion d'un visiteur sans compte (1.44.0, refaite à l'identique de celle de l'agenda partagé en 1.45.1)
 
