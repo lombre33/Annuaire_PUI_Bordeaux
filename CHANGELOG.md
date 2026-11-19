@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.45.4 — Le guide utilisateur est plus digeste : paragraphes découpés en phrases courtes et en listes, captures et messages cités gardés
+
+Demande d'Antoine du 19 novembre 2026 : « peut-on faire un guide un peu plus digeste ? Il reste très chargé à lire pour un humain. On garde tout, les captures etc., c'est top, mais des fois les paragraphes sont super longs. »
+
+- **Ce qui change** (`docs/utilisateurs.md` seulement, aucun code). Les 71 paragraphes et éléments de liste de plus de 450 caractères sont découpés : une idée par paragraphe, des phrases courtes, des listes là où le texte énumérait des cas. Le plus long, la réponse « L'annuaire est-il accessible ? » (3 100 caractères d'un seul bloc), est rangée sous quatre repères (au clavier, les filtres, ce que lit un lecteur d'écran, lisibilité) ; « Envoyer la demande », « Quand un logo manque », « Les administrateurs peuvent-ils modifier ma fiche ? » et les autres suivent le même principe. Hors tableaux, plus aucun paragraphe ne dépasse 470 caractères (il y en avait de 1 000 à 3 100).
+- **Ce qui ne change pas.** Les 29 captures, tous les titres et leurs ancres (le sommaire et les liens internes marchent comme avant), tous les messages cités entre guillemets, mot pour mot (les tests de `tests/docs.test.mjs` les comparent au code), les tableaux, et le fond : aucune information retirée ni ajoutée.
+- **« Pages liées » remplacé.** La ligne qui listait le README, la sécurité, la maintenance et la documentation développeur (documents que seul un administrateur ouvre depuis la 1.45.3) dit maintenant qu'ils sont réservés aux administrateurs et qu'il faut s'adresser à l'un d'eux quand le guide y renvoie.
+- **Ce que cette version ne garantit pas.** (1) Le guide garde ses tableaux et une quinzaine de paragraphes de 400 à 470 caractères : ils sont lisibles, mais un second passage resterait possible si Antoine le souhaite. (2) Plusieurs passages décrivent encore ce que fait l'annuaire avant la 1.45.0 (par exemple « Publier ma fiche » dans les questions fréquentes) : le fond n'a volontairement pas été retouché ici.
+- Fichiers : `constants.js` (`VERSION`), `docs/utilisateurs.md`, `CHANGELOG.md`, `VERSION.md`.
+
 ## 1.45.3 — La fenêtre « Documentation » : un administrateur lit tous les documents, les autres le guide utilisateur seulement ; plus de bouton « Ouvrir sur GitHub » en bas
 
 Demande d'Antoine du 19 novembre 2026 : « onglet documentation possible de ne garder que pour les admins les éléments installation, sécurité et tout le reste ? Les users ne voient que [le] guide utilisateur ? » (précisé : la présentation aussi est réservée aux administrateurs), et « retirer le bouton ouvrir sur GitHub en bas ».
